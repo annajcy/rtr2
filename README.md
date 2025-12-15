@@ -1,6 +1,6 @@
-# lightmap_compression
+# RTR2 - Real-Time Renderer
 
-TGAC task2: lightmap_compression
+Compared to RTR, RTR2 focuses on modern rendering API support (Vulkan) and modern Shading Language (Slang). It also explores intergrating Machine Learning techniques into real-time rendering.
 
 # How to build
 
