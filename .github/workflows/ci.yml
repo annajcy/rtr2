@@ -73,7 +73,7 @@ jobs:
               libxcb-xinerama0-dev libxcb-dri3-dev libxcb-dri2-0-dev libxcb-present-dev
               libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev
               uuid-dev libgl1-mesa-dev libglvnd-dev libwayland-dev libxkbcommon-dev
-              libxcursor-dev libxinerama-dev libxcb-cursor-dev
+              libxcursor-dev libxinerama-dev libxcb-cursor-dev libxcb-util-dev libxcb-util0-dev
             )
             sudo apt-get install -y --no-install-recommends "${pkgs[@]}"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
@@ -136,6 +136,7 @@ jobs:
           build_type="${{ matrix.build_type }}"
           preset="conan-$(echo "$build_type" | tr '[:upper:]' '[:lower:]')"
           source "build/${build_type}/generators/conanbuild.sh"
+          source "build/${build_type}/generators/conanrun.sh"
           cmake --list-presets
           cmake --preset "$preset"
           cmake --build --preset "$preset"
@@ -148,6 +149,7 @@ jobs:
           set BUILD_TYPE=${{ matrix.build_type }}
           if /I "%BUILD_TYPE%"=="Debug" (set PRESET=conan-debug) else (set PRESET=conan-release)
           call "build\%BUILD_TYPE%\generators\conanbuild.bat"
+          call "build\%BUILD_TYPE%\generators\conanrun.bat"
           cmake --list-presets
           cmake --preset %PRESET%
           cmake --build --preset %PRESET%
