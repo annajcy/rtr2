@@ -136,7 +136,9 @@ jobs:
           build_type="${{ matrix.build_type }}"
           preset="conan-$(echo "$build_type" | tr '[:upper:]' '[:lower:]')"
           source "build/${build_type}/generators/conanbuild.sh"
+          set +u
           source "build/${build_type}/generators/conanrun.sh"
+          set -u
           cmake --list-presets
           cmake --preset "$preset"
           cmake --build --preset "$preset"
