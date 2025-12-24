@@ -222,6 +222,57 @@ public:
     }
 };
 
+namespace detail {
+    template<typename T>
+    struct FeatureChecker {
+        static bool check(const T& required, const T& supported) {
+            struct Header {
+                vk::StructureType sType;
+                void* pNext;
+            };
+            constexpr size_t offset = sizeof(Header);
+            
+            const uint8_t* req_ptr = reinterpret_cast<const uint8_t*>(&required);
+            const uint8_t* sup_ptr = reinterpret_cast<const uint8_t*>(&supported);
+            
+            const VkBool32* req_bools = reinterpret_cast<const VkBool32*>(req_ptr + offset);
+            const VkBool32* sup_bools = reinterpret_cast<const VkBool32*>(sup_ptr + offset);
+            
+            size_t num_bools = (sizeof(T) - offset) / sizeof(VkBool32);
+            
+            for (size_t i = 0; i < num_bools; ++i) {
+                if (req_bools[i] && !sup_bools[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    };
+
+    template<>
+    struct FeatureChecker<vk::PhysicalDeviceFeatures> {
+        static bool check(const vk::PhysicalDeviceFeatures& required, const vk::PhysicalDeviceFeatures& supported) {
+            const VkBool32* req_bools = reinterpret_cast<const VkBool32*>(&required);
+            const VkBool32* sup_bools = reinterpret_cast<const VkBool32*>(&supported);
+            size_t num_bools = sizeof(vk::PhysicalDeviceFeatures) / sizeof(VkBool32);
+            
+            for (size_t i = 0; i < num_bools; ++i) {
+                if (req_bools[i] && !sup_bools[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    };
+
+    template<>
+    struct FeatureChecker<vk::PhysicalDeviceFeatures2> {
+        static bool check(const vk::PhysicalDeviceFeatures2& required, const vk::PhysicalDeviceFeatures2& supported) {
+            return FeatureChecker<vk::PhysicalDeviceFeatures>::check(required.features, supported.features);
+        }
+    };
+}
+
 // New StructureChain-based feature rule
 template<typename... Features>
 class VKPhysicalDevicePickerFeatureRule : public VKPhysicalDevicePickerRuleBase {
@@ -241,6 +292,17 @@ public:
         std::remove_cvref_t<Func>, 
         VKPhysicalDevicePickerFeatureRule>
     ) : m_checker(std::forward<Func>(checker)) {}
+
+    VKPhysicalDevicePickerFeatureRule(
+        const vk::StructureChain<Features...>& feature_chain
+    ) {
+        m_checker = [feature_chain](const vk::StructureChain<Features...>& device_feature_chain) {
+            return (detail::FeatureChecker<Features>::check(
+                feature_chain.template get<Features>(), 
+                device_feature_chain.template get<Features>()
+            ) && ...);
+        };
+    }
 
     bool check(const vk::raii::PhysicalDevice& device) const override {
         // Query the device features using the StructureChain types

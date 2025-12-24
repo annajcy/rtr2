@@ -16,15 +16,16 @@
 #include <vector>
 #include <chrono>
 
-#include "vk_memory_buffer.hpp"
-#include "vk_window.hpp"
-#include "vk_instance.hpp"
-#include "vk_surface.hpp"
-#include "vk_physical_device_picker.hpp"
-#include "vk_device.hpp"
-#include "vk_swapchain.hpp"
+#include "vk/vk_memory_buffer.hpp"
+#include "vk/vk_surface.hpp"
+#include "vk/vk_physical_device_picker.hpp"
+#include "vk/vk_device.hpp"
+#include "vk/vk_swapchain.hpp"
 
-#include "utils.hpp"
+#include "utils/file_loder.hpp"
+
+#include "window.hpp"
+#include "context.hpp"
 
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_enums.hpp"
@@ -36,7 +37,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-namespace rtr {
+namespace rtr::core {
 
 constexpr uint32_t WIDTH = 800;
 constexpr uint32_t HEIGHT = 600;
@@ -45,7 +46,7 @@ constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
 //const std::string shader_output_dir = "C:\\Users\\annaj\\Desktop\\codebase\\lightmap_compression\\build\\Debug\\shaders\\compiled\\";
 //const std::string shader_output_dir = "/home/annaj/codebase/lightmap_compression/build/Debug/shaders/compiled/";
-const std::string shader_output_dir = "/Users/jinceyang/Desktop/codebase/lightmap_compression/build/Debug/shaders/compiled/";
+const std::string shader_output_dir = "/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/";
 const std::string vertex_shader_filename = "vert_buffer_vert.spv";
 const std::string fragment_shader_filename = "vert_buffer_frag.spv";
 
@@ -110,14 +111,11 @@ const std::vector<Vertex> vertices = {
 
 const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 
-class VKApplication {
+class Application {
 private:
-    std::unique_ptr<rtr::VKWindow> m_window{};
+    std::unique_ptr<Window> m_window{};
+    std::unique_ptr<Context> m_context{};
 
-    vk::raii::Context m_context{};
-    vk::raii::Instance m_instance{nullptr};
-    vk::raii::DebugUtilsMessengerEXT m_debug_messenger{nullptr};
-    vk::raii::SurfaceKHR m_surface{nullptr};
     vk::raii::PhysicalDevice m_physical_device{nullptr};
     vk::raii::Device m_device{nullptr};
     vk::raii::Queue m_queue{nullptr};
@@ -154,8 +152,6 @@ private:
     uint32_t m_current_frame = 0;
     int m_queue_family_index{-1};
 
-    std::vector<std::string> m_required_layers{};
-
     std::vector<std::string> m_required_device_extensions = {
         vk::KHRSwapchainExtensionName,
         vk::KHRSpirv14ExtensionName,
@@ -167,16 +163,6 @@ private:
         "VK_KHR_dynamic_rendering"
 #endif
     };
-
-    std::vector<std::string> m_required_instance_extensions{
-#if defined(__APPLE__)
-        vk::KHRPortabilityEnumerationExtensionName,
-#endif
-#if !defined(NDEBUG)
-        vk::EXTDebugUtilsExtensionName,
-#endif
-        "VK_EXT_surface_maintenance1",
-        "VK_KHR_get_surface_capabilities2"};
 
     rtr::VKPhysicalDevicePickerApiVersionRule m_api_version_rule{
 #if defined(__APPLE__)
@@ -203,6 +189,7 @@ private:
         vk::PhysicalDeviceVulkan11Features,
         vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT
     >m_feature_rule{[](const auto &feature_chain) {
+            
             const auto &dynamic_rendering_features = feature_chain.template get<vk::PhysicalDeviceDynamicRenderingFeatures>();
             if (!dynamic_rendering_features.dynamicRendering) {
                 std::cout << "PhysicalDeviceDynamicRenderingFeatures.dynamicRendering not supported" << std::endl;
@@ -335,10 +322,20 @@ private:
 #endif
 
 public:
-    VKApplication() {
-        create_window();
-        create_vulkan_instance();
-        create_surface();
+    Application() {
+        m_window = std::make_unique<Window>(
+            WIDTH,
+            HEIGHT,
+            "RTR Application"
+        );
+
+        m_context = std::make_unique<Context>(
+            m_window.get(),
+#if !defined(NDEBUG)
+            true
+#endif
+        );
+
         pick_physical_device();
         create_device();
         create_queue();
@@ -357,12 +354,12 @@ public:
 
     void run() { loop(); }
 
-    ~VKApplication() = default;
+    ~Application() = default;
 
 private:
     void loop() {
-        while (!m_window->is_should_close()) {
-            m_window->poll_events();
+        while (!m_context->window().is_should_close()) {
+            m_context->window().poll_events();
             draw_frame();
         }
         
@@ -647,66 +644,16 @@ private:
         m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    void create_window() {
-        m_window = std::make_unique<rtr::VKWindow>(
-            WIDTH,
-            HEIGHT,
-            "RTR Vulkan App");
-        m_window->set_user_pointer(this);
-        m_window->set_framebuffer_size_callback(framebuffer_resize_callback);
-
-        auto window_extensions = m_window->required_extensions();
-        m_required_instance_extensions.insert(m_required_instance_extensions.end(), window_extensions.begin(), window_extensions.end());
-    }
-
-    void create_vulkan_instance() {
-        vk::ApplicationInfo app_info{};
-        app_info.pApplicationName = "RTR Vulkan App";
-        app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-        app_info.pEngineName = "RTR";
-        app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        app_info.apiVersion = vk::ApiVersion14;
-
-#if !defined(NDEBUG)
-        m_required_layers.push_back("VK_LAYER_KHRONOS_validation");
-#endif
-
-        auto instance_result = rtr::make_instance(
-            m_required_layers,
-            m_required_instance_extensions,
-            app_info);
-
-        if (!instance_result.has_value()) {
-            throw std::runtime_error("Failed to create Vulkan instance.");
-        }
-
-        auto instance_handles = std::move(instance_result.value());
-        m_context = std::move(instance_handles.first);
-        m_instance = std::move(instance_handles.second);
-
-#if !defined(NDEBUG)
-        if (auto messenger = rtr::create_debug_messenger(m_instance)) {
-            m_debug_messenger = std::move(messenger.value());
-        }
-#endif
-    }
-
-    void create_surface() {
-        if (auto surface_handle = m_window->create_vk_surface(m_instance)) {
-            m_surface = vk::raii::SurfaceKHR{m_instance, surface_handle.value()};
-        } else {
-            throw std::runtime_error("Failed to create Vulkan surface.");
-        }
-    }
-
     void pick_physical_device() {
-        rtr::VKPhysicalDevicePickerQueuePresentChecker queue_present_checker{m_surface};
+        rtr::VKPhysicalDevicePickerQueuePresentChecker queue_present_checker{
+            m_context->surface()
+        };
 
         rtr::VKPhysicalDevicePickerQueueRule queue_rule{
             m_queue_family_index,
             {std::cref(m_queue_bits_checker), std::cref(queue_present_checker)}};
 
-        auto physical_devices = m_instance.enumeratePhysicalDevices();
+        auto physical_devices = m_context->instance().enumeratePhysicalDevices();
         if (auto _physical_device = rtr::pick_physical_device(
                 physical_devices,
                 m_api_version_rule,
@@ -741,7 +688,7 @@ private:
     }
 
     void create_swapchain() {
-        auto surface_formats = m_physical_device.getSurfaceFormatsKHR(*m_surface);
+        auto surface_formats = m_physical_device.getSurfaceFormatsKHR(*m_context->surface());
         auto surface_format = rtr::select_surface_format(
             surface_formats,
             [](vk::SurfaceFormatKHR format) {
@@ -750,12 +697,12 @@ private:
             });
 
         auto present_mode = rtr::select_present_mode(
-            m_physical_device.getSurfacePresentModesKHR(*m_surface),
+            m_physical_device.getSurfacePresentModesKHR(*m_context->surface()),
             vk::PresentModeKHR::eMailbox);
 
-        auto [extent_x, extent_y] = m_window->framebuffer_size();
+        auto [extent_x, extent_y] = m_context->window().framebuffer_size();
 
-        auto capabilities = m_physical_device.getSurfaceCapabilitiesKHR(*m_surface);
+        auto capabilities = m_physical_device.getSurfaceCapabilitiesKHR(*m_context->surface());
         auto [extent, image_count] = rtr::select_swapchain_image_property(
             capabilities,
             static_cast<uint32_t>(extent_x),
@@ -766,7 +713,7 @@ private:
                   << extent.width << ", " << extent.height << ")." << std::endl;
 
         vk::SwapchainCreateInfoKHR swapchain_create_info{};
-        swapchain_create_info.surface = *m_surface;
+        swapchain_create_info.surface = *m_context->surface();
         swapchain_create_info.minImageCount = image_count;
         swapchain_create_info.imageFormat = surface_format.format;
         swapchain_create_info.imageColorSpace = surface_format.colorSpace;
@@ -801,10 +748,10 @@ private:
     }
 
     void recreate_swapchain() {
-        auto [width, height] = m_window->framebuffer_size();
+        auto [width, height] = m_context->window().framebuffer_size();
         while (width == 0 || height == 0) {
-            m_window->wait_events();
-            std::tie(width, height) = m_window->framebuffer_size();
+            m_context->window().wait_events();
+            std::tie(width, height) = m_context->window().framebuffer_size();
         }
 
         m_device.waitIdle();
@@ -1219,7 +1166,7 @@ private:
     }
 
     static void framebuffer_resize_callback(GLFWwindow *window, int width, int height) {
-        auto app = reinterpret_cast<VKApplication *>(glfwGetWindowUserPointer(window));
+        auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
         if (!app) {
             return;
         }

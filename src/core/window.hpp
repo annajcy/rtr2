@@ -12,9 +12,9 @@
 
 #include "vulkan/vulkan_raii.hpp"
 
-namespace rtr {
+namespace rtr::core {
     
-class VKWindow {
+class Window {
 private:
     int m_width{800};
     int m_height{600};
@@ -22,7 +22,7 @@ private:
     GLFWwindow* m_window{ nullptr };
 
 public:
-    VKWindow(int width, int height, const std::string& title) : m_width(width), m_height(height), m_title(title) {
+    Window(int width, int height, const std::string& title) : m_width(width), m_height(height), m_title(title) {
         if (!glfwInit()) {
             throw std::runtime_error("Failed to initialize GLFW");
         }
@@ -37,7 +37,7 @@ public:
         );
     }
 
-    ~VKWindow() {
+    ~Window() {
         if (m_window) {
             glfwDestroyWindow(m_window);
         }
@@ -46,6 +46,10 @@ public:
 
     GLFWwindow* window() const {
         return m_window;
+    }
+
+    std::string title() const {
+        return m_title;
     }
 
     std::pair<int, int> framebuffer_size() const {

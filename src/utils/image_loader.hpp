@@ -7,8 +7,8 @@
 #include <tuple>
 #include <utility>
 
-namespace rtr {
-
+namespace rtr::utils {
+    
 class Image{
 private:
     int m_width;

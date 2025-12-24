@@ -60,6 +60,7 @@ conan install . -pr=profiles/rtr2 -pr=rtr2-local -s build_type=Debug --build=mis
 
 Configure and build with CMake presets:
 ```bash
+cmake --list-presets
 cmake --preset conan-debug
 cmake --build --preset conan-debug
 ```

@@ -1,14 +1,16 @@
 #include <iostream>
 #include <cstdlib>
 
-#include "vk_application.hpp"
-#include "image_loader.hpp"
+#include "core/application.hpp"
+#include "core/context.hpp"
+#include "utils/image_loader.hpp"
+
 
 int main() {
     
-    rtr::VKApplication app{};
+    rtr::core::Application app{};
 
-    rtr::Image image{"assets/textures/test.png"};
+    rtr::utils::Image image{"assets/textures/test.png"};
     std::cout << 
         "Loaded image with dimensions: " << image.width() << "x" << image.height() << 
         " channels: " << image.channels() << 
