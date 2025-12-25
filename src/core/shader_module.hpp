@@ -16,7 +16,7 @@ private:
     std::string m_entry_point = "main";
 
 public:
-    // 从文件创建
+    // 从 SPIR-V 文件创建
     static ShaderModule from_file(
         Device* device,
         const std::string& filepath,

@@ -11,16 +11,16 @@
 #include <vector>
 #include <chrono>
 
-#include "utils/file_loder.hpp"
-
 #include "window.hpp"
 #include "context.hpp"
 #include "device.hpp"
 #include "swap_chain.hpp"
 #include "buffer.hpp"
-#include "command_pool.hpp"
+#include "command.hpp"
 #include "descriptor.hpp"
 #include "shader_module.hpp"
+#include "frame_context.hpp"
+#include "renderer.hpp"
 
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_enums.hpp"
@@ -111,10 +111,9 @@ private:
     std::unique_ptr<Window> m_window{};
     std::unique_ptr<Context> m_context{};
     std::unique_ptr<Device> m_device{};
-    std::unique_ptr<SwapChain> m_swapchain{};
-
-    std::unique_ptr<CommandPool> m_command_pool{nullptr};
-    std::vector<vk::raii::CommandBuffer> m_command_buffers{};
+    
+    // Renderer now manages swapchain, command pool, and sync objects
+    std::unique_ptr<Renderer> m_renderer{};
 
     std::unique_ptr<Buffer> m_vertex_buffer{nullptr};
     std::unique_ptr<Buffer> m_index_buffer{nullptr};
@@ -126,24 +125,21 @@ private:
     vk::raii::Pipeline m_pipeline{nullptr};
 
     std::vector<std::unique_ptr<Buffer>> m_uniform_buffers{};
-    std::unique_ptr<DescriptorSetLayout> m_descriptor_set_layout{nullptr};
-    std::unique_ptr<DescriptorPool> m_descriptor_pool{nullptr};
-    std::vector<vk::raii::DescriptorSet> m_descriptor_sets{};
-
-    std::vector<FrameSynchronizationObjects> m_frame_sync_objects{};
-
-    bool m_framebuffer_resized = false;
-    uint32_t m_current_frame = 0;
+    std::unique_ptr<DescriptorSystem> m_descriptor_system{nullptr};
 
 
 public:
     Application() {
         m_window = std::make_unique<Window>(WIDTH, HEIGHT, "RTR Application");
-        m_window->set_framebuffer_size_callback(framebuffer_resize_callback);
 
         m_context = std::make_unique<Context>(m_window.get());
         m_device = std::make_unique<Device>(m_context.get());
-        m_swapchain = std::make_unique<SwapChain>(m_device.get());
+        
+        // Create renderer (manages swapchain, command buffers, sync)
+        m_renderer = std::make_unique<Renderer>(m_device.get(), m_window.get(), MAX_FRAMES_IN_FLIGHT);
+        
+        // Set window resize callback
+        m_window->set_framebuffer_size_callback(framebuffer_resize_callback);
 
         // set shader modules
         m_vertex_shader_module = std::make_unique<ShaderModule>(
@@ -162,15 +158,11 @@ public:
             )
         );
 
-         // Create vertex and index buffers
-        vk::DeviceSize vertex_buffer_size = sizeof(vertices[0]) * vertices.size();
-        vk::DeviceSize index_buffer_size = sizeof(indices[0]) * indices.size();
-
         m_vertex_buffer = std::make_unique<Buffer>(
             Buffer::create_device_local_with_data(
                 m_device.get(),
                 vertices.data(),
-                vertex_buffer_size,
+                sizeof(vertices[0]) * vertices.size(),
                 vk::BufferUsageFlagBits::eVertexBuffer
             )
         );
@@ -179,7 +171,7 @@ public:
             Buffer::create_device_local_with_data(
                 m_device.get(),
                 indices.data(),
-                index_buffer_size,
+                 sizeof(indices[0]) * indices.size(),
                 vk::BufferUsageFlagBits::eIndexBuffer
             )
         );
@@ -199,41 +191,41 @@ public:
             uniform_buffer->map();
             m_uniform_buffers.emplace_back(std::move(uniform_buffer));
         }
-        // Create descriptor set layout
-        m_descriptor_set_layout = std::make_unique<DescriptorSetLayout>(
-            DescriptorSetLayout::Builder()
-                .add_binding(0, vk::DescriptorType::eUniformBuffer, 
-                           vk::ShaderStageFlagBits::eVertex)
-                .build(m_device.get())
-        );
-        // Create descriptor pool 
-        m_descriptor_pool = std::make_unique<DescriptorPool>(
-            DescriptorPool::Builder()
-                .add_layout(*m_descriptor_set_layout, MAX_FRAMES_IN_FLIGHT)
-                .set_flags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-                .build(m_device.get())
-        );
-        // Allocate and update descriptor sets
-        m_descriptor_sets = m_descriptor_pool->allocate_multiple(
-            *m_descriptor_set_layout, 
-            MAX_FRAMES_IN_FLIGHT
+        // Create descriptor system
+        m_descriptor_system = std::make_unique<DescriptorSystem>(
+            DescriptorSystem::Builder(m_device.get())
+                .add_set("per_frame", 0, MAX_FRAMES_IN_FLIGHT, 
+                    [](DescriptorSetLayout::Builder& builder) {
+                        builder.add_binding(0, vk::DescriptorType::eUniformBuffer, 
+                                          vk::ShaderStageFlagBits::eVertex);
+                    })
+                .build()
         );
 
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            DescriptorWriter()
-                .write_buffer(
+        // Update descriptor sets
+        m_descriptor_system->update_all_sets("per_frame", 
+            [this](DescriptorWriter& writer, uint32_t index) {
+                writer.write_buffer(
                     0, 
-                    *m_uniform_buffers[i]->buffer(), 
+                    *m_uniform_buffers[index]->buffer(), 
                     0, 
                     sizeof(UniformBufferObject)
-                )
-                .update(m_device.get(), *m_descriptor_sets[i]);
-        }
+                );
+            });
+        
+        // Test descriptor to_string methods
+        std::cout << "\n========== Descriptor System Info ==========\n";
+        std::cout << to_string(*m_descriptor_system) << std::endl;
+        
+        // Test DescriptorSetLayout to_string
+        std::cout << "========== Per-Frame Layout Info ==========\n";
+        std::cout << to_string(m_descriptor_system->get_layout("per_frame")) << std::endl;
+
+        // Test DescriptorPool to_string
+        std::cout << "========== Descriptor Pool Info ==========\n";
+        std::cout << to_string(m_descriptor_system->pool()) << std::endl;
+        
         create_pipeline();
-       
-        m_command_pool = std::make_unique<CommandPool>(m_device.get(), vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
-        m_command_buffers = m_command_pool->allocate_command_buffers(MAX_FRAMES_IN_FLIGHT);
-        create_sync_objects();
     }
 
     void run() { loop(); }
@@ -244,11 +236,36 @@ private:
     void loop() {
         while (!m_window->is_should_close()) {
             m_window->poll_events();
-            draw_frame();
+            
+            // Use new Renderer API
+            m_renderer->draw_frame([this](FrameContext& ctx) {
+                this->render_frame(ctx);
+            });
         }
         
         m_device->device().waitIdle();
+    }
+    
+    void render_frame(FrameContext& frame_ctx) {
+        // Update uniform buffer for current frame
+        uint32_t frame_index = m_renderer->current_frame_index();
+        update_uniform_buffer(m_uniform_buffers[frame_index]->mapped_data());
         
+        // Add descriptor set to frame context
+        auto builder = FrameContext::Builder()
+            .add_buffer("uniform", m_uniform_buffers[frame_index].get())
+            .add_descriptor_set("per_frame", m_descriptor_system->get_set("per_frame", frame_index));
+        
+        // Build complete frame context with descriptor sets
+        FrameContext complete_ctx = builder.build(
+            frame_ctx.device(),
+            frame_ctx.cmd(),
+            &frame_ctx.swapchain_image_view(),
+            &frame_ctx.swapchain_image()
+        );
+        
+        // Record rendering commands
+        record_command_buffer(complete_ctx);
     }
 
     struct TransitionImageLayoutInfo {
@@ -257,107 +274,104 @@ private:
         vk::PipelineStageFlagBits2 stage;
     };
 
-    void record_command_buffer(const vk::raii::CommandBuffer &command_buffer, const vk::raii::DescriptorSet &descriptor_set, uint32_t image_index) {
-        vk::CommandBufferBeginInfo begin_info{};
-        begin_info.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
-        command_buffer.begin(begin_info);
+    void record_command_buffer(FrameContext& frame_ctx) {
+        frame_ctx.cmd()->record([&](CommandBuffer& cmd) {
+            TransitionImageLayoutInfo old_layout_info{
+                vk::ImageLayout::eUndefined,
+                vk::AccessFlagBits2::eNone,
+                vk::PipelineStageFlagBits2::eTopOfPipe};
 
-        TransitionImageLayoutInfo old_layout_info{
-            vk::ImageLayout::eUndefined,
-            vk::AccessFlagBits2::eNone,
-            vk::PipelineStageFlagBits2::eTopOfPipe};
+            TransitionImageLayoutInfo new_layout_info{
+                vk::ImageLayout::eColorAttachmentOptimal,
+                vk::AccessFlagBits2::eColorAttachmentWrite,
+                vk::PipelineStageFlagBits2::eColorAttachmentOutput};
 
-        TransitionImageLayoutInfo new_layout_info{
-            vk::ImageLayout::eColorAttachmentOptimal,
-            vk::AccessFlagBits2::eColorAttachmentWrite,
-            vk::PipelineStageFlagBits2::eColorAttachmentOutput};
+            transition_image_layout(
+                cmd,
+                frame_ctx.swapchain_image(),
+                old_layout_info,
+                new_layout_info
+            );
 
-        transition_image_layout(
-            command_buffer,
-            m_swapchain->images().at(image_index),
-            old_layout_info,
-            new_layout_info);
+            //vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}};
+            vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{1.0f, 0.0f, 1.0f, 1.0f}}; 
+            vk::RenderingAttachmentInfo color_attachment_info{};
+            color_attachment_info.imageView = *frame_ctx.swapchain_image_view();
+            color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+            color_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
+            color_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
+            color_attachment_info.clearValue = clear_value;
 
-        //vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}};
-        vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{1.0f, 0.0f, 1.0f, 1.0f}}; 
-        vk::RenderingAttachmentInfo color_attachment_info{};
-        color_attachment_info.imageView = *m_swapchain->image_views().at(image_index);
-        color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-        color_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
-        color_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
-        color_attachment_info.clearValue = clear_value;
+            vk::RenderingInfo rendering_info{};
+            rendering_info.renderArea.offset = vk::Offset2D{0, 0};
+            rendering_info.renderArea.extent = m_renderer->render_extent();
+            rendering_info.layerCount = 1;
+            rendering_info.colorAttachmentCount = 1;
+            rendering_info.pColorAttachments = &color_attachment_info;
 
-        vk::RenderingInfo rendering_info{};
-        rendering_info.renderArea.offset = vk::Offset2D{0, 0};
-        rendering_info.renderArea.extent = m_swapchain->extent();
-        rendering_info.layerCount = 1;
-        rendering_info.colorAttachmentCount = 1;
-        rendering_info.pColorAttachments = &color_attachment_info;
+            cmd.begin_rendering(rendering_info);
 
-        command_buffer.beginRendering(rendering_info);
+            cmd.bind_pipeline(
+                vk::PipelineBindPoint::eGraphics,
+                m_pipeline);
 
-        command_buffer.bindPipeline(
-            vk::PipelineBindPoint::eGraphics,
-            *m_pipeline);
+            std::vector<vk::Buffer> vertex_buffers = {*m_vertex_buffer->buffer()};
+            std::vector<vk::DeviceSize> offsets = {0};
+            cmd.bind_vertex_buffers(0, vertex_buffers, offsets);
 
-        vk::Buffer vertex_buffers[] = {*m_vertex_buffer->buffer()};
-        vk::DeviceSize offsets[] = {0};
-        command_buffer.bindVertexBuffers(0, vertex_buffers, offsets);
+            cmd.bind_index_buffer(
+                *m_index_buffer->buffer(),
+                0,
+                vk::IndexType::eUint16);
 
-        command_buffer.bindIndexBuffer(
-            *m_index_buffer->buffer(),
-            0,
-            vk::IndexType::eUint16);
+            cmd.bind_descriptor_sets(
+                vk::PipelineBindPoint::eGraphics,
+                m_pipeline_layout,
+                0,
+                frame_ctx.get_descriptor_set("per_frame"));
 
-        command_buffer.bindDescriptorSets(
-            vk::PipelineBindPoint::eGraphics,
-            *m_pipeline_layout,
-            0,
-            *descriptor_set,
-            {});
+            vk::Viewport viewport{};
+            viewport.x = 0.0f;
+            viewport.y = 0.0f;
+            viewport.width = static_cast<float>(m_renderer->render_extent().width);
+            viewport.height = static_cast<float>(m_renderer->render_extent().height);
+            viewport.minDepth = 0.0f;
+            viewport.maxDepth = 1.0f;
+            cmd.set_viewport(viewport);
 
-        vk::Viewport viewport{};
-        viewport.x = 0.0f;
-        viewport.y = 0.0f;
-        viewport.width = static_cast<float>(m_swapchain->extent().width);
-        viewport.height = static_cast<float>(m_swapchain->extent().height);
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        command_buffer.setViewport(0, viewport);
+            vk::Rect2D scissor{};
+            scissor.offset = vk::Offset2D{0, 0};
+            scissor.extent = m_renderer->render_extent();
+            cmd.set_scissor(scissor);
 
-        vk::Rect2D scissor{};
-        scissor.offset = vk::Offset2D{0, 0};
-        scissor.extent = m_swapchain->extent();
-        command_buffer.setScissor(0, scissor);
+            cmd.draw_indexed(
+                static_cast<uint32_t>(indices.size()),
+                1,
+                0,
+                0,
+                0);
 
-        command_buffer.drawIndexed(
-            static_cast<uint32_t>(indices.size()),
-            1,
-            0,
-            0,
-            0);
+            cmd.end_rendering();
 
-        command_buffer.endRendering();
+            old_layout_info.layout = vk::ImageLayout::eColorAttachmentOptimal;
+            old_layout_info.access_mask = vk::AccessFlagBits2::eColorAttachmentWrite;
+            old_layout_info.stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
 
-        old_layout_info.layout = vk::ImageLayout::eColorAttachmentOptimal;
-        old_layout_info.access_mask = vk::AccessFlagBits2::eColorAttachmentWrite;
-        old_layout_info.stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+            new_layout_info.layout = vk::ImageLayout::ePresentSrcKHR;
+            new_layout_info.access_mask = vk::AccessFlagBits2::eNone;
+            new_layout_info.stage = vk::PipelineStageFlagBits2::eBottomOfPipe;
 
-        new_layout_info.layout = vk::ImageLayout::ePresentSrcKHR;
-        new_layout_info.access_mask = vk::AccessFlagBits2::eNone;
-        new_layout_info.stage = vk::PipelineStageFlagBits2::eBottomOfPipe;
-
-        transition_image_layout(
-            command_buffer,
-            m_swapchain->images().at(image_index),
-            old_layout_info,
-            new_layout_info);
-
-        command_buffer.end();
+            transition_image_layout(
+                cmd,
+                frame_ctx.swapchain_image(),
+                old_layout_info,
+                new_layout_info
+            );
+        }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     }
 
     void transition_image_layout(
-        const vk::raii::CommandBuffer &command_buffer,
+        CommandBuffer& cmd,
         const vk::Image &image,
         const TransitionImageLayoutInfo &old_layout_info,
         const TransitionImageLayoutInfo &new_layout_info) {
@@ -379,7 +393,7 @@ private:
         dependency_info.imageMemoryBarrierCount = 1;
         dependency_info.pImageMemoryBarriers = &image_memory_barrier;
 
-        command_buffer.pipelineBarrier2(dependency_info);
+        cmd.pipeline_barrier_2(dependency_info);
     }
 
     void update_uniform_buffer(void* mapped_ptr) {
@@ -399,110 +413,12 @@ private:
             glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.proj = glm::perspective(
             glm::radians(45.0f),
-            static_cast<float>(m_swapchain->extent().width) / static_cast<float>(m_swapchain->extent().height),
+            static_cast<float>(m_renderer->render_extent().width) / static_cast<float>(m_renderer->render_extent().height),
             0.1f,
             10.0f);
         ubo.proj[1][1] *= -1;
 
         std::memcpy(mapped_ptr, &ubo, sizeof(ubo));
-    }
-
-    void draw_frame() {
-        auto &current_sync_objects = m_frame_sync_objects[m_current_frame];
-
-        //update uniform buffer
-        update_uniform_buffer(m_uniform_buffers[m_current_frame]->mapped_data());
-
-        // acquire image
-        std::array<vk::Fence, 2> wait_fences = {
-            *current_sync_objects.submit_fence,
-            *current_sync_objects.present_fence};
-
-        if (vk::Result::eTimeout == m_device->device().waitForFences(
-                                           wait_fences,
-                                           true,
-                                           UINT64_MAX)) {
-            std::cout << "Wait for fence timed out." << std::endl;
-        }
-
-        auto [result, image_index] = m_swapchain->acquire_next_image(
-            current_sync_objects.image_available_semaphore);
-
-        if (result == vk::Result::eErrorOutOfDateKHR) {
-            m_framebuffer_resized = false;
-            recreate_swapchain();
-            return;
-        }
-
-        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
-            throw std::runtime_error("Failed to acquire swapchain image.");
-        }
-
-        bool recreate_required = (result == vk::Result::eSuboptimalKHR);
-
-        //record command buffer
-        auto &current_descriptor_set = m_descriptor_sets.at(m_current_frame);
-        auto &command_buffer = m_command_buffers.at(m_current_frame);
-        command_buffer.reset();
-
-        record_command_buffer(
-            command_buffer,
-            current_descriptor_set,
-            image_index
-        );
-
-        m_device->device().resetFences(wait_fences);
-
-        vk::PipelineStageFlags wait_dst_stage_flag = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-
-        vk::Semaphore wait_semaphores[] = {
-            *current_sync_objects.image_available_semaphore};
-
-        vk::CommandBuffer command_buffers[] = {
-            *command_buffer};
-
-        vk::Semaphore signal_semaphores[] = {
-            *current_sync_objects.render_finished_semaphore};
-
-        vk::SubmitInfo submit_info{};
-        submit_info.waitSemaphoreCount = 1;
-        submit_info.pWaitSemaphores = wait_semaphores;
-        submit_info.pWaitDstStageMask = &wait_dst_stage_flag;
-        submit_info.commandBufferCount = 1;
-        submit_info.pCommandBuffers = command_buffers;
-        submit_info.signalSemaphoreCount = 1;
-        submit_info.pSignalSemaphores = signal_semaphores;
-
-        m_device->queue().submit(submit_info, *current_sync_objects.submit_fence);
-
-        // present image
-        vk::Result present_result = m_swapchain->present(
-            image_index, 
-            current_sync_objects.render_finished_semaphore,
-            current_sync_objects.present_fence
-        );
-
-        if (present_result == vk::Result::eErrorOutOfDateKHR || present_result == vk::Result::eSuboptimalKHR) {
-            recreate_required = true;
-            if (present_result == vk::Result::eErrorOutOfDateKHR) {
-                std::cout << "Swapchain out of date during presentation." << std::endl;
-            } else {
-                std::cout << "Swapchain suboptimal during presentation." << std::endl;
-            }
-        } else if (present_result != vk::Result::eSuccess) {
-            throw std::runtime_error("Failed to present swapchain image.");
-        }
-
-        if (recreate_required || m_framebuffer_resized) {
-            m_framebuffer_resized = false;
-            recreate_swapchain();
-        }
-
-        m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
-    }
-
-    void recreate_swapchain() {
-        m_swapchain->recreate();
     }
 
     void create_pipeline() {
@@ -576,7 +492,7 @@ private:
 
         vk::PipelineLayoutCreateInfo pipeline_layout_info{};
         std::vector<vk::DescriptorSetLayout> set_layouts = {
-            *m_descriptor_set_layout->layout()
+            *m_descriptor_system->get_layout("per_frame").layout()
         };
         pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(set_layouts.size());
         pipeline_layout_info.pSetLayouts = set_layouts.data();
@@ -601,7 +517,7 @@ private:
         vk::PipelineRenderingCreateInfo pipeline_rendering_info{};
 
         std::vector<vk::Format> color_attachment_formats = {
-            m_swapchain->image_format()};
+            m_renderer->render_format()};
 
         pipeline_rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachment_formats.size());
         pipeline_rendering_info.pColorAttachmentFormats = color_attachment_formats.data();
@@ -620,40 +536,11 @@ private:
             pipeline_info_chain.get<vk::GraphicsPipelineCreateInfo>()
         };
     }
-
-
-    void create_sync_objects() {
-        m_frame_sync_objects.clear();
-        m_frame_sync_objects.resize(MAX_FRAMES_IN_FLIGHT);
-
-        vk::SemaphoreCreateInfo semaphore_create_info{};
-        vk::FenceCreateInfo fence_create_info{};
-        fence_create_info.flags = vk::FenceCreateFlagBits::eSignaled;
-
-        for (auto &sync_objects : m_frame_sync_objects) {
-            sync_objects.image_available_semaphore = vk::raii::Semaphore{
-                m_device->device(),
-                semaphore_create_info};
-
-            sync_objects.render_finished_semaphore = vk::raii::Semaphore{
-                m_device->device(),
-                semaphore_create_info};
-
-            sync_objects.submit_fence = vk::raii::Fence{
-                m_device->device(),
-                fence_create_info};
-
-            sync_objects.present_fence = vk::raii::Fence{
-                m_device->device(),
-                fence_create_info};
-        }
-    }
-
-    static void framebuffer_resize_callback(GLFWwindow *window, int width, int height) {
-        auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
+    
+    static void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
+        auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
         if (!app) { return; }
-        std::cout << "Framebuffer resized to (" << width << ", " << height << ")." << std::endl;
-        app->m_framebuffer_resized = true;
+        app->m_renderer->on_window_resized(width, height);
     }
 };
 

@@ -1,12 +1,12 @@
 #pragma once
 
-#include <memory>
 #include <optional>
 #include <tuple>
 #include <utility>
 
 #include "device.hpp"
-#include "command_pool.hpp"
+#include "command.hpp"
+
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_core.h"
 #include "vulkan/vulkan_enums.hpp"
@@ -160,13 +160,17 @@ public:
         vk::DeviceSize size
     ) {
         CommandPool command_pool(device, vk::CommandPoolCreateFlagBits::eTransient);
-        command_pool.execute_single_time_commands([&](vk::CommandBuffer command_buffer) {
+        auto cmd = command_pool.create_command_buffer();
+        
+        cmd.record_and_submit([&](CommandBuffer& cmd) {
             vk::BufferCopy buffer_copy{};
             buffer_copy.srcOffset = 0;
             buffer_copy.dstOffset = 0;
             buffer_copy.size = size;
-            command_buffer.copyBuffer(src, dst, buffer_copy);
+            cmd.get().copyBuffer(src, dst, buffer_copy);
         });
+        
+        device->queue().waitIdle();
     }
 
     static Buffer create_device_local_with_data(
