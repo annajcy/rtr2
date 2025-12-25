@@ -1,31 +1,26 @@
 #pragma once
 
-#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
-#include <functional>
 #include <iostream>
-#include <limits>
 #include <memory>
-#include <optional>
 #include <stdexcept>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 #include <chrono>
-
-#include "vk/vk_memory_buffer.hpp"
-#include "vk/vk_surface.hpp"
-#include "vk/vk_physical_device_picker.hpp"
-#include "vk/vk_device.hpp"
-#include "vk/vk_swapchain.hpp"
 
 #include "utils/file_loder.hpp"
 
 #include "window.hpp"
 #include "context.hpp"
+#include "device.hpp"
+#include "swap_chain.hpp"
+#include "buffer.hpp"
+#include "command_pool.hpp"
+#include "descriptor.hpp"
+#include "shader_module.hpp"
 
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_enums.hpp"
@@ -115,240 +110,129 @@ class Application {
 private:
     std::unique_ptr<Window> m_window{};
     std::unique_ptr<Context> m_context{};
+    std::unique_ptr<Device> m_device{};
+    std::unique_ptr<SwapChain> m_swapchain{};
 
-    vk::raii::PhysicalDevice m_physical_device{nullptr};
-    vk::raii::Device m_device{nullptr};
-    vk::raii::Queue m_queue{nullptr};
-
-    vk::raii::SwapchainKHR m_swapchain{nullptr};
-    std::vector<vk::Image> m_swapchain_images{};
-    std::vector<vk::raii::ImageView> m_swapchain_image_views{};
-    vk::Extent2D m_swapchain_extent{};
-    vk::Format m_swapchain_image_format{};
-
-    vk::raii::CommandPool m_command_pool{nullptr};
+    std::unique_ptr<CommandPool> m_command_pool{nullptr};
     std::vector<vk::raii::CommandBuffer> m_command_buffers{};
 
-    vk::raii::ShaderModule m_vertex_shader_module{nullptr};
-    vk::raii::ShaderModule m_fragment_shader_module{nullptr};
-    vk::raii::DescriptorSetLayout m_descriptor_set_layout{nullptr};
+    std::unique_ptr<Buffer> m_vertex_buffer{nullptr};
+    std::unique_ptr<Buffer> m_index_buffer{nullptr};
+
+    std::unique_ptr<ShaderModule> m_vertex_shader_module{nullptr};
+    std::unique_ptr<ShaderModule> m_fragment_shader_module{nullptr};
+
     vk::raii::PipelineLayout m_pipeline_layout{nullptr};
     vk::raii::Pipeline m_pipeline{nullptr};
 
-    vk::raii::Buffer m_vertex_buffer{nullptr};
-    vk::raii::DeviceMemory m_vertex_buffer_memory{nullptr};
-    vk::raii::Buffer m_index_buffer{nullptr};
-    vk::raii::DeviceMemory m_index_buffer_memory{nullptr};
-
-    vk::raii::DescriptorPool m_descriptor_pool{nullptr};
-    std::vector<vk::raii::Buffer> m_uniform_buffers{};
-    std::vector<vk::raii::DeviceMemory> m_uniform_buffers_memory{};
-    std::vector<void*> m_uniform_buffers_mapped_ptr{};
+    std::vector<std::unique_ptr<Buffer>> m_uniform_buffers{};
+    std::unique_ptr<DescriptorSetLayout> m_descriptor_set_layout{nullptr};
+    std::unique_ptr<DescriptorPool> m_descriptor_pool{nullptr};
     std::vector<vk::raii::DescriptorSet> m_descriptor_sets{};
 
     std::vector<FrameSynchronizationObjects> m_frame_sync_objects{};
 
     bool m_framebuffer_resized = false;
     uint32_t m_current_frame = 0;
-    int m_queue_family_index{-1};
 
-    std::vector<std::string> m_required_device_extensions = {
-        vk::KHRSwapchainExtensionName,
-        vk::KHRSpirv14ExtensionName,
-        vk::KHRSynchronization2ExtensionName,
-        vk::KHRCreateRenderpass2ExtensionName,
-        "VK_EXT_swapchain_maintenance1",
-#if defined(__APPLE__)
-        "VK_KHR_portability_subset",
-        "VK_KHR_dynamic_rendering"
-#endif
-    };
-
-    rtr::VKPhysicalDevicePickerApiVersionRule m_api_version_rule{
-#if defined(__APPLE__)
-        vk::ApiVersion12
-#else
-        vk::ApiVersion13
-#endif
-    };
-
-    rtr::VKPhysicalDevicePickerDeviceExtensionRule m_device_extension_rule{
-        m_required_device_extensions
-    };
-
-    rtr::VKPhysicalDevicePickerQueueBitsChecker m_queue_bits_checker{
-        vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer
-    };
-
-#if defined(__APPLE__)
-    rtr::VKPhysicalDevicePickerFeatureRule<
-        vk::PhysicalDeviceFeatures2,
-        vk::PhysicalDeviceDynamicRenderingFeatures,
-        vk::PhysicalDeviceSynchronization2Features,
-        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
-        vk::PhysicalDeviceVulkan11Features,
-        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT
-    >m_feature_rule{[](const auto &feature_chain) {
-            
-            const auto &dynamic_rendering_features = feature_chain.template get<vk::PhysicalDeviceDynamicRenderingFeatures>();
-            if (!dynamic_rendering_features.dynamicRendering) {
-                std::cout << "PhysicalDeviceDynamicRenderingFeatures.dynamicRendering not supported" << std::endl;
-                return false;
-            }
-            const auto &dynamic_state_features = feature_chain.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
-            if (!dynamic_state_features.extendedDynamicState) {
-                std::cout << "PhysicalDeviceExtendedDynamicStateFeaturesEXT.extendedDynamicState not supported" << std::endl;
-                return false;
-            }
-            const auto &synchronization2_features = feature_chain.template get<vk::PhysicalDeviceSynchronization2Features>();
-            if (!synchronization2_features.synchronization2) {
-                std::cout << "PhysicalDeviceSynchronization2Features.synchronization2 not supported" << std::endl;
-                return false;
-            }
-            const auto &vulkan11_features = feature_chain.template get<vk::PhysicalDeviceVulkan11Features>();
-            if (!vulkan11_features.shaderDrawParameters) {
-                std::cout << "PhysicalDeviceVulkan11Features.shaderDrawParameters not supported" << std::endl;
-                return false;
-            }
-            const auto &swapchain_maintenance_features = feature_chain.template get<vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>();
-            if (!swapchain_maintenance_features.swapchainMaintenance1) {
-                std::cout << "PhysicalDeviceSwapchainMaintenance1FeaturesEXT.swapchainMaintenance1 not supported" << std::endl;
-                return false;
-            }
-            return true;
-        }};
-#else
-    rtr::VKPhysicalDevicePickerFeatureRule<
-        vk::PhysicalDeviceFeatures2,
-        vk::PhysicalDeviceVulkan11Features,
-        vk::PhysicalDeviceVulkan13Features,
-        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
-        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>
-        m_feature_rule{[](const auto &feature_chain) {
-            const auto &vulkan13_features = feature_chain.template get<vk::PhysicalDeviceVulkan13Features>();
-            if (!vulkan13_features.dynamicRendering) {
-                std::cout << "PhysicalDeviceVulkan13Features.dynamicRendering not supported" << std::endl;
-                return false;
-            }
-            if (!vulkan13_features.synchronization2) {
-                std::cout << "PhysicalDeviceVulkan13Features.synchronization2 not supported" << std::endl;
-                return false;
-            }
-            const auto &dynamic_state_features = feature_chain.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
-            if (!dynamic_state_features.extendedDynamicState) {
-                std::cout << "PhysicalDeviceExtendedDynamicStateFeaturesEXT.extendedDynamicState not supported" << std::endl;
-                return false;
-            }
-            const auto &vulkan11_features = feature_chain.template get<vk::PhysicalDeviceVulkan11Features>();
-            if (!vulkan11_features.shaderDrawParameters) {
-                std::cout << "PhysicalDeviceVulkan11Features.shaderDrawParameters not supported" << std::endl;
-                return false;
-            }
-            const auto &swapchain_maintenance_features = feature_chain.template get<vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>();
-            if (!swapchain_maintenance_features.swapchainMaintenance1) {
-                std::cout << "PhysicalDeviceSwapchainMaintenance1FeaturesEXT.swapchainMaintenance1 not supported" << std::endl;
-                return false;
-            }
-            return true;
-        }};
-#endif
-
-#if defined(__APPLE__)
-    using DeviceFeatureChainType = vk::StructureChain<
-        vk::PhysicalDeviceFeatures2,
-        vk::PhysicalDeviceDynamicRenderingFeatures,
-        vk::PhysicalDeviceSynchronization2Features,
-        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
-        vk::PhysicalDeviceVulkan11Features,
-        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>;
-
-    std::function<DeviceFeatureChainType()> m_device_feature_chain_generator = []() {
-        vk::PhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features{};
-        dynamic_rendering_features.dynamicRendering = true;
-
-        vk::PhysicalDeviceSynchronization2Features synchronization2_features{};
-        synchronization2_features.synchronization2 = true;
-
-        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extended_dynamic_state_features{};
-        extended_dynamic_state_features.extendedDynamicState = true;
-
-        vk::PhysicalDeviceVulkan11Features vulkan11_features{};
-        vulkan11_features.shaderDrawParameters = true;
-
-        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT swapchain_maintenance_features{};
-        swapchain_maintenance_features.swapchainMaintenance1 = true;
-
-        vk::PhysicalDeviceFeatures2 physical_device_features2{};
-
-        return DeviceFeatureChainType{
-            physical_device_features2,
-            dynamic_rendering_features,
-            synchronization2_features,
-            extended_dynamic_state_features,
-            vulkan11_features,
-            swapchain_maintenance_features};
-    };
-#else
-    using DeviceFeatureChainType = vk::StructureChain<
-        vk::PhysicalDeviceFeatures2,
-        vk::PhysicalDeviceVulkan11Features,
-        vk::PhysicalDeviceVulkan13Features,
-        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
-        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>;
-
-    std::function<DeviceFeatureChainType()> m_device_feature_chain_generator = []() {
-        vk::PhysicalDeviceVulkan13Features vulkan13_features{};
-        vulkan13_features.dynamicRendering = true;
-        vulkan13_features.synchronization2 = true;
-
-        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extended_dynamic_state_features{};
-        extended_dynamic_state_features.extendedDynamicState = true;
-
-        vk::PhysicalDeviceVulkan11Features vulkan11_features{};
-        vulkan11_features.shaderDrawParameters = true;
-
-        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT swapchain_maintenance_features{};
-        swapchain_maintenance_features.swapchainMaintenance1 = true;
-
-        vk::PhysicalDeviceFeatures2 physical_device_features2{};
-
-        return DeviceFeatureChainType{
-            physical_device_features2,
-            vulkan11_features,
-            vulkan13_features,
-            extended_dynamic_state_features,
-            swapchain_maintenance_features};
-    };
-#endif
 
 public:
     Application() {
-        m_window = std::make_unique<Window>(
-            WIDTH,
-            HEIGHT,
-            "RTR Application"
+        m_window = std::make_unique<Window>(WIDTH, HEIGHT, "RTR Application");
+        m_window->set_framebuffer_size_callback(framebuffer_resize_callback);
+
+        m_context = std::make_unique<Context>(m_window.get());
+        m_device = std::make_unique<Device>(m_context.get());
+        m_swapchain = std::make_unique<SwapChain>(m_device.get());
+
+        // set shader modules
+        m_vertex_shader_module = std::make_unique<ShaderModule>(
+            ShaderModule::from_file(
+                m_device.get(),
+                shader_output_dir + vertex_shader_filename,
+                vk::ShaderStageFlagBits::eVertex
+            )
         );
 
-        m_context = std::make_unique<Context>(
-            m_window.get(),
-#if !defined(NDEBUG)
-            true
-#endif
+        m_fragment_shader_module = std::make_unique<ShaderModule>(
+            ShaderModule::from_file(
+                m_device.get(),
+                shader_output_dir + fragment_shader_filename,
+                vk::ShaderStageFlagBits::eFragment
+            )
         );
 
-        pick_physical_device();
-        create_device();
-        create_queue();
-        create_swapchain();
-        create_shader_modules();
-        create_descriptor_set_layout();
+         // Create vertex and index buffers
+        vk::DeviceSize vertex_buffer_size = sizeof(vertices[0]) * vertices.size();
+        vk::DeviceSize index_buffer_size = sizeof(indices[0]) * indices.size();
+
+        m_vertex_buffer = std::make_unique<Buffer>(
+            Buffer::create_device_local_with_data(
+                m_device.get(),
+                vertices.data(),
+                vertex_buffer_size,
+                vk::BufferUsageFlagBits::eVertexBuffer
+            )
+        );
+
+        m_index_buffer = std::make_unique<Buffer>(
+            Buffer::create_device_local_with_data(
+                m_device.get(),
+                indices.data(),
+                index_buffer_size,
+                vk::BufferUsageFlagBits::eIndexBuffer
+            )
+        );
+
+        // Create uniform buffers 
+        m_uniform_buffers.clear();
+        m_uniform_buffers.reserve(MAX_FRAMES_IN_FLIGHT);
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i ++) {
+            vk::DeviceSize buffer_size = sizeof(UniformBufferObject);
+            auto uniform_buffer = std::make_unique<Buffer>(
+                Buffer::create_host_visible_buffer(
+                    m_device.get(),
+                    buffer_size,
+                    vk::BufferUsageFlagBits::eUniformBuffer
+                )
+            );
+            uniform_buffer->map();
+            m_uniform_buffers.emplace_back(std::move(uniform_buffer));
+        }
+        // Create descriptor set layout
+        m_descriptor_set_layout = std::make_unique<DescriptorSetLayout>(
+            DescriptorSetLayout::Builder()
+                .add_binding(0, vk::DescriptorType::eUniformBuffer, 
+                           vk::ShaderStageFlagBits::eVertex)
+                .build(m_device.get())
+        );
+        // Create descriptor pool 
+        m_descriptor_pool = std::make_unique<DescriptorPool>(
+            DescriptorPool::Builder()
+                .add_layout(*m_descriptor_set_layout, MAX_FRAMES_IN_FLIGHT)
+                .set_flags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+                .build(m_device.get())
+        );
+        // Allocate and update descriptor sets
+        m_descriptor_sets = m_descriptor_pool->allocate_multiple(
+            *m_descriptor_set_layout, 
+            MAX_FRAMES_IN_FLIGHT
+        );
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            DescriptorWriter()
+                .write_buffer(
+                    0, 
+                    *m_uniform_buffers[i]->buffer(), 
+                    0, 
+                    sizeof(UniformBufferObject)
+                )
+                .update(m_device.get(), *m_descriptor_sets[i]);
+        }
         create_pipeline();
-        create_buffers();
-        create_uniform_buffers();
-        create_descriptor_pool();
-        create_descriptor_sets();
-        create_command_pool();
-        create_frame_command_buffers();
+       
+        m_command_pool = std::make_unique<CommandPool>(m_device.get(), vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
+        m_command_buffers = m_command_pool->allocate_command_buffers(MAX_FRAMES_IN_FLIGHT);
         create_sync_objects();
     }
 
@@ -358,12 +242,12 @@ public:
 
 private:
     void loop() {
-        while (!m_context->window().is_should_close()) {
-            m_context->window().poll_events();
+        while (!m_window->is_should_close()) {
+            m_window->poll_events();
             draw_frame();
         }
         
-        m_device.waitIdle();
+        m_device->device().waitIdle();
         
     }
 
@@ -390,14 +274,14 @@ private:
 
         transition_image_layout(
             command_buffer,
-            m_swapchain_images.at(image_index),
+            m_swapchain->images().at(image_index),
             old_layout_info,
             new_layout_info);
 
         //vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}};
         vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{1.0f, 0.0f, 1.0f, 1.0f}}; 
         vk::RenderingAttachmentInfo color_attachment_info{};
-        color_attachment_info.imageView = *m_swapchain_image_views.at(image_index);
+        color_attachment_info.imageView = *m_swapchain->image_views().at(image_index);
         color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
         color_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
         color_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
@@ -405,7 +289,7 @@ private:
 
         vk::RenderingInfo rendering_info{};
         rendering_info.renderArea.offset = vk::Offset2D{0, 0};
-        rendering_info.renderArea.extent = m_swapchain_extent;
+        rendering_info.renderArea.extent = m_swapchain->extent();
         rendering_info.layerCount = 1;
         rendering_info.colorAttachmentCount = 1;
         rendering_info.pColorAttachments = &color_attachment_info;
@@ -416,12 +300,12 @@ private:
             vk::PipelineBindPoint::eGraphics,
             *m_pipeline);
 
-        vk::Buffer vertex_buffers[] = {*m_vertex_buffer};
+        vk::Buffer vertex_buffers[] = {*m_vertex_buffer->buffer()};
         vk::DeviceSize offsets[] = {0};
         command_buffer.bindVertexBuffers(0, vertex_buffers, offsets);
 
         command_buffer.bindIndexBuffer(
-            *m_index_buffer,
+            *m_index_buffer->buffer(),
             0,
             vk::IndexType::eUint16);
 
@@ -435,15 +319,15 @@ private:
         vk::Viewport viewport{};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
-        viewport.width = static_cast<float>(m_swapchain_extent.width);
-        viewport.height = static_cast<float>(m_swapchain_extent.height);
+        viewport.width = static_cast<float>(m_swapchain->extent().width);
+        viewport.height = static_cast<float>(m_swapchain->extent().height);
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         command_buffer.setViewport(0, viewport);
 
         vk::Rect2D scissor{};
         scissor.offset = vk::Offset2D{0, 0};
-        scissor.extent = m_swapchain_extent;
+        scissor.extent = m_swapchain->extent();
         command_buffer.setScissor(0, scissor);
 
         command_buffer.drawIndexed(
@@ -465,7 +349,7 @@ private:
 
         transition_image_layout(
             command_buffer,
-            m_swapchain_images.at(image_index),
+            m_swapchain->images().at(image_index),
             old_layout_info,
             new_layout_info);
 
@@ -515,7 +399,7 @@ private:
             glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.proj = glm::perspective(
             glm::radians(45.0f),
-            static_cast<float>(m_swapchain_extent.width) / static_cast<float>(m_swapchain_extent.height),
+            static_cast<float>(m_swapchain->extent().width) / static_cast<float>(m_swapchain->extent().height),
             0.1f,
             10.0f);
         ubo.proj[1][1] *= -1;
@@ -527,25 +411,22 @@ private:
         auto &current_sync_objects = m_frame_sync_objects[m_current_frame];
 
         //update uniform buffer
-        auto &uniform_buffer_mapped_ptr = m_uniform_buffers_mapped_ptr[m_current_frame];
-        update_uniform_buffer(uniform_buffer_mapped_ptr);
+        update_uniform_buffer(m_uniform_buffers[m_current_frame]->mapped_data());
 
         // acquire image
         std::array<vk::Fence, 2> wait_fences = {
             *current_sync_objects.submit_fence,
             *current_sync_objects.present_fence};
 
-        if (vk::Result::eTimeout == m_device.waitForFences(
+        if (vk::Result::eTimeout == m_device->device().waitForFences(
                                            wait_fences,
                                            true,
                                            UINT64_MAX)) {
             std::cout << "Wait for fence timed out." << std::endl;
         }
 
-        auto [result, image_index] = m_swapchain.acquireNextImage(
-            UINT64_MAX,
-            *current_sync_objects.image_available_semaphore,
-            nullptr);
+        auto [result, image_index] = m_swapchain->acquire_next_image(
+            current_sync_objects.image_available_semaphore);
 
         if (result == vk::Result::eErrorOutOfDateKHR) {
             m_framebuffer_resized = false;
@@ -570,7 +451,7 @@ private:
             image_index
         );
 
-        m_device.resetFences(wait_fences);
+        m_device->device().resetFences(wait_fences);
 
         vk::PipelineStageFlags wait_dst_stage_flag = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
@@ -592,38 +473,14 @@ private:
         submit_info.signalSemaphoreCount = 1;
         submit_info.pSignalSemaphores = signal_semaphores;
 
-        m_queue.submit(submit_info, *current_sync_objects.submit_fence);
+        m_device->queue().submit(submit_info, *current_sync_objects.submit_fence);
 
         // present image
-        vk::Fence present_fences[] = {
-            *current_sync_objects.present_fence};
-
-        vk::SwapchainPresentFenceInfoEXT present_fence_info{};
-        present_fence_info.swapchainCount = 1;
-        present_fence_info.pFences = present_fences;
-
-        vk::SwapchainKHR swapchains[] = {
-            *m_swapchain};
-
-        vk::PresentInfoKHR present_info{};
-        present_info.waitSemaphoreCount = 1;
-        present_info.pWaitSemaphores = signal_semaphores;
-        present_info.swapchainCount = 1;
-        present_info.pSwapchains = swapchains;
-        present_info.pImageIndices = &image_index;
-
-        vk::StructureChain<vk::PresentInfoKHR, vk::SwapchainPresentFenceInfoEXT> present_info_chain{
-            present_info,
-            present_fence_info
-        };
-
-        vk::Result present_result = vk::Result::eSuccess;
-        try {
-            present_result = m_queue.presentKHR(
-                present_info_chain.get<vk::PresentInfoKHR>());
-        } catch (const vk::OutOfDateKHRError &) {
-            present_result = vk::Result::eErrorOutOfDateKHR;
-        }
+        vk::Result present_result = m_swapchain->present(
+            image_index, 
+            current_sync_objects.render_finished_semaphore,
+            current_sync_objects.present_fence
+        );
 
         if (present_result == vk::Result::eErrorOutOfDateKHR || present_result == vk::Result::eSuboptimalKHR) {
             recreate_required = true;
@@ -644,249 +501,15 @@ private:
         m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    void pick_physical_device() {
-        rtr::VKPhysicalDevicePickerQueuePresentChecker queue_present_checker{
-            m_context->surface()
-        };
-
-        rtr::VKPhysicalDevicePickerQueueRule queue_rule{
-            m_queue_family_index,
-            {std::cref(m_queue_bits_checker), std::cref(queue_present_checker)}};
-
-        auto physical_devices = m_context->instance().enumeratePhysicalDevices();
-        if (auto _physical_device = rtr::pick_physical_device(
-                physical_devices,
-                m_api_version_rule,
-                queue_rule,
-                m_device_extension_rule,
-                m_feature_rule)) {
-            m_physical_device = std::move(_physical_device.value());
-            std::cout << "Physical device selected as: " << m_physical_device.getProperties().deviceName << std::endl;
-        } else {
-            throw std::runtime_error("Failed to select a suitable physical device.");
-        }
-    }
-
-    void create_device() {
-        auto device_result = rtr::make_device(
-            m_physical_device,
-            m_required_device_extensions,
-            m_device_feature_chain_generator(),
-            static_cast<uint32_t>(m_queue_family_index));
-
-        if (!device_result.has_value()) {
-            throw std::runtime_error("Failed to create logical device.");
-        }
-
-        m_device = std::move(device_result.value());
-    }
-
-    void create_queue() {
-        m_queue = m_device.getQueue(
-            static_cast<uint32_t>(m_queue_family_index),
-            0);
-    }
-
-    void create_swapchain() {
-        auto surface_formats = m_physical_device.getSurfaceFormatsKHR(*m_context->surface());
-        auto surface_format = rtr::select_surface_format(
-            surface_formats,
-            [](vk::SurfaceFormatKHR format) {
-                return format.format == vk::Format::eB8G8R8A8Srgb &&
-                       format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear;
-            });
-
-        auto present_mode = rtr::select_present_mode(
-            m_physical_device.getSurfacePresentModesKHR(*m_context->surface()),
-            vk::PresentModeKHR::eMailbox);
-
-        auto [extent_x, extent_y] = m_context->window().framebuffer_size();
-
-        auto capabilities = m_physical_device.getSurfaceCapabilitiesKHR(*m_context->surface());
-        auto [extent, image_count] = rtr::select_swapchain_image_property(
-            capabilities,
-            static_cast<uint32_t>(extent_x),
-            static_cast<uint32_t>(extent_y),
-            3);
-
-        std::cout << image_count << " swapchain images will be created with extent ("
-                  << extent.width << ", " << extent.height << ")." << std::endl;
-
-        vk::SwapchainCreateInfoKHR swapchain_create_info{};
-        swapchain_create_info.surface = *m_context->surface();
-        swapchain_create_info.minImageCount = image_count;
-        swapchain_create_info.imageFormat = surface_format.format;
-        swapchain_create_info.imageColorSpace = surface_format.colorSpace;
-        swapchain_create_info.imageExtent = extent;
-        swapchain_create_info.imageArrayLayers = 1;
-        swapchain_create_info.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
-        swapchain_create_info.imageSharingMode = vk::SharingMode::eExclusive;
-        swapchain_create_info.preTransform = capabilities.currentTransform;
-        swapchain_create_info.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-        swapchain_create_info.presentMode = present_mode;
-        swapchain_create_info.clipped = true;
-
-        auto swapchain_result = rtr::make_swapchain_with_image_views(
-            m_device,
-            swapchain_create_info);
-
-        if (!swapchain_result.has_value()) {
-            throw std::runtime_error("Failed to create swapchain.");
-        }
-
-        m_swapchain = std::move(swapchain_result->first);
-        m_swapchain_image_views = std::move(swapchain_result->second);
-        m_swapchain_images = m_swapchain.getImages();
-        m_swapchain_extent = extent;
-        m_swapchain_image_format = surface_format.format;
-    }
-
-    void cleanup_swapchain() {
-        m_swapchain_image_views.clear();
-        m_swapchain_images.clear();
-        m_swapchain.clear();
-    }
-
     void recreate_swapchain() {
-        auto [width, height] = m_context->window().framebuffer_size();
-        while (width == 0 || height == 0) {
-            m_context->window().wait_events();
-            std::tie(width, height) = m_context->window().framebuffer_size();
-        }
-
-        m_device.waitIdle();
-
-        cleanup_swapchain();
-        create_swapchain();
-    }
-
-    void create_shader_modules() {
-        auto vertex_shader_code = rtr::utils::read_file(shader_output_dir + vertex_shader_filename);
-        auto fragment_shader_code = rtr::utils::read_file(shader_output_dir + fragment_shader_filename);
-
-        vk::ShaderModuleCreateInfo vertex_shader_module_create_info{};
-        vertex_shader_module_create_info.codeSize = vertex_shader_code.size();
-        vertex_shader_module_create_info.pCode = reinterpret_cast<const uint32_t *>(vertex_shader_code.data());
-
-        vk::ShaderModuleCreateInfo fragment_shader_module_create_info{};
-        fragment_shader_module_create_info.codeSize = fragment_shader_code.size();
-        fragment_shader_module_create_info.pCode = reinterpret_cast<const uint32_t *>(fragment_shader_code.data());
-
-        m_vertex_shader_module = vk::raii::ShaderModule{
-            m_device,
-            vertex_shader_module_create_info
-        };
-
-        m_fragment_shader_module = vk::raii::ShaderModule{
-            m_device,
-            fragment_shader_module_create_info
-        };
-    }
-
-    void create_descriptor_set_layout() {
-        vk::DescriptorSetLayoutBinding ubo_layout_binding = UniformBufferObject::get_descriptor_set_layout_binding(0);
-
-        std::vector<vk::DescriptorSetLayoutBinding> layout_bindings = {
-            ubo_layout_binding
-        };
-
-        vk::DescriptorSetLayoutCreateInfo layout_create_info{};
-        layout_create_info.bindingCount = static_cast<uint32_t>(layout_bindings.size());
-        layout_create_info.pBindings = layout_bindings.data();
-
-        m_descriptor_set_layout = vk::raii::DescriptorSetLayout{
-            m_device,
-            layout_create_info
-        };
-    }
-
-    void create_uniform_buffers() {
-        m_uniform_buffers.clear();
-        m_uniform_buffers_memory.clear();
-        m_uniform_buffers_mapped_ptr.clear();
-
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i ++) {
-            vk::DeviceSize buffer_size = sizeof(UniformBufferObject);
-            if (auto mapped_buffer_with_memory_opt = rtr::make_mapped_buffer_with_memory(
-                m_device,
-                m_physical_device,
-                buffer_size,
-                vk::BufferUsageFlagBits::eUniformBuffer, 
-                vk::MemoryPropertyFlags {})
-            ) {
-                auto [uniform_buffer, uniform_buffer_memory, mapped_ptr] = std::move(mapped_buffer_with_memory_opt.value());
-                m_uniform_buffers.emplace_back(std::move(uniform_buffer));
-                m_uniform_buffers_memory.emplace_back(std::move(uniform_buffer_memory));
-                m_uniform_buffers_mapped_ptr.emplace_back(mapped_ptr);
-            } else {
-                throw std::runtime_error("Failed to create uniform buffer.");
-            }
-        }
-    }
-
-    void create_descriptor_pool() {
-
-        std::vector<vk::DescriptorPoolSize> pool_sizes = {
-            {vk::DescriptorType::eUniformBuffer, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)}
-        };
-
-        vk::DescriptorPoolCreateInfo pool_create_info{};
-        pool_create_info.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-        pool_create_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
-        pool_create_info.pPoolSizes = pool_sizes.data();
-        pool_create_info.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
-
-        m_descriptor_pool = vk::raii::DescriptorPool{
-            m_device,
-            pool_create_info
-        };
-    }
-
-    void create_descriptor_sets() {
-        std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *m_descriptor_set_layout);
-
-        vk::DescriptorSetAllocateInfo alloc_info{};
-        alloc_info.descriptorPool = *m_descriptor_pool;
-        alloc_info.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-        alloc_info.pSetLayouts = layouts.data();
-
-        m_descriptor_sets = m_device.allocateDescriptorSets(alloc_info);
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vk::DescriptorBufferInfo buffer_info{};
-            buffer_info.buffer = *m_uniform_buffers[i];
-            buffer_info.offset = 0;
-            buffer_info.range = sizeof(UniformBufferObject);
-
-            vk::WriteDescriptorSet descriptor_write{};
-            descriptor_write.dstSet = m_descriptor_sets[i];
-            descriptor_write.dstBinding = 0;
-            descriptor_write.dstArrayElement = 0;
-            descriptor_write.descriptorType = vk::DescriptorType::eUniformBuffer;
-            descriptor_write.descriptorCount = 1;
-            descriptor_write.pBufferInfo = &buffer_info;
-
-            m_device.updateDescriptorSets(
-                descriptor_write,
-                {}
-            );
-        }
+        m_swapchain->recreate();
     }
 
     void create_pipeline() {
-        vk::PipelineShaderStageCreateInfo fragment_shader_stage_info{};
-        fragment_shader_stage_info.stage = vk::ShaderStageFlagBits::eFragment;
-        fragment_shader_stage_info.module = *m_fragment_shader_module;
-        fragment_shader_stage_info.pName = "main";
-
-        vk::PipelineShaderStageCreateInfo vertex_shader_stage_info{};
-        vertex_shader_stage_info.stage = vk::ShaderStageFlagBits::eVertex;
-        vertex_shader_stage_info.module = *m_vertex_shader_module;
-        vertex_shader_stage_info.pName = "main";
-
         std::vector<vk::PipelineShaderStageCreateInfo> shader_stage_infos = {
-            vertex_shader_stage_info,
-            fragment_shader_stage_info};
+            m_vertex_shader_module->stage_create_info(),
+            m_fragment_shader_module->stage_create_info()
+        };
 
         vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
         auto vertex_binding_description = Vertex::get_binding_description();
@@ -953,13 +576,13 @@ private:
 
         vk::PipelineLayoutCreateInfo pipeline_layout_info{};
         std::vector<vk::DescriptorSetLayout> set_layouts = {
-            *m_descriptor_set_layout
+            *m_descriptor_set_layout->layout()
         };
         pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(set_layouts.size());
         pipeline_layout_info.pSetLayouts = set_layouts.data();
 
         m_pipeline_layout = vk::raii::PipelineLayout{
-            m_device,
+            m_device->device(),
             pipeline_layout_info};
 
         vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info{};
@@ -978,7 +601,7 @@ private:
         vk::PipelineRenderingCreateInfo pipeline_rendering_info{};
 
         std::vector<vk::Format> color_attachment_formats = {
-            m_swapchain_image_format};
+            m_swapchain->image_format()};
 
         pipeline_rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachment_formats.size());
         pipeline_rendering_info.pColorAttachmentFormats = color_attachment_formats.data();
@@ -992,107 +615,12 @@ private:
         };
 
         m_pipeline = vk::raii::Pipeline{
-            m_device,
+            m_device->device(),
             nullptr,
             pipeline_info_chain.get<vk::GraphicsPipelineCreateInfo>()
         };
     }
 
-    void create_buffers() {
-        vk::DeviceSize vertex_buffer_size = sizeof(vertices[0]) * vertices.size();
-        vk::DeviceSize index_buffer_size = sizeof(indices[0]) * indices.size();
-        vk::DeviceSize staging_buffer_size = vertex_buffer_size + index_buffer_size;
-
-        auto staging_buffer = rtr::make_buffer_with_memory(
-            m_device,
-            m_physical_device,
-            staging_buffer_size,
-            vk::BufferUsageFlagBits::eTransferSrc,
-            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-
-        if (!staging_buffer.has_value()) {
-            throw std::runtime_error("Failed to create staging buffer.");
-        }
-
-        auto vertex_buffer = rtr::make_buffer_with_memory(
-            m_device,
-            m_physical_device,
-            vertex_buffer_size,
-            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-            vk::MemoryPropertyFlagBits::eDeviceLocal);
-
-        if (!vertex_buffer.has_value()) {
-            throw std::runtime_error("Failed to create vertex buffer.");
-        }
-
-        m_vertex_buffer = std::move(vertex_buffer->first);
-        m_vertex_buffer_memory = std::move(vertex_buffer->second);
-
-        auto index_buffer = rtr::make_buffer_with_memory(
-            m_device,
-            m_physical_device,
-            index_buffer_size,
-            vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-            vk::MemoryPropertyFlagBits::eDeviceLocal);
-
-        if (!index_buffer.has_value()) {
-            throw std::runtime_error("Failed to create index buffer.");
-        }
-
-        m_index_buffer = std::move(index_buffer->first);
-        m_index_buffer_memory = std::move(index_buffer->second);
-
-        rtr::map_memory(
-            staging_buffer->second,
-            staging_buffer_size,
-            0,
-            [&](void *data) {
-                std::memcpy(
-                    data,
-                    vertices.data(),
-                    static_cast<size_t>(vertex_buffer_size));
-                std::memcpy(
-                    static_cast<char *>(data) + vertex_buffer_size,
-                    indices.data(),
-                    static_cast<size_t>(index_buffer_size));
-            });
-
-        copy_buffer(
-            *staging_buffer->first,
-            *m_vertex_buffer,
-            vertex_buffer_size);
-
-        copy_buffer(
-            *staging_buffer->first,
-            *m_index_buffer,
-            index_buffer_size,
-            vertex_buffer_size,
-            0);
-    }
-
-    void create_command_pool() {
-        vk::CommandPoolCreateInfo command_pool_create_info{};
-        command_pool_create_info.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
-        command_pool_create_info.queueFamilyIndex = static_cast<uint32_t>(m_queue_family_index);
-
-        m_command_pool = vk::raii::CommandPool{
-            m_device,
-            command_pool_create_info};
-    }
-
-    void create_frame_command_buffers() {
-        vk::CommandBufferAllocateInfo command_buffer_allocate_info{};
-        command_buffer_allocate_info.commandPool = *m_command_pool;
-        command_buffer_allocate_info.level = vk::CommandBufferLevel::ePrimary;
-        command_buffer_allocate_info.commandBufferCount = MAX_FRAMES_IN_FLIGHT;
-
-        auto allocated_buffers = m_device.allocateCommandBuffers(command_buffer_allocate_info);
-        m_command_buffers.clear();
-        m_command_buffers.reserve(allocated_buffers.size());
-        for (auto &buffer : allocated_buffers) {
-            m_command_buffers.emplace_back(std::move(buffer));
-        }
-    }
 
     void create_sync_objects() {
         m_frame_sync_objects.clear();
@@ -1104,75 +632,27 @@ private:
 
         for (auto &sync_objects : m_frame_sync_objects) {
             sync_objects.image_available_semaphore = vk::raii::Semaphore{
-                m_device,
+                m_device->device(),
                 semaphore_create_info};
 
             sync_objects.render_finished_semaphore = vk::raii::Semaphore{
-                m_device,
+                m_device->device(),
                 semaphore_create_info};
 
             sync_objects.submit_fence = vk::raii::Fence{
-                m_device,
+                m_device->device(),
                 fence_create_info};
 
             sync_objects.present_fence = vk::raii::Fence{
-                m_device,
+                m_device->device(),
                 fence_create_info};
         }
-    }
-
-    void copy_buffer(
-        vk::Buffer src,
-        vk::Buffer dst,
-        vk::DeviceSize size,
-        vk::DeviceSize src_offset = 0,
-        vk::DeviceSize dst_offset = 0) {
-        vk::CommandPoolCreateInfo command_pool_info{};
-        command_pool_info.flags = vk::CommandPoolCreateFlagBits::eTransient;
-        command_pool_info.queueFamilyIndex = static_cast<uint32_t>(m_queue_family_index);
-
-        vk::raii::CommandPool command_pool{
-            m_device,
-            command_pool_info};
-
-        vk::CommandBufferAllocateInfo command_buffer_allocate_info{};
-        command_buffer_allocate_info.commandPool = *command_pool;
-        command_buffer_allocate_info.level = vk::CommandBufferLevel::ePrimary;
-        command_buffer_allocate_info.commandBufferCount = 1;
-
-        auto command_buffers = m_device.allocateCommandBuffers(command_buffer_allocate_info);
-        auto &command_buffer = command_buffers.front();
-
-        vk::CommandBufferBeginInfo begin_info{};
-        begin_info.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
-        command_buffer.begin(begin_info);
-
-        vk::BufferCopy buffer_copy{};
-        buffer_copy.srcOffset = src_offset;
-        buffer_copy.dstOffset = dst_offset;
-        buffer_copy.size = size;
-        command_buffer.copyBuffer(src, dst, buffer_copy);
-
-        command_buffer.end();
-
-        vk::CommandBuffer raw_command_buffer = *command_buffer;
-
-        vk::SubmitInfo submit_info{};
-        submit_info.commandBufferCount = 1;
-        submit_info.pCommandBuffers = &raw_command_buffer;
-
-        m_queue.submit(submit_info, vk::Fence{});
-        m_queue.waitIdle();
     }
 
     static void framebuffer_resize_callback(GLFWwindow *window, int width, int height) {
         auto app = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
-        if (!app) {
-            return;
-        }
-
+        if (!app) { return; }
         std::cout << "Framebuffer resized to (" << width << ", " << height << ")." << std::endl;
-
         app->m_framebuffer_resized = true;
     }
 };

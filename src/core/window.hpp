@@ -35,6 +35,9 @@ public:
             m_title.c_str(), 
             nullptr, nullptr
         );
+
+        //save this pointer for callbacks
+        set_user_pointer(this);
     }
 
     ~Window() {
@@ -44,7 +47,7 @@ public:
         glfwTerminate();
     }
 
-    GLFWwindow* window() const {
+    const GLFWwindow* window() const {
         return m_window;
     }
 

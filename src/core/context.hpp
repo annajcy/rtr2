@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 #include <vector>
 #include <string>
 #include <optional>
@@ -144,7 +143,11 @@ private:
     vk::raii::SurfaceKHR m_surface{nullptr};
     vk::raii::DebugUtilsMessengerEXT m_debug_messenger{nullptr};
 
-    bool m_is_validation_layers_enabled{ false };
+#if !defined(NDEBUG)
+    bool m_is_validation_layers_enabled{ true }; 
+#else
+    bool m_is_validation_layers_enabled{ false }; 
+#endif
 
     std::vector<std::string> m_instance_layers{};
     std::vector<std::string> m_instance_extensions{
@@ -154,20 +157,16 @@ private:
         "VK_EXT_surface_maintenance1",
         "VK_KHR_get_surface_capabilities2"
     };
-    
-public:
-    Context(
-        Window* window,
-        bool enable_validation_layers = false
-    ) : m_window(window), m_is_validation_layers_enabled(enable_validation_layers) {
 
+private:
+    void create_instance() {
         auto window_extensions = m_window->required_extensions();
         m_instance_extensions.insert(
             m_instance_extensions.end(),
             window_extensions.begin(),
             window_extensions.end()
         );
-        if (enable_validation_layers) {
+        if (m_is_validation_layers_enabled) {
             m_instance_layers.push_back("VK_LAYER_KHRONOS_validation");
             m_instance_extensions.push_back(vk::EXTDebugUtilsExtensionName);
         }
@@ -193,20 +192,31 @@ public:
         auto instance_handles = std::move(instance_result.value());
         m_context = std::move(instance_handles.first);
         m_instance = std::move(instance_handles.second);
+    }
 
+    void create_surface() {
         if (auto surface_handle = m_window->create_vk_surface(m_instance)) {
             m_surface = vk::raii::SurfaceKHR{m_instance, surface_handle.value()};
         } else {
             throw std::runtime_error("Failed to create Vulkan surface.");
         }
-
-        if (enable_validation_layers) {
-            m_debug_messenger = create_debug_messenger(m_instance);
-        }
     }
 
-    const Window& window() const {
-        return *m_window;
+    void create_debug_messenger() {
+        if (m_is_validation_layers_enabled) {
+            m_debug_messenger = rtr::core::create_debug_messenger(m_instance);
+        }
+    }
+    
+public:
+    Context(Window* window) : m_window(window) {
+        create_instance();
+        create_surface();
+        create_debug_messenger();
+    }
+
+    const Window* window() const {
+        return m_window;
     }
 
     const vk::raii::Instance& instance() const {
