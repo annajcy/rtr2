@@ -5,22 +5,16 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
-#include <chrono>
 
 #include "window.hpp"
 #include "context.hpp"
 #include "device.hpp"
-#include "swap_chain.hpp"
-#include "buffer.hpp"
 #include "command.hpp"
-#include "descriptor.hpp"
-#include "shader_module.hpp"
-#include "frame_context.hpp"
 #include "renderer.hpp"
+#include "render_pipeline.hpp"
 
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_enums.hpp"
@@ -45,58 +39,6 @@ const std::string shader_output_dir = "/Users/jinceyang/Desktop/codebase/graphic
 const std::string vertex_shader_filename = "vert_buffer_vert.spv";
 const std::string fragment_shader_filename = "vert_buffer_frag.spv";
 
-struct FrameSynchronizationObjects {
-    vk::raii::Semaphore image_available_semaphore{nullptr};
-    vk::raii::Semaphore render_finished_semaphore{nullptr};
-    vk::raii::Fence submit_fence{nullptr};
-    vk::raii::Fence present_fence{nullptr};
-};
-
-struct UniformBufferObject {
-    alignas(16) glm::mat4 model;
-    alignas(16) glm::mat4 view;
-    alignas(16) glm::mat4 proj;
-
-    static vk::DescriptorSetLayoutBinding get_descriptor_set_layout_binding(uint32_t binding = 0) {
-        vk::DescriptorSetLayoutBinding layout_binding{};
-        layout_binding.binding = binding;
-        layout_binding.descriptorType = vk::DescriptorType::eUniformBuffer;
-        layout_binding.descriptorCount = 1;
-        layout_binding.stageFlags = vk::ShaderStageFlagBits::eVertex;
-        layout_binding.pImmutableSamplers = nullptr;
-        return layout_binding;
-    }
-};
-
-struct Vertex {
-    glm::vec2 pos;
-    glm::vec3 color;
-
-    static vk::VertexInputBindingDescription get_binding_description() {
-        vk::VertexInputBindingDescription binding_description{};
-        binding_description.binding = 0;
-        binding_description.stride = sizeof(Vertex);
-        binding_description.inputRate = vk::VertexInputRate::eVertex;
-        return binding_description;
-    }
-
-    static std::array<vk::VertexInputAttributeDescription, 2> get_attribute_descriptions() {
-        std::array<vk::VertexInputAttributeDescription, 2> attribute_descriptions{};
-
-        attribute_descriptions[0].binding = 0;
-        attribute_descriptions[0].location = 0;
-        attribute_descriptions[0].format = vk::Format::eR32G32Sfloat;
-        attribute_descriptions[0].offset = offsetof(Vertex, pos);
-
-        attribute_descriptions[1].binding = 0;
-        attribute_descriptions[1].location = 1;
-        attribute_descriptions[1].format = vk::Format::eR32G32B32Sfloat;
-        attribute_descriptions[1].offset = offsetof(Vertex, color);
-
-        return attribute_descriptions;
-    }
-};
-
 const std::vector<Vertex> vertices = {
     {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
     {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
@@ -114,429 +56,51 @@ private:
     
     // Renderer now manages swapchain, command pool, and sync objects
     std::unique_ptr<Renderer> m_renderer{};
-
-    std::unique_ptr<Buffer> m_vertex_buffer{nullptr};
-    std::unique_ptr<Buffer> m_index_buffer{nullptr};
-
-    std::unique_ptr<ShaderModule> m_vertex_shader_module{nullptr};
-    std::unique_ptr<ShaderModule> m_fragment_shader_module{nullptr};
-
-    vk::raii::PipelineLayout m_pipeline_layout{nullptr};
-    vk::raii::Pipeline m_pipeline{nullptr};
-
-    std::vector<std::unique_ptr<Buffer>> m_uniform_buffers{};
-    std::unique_ptr<DescriptorSystem> m_descriptor_system{nullptr};
-
+    std::unique_ptr<RenderPipeline> m_pipeline_graph{};
 
 public:
     Application() {
         m_window = std::make_unique<Window>(WIDTH, HEIGHT, "RTR Application");
+        m_window->set_user_pointer(this);
+        m_window->set_framebuffer_size_callback(framebuffer_resize_callback);
 
         m_context = std::make_unique<Context>(m_window.get());
         m_device = std::make_unique<Device>(m_context.get());
         
         // Create renderer (manages swapchain, command buffers, sync)
-        m_renderer = std::make_unique<Renderer>(m_device.get(), m_window.get(), MAX_FRAMES_IN_FLIGHT);
-        
-        // Set window resize callback
-        m_window->set_framebuffer_size_callback(framebuffer_resize_callback);
-
-        // set shader modules
-        m_vertex_shader_module = std::make_unique<ShaderModule>(
-            ShaderModule::from_file(
-                m_device.get(),
-                shader_output_dir + vertex_shader_filename,
-                vk::ShaderStageFlagBits::eVertex
-            )
+        m_renderer = std::make_unique<Renderer>(
+            m_device.get(),
+            m_window.get(),
+            MAX_FRAMES_IN_FLIGHT
         );
 
-        m_fragment_shader_module = std::make_unique<ShaderModule>(
-            ShaderModule::from_file(
-                m_device.get(),
-                shader_output_dir + fragment_shader_filename,
-                vk::ShaderStageFlagBits::eFragment
-            )
-        );
-
-        m_vertex_buffer = std::make_unique<Buffer>(
-            Buffer::create_device_local_with_data(
-                m_device.get(),
-                vertices.data(),
-                sizeof(vertices[0]) * vertices.size(),
-                vk::BufferUsageFlagBits::eVertexBuffer
-            )
-        );
-
-        m_index_buffer = std::make_unique<Buffer>(
-            Buffer::create_device_local_with_data(
-                m_device.get(),
-                indices.data(),
-                 sizeof(indices[0]) * indices.size(),
-                vk::BufferUsageFlagBits::eIndexBuffer
-            )
-        );
-
-        // Create uniform buffers 
-        m_uniform_buffers.clear();
-        m_uniform_buffers.reserve(MAX_FRAMES_IN_FLIGHT);
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i ++) {
-            vk::DeviceSize buffer_size = sizeof(UniformBufferObject);
-            auto uniform_buffer = std::make_unique<Buffer>(
-                Buffer::create_host_visible_buffer(
-                    m_device.get(),
-                    buffer_size,
-                    vk::BufferUsageFlagBits::eUniformBuffer
-                )
-            );
-            uniform_buffer->map();
-            m_uniform_buffers.emplace_back(std::move(uniform_buffer));
-        }
-        // Create descriptor system
-        m_descriptor_system = std::make_unique<DescriptorSystem>(
-            DescriptorSystem::Builder(m_device.get())
-                .add_set("per_frame", 0, MAX_FRAMES_IN_FLIGHT, 
-                    [](DescriptorSetLayout::Builder& builder) {
-                        builder.add_binding(0, vk::DescriptorType::eUniformBuffer, 
-                                          vk::ShaderStageFlagBits::eVertex);
-                    })
-                .build()
-        );
-
-        // Update descriptor sets
-        m_descriptor_system->update_all_sets("per_frame", 
-            [this](DescriptorWriter& writer, uint32_t index) {
-                writer.write_buffer(
-                    0, 
-                    *m_uniform_buffers[index]->buffer(), 
-                    0, 
-                    sizeof(UniformBufferObject)
-                );
-            });
-        
-        // Test descriptor to_string methods
-        std::cout << "\n========== Descriptor System Info ==========\n";
-        std::cout << to_string(*m_descriptor_system) << std::endl;
-        
-        // Test DescriptorSetLayout to_string
-        std::cout << "========== Per-Frame Layout Info ==========\n";
-        std::cout << to_string(m_descriptor_system->get_layout("per_frame")) << std::endl;
-
-        // Test DescriptorPool to_string
-        std::cout << "========== Descriptor Pool Info ==========\n";
-        std::cout << to_string(m_descriptor_system->pool()) << std::endl;
-        
-        create_pipeline();
+        // Build render pipeline (owns shaders/buffers/descriptor sets/pipeline state)
+        m_pipeline_graph = std::make_unique<RenderPipeline>(m_device.get(), m_renderer.get());
+        m_pipeline_graph->initialize(
+            shader_output_dir,
+            vertex_shader_filename,
+            fragment_shader_filename,
+            vertices,
+            indices);
     }
 
     void run() { loop(); }
 
     ~Application() = default;
 
-private:
     void loop() {
         while (!m_window->is_should_close()) {
             m_window->poll_events();
             
-            // Use new Renderer API
+            // Execute linear pipeline
             m_renderer->draw_frame([this](FrameContext& ctx) {
-                this->render_frame(ctx);
+                this->m_pipeline_graph->execute_frame(ctx);
             });
         }
         
         m_device->device().waitIdle();
     }
-    
-    void render_frame(FrameContext& frame_ctx) {
-        // Update uniform buffer for current frame
-        uint32_t frame_index = m_renderer->current_frame_index();
-        update_uniform_buffer(m_uniform_buffers[frame_index]->mapped_data());
-        
-        // Add descriptor set to frame context
-        auto builder = FrameContext::Builder()
-            .add_buffer("uniform", m_uniform_buffers[frame_index].get())
-            .add_descriptor_set("per_frame", m_descriptor_system->get_set("per_frame", frame_index));
-        
-        // Build complete frame context with descriptor sets
-        FrameContext complete_ctx = builder.build(
-            frame_ctx.device(),
-            frame_ctx.cmd(),
-            &frame_ctx.swapchain_image_view(),
-            &frame_ctx.swapchain_image()
-        );
-        
-        // Record rendering commands
-        record_command_buffer(complete_ctx);
-    }
 
-    struct TransitionImageLayoutInfo {
-        vk::ImageLayout layout;
-        vk::AccessFlagBits2 access_mask;
-        vk::PipelineStageFlagBits2 stage;
-    };
-
-    void record_command_buffer(FrameContext& frame_ctx) {
-        frame_ctx.cmd()->record([&](CommandBuffer& cmd) {
-            TransitionImageLayoutInfo old_layout_info{
-                vk::ImageLayout::eUndefined,
-                vk::AccessFlagBits2::eNone,
-                vk::PipelineStageFlagBits2::eTopOfPipe};
-
-            TransitionImageLayoutInfo new_layout_info{
-                vk::ImageLayout::eColorAttachmentOptimal,
-                vk::AccessFlagBits2::eColorAttachmentWrite,
-                vk::PipelineStageFlagBits2::eColorAttachmentOutput};
-
-            transition_image_layout(
-                cmd,
-                frame_ctx.swapchain_image(),
-                old_layout_info,
-                new_layout_info
-            );
-
-            //vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}};
-            vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{1.0f, 0.0f, 1.0f, 1.0f}}; 
-            vk::RenderingAttachmentInfo color_attachment_info{};
-            color_attachment_info.imageView = *frame_ctx.swapchain_image_view();
-            color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-            color_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
-            color_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
-            color_attachment_info.clearValue = clear_value;
-
-            vk::RenderingInfo rendering_info{};
-            rendering_info.renderArea.offset = vk::Offset2D{0, 0};
-            rendering_info.renderArea.extent = m_renderer->render_extent();
-            rendering_info.layerCount = 1;
-            rendering_info.colorAttachmentCount = 1;
-            rendering_info.pColorAttachments = &color_attachment_info;
-
-            cmd.begin_rendering(rendering_info);
-
-            cmd.bind_pipeline(
-                vk::PipelineBindPoint::eGraphics,
-                m_pipeline);
-
-            std::vector<vk::Buffer> vertex_buffers = {*m_vertex_buffer->buffer()};
-            std::vector<vk::DeviceSize> offsets = {0};
-            cmd.bind_vertex_buffers(0, vertex_buffers, offsets);
-
-            cmd.bind_index_buffer(
-                *m_index_buffer->buffer(),
-                0,
-                vk::IndexType::eUint16);
-
-            cmd.bind_descriptor_sets(
-                vk::PipelineBindPoint::eGraphics,
-                m_pipeline_layout,
-                0,
-                frame_ctx.get_descriptor_set("per_frame"));
-
-            vk::Viewport viewport{};
-            viewport.x = 0.0f;
-            viewport.y = 0.0f;
-            viewport.width = static_cast<float>(m_renderer->render_extent().width);
-            viewport.height = static_cast<float>(m_renderer->render_extent().height);
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            cmd.set_viewport(viewport);
-
-            vk::Rect2D scissor{};
-            scissor.offset = vk::Offset2D{0, 0};
-            scissor.extent = m_renderer->render_extent();
-            cmd.set_scissor(scissor);
-
-            cmd.draw_indexed(
-                static_cast<uint32_t>(indices.size()),
-                1,
-                0,
-                0,
-                0);
-
-            cmd.end_rendering();
-
-            old_layout_info.layout = vk::ImageLayout::eColorAttachmentOptimal;
-            old_layout_info.access_mask = vk::AccessFlagBits2::eColorAttachmentWrite;
-            old_layout_info.stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-
-            new_layout_info.layout = vk::ImageLayout::ePresentSrcKHR;
-            new_layout_info.access_mask = vk::AccessFlagBits2::eNone;
-            new_layout_info.stage = vk::PipelineStageFlagBits2::eBottomOfPipe;
-
-            transition_image_layout(
-                cmd,
-                frame_ctx.swapchain_image(),
-                old_layout_info,
-                new_layout_info
-            );
-        }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-    }
-
-    void transition_image_layout(
-        CommandBuffer& cmd,
-        const vk::Image &image,
-        const TransitionImageLayoutInfo &old_layout_info,
-        const TransitionImageLayoutInfo &new_layout_info) {
-        vk::ImageMemoryBarrier2 image_memory_barrier{};
-        image_memory_barrier.srcStageMask = old_layout_info.stage;
-        image_memory_barrier.dstStageMask = new_layout_info.stage;
-        image_memory_barrier.srcAccessMask = old_layout_info.access_mask;
-        image_memory_barrier.dstAccessMask = new_layout_info.access_mask;
-        image_memory_barrier.oldLayout = old_layout_info.layout;
-        image_memory_barrier.newLayout = new_layout_info.layout;
-        image_memory_barrier.image = image;
-        image_memory_barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-        image_memory_barrier.subresourceRange.baseMipLevel = 0;
-        image_memory_barrier.subresourceRange.levelCount = 1;
-        image_memory_barrier.subresourceRange.baseArrayLayer = 0;
-        image_memory_barrier.subresourceRange.layerCount = 1;
-
-        vk::DependencyInfo dependency_info{};
-        dependency_info.imageMemoryBarrierCount = 1;
-        dependency_info.pImageMemoryBarriers = &image_memory_barrier;
-
-        cmd.pipeline_barrier_2(dependency_info);
-    }
-
-    void update_uniform_buffer(void* mapped_ptr) {
-        static auto start_time = std::chrono::high_resolution_clock::now();
-
-        auto current_time = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
-
-        UniformBufferObject ubo{};
-        ubo.model = glm::rotate(
-            glm::mat4(1.0f),
-            time * glm::radians(90.0f),
-            glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.view = glm::lookAt(
-            glm::vec3(2.0f, 2.0f, 2.0f),
-            glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.proj = glm::perspective(
-            glm::radians(45.0f),
-            static_cast<float>(m_renderer->render_extent().width) / static_cast<float>(m_renderer->render_extent().height),
-            0.1f,
-            10.0f);
-        ubo.proj[1][1] *= -1;
-
-        std::memcpy(mapped_ptr, &ubo, sizeof(ubo));
-    }
-
-    void create_pipeline() {
-        std::vector<vk::PipelineShaderStageCreateInfo> shader_stage_infos = {
-            m_vertex_shader_module->stage_create_info(),
-            m_fragment_shader_module->stage_create_info()
-        };
-
-        vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
-        auto vertex_binding_description = Vertex::get_binding_description();
-
-        std::vector<vk::VertexInputBindingDescription> binding_descriptions = {
-            vertex_binding_description};
-
-        vertex_input_info.vertexBindingDescriptionCount = static_cast<uint32_t>(binding_descriptions.size());
-        vertex_input_info.pVertexBindingDescriptions = binding_descriptions.data();
-
-        auto attribute_descriptions = Vertex::get_attribute_descriptions();
-
-        std::vector<vk::VertexInputAttributeDescription> attribute_descs = {
-            attribute_descriptions[0],
-            attribute_descriptions[1]
-        };
-
-        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descs.size());
-        vertex_input_info.pVertexAttributeDescriptions = attribute_descs.data();
-
-        vk::PipelineInputAssemblyStateCreateInfo input_assembly_info{};
-        input_assembly_info.topology = vk::PrimitiveTopology::eTriangleList;
-
-        vk::PipelineViewportStateCreateInfo viewport_info{};
-        viewport_info.viewportCount = 1;
-        viewport_info.scissorCount = 1;
-
-        vk::PipelineRasterizationStateCreateInfo rasterization_info{};
-        rasterization_info.depthClampEnable = VK_FALSE;
-        rasterization_info.rasterizerDiscardEnable = VK_FALSE;
-        rasterization_info.polygonMode = vk::PolygonMode::eFill;
-        rasterization_info.cullMode = vk::CullModeFlagBits::eNone;
-        rasterization_info.frontFace = vk::FrontFace::eCounterClockwise;
-        rasterization_info.depthBiasEnable = VK_FALSE;
-        rasterization_info.lineWidth = 1.0f;
-
-        vk::PipelineMultisampleStateCreateInfo multisample_info{};
-        multisample_info.rasterizationSamples = vk::SampleCountFlagBits::e1;
-
-        vk::PipelineColorBlendAttachmentState color_blend_attachment{};
-        color_blend_attachment.blendEnable = VK_FALSE;
-        color_blend_attachment.colorWriteMask =
-            vk::ColorComponentFlagBits::eR |
-            vk::ColorComponentFlagBits::eG |
-            vk::ColorComponentFlagBits::eB |
-            vk::ColorComponentFlagBits::eA;
-
-        std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments = {
-            color_blend_attachment};
-
-        vk::PipelineColorBlendStateCreateInfo color_blend_state{};
-        color_blend_state.logicOpEnable = VK_FALSE;
-        color_blend_state.logicOp = vk::LogicOp::eCopy;
-        color_blend_state.attachmentCount = static_cast<uint32_t>(color_blend_attachments.size());
-        color_blend_state.pAttachments = color_blend_attachments.data();
-
-        std::vector<vk::DynamicState> dynamic_states = {
-            vk::DynamicState::eViewport,
-            vk::DynamicState::eScissor};
-
-        vk::PipelineDynamicStateCreateInfo dynamic_state_info{};
-        dynamic_state_info.dynamicStateCount = static_cast<uint32_t>(dynamic_states.size());
-        dynamic_state_info.pDynamicStates = dynamic_states.data();
-
-        vk::PipelineLayoutCreateInfo pipeline_layout_info{};
-        std::vector<vk::DescriptorSetLayout> set_layouts = {
-            *m_descriptor_system->get_layout("per_frame").layout()
-        };
-        pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(set_layouts.size());
-        pipeline_layout_info.pSetLayouts = set_layouts.data();
-
-        m_pipeline_layout = vk::raii::PipelineLayout{
-            m_device->device(),
-            pipeline_layout_info};
-
-        vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info{};
-        graphics_pipeline_create_info.stageCount = static_cast<uint32_t>(shader_stage_infos.size());
-        graphics_pipeline_create_info.pStages = shader_stage_infos.data();
-        graphics_pipeline_create_info.pVertexInputState = &vertex_input_info;
-        graphics_pipeline_create_info.pInputAssemblyState = &input_assembly_info;
-        graphics_pipeline_create_info.pViewportState = &viewport_info;
-        graphics_pipeline_create_info.pRasterizationState = &rasterization_info;
-        graphics_pipeline_create_info.pMultisampleState = &multisample_info;
-        graphics_pipeline_create_info.pColorBlendState = &color_blend_state;
-        graphics_pipeline_create_info.pDynamicState = &dynamic_state_info;
-        graphics_pipeline_create_info.layout = *m_pipeline_layout;
-        graphics_pipeline_create_info.renderPass = VK_NULL_HANDLE;
-
-        vk::PipelineRenderingCreateInfo pipeline_rendering_info{};
-
-        std::vector<vk::Format> color_attachment_formats = {
-            m_renderer->render_format()};
-
-        pipeline_rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachment_formats.size());
-        pipeline_rendering_info.pColorAttachmentFormats = color_attachment_formats.data();
-
-        vk::StructureChain<
-            vk::GraphicsPipelineCreateInfo,
-            vk::PipelineRenderingCreateInfo
-        > pipeline_info_chain{
-            graphics_pipeline_create_info,
-            pipeline_rendering_info
-        };
-
-        m_pipeline = vk::raii::Pipeline{
-            m_device->device(),
-            nullptr,
-            pipeline_info_chain.get<vk::GraphicsPipelineCreateInfo>()
-        };
-    }
-    
     static void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
         auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
         if (!app) { return; }
