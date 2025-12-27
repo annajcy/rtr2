@@ -2,7 +2,6 @@
 #include <cstdlib>
 
 #include "core/application.hpp"
-#include "core/context.hpp"
 #include "utils/image_loader.hpp"
 
 

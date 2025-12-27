@@ -4,12 +4,12 @@
 #include <cstring>
 #include <memory>
 #include <string>
-#include <stdexcept>
 #include <utility>
 #include <vector>
 
 #include "buffer.hpp"
 #include "descriptor.hpp"
+#include "mesh.hpp"
 #include "renderer.hpp"
 #include "shader_module.hpp"
 
@@ -23,35 +23,7 @@ struct UniformBufferObject {
     alignas(16) glm::mat4 model;
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
-};
-
-struct Vertex {
-    glm::vec2 pos;
-    glm::vec3 color;
-
-    static vk::VertexInputBindingDescription get_binding_description() {
-        vk::VertexInputBindingDescription binding_description{};
-        binding_description.binding = 0;
-        binding_description.stride = sizeof(Vertex);
-        binding_description.inputRate = vk::VertexInputRate::eVertex;
-        return binding_description;
-    }
-
-    static std::array<vk::VertexInputAttributeDescription, 2> get_attribute_descriptions() {
-        std::array<vk::VertexInputAttributeDescription, 2> attribute_descriptions{};
-
-        attribute_descriptions[0].binding = 0;
-        attribute_descriptions[0].location = 0;
-        attribute_descriptions[0].format = vk::Format::eR32G32Sfloat;
-        attribute_descriptions[0].offset = offsetof(Vertex, pos);
-
-        attribute_descriptions[1].binding = 0;
-        attribute_descriptions[1].location = 1;
-        attribute_descriptions[1].format = vk::Format::eR32G32B32Sfloat;
-        attribute_descriptions[1].offset = offsetof(Vertex, color);
-
-        return attribute_descriptions;
-    }
+    alignas(16) glm::mat4 normal; // inverse-transpose of model for normals
 };
 
 /**
@@ -62,21 +34,20 @@ private:
     Device* m_device;
     Renderer* m_renderer;
 
-    std::unique_ptr<ShaderModule> m_vertex_shader_module{nullptr};
-    std::unique_ptr<ShaderModule> m_fragment_shader_module{nullptr};
-
-    std::unique_ptr<Buffer> m_vertex_buffer{nullptr};
-    std::unique_ptr<Buffer> m_index_buffer{nullptr};
-    uint32_t m_index_count{0};
-
-    std::vector<std::unique_ptr<Buffer>> m_uniform_buffers{};
-    std::unique_ptr<DescriptorSystem> m_descriptor_system{nullptr};
-
     vk::raii::PipelineLayout m_pipeline_layout{nullptr};
     vk::raii::Pipeline m_pipeline{nullptr};
 
     vk::DeviceSize m_uniform_buffer_size{0};
     uint32_t m_frame_count{0};
+
+    std::unique_ptr<ShaderModule> m_vertex_shader_module{nullptr};
+    std::unique_ptr<ShaderModule> m_fragment_shader_module{nullptr};
+
+    std::unique_ptr<Mesh> m_mesh{nullptr};
+
+    std::vector<std::unique_ptr<Buffer>> m_uniform_buffers{};
+    std::unique_ptr<DescriptorSystem> m_descriptor_system{nullptr};
+    
 public:
     RenderPipeline(Device* device, Renderer* renderer)
         : m_device(device), m_renderer(renderer) {}
@@ -84,8 +55,7 @@ public:
     void initialize(const std::string& shader_dir,
                     const std::string& vertex_shader_filename,
                     const std::string& fragment_shader_filename,
-                    const std::vector<Vertex>& vertices,
-                    const std::vector<uint16_t>& indices) {
+                    const std::string& obj_path) {
         m_uniform_buffer_size = sizeof(UniformBufferObject);
         m_frame_count = m_renderer->max_frames_in_flight();
 
@@ -106,25 +76,8 @@ public:
             )
         );
 
-        // Create vertex buffer
-         m_vertex_buffer = std::make_unique<Buffer>(
-            Buffer::create_device_local_with_data(
-                m_device,
-                vertices.data(),
-                sizeof(vertices[0]) * vertices.size(),
-                vk::BufferUsageFlagBits::eVertexBuffer
-            )
-        );
-
-        m_index_buffer = std::make_unique<Buffer>(
-            Buffer::create_device_local_with_data(
-                m_device,
-                indices.data(),
-                sizeof(indices[0]) * indices.size(),
-                vk::BufferUsageFlagBits::eIndexBuffer
-            )
-        );
-        m_index_count = static_cast<uint32_t>(indices.size());
+        // Load mesh from OBJ and create GPU buffers
+        m_mesh = std::make_unique<Mesh>(Mesh::from_obj(m_device, obj_path));
 
         m_uniform_buffers.clear();
         m_uniform_buffers.reserve(m_frame_count);
@@ -168,7 +121,7 @@ public:
         };
 
         vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
-        auto vertex_binding_description = Vertex::get_binding_description();
+        auto vertex_binding_description = Mesh::binding_description();
 
         std::vector<vk::VertexInputBindingDescription> binding_descriptions = {
             vertex_binding_description};
@@ -176,14 +129,10 @@ public:
         vertex_input_info.vertexBindingDescriptionCount = static_cast<uint32_t>(binding_descriptions.size());
         vertex_input_info.pVertexBindingDescriptions = binding_descriptions.data();
 
-        auto attribute_descriptions = Vertex::get_attribute_descriptions();
+        auto attribute_descriptions = Mesh::attribute_descriptions();
 
-        std::vector<vk::VertexInputAttributeDescription> attribute_descs = {
-            attribute_descriptions[0],
-            attribute_descriptions[1]};
-
-        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descs.size());
-        vertex_input_info.pVertexAttributeDescriptions = attribute_descs.data();
+        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descriptions.size());
+        vertex_input_info.pVertexAttributeDescriptions = attribute_descriptions.data();
 
         vk::PipelineInputAssemblyStateCreateInfo input_assembly_info{};
         input_assembly_info.topology = vk::PrimitiveTopology::eTriangleList;
@@ -203,6 +152,11 @@ public:
 
         vk::PipelineMultisampleStateCreateInfo multisample_info{};
         multisample_info.rasterizationSamples = vk::SampleCountFlagBits::e1;
+
+        vk::PipelineDepthStencilStateCreateInfo depth_info{};
+        depth_info.depthTestEnable = VK_TRUE;
+        depth_info.depthWriteEnable = VK_TRUE;
+        depth_info.depthCompareOp = vk::CompareOp::eLess;
 
         vk::PipelineColorBlendAttachmentState color_blend_attachment{};
         color_blend_attachment.blendEnable = VK_FALSE;
@@ -248,6 +202,7 @@ public:
         graphics_pipeline_create_info.pViewportState = &viewport_info;
         graphics_pipeline_create_info.pRasterizationState = &rasterization_info;
         graphics_pipeline_create_info.pMultisampleState = &multisample_info;
+        graphics_pipeline_create_info.pDepthStencilState = &depth_info;
         graphics_pipeline_create_info.pColorBlendState = &color_blend_state;
         graphics_pipeline_create_info.pDynamicState = &dynamic_state_info;
         graphics_pipeline_create_info.layout = *m_pipeline_layout;
@@ -260,6 +215,7 @@ public:
 
         pipeline_rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachment_formats.size());
         pipeline_rendering_info.pColorAttachmentFormats = color_attachment_formats.data();
+        pipeline_rendering_info.depthAttachmentFormat = m_renderer->depth_format();
 
         vk::StructureChain<
             vk::GraphicsPipelineCreateInfo,
@@ -295,12 +251,21 @@ public:
             color_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
             color_attachment_info.clearValue = clear_value;
 
+            vk::ClearValue depth_clear{vk::ClearDepthStencilValue{1.0f, 0}};
+            vk::RenderingAttachmentInfo depth_attachment_info{};
+            depth_attachment_info.imageView = m_renderer->depth_image_view();
+            depth_attachment_info.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+            depth_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
+            depth_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
+            depth_attachment_info.clearValue = depth_clear;
+
             vk::RenderingInfo rendering_info{};
             rendering_info.renderArea.offset = vk::Offset2D{0, 0};
             rendering_info.renderArea.extent = m_renderer->render_extent();
             rendering_info.layerCount = 1;
             rendering_info.colorAttachmentCount = 1;
             rendering_info.pColorAttachments = &color_attachment_info;
+            rendering_info.pDepthAttachment = &depth_attachment_info;
 
             vk::ImageMemoryBarrier2 to_color{};
             to_color.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe;
@@ -327,14 +292,14 @@ public:
                 vk::PipelineBindPoint::eGraphics,
                 m_pipeline);
 
-            std::vector<vk::Buffer> vertex_buffers = {*m_vertex_buffer->buffer()};
+            std::vector<vk::Buffer> vertex_buffers = {m_mesh->vertex_buffer()};
             std::vector<vk::DeviceSize> offsets = {0};
             cmd.bind_vertex_buffers(0, vertex_buffers, offsets);
 
             cmd.bind_index_buffer(
-                *m_index_buffer->buffer(),
+                m_mesh->index_buffer(),
                 0,
-                vk::IndexType::eUint16);
+                vk::IndexType::eUint32);
 
             cmd.bind_descriptor_sets(
                 vk::PipelineBindPoint::eGraphics,
@@ -357,7 +322,7 @@ public:
             cmd.set_scissor(scissor);
 
             cmd.draw_indexed(
-                m_index_count,
+                m_mesh->index_count(),
                 1,
                 0,
                 0,
@@ -386,27 +351,23 @@ public:
         }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     }
 
-    Buffer& uniform_buffer(uint32_t frame_index) {
-        if (frame_index >= m_uniform_buffers.size()) {
-            throw std::runtime_error("Frame index out of range for uniform buffer");
-        }
-        return *m_uniform_buffers[frame_index];
-    }
-
     void update_uniform_buffer(FrameContext& ctx) {
         static auto start_time = std::chrono::high_resolution_clock::now();
         auto current_time = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
 
         UniformBufferObject ubo{};
-        ubo.model = glm::rotate(
+        glm::mat4 model = glm::scale(
             glm::mat4(1.0f),
+            glm::vec3(3.0f));
+        ubo.model = glm::rotate(
+            model,
             time * glm::radians(90.0f),
-            glm::vec3(0.0f, 0.0f, 1.0f));
+            glm::vec3(0.0f, 1.0f, 0.0f));
         ubo.view = glm::lookAt(
-            glm::vec3(2.0f, 2.0f, 2.0f),
+            glm::vec3(0.0f, 0.0f, -3.0f),
             glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 0.0f, 1.0f));
+            glm::vec3(0.0f, 1.0f, 0.0f));
         auto extent = m_renderer->render_extent();
         ubo.proj = glm::perspective(
             glm::radians(45.0f),
@@ -414,6 +375,7 @@ public:
             0.1f,
             10.0f);
         ubo.proj[1][1] *= -1;
+        ubo.normal = glm::transpose(glm::inverse(ubo.model));
 
         std::memcpy(ctx.get_buffer("uniform").mapped_data(), &ubo, sizeof(ubo));
     }

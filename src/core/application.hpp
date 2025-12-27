@@ -39,14 +39,7 @@ const std::string shader_output_dir = "/Users/jinceyang/Desktop/codebase/graphic
 const std::string vertex_shader_filename = "vert_buffer_vert.spv";
 const std::string fragment_shader_filename = "vert_buffer_frag.spv";
 
-const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
-};
-
-const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
+const std::string model_path = "assets/models/stanford_bunny.obj";
 
 class Application {
 private:
@@ -56,7 +49,7 @@ private:
     
     // Renderer now manages swapchain, command pool, and sync objects
     std::unique_ptr<Renderer> m_renderer{};
-    std::unique_ptr<RenderPipeline> m_pipeline_graph{};
+    std::unique_ptr<RenderPipeline> m_render_pipeline{};
 
 public:
     Application() {
@@ -75,13 +68,12 @@ public:
         );
 
         // Build render pipeline (owns shaders/buffers/descriptor sets/pipeline state)
-        m_pipeline_graph = std::make_unique<RenderPipeline>(m_device.get(), m_renderer.get());
-        m_pipeline_graph->initialize(
+        m_render_pipeline = std::make_unique<RenderPipeline>(m_device.get(), m_renderer.get());
+        m_render_pipeline->initialize(
             shader_output_dir,
             vertex_shader_filename,
             fragment_shader_filename,
-            vertices,
-            indices);
+            model_path);
     }
 
     void run() { loop(); }
@@ -94,7 +86,7 @@ public:
             
             // Execute linear pipeline
             m_renderer->draw_frame([this](FrameContext& ctx) {
-                this->m_pipeline_graph->execute_frame(ctx);
+                this->m_render_pipeline->execute_frame(ctx);
             });
         }
         

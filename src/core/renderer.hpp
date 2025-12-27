@@ -165,10 +165,18 @@ public:
         PerFrameResources& operator=(PerFrameResources&&) = default;
     };
 
+    struct DepthResources {
+        vk::raii::Image image{nullptr};
+        vk::raii::DeviceMemory memory{nullptr};
+        vk::raii::ImageView view{nullptr};
+        vk::Format format{vk::Format::eD32Sfloat};
+    };
+
 private:
     Device* m_device;
     Window* m_window;
     
+    DepthResources m_depth;
     std::unique_ptr<SwapChain> m_swapchain;
     std::unique_ptr<CommandPool> m_command_pool;
     
@@ -202,6 +210,7 @@ public:
         
         // Create swapchain
         m_swapchain = std::make_unique<SwapChain>(device);
+        create_depth_resources();
         
         // Create command pool with reset capability
         m_command_pool = std::make_unique<CommandPool>(
@@ -347,6 +356,9 @@ public:
      * @brief Get current render format (swapchain image format)
      */
     vk::Format render_format() const { return m_swapchain->image_format(); }
+    vk::Format depth_format() const { return m_depth.format; }
+    const vk::raii::ImageView& depth_image_view() const { return m_depth.view; }
+    const vk::Image& depth_image() const { return *m_depth.image; }
     
     /**
      * @brief Get number of swapchain images
@@ -442,6 +454,7 @@ public:
         
         // Recreate swapchain
         m_swapchain->recreate();
+        recreate_depth_resources();
         
         std::cout << "Swapchain recreated with extent (" 
                   << m_swapchain->extent().width << ", " 
@@ -462,6 +475,82 @@ public:
             &m_resource_registry,
             m_current_frame
         );
+    }
+
+    void recreate_depth_resources() {
+        m_depth.view.clear();
+        m_depth.image.clear();
+        m_depth.memory.clear();
+        create_depth_resources();
+    }
+
+    void create_depth_resources() {
+        vk::ImageCreateInfo image_info{};
+        image_info.imageType = vk::ImageType::e2D;
+        auto extent = m_swapchain->extent();
+        image_info.extent = vk::Extent3D{extent.width, extent.height, 1};
+        image_info.mipLevels = 1;
+        image_info.arrayLayers = 1;
+        image_info.format = m_depth.format;
+        image_info.tiling = vk::ImageTiling::eOptimal;
+        image_info.initialLayout = vk::ImageLayout::eUndefined;
+        image_info.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
+        image_info.samples = vk::SampleCountFlagBits::e1;
+        image_info.sharingMode = vk::SharingMode::eExclusive;
+
+        m_depth.image = vk::raii::Image(m_device->device(), image_info);
+
+        auto mem_requirements = m_depth.image.getMemoryRequirements();
+        auto mem_properties = m_device->physical_device().getMemoryProperties();
+        auto mem_type_index = find_memory_type(
+            mem_properties,
+            mem_requirements.memoryTypeBits,
+            vk::MemoryPropertyFlagBits::eDeviceLocal);
+        if (!mem_type_index.has_value()) {
+            throw std::runtime_error("Failed to find memory for depth buffer.");
+        }
+
+        vk::MemoryAllocateInfo alloc_info{};
+        alloc_info.allocationSize = mem_requirements.size;
+        alloc_info.memoryTypeIndex = mem_type_index.value();
+        m_depth.memory = vk::raii::DeviceMemory(m_device->device(), alloc_info);
+        m_depth.image.bindMemory(*m_depth.memory, 0);
+
+        vk::ImageViewCreateInfo view_info{};
+        view_info.image = *m_depth.image;
+        view_info.viewType = vk::ImageViewType::e2D;
+        view_info.format = m_depth.format;
+        view_info.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+        view_info.subresourceRange.baseMipLevel = 0;
+        view_info.subresourceRange.levelCount = 1;
+        view_info.subresourceRange.baseArrayLayer = 0;
+        view_info.subresourceRange.layerCount = 1;
+        m_depth.view = vk::raii::ImageView(m_device->device(), view_info);
+
+        // Transition to depth attachment layout once.
+        CommandPool temp_pool(m_device, vk::CommandPoolCreateFlagBits::eTransient);
+        auto cmd = temp_pool.create_command_buffer();
+        cmd.record_and_submit([&](CommandBuffer& recorder) {
+            vk::ImageMemoryBarrier2 barrier{};
+            barrier.oldLayout = vk::ImageLayout::eUndefined;
+            barrier.newLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+            barrier.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe;
+            barrier.srcAccessMask = vk::AccessFlagBits2::eNone;
+            barrier.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests;
+            barrier.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite | vk::AccessFlagBits2::eDepthStencilAttachmentRead;
+            barrier.image = *m_depth.image;
+            barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            vk::DependencyInfo dep{};
+            dep.imageMemoryBarrierCount = 1;
+            dep.pImageMemoryBarriers = &barrier;
+            recorder.pipeline_barrier_2(dep);
+        });
+        m_device->queue().waitIdle();
     }
 };
 
