@@ -18,7 +18,6 @@ namespace rtr::utils {
 
 struct ObjVertex {
     glm::vec3 position{0.0f};
-    glm::vec3 color{1.0f};
     glm::vec2 uv{0.0f};
     glm::vec3 normal{0.0f};
 };
@@ -113,7 +112,6 @@ inline ObjMeshData load_obj(const std::string& filepath) {
     }
 
     std::vector<glm::vec3> positions;
-    std::vector<glm::vec3> position_colors;
     std::vector<glm::vec2> texcoords;
     std::vector<glm::vec3> normals;
 
@@ -133,16 +131,6 @@ inline ObjMeshData load_obj(const std::string& filepath) {
 
         if (tokens[0] == "v" && tokens.size() >= 4) {
             positions.push_back(detail::parse_vec3(tokens, 1));
-            // Optional per-vertex color appended on the v line.
-            if (tokens.size() >= 7) {
-                position_colors.emplace_back(
-                    std::stof(tokens[4]),
-                    std::stof(tokens[5]),
-                    std::stof(tokens[6])
-                );
-            } else {
-                position_colors.emplace_back(1.0f, 1.0f, 1.0f);
-            }
         } else if (tokens[0] == "vt" && tokens.size() >= 3) {
             texcoords.push_back(detail::parse_vec2(tokens, 1));
         } else if (tokens[0] == "vn" && tokens.size() >= 4) {
@@ -179,7 +167,6 @@ inline ObjMeshData load_obj(const std::string& filepath) {
                     ObjVertex vert{};
                     if (key.pos >= 0 && key.pos < static_cast<int>(positions.size())) {
                         vert.position = positions[key.pos];
-                        vert.color = position_colors[key.pos];
                     }
                     if (key.tex >= 0 && key.tex < static_cast<int>(texcoords.size())) {
                         vert.uv = texcoords[key.tex];

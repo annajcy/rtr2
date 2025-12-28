@@ -74,13 +74,11 @@ private:
     std::vector<DescriptorSetMap> m_descriptor_sets;
 };
 
-
 struct DepthResources {
     vk::raii::Image image{nullptr};
     vk::raii::DeviceMemory memory{nullptr};
     vk::raii::ImageView view{nullptr};
 };
-
 
 /**
  * @brief Context for a single frame rendering
@@ -189,8 +187,8 @@ private:
     std::vector<vk::raii::Semaphore> m_render_finished_semaphores;
     
     uint32_t m_max_frames_in_flight;
-    uint32_t m_current_frame = 0;
-    uint32_t m_current_image = 0;
+    uint32_t m_current_frame_index = 0;
+    uint32_t m_current_image_index = 0;
     bool m_framebuffer_resized = false;
     
     std::vector<PerFrameResources> m_per_frame_resources;
@@ -261,7 +259,7 @@ public:
      * @param callback User-provided function to record rendering commands
      */
     void draw_frame(RenderCallback callback) {
-        auto& frame_res = m_per_frame_resources[m_current_frame];
+        auto& frame_res = m_per_frame_resources[m_current_frame_index];
         
         // 1. Wait for previous frame to finish
         vk::Result wait_result = m_device->device().waitForFences(
@@ -285,6 +283,8 @@ public:
         if (result == vk::Result::eErrorOutOfDateKHR) {
             // Swapchain is out of date, recreate it
             recreate_swapchain();
+            init_depth_resources();
+            init_render_finished_semaphores();
             return;
         }
         
@@ -292,14 +292,14 @@ public:
             throw std::runtime_error("Failed to acquire swapchain image");
         }
         
-        m_current_image = image_index;
+        m_current_image_index = image_index;
         
         // 3. Reset per-frame resource registry entries
-        m_resource_registry.clear_frame(m_current_frame);
+        m_resource_registry.clear_frame(m_current_frame_index);
         
         // 4. Let caller register per-frame resources (if provided)
         if (m_frame_resource_provider) {
-            m_frame_resource_provider(m_current_frame, m_resource_registry);
+            m_frame_resource_provider(m_current_frame_index, m_resource_registry);
         }
         
         // 5. Build FrameContext
@@ -347,7 +347,7 @@ public:
         }
         
         // 10. Advance to next frame
-        m_current_frame = (m_current_frame + 1) % m_max_frames_in_flight;
+        m_current_frame_index = (m_current_frame_index + 1) % m_max_frames_in_flight;
     }
     
     /**
@@ -388,12 +388,12 @@ public:
     /**
      * @brief Get current frame index (for accessing per-frame resources)
      */
-    uint32_t current_frame_index() const { return m_current_frame; }
+    uint32_t current_frame_index() const { return m_current_frame_index; }
     
     /**
      * @brief Get current swapchain image index
      */
-    uint32_t current_image_index() const { return m_current_image; }
+    uint32_t current_image_index() const { return m_current_image_index; }
     
     /**
      * @brief Get per-frame resources for a specific frame index
@@ -406,7 +406,7 @@ public:
      * @brief Get current frame's resources
      */
     const PerFrameResources& current_frame_resources() const {
-        return m_per_frame_resources[m_current_frame];
+        return m_per_frame_resources[m_current_frame_index];
     }
     
     /**
@@ -477,16 +477,16 @@ public:
      * @brief Build FrameContext for current frame
      */
     FrameContext build_frame_context() {
-        auto& frame_res = m_per_frame_resources[m_current_frame];
+        auto& frame_res = m_per_frame_resources[m_current_frame_index];
         
         return FrameContext(
             m_device,
             &frame_res.command_buffer,
             &m_resource_registry,
-            m_swapchain->image_views()[m_current_image],
-            m_swapchain->images()[m_current_image],
-            m_depth_resources[m_current_image],
-            m_current_frame
+            m_swapchain->image_views()[m_current_image_index],
+            m_swapchain->images()[m_current_image_index],
+            m_depth_resources[m_current_image_index],
+            m_current_frame_index
         );
     }
 
@@ -542,7 +542,8 @@ public:
         // Transition to depth attachment layout once.
         CommandPool temp_pool(m_device, vk::CommandPoolCreateFlagBits::eTransient);
         auto cmd = temp_pool.create_command_buffer();
-        cmd.record_and_submit([&](CommandBuffer& recorder) {
+        cmd.record_and_submit([&](CommandBuffer& cb) {
+            auto& cmd = cb.command_buffer();
             vk::ImageMemoryBarrier2 barrier{};
             barrier.oldLayout = vk::ImageLayout::eUndefined;
             barrier.newLayout = vk::ImageLayout::eDepthAttachmentOptimal;
@@ -560,7 +561,7 @@ public:
             vk::DependencyInfo dep{};
             dep.imageMemoryBarrierCount = 1;
             dep.pImageMemoryBarriers = &barrier;
-            recorder.pipeline_barrier_2(dep);
+            cmd.pipelineBarrier2(dep);
         });
         m_device->queue().waitIdle();
     }

@@ -98,61 +98,7 @@ public:
     }
 
     // Get underlying command buffer for direct access
-    const vk::raii::CommandBuffer& get() const { return m_command_buffer; }
-    vk::raii::CommandBuffer& get() { return m_command_buffer; }
-
-    // Convenient accessors for common operations
-    void bind_pipeline(vk::PipelineBindPoint bind_point, const vk::raii::Pipeline& pipeline) {
-        m_command_buffer.bindPipeline(bind_point, *pipeline);
-    }
-
-    void bind_descriptor_sets(vk::PipelineBindPoint bind_point,
-                             const vk::raii::PipelineLayout& layout,
-                             uint32_t first_set,
-                             const vk::raii::DescriptorSet& descriptor_set) {
-        m_command_buffer.bindDescriptorSets(bind_point, *layout, first_set, *descriptor_set, {});
-    }
-
-    void bind_vertex_buffers(uint32_t first_binding,
-                            const std::vector<vk::Buffer>& buffers,
-                            const std::vector<vk::DeviceSize>& offsets) {
-        m_command_buffer.bindVertexBuffers(first_binding, buffers, offsets);
-    }
-
-    void bind_index_buffer(vk::Buffer buffer, vk::DeviceSize offset, vk::IndexType index_type) {
-        m_command_buffer.bindIndexBuffer(buffer, offset, index_type);
-    }
-
-    void set_viewport(const vk::Viewport& viewport) {
-        m_command_buffer.setViewport(0, viewport);
-    }
-
-    void set_scissor(const vk::Rect2D& scissor) {
-        m_command_buffer.setScissor(0, scissor);
-    }
-
-    void begin_rendering(const vk::RenderingInfo& rendering_info) {
-        m_command_buffer.beginRendering(rendering_info);
-    }
-
-    void end_rendering() {
-        m_command_buffer.endRendering();
-    }
-
-    void draw(uint32_t vertex_count, uint32_t instance_count = 1, 
-             uint32_t first_vertex = 0, uint32_t first_instance = 0) {
-        m_command_buffer.draw(vertex_count, instance_count, first_vertex, first_instance);
-    }
-
-    void draw_indexed(uint32_t index_count, uint32_t instance_count = 1,
-                     uint32_t first_index = 0, int32_t vertex_offset = 0, uint32_t first_instance = 0) {
-        m_command_buffer.drawIndexed(index_count, instance_count, first_index, vertex_offset, first_instance);
-    }
-
-    void pipeline_barrier_2(const vk::DependencyInfo& dependency_info) {
-        m_command_buffer.pipelineBarrier2(dependency_info);
-    }
-
+    const vk::raii::CommandBuffer& command_buffer() const { return m_command_buffer; }
     Device* device() const { return m_device; }
 };
 

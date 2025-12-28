@@ -15,6 +15,7 @@
 #include "command.hpp"
 #include "renderer.hpp"
 #include "render_pipeline.hpp"
+#include "texture.hpp"
 
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_enums.hpp"

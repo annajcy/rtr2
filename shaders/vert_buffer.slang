@@ -1,6 +1,5 @@
 struct VSInput {
     float3 in_position : POSITION0;
-    float3 in_color : COLOR0;
     float2 in_uv : TEXCOORD0;
     float3 in_normal : NORMAL0;
 };

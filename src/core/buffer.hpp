@@ -1,9 +1,9 @@
 #pragma once
 
-#include <optional>
-#include <tuple>
+#include <cstring>
 #include <utility>
 
+#include "common.hpp"
 #include "device.hpp"
 #include "command.hpp"
 
@@ -15,105 +15,6 @@
 #include "vulkan/vulkan_structs.hpp"
 
 namespace rtr::core {
-
-inline std::optional<uint32_t> find_memory_type(
-    const vk::PhysicalDeviceMemoryProperties& mem_properties,
-    uint32_t type_filter,
-    vk::MemoryPropertyFlags properties
-) {
-    for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++) {
-        if ((type_filter & (1 << i)) && 
-            (mem_properties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
-    return std::nullopt;
-}
-
-inline std::optional<std::pair<vk::raii::Buffer, vk::raii::DeviceMemory>> make_buffer_with_memory(
-    const vk::raii::Device& device,
-    const vk::raii::PhysicalDevice& physical_device,
-    vk::DeviceSize size,
-    vk::BufferUsageFlags usage,
-    vk::MemoryPropertyFlags properties
-) {
-    vk::BufferCreateInfo buffer_create_info{};
-    buffer_create_info.size = size;
-    buffer_create_info.usage = usage;
-    buffer_create_info.sharingMode = vk::SharingMode::eExclusive;
-
-    vk::raii::Buffer buffer{ device, buffer_create_info };
-
-    vk::MemoryRequirements mem_requirements = buffer.getMemoryRequirements();
-
-    vk::PhysicalDeviceMemoryProperties mem_properties = physical_device.getMemoryProperties();
-    if (auto memory_type_index_opt = find_memory_type(
-        mem_properties,
-        mem_requirements.memoryTypeBits,
-        properties
-    )) {
-        auto memory_type_index = memory_type_index_opt.value();
-
-        vk::MemoryAllocateInfo alloc_info{};
-        alloc_info.allocationSize = mem_requirements.size;
-        alloc_info.memoryTypeIndex = memory_type_index;
-
-        vk::raii::DeviceMemory buffer_memory{ device, alloc_info };
-
-        buffer.bindMemory(
-            *buffer_memory,
-            vk::DeviceSize(0)
-        );
-
-        return std::make_pair(std::move(buffer), std::move(buffer_memory));
-    } else {
-        return std::nullopt;
-    }
-}
-
-inline std::optional<std::tuple<vk::raii::Buffer, vk::raii::DeviceMemory, void*>> make_mapped_buffer_with_memory(
-    const vk::raii::Device& device,
-    const vk::raii::PhysicalDevice& physical_device,
-    vk::DeviceSize size,
-    vk::BufferUsageFlags usage,
-    vk::MemoryPropertyFlags properties
-) {
-    if (auto buffer_with_memory_opt = make_buffer_with_memory(
-        device,
-        physical_device,
-        size,
-        usage,
-        properties | vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)
-    ) {
-        auto [buffer, buffer_memory] = std::move(buffer_with_memory_opt.value());
-        void* mapped_ptr = buffer_memory.mapMemory(0, size);
-        return std::make_tuple(
-            std::move(buffer),
-            std::move(buffer_memory),
-            mapped_ptr
-        );
-    } else {
-        return std::nullopt;
-    }
-}
-
-template<typename Mapper>
-inline void map_memory(
-    const vk::raii::DeviceMemory& memory,
-    vk::DeviceSize size,
-    vk::DeviceSize offset,
-    Mapper&& mapper,
-    vk::MemoryMapFlags flags = vk::MemoryMapFlags{}
-) {
-    void* data = memory.mapMemory(
-        offset,
-        size,
-        flags
-    );
-    mapper(data);
-    memory.unmapMemory();
-}
-
 
 class Buffer {
 private:
@@ -130,7 +31,7 @@ public:
     static Buffer create_host_visible_buffer(
         Device* device,
         vk::DeviceSize size,
-        vk::BufferUsageFlags usage
+        vk::BufferUsageFlags usage = {}
     ) {
         return Buffer(
             device,
@@ -143,7 +44,7 @@ public:
     static Buffer create_device_local_buffer(
         Device* device,
         vk::DeviceSize size,
-        vk::BufferUsageFlags usage
+        vk::BufferUsageFlags usage = {}
     ) {
         return Buffer(
             device,
@@ -153,59 +54,12 @@ public:
         );
     }
 
-    static void copy_buffer(
-        Device* device,
-        vk::Buffer src,
-        vk::Buffer dst,
-        vk::DeviceSize size
-    ) {
-        CommandPool command_pool(device, vk::CommandPoolCreateFlagBits::eTransient);
-        auto cmd = command_pool.create_command_buffer();
-        
-        cmd.record_and_submit([&](CommandBuffer& cmd) {
-            vk::BufferCopy buffer_copy{};
-            buffer_copy.srcOffset = 0;
-            buffer_copy.dstOffset = 0;
-            buffer_copy.size = size;
-            cmd.get().copyBuffer(src, dst, buffer_copy);
-        });
-        
-        device->queue().waitIdle();
-    }
-
-    static Buffer create_device_local_with_data(
-        Device* device,
-        const void* data,
-        vk::DeviceSize size,
-        vk::BufferUsageFlags usage
-    ) {
-        auto buffer = create_device_local_buffer(
-            device, 
-            size, 
-            usage | vk::BufferUsageFlagBits::eTransferDst
-        );
-        
-        auto staging_buffer = create_host_visible_buffer(
-            device, 
-            size, 
-            vk::BufferUsageFlagBits::eTransferSrc
-        );
-        
-        staging_buffer.map();
-        std::memcpy(staging_buffer.mapped_data(), data, size);
-        staging_buffer.unmap();
-        
-        copy_buffer(device, *staging_buffer.buffer(), *buffer.buffer(), size);
-        
-        return buffer;
-    }
-
 public:
     Buffer(
         Device* device,
         vk::DeviceSize size,
-        vk::BufferUsageFlags usage,
-        vk::MemoryPropertyFlags properties
+        vk::BufferUsageFlags usage = {},
+        vk::MemoryPropertyFlags properties = {}
     ) : m_device(device), m_size(size), m_usage(usage), m_properties(properties) {
         auto buffer_with_memory_opt = make_buffer_with_memory(
             device->device(),
@@ -224,10 +78,50 @@ public:
         m_buffer_memory = std::move(buffer_memory);
     }
 
+    // 移动构造
+    Buffer(Buffer&& other) noexcept 
+        : m_device(other.m_device),
+        m_buffer(std::move(other.m_buffer)),
+        m_buffer_memory(std::move(other.m_buffer_memory)),
+        m_size(other.m_size),
+        m_usage(other.m_usage),
+        m_properties(other.m_properties),
+        m_mapped_data(other.m_mapped_data),
+        m_is_mapped(other.m_is_mapped) // 接管状态
+    {
+        // 重置源对象状态
+        other.m_mapped_data = nullptr;
+        other.m_is_mapped = false;
+        other.m_size = 0;
+    }
+
+    // 移动赋值类似，需要先处理自己的析构逻辑
+    Buffer& operator=(Buffer&& other) noexcept {
+        if (this != &other) {
+            // 释放当前资源
+            if (m_is_mapped) {
+                unmap();
+            }
+
+            m_device = other.m_device;
+            m_buffer = std::move(other.m_buffer);
+            m_buffer_memory = std::move(other.m_buffer_memory);
+            m_size = other.m_size;
+            m_usage = other.m_usage;
+            m_properties = other.m_properties;
+            m_mapped_data = other.m_mapped_data;
+            m_is_mapped = other.m_is_mapped;
+
+            // 重置源对象状态
+            other.m_mapped_data = nullptr;
+            other.m_is_mapped = false;
+            other.m_size = 0;
+        }
+        return *this;
+    }
+
     Buffer(const Buffer&) = delete;
     Buffer& operator=(const Buffer&) = delete;
-    Buffer(Buffer&&) = default;
-    Buffer& operator=(Buffer&&) = default;
 
     ~Buffer() {
         if (m_is_mapped) {
@@ -245,7 +139,7 @@ public:
     bool is_mapped() const { return m_is_mapped; }
 
     void map(
-        vk::DeviceSize size = VK_WHOLE_SIZE,
+        vk::DeviceSize size = vk::WholeSize,
         vk::DeviceSize offset = 0
     ) {
         if (m_is_mapped) {

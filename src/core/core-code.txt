@@ -1,0 +1,3553 @@
+
+
+## application.hpp
+
+```hpp
+#pragma once
+
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "window.hpp"
+#include "context.hpp"
+#include "device.hpp"
+#include "command.hpp"
+#include "renderer.hpp"
+#include "render_pipeline.hpp"
+
+#include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan_enums.hpp"
+#include "vulkan/vulkan_handles.hpp"
+#include "vulkan/vulkan_raii.hpp"
+#include "vulkan/vulkan_structs.hpp"
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+namespace rtr::core {
+
+constexpr uint32_t WIDTH = 800;
+constexpr uint32_t HEIGHT = 600;
+
+constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+
+//const std::string shader_output_dir = "C:\\Users\\annaj\\Desktop\\codebase\\lightmap_compression\\build\\Debug\\shaders\\compiled\\";
+//const std::string shader_output_dir = "/home/annaj/codebase/lightmap_compression/build/Debug/shaders/compiled/";
+const std::string shader_output_dir = "/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/";
+const std::string vertex_shader_filename = "vert_buffer_vert.spv";
+const std::string fragment_shader_filename = "vert_buffer_frag.spv";
+
+const std::string model_path = "assets/models/stanford_bunny.obj";
+
+class Application {
+private:
+    std::unique_ptr<Window> m_window{};
+    std::unique_ptr<Context> m_context{};
+    std::unique_ptr<Device> m_device{};
+    
+    // Renderer now manages swapchain, command pool, and sync objects
+    std::unique_ptr<Renderer> m_renderer{};
+    std::unique_ptr<RenderPipeline> m_render_pipeline{};
+
+public:
+    Application() {
+        m_window = std::make_unique<Window>(WIDTH, HEIGHT, "RTR Application");
+        m_window->set_user_pointer(this);
+        m_window->set_framebuffer_size_callback(framebuffer_resize_callback);
+
+        m_context = std::make_unique<Context>(m_window.get());
+        m_device = std::make_unique<Device>(m_context.get());
+        
+        // Create renderer (manages swapchain, command buffers, sync)
+        m_renderer = std::make_unique<Renderer>(
+            m_device.get(),
+            m_window.get(),
+            MAX_FRAMES_IN_FLIGHT
+        );
+
+        // Build render pipeline (owns shaders/buffers/descriptor sets/pipeline state)
+        m_render_pipeline = std::make_unique<RenderPipeline>(m_device.get(), m_renderer.get());
+        m_render_pipeline->initialize(
+            shader_output_dir,
+            vertex_shader_filename,
+            fragment_shader_filename,
+            model_path);
+    }
+
+    void run() { loop(); }
+
+    ~Application() = default;
+
+    void loop() {
+        while (!m_window->is_should_close()) {
+            m_window->poll_events();
+            
+            // Execute linear pipeline
+            m_renderer->draw_frame([this](FrameContext& ctx) {
+                this->m_render_pipeline->execute_frame(ctx);
+            });
+        }
+        
+        m_device->device().waitIdle();
+    }
+
+    static void framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
+        auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
+        if (!app) { return; }
+        app->m_renderer->on_window_resized(width, height);
+    }
+};
+
+} // namespace rtr
+
+```
+
+## buffer.hpp
+
+```hpp
+#pragma once
+
+#include <optional>
+#include <tuple>
+#include <utility>
+
+#include "device.hpp"
+#include "command.hpp"
+
+#include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan_core.h"
+#include "vulkan/vulkan_enums.hpp"
+#include "vulkan/vulkan_handles.hpp"
+#include "vulkan/vulkan_raii.hpp"
+#include "vulkan/vulkan_structs.hpp"
+
+namespace rtr::core {
+
+inline std::optional<uint32_t> find_memory_type(
+    const vk::PhysicalDeviceMemoryProperties& mem_properties,
+    uint32_t type_filter,
+    vk::MemoryPropertyFlags properties
+) {
+    for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++) {
+        if ((type_filter & (1 << i)) && 
+            (mem_properties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
+inline std::optional<std::pair<vk::raii::Buffer, vk::raii::DeviceMemory>> make_buffer_with_memory(
+    const vk::raii::Device& device,
+    const vk::raii::PhysicalDevice& physical_device,
+    vk::DeviceSize size,
+    vk::BufferUsageFlags usage,
+    vk::MemoryPropertyFlags properties
+) {
+    vk::BufferCreateInfo buffer_create_info{};
+    buffer_create_info.size = size;
+    buffer_create_info.usage = usage;
+    buffer_create_info.sharingMode = vk::SharingMode::eExclusive;
+
+    vk::raii::Buffer buffer{ device, buffer_create_info };
+
+    vk::MemoryRequirements mem_requirements = buffer.getMemoryRequirements();
+
+    vk::PhysicalDeviceMemoryProperties mem_properties = physical_device.getMemoryProperties();
+    if (auto memory_type_index_opt = find_memory_type(
+        mem_properties,
+        mem_requirements.memoryTypeBits,
+        properties
+    )) {
+        auto memory_type_index = memory_type_index_opt.value();
+
+        vk::MemoryAllocateInfo alloc_info{};
+        alloc_info.allocationSize = mem_requirements.size;
+        alloc_info.memoryTypeIndex = memory_type_index;
+
+        vk::raii::DeviceMemory buffer_memory{ device, alloc_info };
+
+        buffer.bindMemory(
+            *buffer_memory,
+            vk::DeviceSize(0)
+        );
+
+        return std::make_pair(std::move(buffer), std::move(buffer_memory));
+    } else {
+        return std::nullopt;
+    }
+}
+
+inline std::optional<std::tuple<vk::raii::Buffer, vk::raii::DeviceMemory, void*>> make_mapped_buffer_with_memory(
+    const vk::raii::Device& device,
+    const vk::raii::PhysicalDevice& physical_device,
+    vk::DeviceSize size,
+    vk::BufferUsageFlags usage,
+    vk::MemoryPropertyFlags properties
+) {
+    if (auto buffer_with_memory_opt = make_buffer_with_memory(
+        device,
+        physical_device,
+        size,
+        usage,
+        properties | vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)
+    ) {
+        auto [buffer, buffer_memory] = std::move(buffer_with_memory_opt.value());
+        void* mapped_ptr = buffer_memory.mapMemory(0, size);
+        return std::make_tuple(
+            std::move(buffer),
+            std::move(buffer_memory),
+            mapped_ptr
+        );
+    } else {
+        return std::nullopt;
+    }
+}
+
+template<typename Mapper>
+inline void map_memory(
+    const vk::raii::DeviceMemory& memory,
+    vk::DeviceSize size,
+    vk::DeviceSize offset,
+    Mapper&& mapper,
+    vk::MemoryMapFlags flags = vk::MemoryMapFlags{}
+) {
+    void* data = memory.mapMemory(
+        offset,
+        size,
+        flags
+    );
+    mapper(data);
+    memory.unmapMemory();
+}
+
+
+class Buffer {
+private:
+    Device* m_device{};
+    vk::raii::Buffer m_buffer{nullptr};
+    vk::raii::DeviceMemory m_buffer_memory{nullptr};
+    vk::DeviceSize m_size{0};
+    vk::BufferUsageFlags m_usage{};
+    vk::MemoryPropertyFlags m_properties{};
+    void* m_mapped_data{nullptr};
+    bool m_is_mapped{ false };
+
+public:  
+    static Buffer create_host_visible_buffer(
+        Device* device,
+        vk::DeviceSize size,
+        vk::BufferUsageFlags usage
+    ) {
+        return Buffer(
+            device,
+            size,
+            usage,
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+        );
+    }
+
+    static Buffer create_device_local_buffer(
+        Device* device,
+        vk::DeviceSize size,
+        vk::BufferUsageFlags usage
+    ) {
+        return Buffer(
+            device,
+            size,
+            usage,
+            vk::MemoryPropertyFlagBits::eDeviceLocal
+        );
+    }
+
+    static void copy_buffer(
+        Device* device,
+        vk::Buffer src,
+        vk::Buffer dst,
+        vk::DeviceSize size
+    ) {
+        CommandPool command_pool(device, vk::CommandPoolCreateFlagBits::eTransient);
+        auto cmd = command_pool.create_command_buffer();
+        
+        cmd.record_and_submit([&](CommandBuffer& cmd) {
+            vk::BufferCopy buffer_copy{};
+            buffer_copy.srcOffset = 0;
+            buffer_copy.dstOffset = 0;
+            buffer_copy.size = size;
+            cmd.get().copyBuffer(src, dst, buffer_copy);
+        });
+        
+        device->queue().waitIdle();
+    }
+
+    static Buffer create_device_local_with_data(
+        Device* device,
+        const void* data,
+        vk::DeviceSize size,
+        vk::BufferUsageFlags usage
+    ) {
+        auto buffer = create_device_local_buffer(
+            device, 
+            size, 
+            usage | vk::BufferUsageFlagBits::eTransferDst
+        );
+        
+        auto staging_buffer = create_host_visible_buffer(
+            device, 
+            size, 
+            vk::BufferUsageFlagBits::eTransferSrc
+        );
+        
+        staging_buffer.map();
+        std::memcpy(staging_buffer.mapped_data(), data, size);
+        staging_buffer.unmap();
+        
+        copy_buffer(device, *staging_buffer.buffer(), *buffer.buffer(), size);
+        
+        return buffer;
+    }
+
+public:
+    Buffer(
+        Device* device,
+        vk::DeviceSize size,
+        vk::BufferUsageFlags usage,
+        vk::MemoryPropertyFlags properties
+    ) : m_device(device), m_size(size), m_usage(usage), m_properties(properties) {
+        auto buffer_with_memory_opt = make_buffer_with_memory(
+            device->device(),
+            device->physical_device(),
+            size,
+            usage,
+            properties
+        );
+
+        if (!buffer_with_memory_opt.has_value()) {
+            throw std::runtime_error("Failed to create buffer.");
+        }
+
+        auto [buffer, buffer_memory] = std::move(buffer_with_memory_opt.value());
+        m_buffer = std::move(buffer);
+        m_buffer_memory = std::move(buffer_memory);
+    }
+
+    Buffer(const Buffer&) = delete;
+    Buffer& operator=(const Buffer&) = delete;
+    Buffer(Buffer&&) = default;
+    Buffer& operator=(Buffer&&) = default;
+
+    ~Buffer() {
+        if (m_is_mapped) {
+            unmap();
+        }
+    }
+
+    const vk::raii::Buffer& buffer() const { return m_buffer; }
+    const vk::raii::DeviceMemory& buffer_memory() const { return m_buffer_memory; }
+    vk::DeviceSize size() const { return m_size; }
+    vk::BufferUsageFlags usage() const { return m_usage; }
+    vk::MemoryPropertyFlags properties() const { return m_properties; }
+    const Device* device() const { return m_device; }
+
+    bool is_mapped() const { return m_is_mapped; }
+
+    void map(
+        vk::DeviceSize size = VK_WHOLE_SIZE,
+        vk::DeviceSize offset = 0
+    ) {
+        if (m_is_mapped) {
+            throw std::runtime_error("Buffer is already mapped.");
+        }
+        m_mapped_data = m_buffer_memory.mapMemory(
+            offset,
+            size,
+            vk::MemoryMapFlags{}
+        );
+        m_is_mapped = true;
+    }
+
+    void unmap() {
+        if (!m_is_mapped) {
+            throw std::runtime_error("Buffer is not mapped.");
+        }
+        m_buffer_memory.unmapMemory();
+        m_mapped_data = nullptr;
+        m_is_mapped = false;
+    }
+
+    void* mapped_data() const {
+        if (!m_is_mapped) {
+            throw std::runtime_error("Buffer is not mapped.");
+        }
+        return m_mapped_data;
+    }
+};
+
+
+}
+```
+
+## command.hpp
+
+```hpp
+#pragma once
+
+#include "device.hpp"
+#include "vulkan/vulkan_raii.hpp"
+#include <vector>
+
+namespace rtr::core {
+
+class CommandBuffer {
+private:
+    Device* m_device;
+    vk::raii::CommandBuffer m_command_buffer;
+    bool m_is_recording = false;
+
+public:
+    CommandBuffer(Device* device, vk::raii::CommandBuffer&& command_buffer)
+        : m_device(device)
+        , m_command_buffer(std::move(command_buffer)) {
+    }
+
+    // Begin recording
+    void begin(vk::CommandBufferUsageFlags usage_flags = {}) {
+        if (m_is_recording) {
+            throw std::runtime_error("CommandBuffer is already recording");
+        }
+
+        vk::CommandBufferBeginInfo begin_info{};
+        begin_info.flags = usage_flags;
+        m_command_buffer.begin(begin_info);
+        m_is_recording = true;
+    }
+
+    // End recording
+    void end() {
+        if (!m_is_recording) {
+            throw std::runtime_error("CommandBuffer is not recording");
+        }
+
+        m_command_buffer.end();
+        m_is_recording = false;
+    }
+
+    // Reset command buffer
+    void reset(vk::CommandBufferResetFlags flags = {}) {
+        m_command_buffer.reset(flags);
+        m_is_recording = false;
+    }
+
+    // Record commands using lambda
+    template<typename Func>
+    void record(Func&& recorder, vk::CommandBufferUsageFlags usage_flags = {}) {
+        begin(usage_flags);
+        recorder(*this);
+        end();
+    }
+
+    // Submit to queue with optional synchronization
+    struct SubmitInfo {
+        std::vector<vk::Semaphore> wait_semaphores;
+        std::vector<vk::PipelineStageFlags> wait_stages;
+        std::vector<vk::Semaphore> signal_semaphores;
+        std::optional<vk::Fence> fence;
+    };
+
+    void submit(const SubmitInfo& submit_info = {}) {
+        if (m_is_recording) {
+            throw std::runtime_error("Cannot submit while recording");
+        }
+
+        vk::SubmitInfo vk_submit_info{};
+        
+        if (!submit_info.wait_semaphores.empty()) {
+            vk_submit_info.waitSemaphoreCount = static_cast<uint32_t>(submit_info.wait_semaphores.size());
+            vk_submit_info.pWaitSemaphores = submit_info.wait_semaphores.data();
+            vk_submit_info.pWaitDstStageMask = submit_info.wait_stages.data();
+        }
+
+        vk::CommandBuffer cmd_buf = *m_command_buffer;
+        vk_submit_info.commandBufferCount = 1;
+        vk_submit_info.pCommandBuffers = &cmd_buf;
+
+        if (!submit_info.signal_semaphores.empty()) {
+            vk_submit_info.signalSemaphoreCount = static_cast<uint32_t>(submit_info.signal_semaphores.size());
+            vk_submit_info.pSignalSemaphores = submit_info.signal_semaphores.data();
+        }
+
+        vk::Fence fence_handle = submit_info.fence.value_or(VK_NULL_HANDLE);
+        m_device->queue().submit(vk_submit_info, fence_handle);
+    }
+
+    // Record and submit in one call
+    template<typename Func>
+    void record_and_submit(Func&& recorder, 
+                          const SubmitInfo& submit_info = {},
+                          vk::CommandBufferUsageFlags usage_flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit) {
+        record(std::forward<Func>(recorder), usage_flags);
+        submit(submit_info);
+    }
+
+    // Get underlying command buffer for direct access
+    const vk::raii::CommandBuffer& get() const { return m_command_buffer; }
+    vk::raii::CommandBuffer& get() { return m_command_buffer; }
+
+    // Convenient accessors for common operations
+    void bind_pipeline(vk::PipelineBindPoint bind_point, const vk::raii::Pipeline& pipeline) {
+        m_command_buffer.bindPipeline(bind_point, *pipeline);
+    }
+
+    void bind_descriptor_sets(vk::PipelineBindPoint bind_point,
+                             const vk::raii::PipelineLayout& layout,
+                             uint32_t first_set,
+                             const vk::raii::DescriptorSet& descriptor_set) {
+        m_command_buffer.bindDescriptorSets(bind_point, *layout, first_set, *descriptor_set, {});
+    }
+
+    void bind_vertex_buffers(uint32_t first_binding,
+                            const std::vector<vk::Buffer>& buffers,
+                            const std::vector<vk::DeviceSize>& offsets) {
+        m_command_buffer.bindVertexBuffers(first_binding, buffers, offsets);
+    }
+
+    void bind_index_buffer(vk::Buffer buffer, vk::DeviceSize offset, vk::IndexType index_type) {
+        m_command_buffer.bindIndexBuffer(buffer, offset, index_type);
+    }
+
+    void set_viewport(const vk::Viewport& viewport) {
+        m_command_buffer.setViewport(0, viewport);
+    }
+
+    void set_scissor(const vk::Rect2D& scissor) {
+        m_command_buffer.setScissor(0, scissor);
+    }
+
+    void begin_rendering(const vk::RenderingInfo& rendering_info) {
+        m_command_buffer.beginRendering(rendering_info);
+    }
+
+    void end_rendering() {
+        m_command_buffer.endRendering();
+    }
+
+    void draw(uint32_t vertex_count, uint32_t instance_count = 1, 
+             uint32_t first_vertex = 0, uint32_t first_instance = 0) {
+        m_command_buffer.draw(vertex_count, instance_count, first_vertex, first_instance);
+    }
+
+    void draw_indexed(uint32_t index_count, uint32_t instance_count = 1,
+                     uint32_t first_index = 0, int32_t vertex_offset = 0, uint32_t first_instance = 0) {
+        m_command_buffer.drawIndexed(index_count, instance_count, first_index, vertex_offset, first_instance);
+    }
+
+    void pipeline_barrier_2(const vk::DependencyInfo& dependency_info) {
+        m_command_buffer.pipelineBarrier2(dependency_info);
+    }
+
+    Device* device() const { return m_device; }
+};
+
+class CommandPool {
+private:
+    Device* m_device;
+    vk::raii::CommandPool m_pool{nullptr};
+
+public:
+    CommandPool(Device* device, vk::CommandPoolCreateFlags flags)
+        : m_device(device) {
+        vk::CommandPoolCreateInfo create_info{};
+        create_info.flags = flags;
+        create_info.queueFamilyIndex = device->queue_family_index();
+        m_pool = vk::raii::CommandPool(device->device(), create_info);
+    }
+
+    vk::raii::CommandBuffer allocate_command_buffer(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) {
+        vk::CommandBufferAllocateInfo alloc_info{};
+        alloc_info.commandPool = *m_pool;
+        alloc_info.level = level;
+        alloc_info.commandBufferCount = 1;
+
+        auto buffers = m_device->device().allocateCommandBuffers(alloc_info);
+        return std::move(buffers.front());
+    }
+
+    std::vector<vk::raii::CommandBuffer> allocate_command_buffers(uint32_t count, vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) {
+        vk::CommandBufferAllocateInfo alloc_info{};
+        alloc_info.commandPool = *m_pool;
+        alloc_info.level = level;
+        alloc_info.commandBufferCount = count;
+
+        auto buffers = m_device->device().allocateCommandBuffers(alloc_info);
+        std::vector<vk::raii::CommandBuffer> result;
+        result.reserve(buffers.size());
+        for (auto& buffer : buffers) {
+            result.emplace_back(std::move(buffer));
+        }
+        return result;
+    }
+
+    // Create a CommandBuffer wrapper for easier command recording and submission
+    CommandBuffer create_command_buffer(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) {
+        auto raw_buffer = allocate_command_buffer(level);
+        return CommandBuffer(m_device, std::move(raw_buffer));
+    }
+
+    std::vector<CommandBuffer> create_command_buffers(uint32_t count, vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) {
+        auto raw_buffers = allocate_command_buffers(count, level);
+        std::vector<CommandBuffer> result;
+        result.reserve(raw_buffers.size());
+        for (auto& raw_buffer : raw_buffers) {
+            result.emplace_back(m_device, std::move(raw_buffer));
+        }
+        return result;
+    }
+
+    const vk::raii::CommandPool& command_pool() const { return m_pool; }
+    const Device* device() const { return m_device; }
+
+};
+
+}
+
+```
+
+## context.hpp
+
+```hpp
+#pragma once
+
+#include <cstdint>
+#include <vector>
+#include <string>
+#include <optional>
+#include <iostream>
+
+#include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan_enums.hpp"
+#include "vulkan/vulkan_handles.hpp"
+#include "vulkan/vulkan_raii.hpp"
+#include "vulkan/vk_platform.h"
+#include "vulkan/vulkan_structs.hpp"
+
+#include "window.hpp"
+
+namespace rtr::core {
+
+inline bool is_instance_extensions_supported(
+    const std::vector<vk::ExtensionProperties>& instance_extension_properties,
+    const std::vector<std::string>& required_extensions
+) {
+    for (const auto& required_ext : required_extensions) {
+        if (std::ranges::none_of(instance_extension_properties, 
+            [&](const vk::ExtensionProperties& ext) {
+                return required_ext == ext.extensionName;
+            })) {
+            return false;
+        }
+    }
+    return true;
+}
+
+inline bool is_layers_supported(
+    const std::vector<vk::LayerProperties>& available_layer_properties,
+    const std::vector<std::string>& required_layers
+) {
+    for (const auto& required_layer : required_layers) {
+        if (std::ranges::none_of(available_layer_properties, 
+            [&](const vk::LayerProperties& layer) {
+                return required_layer == layer.layerName;
+            })) {
+            return false;
+        }
+    }
+    return true;
+}
+
+inline std::optional<std::pair<vk::raii::Context, vk::raii::Instance>> make_instance(
+    const std::vector<std::string>& required_layers,
+    const std::vector<std::string>& required_extensions,
+    const vk::ApplicationInfo& app_info
+) {
+    vk::raii::Context context{};
+
+    auto ext_prop = context.enumerateInstanceExtensionProperties();
+    if (!is_instance_extensions_supported(
+        ext_prop, 
+        required_extensions
+    )) {
+        std::cout << "Not all required extensions are supported:" << std::endl;
+        std::cout << "Required extensions:" << std::endl;
+        for (const auto& ext : required_extensions) {
+            std::cout << "  " << ext << std::endl;
+        }
+        std::cout << std::endl;
+        std::cout << "Available extensions:" << std::endl;
+        for (const auto& ext : ext_prop) {
+            std::cout << "  " << ext.extensionName << std::endl;
+        }
+        return std::nullopt;
+    }
+
+    auto layer_prop = context.enumerateInstanceLayerProperties();
+    if (!is_layers_supported(
+        layer_prop,
+        required_layers
+    )) {
+        std::cout << "Not all required layers are supported:" << std::endl;
+        return std::nullopt;
+    }
+
+    vk::InstanceCreateInfo instance_info{};
+#if defined (__APPLE__)
+    instance_info.flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+#endif
+    instance_info.pApplicationInfo = &app_info; 
+    std::vector<const char*> extension_names;
+    std::ranges::transform(
+        required_extensions, 
+        std::back_inserter(extension_names),
+        [](const std::string& ext) { return ext.c_str(); }
+    );
+    instance_info.enabledExtensionCount = static_cast<uint32_t>(extension_names.size());
+    instance_info.ppEnabledExtensionNames = extension_names.data();
+    std::vector<const char*> layer_names;
+    std::ranges::transform(
+        required_layers, 
+        std::back_inserter(layer_names),
+        [](const std::string& layer) { return layer.c_str(); }
+    );
+    instance_info.enabledLayerCount = static_cast<uint32_t>(layer_names.size());
+    instance_info.ppEnabledLayerNames = layer_names.data();
+    vk::raii::Instance instance{ context, instance_info };
+    return std::make_pair(std::move(context), std::move(instance));
+}
+
+inline VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData, void*) {
+    if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eError || 
+        severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
+    ) {
+        std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << std::endl;
+    }
+    return vk::False;
+}
+
+inline vk::raii::DebugUtilsMessengerEXT create_debug_messenger(const vk::raii::Instance& instance) {
+    vk::DebugUtilsMessageSeverityFlagsEXT severity_flags( 
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | 
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | 
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eError 
+    );  
+
+    vk::DebugUtilsMessageTypeFlagsEXT    messageType_flags( 
+        vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | 
+        vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | 
+        vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation 
+    );
+
+    vk::DebugUtilsMessengerCreateInfoEXT debugUtils_messenger_createInfo_EXT{};
+    debugUtils_messenger_createInfo_EXT.messageSeverity = severity_flags;
+    debugUtils_messenger_createInfo_EXT.messageType = messageType_flags;
+    debugUtils_messenger_createInfo_EXT.pfnUserCallback = &debug_callback;
+    return vk::raii::DebugUtilsMessengerEXT(instance, debugUtils_messenger_createInfo_EXT);
+}
+
+class Context {
+private:
+    Window* m_window{};
+    vk::raii::Context m_context{};
+    vk::raii::Instance m_instance{nullptr};
+    vk::raii::SurfaceKHR m_surface{nullptr};
+    vk::raii::DebugUtilsMessengerEXT m_debug_messenger{nullptr};
+
+#if !defined(NDEBUG)
+    bool m_is_validation_layers_enabled{ true }; 
+#else
+    bool m_is_validation_layers_enabled{ false }; 
+#endif
+
+    std::vector<std::string> m_instance_layers{};
+    std::vector<std::string> m_instance_extensions{
+#if defined(__APPLE__)
+        vk::KHRPortabilityEnumerationExtensionName,
+#endif
+        "VK_EXT_surface_maintenance1",
+        "VK_KHR_get_surface_capabilities2"
+    };
+
+private:
+    void create_instance() {
+        auto window_extensions = m_window->required_extensions();
+        m_instance_extensions.insert(
+            m_instance_extensions.end(),
+            window_extensions.begin(),
+            window_extensions.end()
+        );
+        if (m_is_validation_layers_enabled) {
+            m_instance_layers.push_back("VK_LAYER_KHRONOS_validation");
+            m_instance_extensions.push_back(vk::EXTDebugUtilsExtensionName);
+        }
+
+        uint32_t application_version{VK_MAKE_VERSION(1, 0, 0)};
+        
+        vk::ApplicationInfo app_info{};
+        app_info.pApplicationName = m_window->title().c_str();
+        app_info.applicationVersion = application_version;
+        app_info.pEngineName = m_window->title().c_str();
+        app_info.engineVersion = application_version;
+        app_info.apiVersion = vk::ApiVersion14;
+        auto instance_result = make_instance(
+            m_instance_layers,
+            m_instance_extensions,
+            app_info
+        );
+
+        if (!instance_result.has_value()) {
+            throw std::runtime_error("Failed to create Vulkan instance.");
+        }
+
+        auto instance_handles = std::move(instance_result.value());
+        m_context = std::move(instance_handles.first);
+        m_instance = std::move(instance_handles.second);
+    }
+
+    void create_surface() {
+        if (auto surface_handle = m_window->create_vk_surface(m_instance)) {
+            m_surface = vk::raii::SurfaceKHR{m_instance, surface_handle.value()};
+        } else {
+            throw std::runtime_error("Failed to create Vulkan surface.");
+        }
+    }
+
+    void create_debug_messenger() {
+        if (m_is_validation_layers_enabled) {
+            m_debug_messenger = rtr::core::create_debug_messenger(m_instance);
+        }
+    }
+    
+public:
+    Context(Window* window) : m_window(window) {
+        create_instance();
+        create_surface();
+        create_debug_messenger();
+    }
+
+    const Window* window() const {
+        return m_window;
+    }
+
+    const vk::raii::Instance& instance() const {
+        return m_instance;
+    }
+
+    const vk::raii::SurfaceKHR& surface() const {
+        return m_surface;
+    }
+
+    const vk::raii::Context& context() const {
+        return m_context;
+    }
+
+    bool is_validation_layers_enabled() const {
+        return m_is_validation_layers_enabled;
+    }
+
+    const std::vector<std::string>& instance_layers() const {
+        return m_instance_layers;
+    }
+
+    const std::vector<std::string>& instance_extensions() const {
+        return m_instance_extensions;
+    }
+
+};
+
+};
+```
+
+## descriptor.hpp
+
+```hpp
+#pragma once
+
+#include "device.hpp"
+#include "vulkan/vulkan_raii.hpp"
+#include <vector>
+#include <unordered_map>
+#include <string>
+#include <sstream>
+
+namespace rtr::core {
+
+// ============================================================================
+// DescriptorSetLayout
+// ============================================================================
+
+class DescriptorSetLayout {
+private:
+    Device* m_device;
+    vk::raii::DescriptorSetLayout m_layout{nullptr};
+    std::vector<vk::DescriptorSetLayoutBinding> m_bindings;
+
+public:
+    class Builder {
+    private:
+        std::vector<vk::DescriptorSetLayoutBinding> m_bindings;
+
+    public:
+        Builder& add_binding(
+            uint32_t binding,
+            vk::DescriptorType type,
+            vk::ShaderStageFlags stages,
+            uint32_t count = 1
+        ) {
+            vk::DescriptorSetLayoutBinding layout_binding{};
+            layout_binding.binding = binding;
+            layout_binding.descriptorType = type;
+            layout_binding.descriptorCount = count;
+            layout_binding.stageFlags = stages;
+            layout_binding.pImmutableSamplers = nullptr;
+            
+            m_bindings.push_back(layout_binding);
+            return *this;
+        }
+
+        DescriptorSetLayout build(Device* device) {
+            return DescriptorSetLayout(device, m_bindings);
+        }
+    };
+
+    DescriptorSetLayout(Device* device, const std::vector<vk::DescriptorSetLayoutBinding>& bindings)
+        : m_device(device), m_bindings(bindings) {
+        vk::DescriptorSetLayoutCreateInfo create_info{};
+        create_info.bindingCount = static_cast<uint32_t>(bindings.size());
+        create_info.pBindings = bindings.data();
+
+        m_layout = vk::raii::DescriptorSetLayout(device->device(), create_info);
+    }
+
+    const Device* device() const { return m_device; }
+    const vk::raii::DescriptorSetLayout& layout() const { return m_layout; }
+    const std::vector<vk::DescriptorSetLayoutBinding>& bindings() const { return m_bindings; }
+};
+
+ // 打印布局信息
+inline std::string to_string(const DescriptorSetLayout& layout) {
+    std::ostringstream oss;
+    oss << "DescriptorSetLayout:\n";
+    oss << "  Bindings (" << layout.bindings().size() << "):\n";
+    
+    for (const auto& binding : layout.bindings()) {
+        oss << "    [" << binding.binding << "] ";
+        oss << "Type: " << vk::to_string(binding.descriptorType);
+        oss << ", Count: " << binding.descriptorCount;
+        oss << ", Stages: " << vk::to_string(binding.stageFlags);
+        oss << "\n";
+    }
+    
+    return oss.str();
+}
+
+// ============================================================================
+// DescriptorPool
+// ============================================================================
+
+class DescriptorPool {
+private:
+    Device* m_device;
+    vk::raii::DescriptorPool m_pool{nullptr};
+    std::vector<vk::DescriptorPoolSize> m_pool_sizes;  // 保存 pool sizes 用于打印
+    uint32_t m_max_sets = 0;
+    vk::DescriptorPoolCreateFlags m_flags = {};
+
+public:
+    class Builder {
+    private:
+        std::unordered_map<vk::DescriptorType, uint32_t> m_descriptor_counts;
+        uint32_t m_max_sets = 0;
+        vk::DescriptorPoolCreateFlags m_flags = {};
+
+    public:
+        Builder& add_pool_size(vk::DescriptorType type, uint32_t count) {
+            m_descriptor_counts[type] += count;
+            return *this;
+        }
+
+        // 自动根据 layout 计算所需的描述符数量
+        Builder& add_layout(const DescriptorSetLayout& layout, uint32_t set_count) {
+            // 遍历 layout 的所有 binding
+            for (const auto& binding : layout.bindings()) {
+                // 累加该类型描述符的总需求量
+                m_descriptor_counts[binding.descriptorType] += 
+                    binding.descriptorCount * set_count;
+            }
+            // 累加总的描述符集数量
+            m_max_sets += set_count;
+            return *this;
+        }
+
+        Builder& set_max_sets(uint32_t max_sets) {
+            m_max_sets = max_sets;
+            return *this;
+        }
+
+        Builder& set_flags(vk::DescriptorPoolCreateFlags flags) {
+            m_flags = flags;
+            return *this;
+        }
+
+        DescriptorPool build(Device* device) {
+            std::vector<vk::DescriptorPoolSize> pool_sizes;
+            pool_sizes.reserve(m_descriptor_counts.size());
+            for (const auto& [type, count] : m_descriptor_counts) {
+                pool_sizes.push_back({type, count});
+            }
+            return DescriptorPool(device, pool_sizes, m_max_sets, m_flags);
+        }
+    };
+
+    DescriptorPool(
+        Device* device,
+        const std::vector<vk::DescriptorPoolSize>& pool_sizes,
+        uint32_t max_sets,
+        vk::DescriptorPoolCreateFlags flags = {}
+    ) : m_device(device), m_pool_sizes(pool_sizes), m_max_sets(max_sets), m_flags(flags) {
+        vk::DescriptorPoolCreateInfo pool_info{};
+        pool_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
+        pool_info.pPoolSizes = pool_sizes.data();
+        pool_info.maxSets = max_sets;
+        pool_info.flags = flags;
+
+        m_pool = vk::raii::DescriptorPool(device->device(), pool_info);
+    }
+
+    vk::raii::DescriptorSet allocate(const DescriptorSetLayout& layout) {
+        vk::DescriptorSetAllocateInfo alloc_info{};
+        alloc_info.descriptorPool = *m_pool;
+        alloc_info.descriptorSetCount = 1;
+        alloc_info.pSetLayouts = &*layout.layout();
+
+        auto sets = m_device->device().allocateDescriptorSets(alloc_info);
+        return std::move(sets.front());
+    }
+
+    std::vector<vk::raii::DescriptorSet> allocate_multiple(
+        const DescriptorSetLayout& layout, 
+        uint32_t count
+    ) {
+        std::vector<vk::DescriptorSetLayout> layouts(count, *layout.layout());
+        
+        vk::DescriptorSetAllocateInfo alloc_info{};
+        alloc_info.descriptorPool = *m_pool;
+        alloc_info.descriptorSetCount = count;
+        alloc_info.pSetLayouts = layouts.data();
+
+        return m_device->device().allocateDescriptorSets(alloc_info);
+    }
+
+    const vk::raii::DescriptorPool& pool() const { return m_pool; }
+    const std::vector<vk::DescriptorPoolSize>& pool_sizes() const { return m_pool_sizes; }
+    uint32_t max_sets() const { return m_max_sets; }
+    vk::DescriptorPoolCreateFlags flags() const { return m_flags; }
+    const Device* device() const { return m_device; }
+};
+
+  // 打印 Pool 信息
+inline std::string to_string(const DescriptorPool& descriptor_pool) {
+    std::ostringstream oss;
+    oss << "DescriptorPool:\n";
+    oss << "  Max Sets: " << descriptor_pool.max_sets() << "\n";
+    oss << "  Flags: " << vk::to_string(descriptor_pool.flags()) << "\n";
+    oss << "  Pool Sizes (" << descriptor_pool.pool_sizes().size() << "):\n";
+    
+    for (const auto& pool_size : descriptor_pool.pool_sizes()) {
+        oss << "    " << vk::to_string(pool_size.type);
+        oss << ": " << pool_size.descriptorCount << " descriptors\n";
+    }
+    
+    return oss.str();
+}
+
+// ============================================================================
+// DescriptorWriter
+// ============================================================================
+
+class DescriptorWriter {
+private:
+    std::vector<vk::WriteDescriptorSet> m_writes;
+    std::vector<vk::DescriptorBufferInfo> m_buffer_infos;
+    std::vector<vk::DescriptorImageInfo> m_image_infos;
+
+public:
+    DescriptorWriter& write_buffer(
+        uint32_t binding,
+        vk::Buffer buffer,
+        vk::DeviceSize offset,
+        vk::DeviceSize range,
+        vk::DescriptorType type = vk::DescriptorType::eUniformBuffer,
+        uint32_t array_element = 0
+    ) {
+        vk::DescriptorBufferInfo buffer_info{};
+        buffer_info.buffer = buffer;
+        buffer_info.offset = offset;
+        buffer_info.range = range;
+        m_buffer_infos.push_back(buffer_info);
+
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding;
+        write.dstArrayElement = array_element;
+        write.descriptorType = type;
+        write.descriptorCount = 1;
+        write.pBufferInfo = &m_buffer_infos.back();
+        m_writes.push_back(write);
+
+        return *this;
+    }
+
+    DescriptorWriter& write_combined_image(
+        uint32_t binding,
+        vk::ImageView image_view,
+        vk::Sampler sampler,
+        vk::ImageLayout layout,
+        uint32_t array_element = 0
+    ) {
+        vk::DescriptorImageInfo image_info{};
+        image_info.imageView = image_view;
+        image_info.sampler = sampler;
+        image_info.imageLayout = layout;
+        m_image_infos.push_back(image_info);
+
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding;
+        write.dstArrayElement = array_element;
+        write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+        write.descriptorCount = 1;
+        write.pImageInfo = &m_image_infos.back();
+        m_writes.push_back(write);
+
+        return *this;
+    }
+
+    DescriptorWriter& write_image(
+        uint32_t binding,
+        vk::ImageView image_view,
+        vk::ImageLayout layout,
+        uint32_t array_element = 0
+    ) {
+        vk::DescriptorImageInfo image_info{};
+        image_info.imageView = image_view;
+        image_info.imageLayout = layout;
+        // sampler is VK_NULL_HANDLE for eSampledImage
+        m_image_infos.push_back(image_info);
+
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding;
+        write.dstArrayElement = array_element;
+        write.descriptorType = vk::DescriptorType::eSampledImage;
+        write.descriptorCount = 1;
+        write.pImageInfo = &m_image_infos.back();
+        m_writes.push_back(write);
+
+        return *this;
+    }
+
+    DescriptorWriter& write_sampler(
+        uint32_t binding,
+        vk::Sampler sampler,
+        uint32_t array_element = 0
+    ) {
+        vk::DescriptorImageInfo image_info{};
+        image_info.sampler = sampler;
+        m_image_infos.push_back(image_info);
+
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding;
+        write.dstArrayElement = array_element;
+        write.descriptorType = vk::DescriptorType::eSampler;
+        write.descriptorCount = 1;
+        write.pImageInfo = &m_image_infos.back();
+        m_writes.push_back(write);
+
+        return *this;
+    }
+
+    // ========================================================================
+    // Array versions for batch updates
+    // ========================================================================
+
+    DescriptorWriter& write_buffer_array(
+        uint32_t binding,
+        const std::vector<vk::Buffer>& buffers,
+        vk::DeviceSize offset,
+        vk::DeviceSize range,
+        vk::DescriptorType type = vk::DescriptorType::eUniformBuffer,
+        uint32_t first_array_element = 0
+    ) {
+        size_t start_index = m_buffer_infos.size();
+        
+        for (const auto& buffer : buffers) {
+            vk::DescriptorBufferInfo buffer_info{};
+            buffer_info.buffer = buffer;
+            buffer_info.offset = offset;
+            buffer_info.range = range;
+            m_buffer_infos.push_back(buffer_info);
+        }
+
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding;
+        write.dstArrayElement = first_array_element;
+        write.descriptorType = type;
+        write.descriptorCount = static_cast<uint32_t>(buffers.size());
+        write.pBufferInfo = &m_buffer_infos[start_index];
+        m_writes.push_back(write);
+
+        return *this;
+    }
+
+    DescriptorWriter& write_combined_image_array(
+        uint32_t binding,
+        const std::vector<vk::ImageView>& image_views,
+        vk::Sampler sampler,
+        vk::ImageLayout layout,
+        uint32_t first_array_element = 0
+    ) {
+        size_t start_index = m_image_infos.size();
+        
+        for (const auto& image_view : image_views) {
+            vk::DescriptorImageInfo image_info{};
+            image_info.imageView = image_view;
+            image_info.sampler = sampler;
+            image_info.imageLayout = layout;
+            m_image_infos.push_back(image_info);
+        }
+
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding;
+        write.dstArrayElement = first_array_element;
+        write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+        write.descriptorCount = static_cast<uint32_t>(image_views.size());
+        write.pImageInfo = &m_image_infos[start_index];
+        m_writes.push_back(write);
+
+        return *this;
+    }
+
+    DescriptorWriter& write_image_array(
+        uint32_t binding,
+        const std::vector<vk::ImageView>& image_views,
+        vk::ImageLayout layout,
+        uint32_t first_array_element = 0
+    ) {
+        size_t start_index = m_image_infos.size();
+        
+        for (const auto& image_view : image_views) {
+            vk::DescriptorImageInfo image_info{};
+            image_info.imageView = image_view;
+            image_info.imageLayout = layout;
+            // sampler is VK_NULL_HANDLE for eSampledImage
+            m_image_infos.push_back(image_info);
+        }
+
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding;
+        write.dstArrayElement = first_array_element;
+        write.descriptorType = vk::DescriptorType::eSampledImage;
+        write.descriptorCount = static_cast<uint32_t>(image_views.size());
+        write.pImageInfo = &m_image_infos[start_index];
+        m_writes.push_back(write);
+
+        return *this;
+    }
+
+    DescriptorWriter& write_sampler_array(
+        uint32_t binding,
+        const std::vector<vk::Sampler>& samplers,
+        uint32_t first_array_element = 0
+    ) {
+        size_t start_index = m_image_infos.size();
+        
+        for (const auto& sampler : samplers) {
+            vk::DescriptorImageInfo image_info{};
+            image_info.sampler = sampler;
+            m_image_infos.push_back(image_info);
+        }
+
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding;
+        write.dstArrayElement = first_array_element;
+        write.descriptorType = vk::DescriptorType::eSampler;
+        write.descriptorCount = static_cast<uint32_t>(samplers.size());
+        write.pImageInfo = &m_image_infos[start_index];
+        m_writes.push_back(write);
+
+        return *this;
+    }
+
+    void update(Device* device, vk::DescriptorSet set) {
+        // Set the descriptor set for all writes
+        for (auto& write : m_writes) {
+            write.dstSet = set;
+        }
+
+        device->device().updateDescriptorSets(m_writes, nullptr);
+
+        // Clear for reuse
+        clear();
+    }
+
+    void clear() {
+        m_writes.clear();
+        m_buffer_infos.clear();
+        m_image_infos.clear();
+    }
+
+    const std::vector<vk::WriteDescriptorSet>& writes() const {
+        return m_writes;
+    }
+
+    const std::vector<vk::DescriptorBufferInfo>& buffer_infos() const {
+        return m_buffer_infos;
+    }
+
+    const std::vector<vk::DescriptorImageInfo>& image_infos() const {
+        return m_image_infos;
+    }
+};
+
+ // 打印 Writer 信息
+inline std::string to_string(const DescriptorWriter& writer) {
+    std::ostringstream oss;
+    oss << "DescriptorWriter:\n";
+    oss << "  Write Operations: " << writer.writes().size() << "\n";
+    oss << "  Buffer Infos: " << writer.buffer_infos().size() << "\n";
+    oss << "  Image Infos: " << writer.image_infos().size() << "\n";
+    
+    for (size_t i = 0; i < writer.writes().size(); ++i) {
+        const auto& write = writer.writes()[i];
+        oss << "  [" << i << "] Binding " << write.dstBinding;
+        oss << ", Array[" << write.dstArrayElement << "]";
+        oss << ", Type: " << vk::to_string(write.descriptorType);
+        oss << ", Count: " << write.descriptorCount << "\n";
+    }
+    
+    return oss.str();
+}
+
+class DescriptorSystem {
+public:
+    // 描述符集的配置信息
+    struct SetConfig {
+        std::unique_ptr<DescriptorSetLayout> layout;
+        uint32_t set_index;  // 在 pipeline layout 中的 set 索引
+        uint32_t count;      // 需要分配的描述符集数量
+        
+        SetConfig(DescriptorSetLayout::Builder builder, 
+                 Device* device, uint32_t idx, uint32_t cnt)
+            : layout(std::make_unique<DescriptorSetLayout>(builder.build(device)))
+            , set_index(idx)
+            , count(cnt) {}
+    };
+
+    // 描述符集句柄，封装实际的 vk::raii::DescriptorSet
+    struct SetHandle {
+        uint32_t set_index;
+        uint32_t array_index;
+        
+        bool operator==(const SetHandle& other) const {
+            return set_index == other.set_index && array_index == other.array_index;
+        }
+    };
+
+public:
+    class Builder {
+    private:
+        Device* m_device;
+        std::unordered_map<std::string, SetConfig> m_configs;
+        vk::DescriptorPoolCreateFlags m_pool_flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
+
+    public:
+        explicit Builder(Device* device) : m_device(device) {}
+
+        // 添加一个描述符集配置
+        Builder& add_set(
+            const std::string& name,
+            uint32_t set_index,
+            uint32_t count,
+            std::function<void(DescriptorSetLayout::Builder&)> configure_layout
+        ) {
+            DescriptorSetLayout::Builder layout_builder;
+            configure_layout(layout_builder);
+            
+            m_configs.emplace(
+                name,
+                SetConfig(std::move(layout_builder), m_device, set_index, count)
+            );
+            return *this;
+        }
+
+        Builder& set_pool_flags(vk::DescriptorPoolCreateFlags flags) {
+            m_pool_flags = flags;
+            return *this;
+        }
+
+        // 未来：从 Slang 反射创建
+        // Builder& add_set_from_reflection(
+        //     const std::string& name,
+        //     uint32_t set_index,
+        //     uint32_t count,
+        //     const slang::IModule* module
+        // ) {
+        //     // TODO: 实现反射逻辑
+        //     return *this;
+        // }
+
+        DescriptorSystem build() {
+            return DescriptorSystem(m_device, std::move(m_configs), m_pool_flags);
+        }
+    };
+
+private:
+    Device* m_device;
+    std::unordered_map<std::string, SetConfig> m_set_configs;
+    std::unique_ptr<DescriptorPool> m_pool;
+    
+    // 存储分配的描述符集：set_name -> vector of descriptor sets
+    std::unordered_map<std::string, std::vector<vk::raii::DescriptorSet>> m_allocated_sets;
+
+public:
+    DescriptorSystem(
+        Device* device,
+        std::unordered_map<std::string, SetConfig> configs,
+        vk::DescriptorPoolCreateFlags pool_flags
+    ) : m_device(device), m_set_configs(std::move(configs)) {
+        create_pool(pool_flags);
+        allocate_all_sets();
+    }
+
+    Device* device() const { return m_device; }
+    const std::unordered_map<std::string, SetConfig>& set_configs() const { return m_set_configs; }
+    const std::unordered_map<std::string, std::vector<vk::raii::DescriptorSet>>& allocated_sets() const { return m_allocated_sets; }
+    const DescriptorPool& pool() const { return *m_pool; }
+
+    // 获取描述符集布局（用于创建 pipeline layout）
+    const DescriptorSetLayout& get_layout(const std::string& set_name) const {
+        return *m_set_configs.at(set_name).layout;
+    }
+
+    // 获取所有布局（按 set_index 排序）
+    std::vector<vk::DescriptorSetLayout> get_all_layouts() const {
+        std::vector<std::pair<uint32_t, vk::DescriptorSetLayout>> layouts;
+        
+        for (const auto& [name, config] : m_set_configs) {
+            layouts.emplace_back(config.set_index, *config.layout->layout());
+        }
+        
+        // 按 set_index 排序
+        std::sort(layouts.begin(), layouts.end(),
+                 [](const auto& a, const auto& b) { return a.first < b.first; });
+        
+        std::vector<vk::DescriptorSetLayout> result;
+        result.reserve(layouts.size());
+        for (const auto& [idx, layout] : layouts) {
+            result.push_back(layout);
+        }
+        return result;
+    }
+
+    // 获取描述符集
+    const vk::raii::DescriptorSet& get_set(const std::string& set_name, uint32_t index = 0) const {
+        const auto& sets = m_allocated_sets.at(set_name);
+        return sets.at(index);
+    }
+
+    // 获取所有描述符集（某个类型的）
+    const std::vector<vk::raii::DescriptorSet>& get_sets(const std::string& set_name) const {
+        return m_allocated_sets.at(set_name);
+    }
+
+    // 更新描述符集
+    void update_set(
+        const std::string& set_name,
+        uint32_t index,
+        std::function<void(DescriptorWriter&)> write_fn
+    ) {
+        DescriptorWriter writer;
+        write_fn(writer);
+        writer.update(m_device, *m_allocated_sets.at(set_name).at(index));
+    }
+
+    // 批量更新某类型的所有描述符集
+    void update_all_sets(
+        const std::string& set_name,
+        std::function<void(DescriptorWriter&, uint32_t index)> write_fn
+    ) {
+        auto& sets = m_allocated_sets.at(set_name);
+        for (uint32_t i = 0; i < sets.size(); ++i) {
+            DescriptorWriter writer;
+            write_fn(writer, i);
+            writer.update(m_device, *sets[i]);
+        }
+    }
+
+    // 获取 set 的数量
+    int get_set_count(const std::string& set_name) const {
+        return m_allocated_sets.at(set_name).size();
+    }
+
+    struct PipelineLayoutInfo {
+        vk::PipelineLayoutCreateInfo info{};
+        std::vector<vk::DescriptorSetLayout> set_layouts;
+    };
+
+    static PipelineLayoutInfo make_pipeline_layout_info(
+        const DescriptorSystem& system,
+        std::span<const vk::PushConstantRange> push_constants = {}
+    ) {
+        PipelineLayoutInfo result{};
+        result.set_layouts = system.get_all_layouts();
+        result.info.setLayoutCount = static_cast<uint32_t>(result.set_layouts.size());
+        result.info.pSetLayouts = result.set_layouts.data();
+        result.info.pushConstantRangeCount = static_cast<uint32_t>(push_constants.size());
+        result.info.pPushConstantRanges = push_constants.data();
+        return result;
+    }
+
+
+private:
+    void create_pool(vk::DescriptorPoolCreateFlags flags) {
+        DescriptorPool::Builder pool_builder;
+        
+        // 根据所有 set config 自动计算 pool 大小
+        for (const auto& [name, config] : m_set_configs) {
+            pool_builder.add_layout(*config.layout, config.count);
+        }
+        
+        pool_builder.set_flags(flags);
+        m_pool = std::make_unique<DescriptorPool>(pool_builder.build(m_device));
+    }
+
+    void allocate_all_sets() {
+        for (const auto& [name, config] : m_set_configs) {
+            auto sets = m_pool->allocate_multiple(*config.layout, config.count);
+            m_allocated_sets.emplace(name, std::move(sets));
+        }
+    }
+};
+
+
+// 打印整个 DescriptorSystem 的信息
+inline std::string to_string(const DescriptorSystem& descriptor_system) {
+    std::ostringstream oss;
+    oss << "DescriptorSystem:\n";
+    oss << "  Total Set Types: " << descriptor_system.set_configs().size() << "\n\n";
+    
+    // 按 set_index 排序输出
+    std::vector<std::pair<std::string, const DescriptorSystem::SetConfig*>> sorted_configs;
+    for (const auto& [name, config] : descriptor_system.set_configs()) {
+        sorted_configs.emplace_back(name, &config);
+    }
+    std::sort(sorted_configs.begin(), sorted_configs.end(),
+                [](const auto& a, const auto& b) { 
+                    return a.second->set_index < b.second->set_index; 
+                });
+    
+    for (const auto& [name, config] : sorted_configs) {
+        oss << "  Set[" << config->set_index << "] \"" << name << "\":\n";
+        oss << "    Allocated Count: " << config->count << "\n";
+        oss << "    Layout:\n";
+        
+        for (const auto& binding : config->layout->bindings()) {
+            oss << "      [" << binding.binding << "] ";
+            oss << vk::to_string(binding.descriptorType);
+            oss << " x" << binding.descriptorCount;
+            oss << " (" << vk::to_string(binding.stageFlags) << ")\n";
+        }
+        oss << "\n";
+    }
+    
+    return oss.str();
+}
+
+} // namespace rtr::core
+
+```
+
+## device.hpp
+
+```hpp
+#pragma once
+
+#include "context.hpp"
+#include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan_enums.hpp"
+#include "vulkan/vulkan_handles.hpp"
+#include "vulkan/vulkan_raii.hpp"
+#include "vulkan/vulkan_structs.hpp"
+
+#include <functional>
+#include <iostream>
+#include <optional>
+#include <vector>
+#include <algorithm>
+
+namespace rtr::core {
+
+namespace detail {
+    template<typename T>
+    struct FeatureChecker;
+
+    template<>
+    struct FeatureChecker<vk::PhysicalDeviceFeatures> {
+        static bool check(const vk::PhysicalDeviceFeatures& required, const vk::PhysicalDeviceFeatures& supported) {
+            if (required.robustBufferAccess && !supported.robustBufferAccess) return false;
+            if (required.fullDrawIndexUint32 && !supported.fullDrawIndexUint32) return false;
+            if (required.imageCubeArray && !supported.imageCubeArray) return false;
+            if (required.independentBlend && !supported.independentBlend) return false;
+            if (required.geometryShader && !supported.geometryShader) return false;
+            if (required.tessellationShader && !supported.tessellationShader) return false;
+            if (required.sampleRateShading && !supported.sampleRateShading) return false;
+            if (required.dualSrcBlend && !supported.dualSrcBlend) return false;
+            if (required.logicOp && !supported.logicOp) return false;
+            if (required.multiDrawIndirect && !supported.multiDrawIndirect) return false;
+            if (required.drawIndirectFirstInstance && !supported.drawIndirectFirstInstance) return false;
+            if (required.depthClamp && !supported.depthClamp) return false;
+            if (required.depthBiasClamp && !supported.depthBiasClamp) return false;
+            if (required.fillModeNonSolid && !supported.fillModeNonSolid) return false;
+            if (required.depthBounds && !supported.depthBounds) return false;
+            if (required.wideLines && !supported.wideLines) return false;
+            if (required.largePoints && !supported.largePoints) return false;
+            if (required.alphaToOne && !supported.alphaToOne) return false;
+            if (required.multiViewport && !supported.multiViewport) return false;
+            if (required.samplerAnisotropy && !supported.samplerAnisotropy) return false;
+            if (required.textureCompressionETC2 && !supported.textureCompressionETC2) return false;
+            if (required.textureCompressionASTC_LDR && !supported.textureCompressionASTC_LDR) return false;
+            if (required.textureCompressionBC && !supported.textureCompressionBC) return false;
+            if (required.occlusionQueryPrecise && !supported.occlusionQueryPrecise) return false;
+            if (required.pipelineStatisticsQuery && !supported.pipelineStatisticsQuery) return false;
+            if (required.vertexPipelineStoresAndAtomics && !supported.vertexPipelineStoresAndAtomics) return false;
+            if (required.fragmentStoresAndAtomics && !supported.fragmentStoresAndAtomics) return false;
+            if (required.shaderTessellationAndGeometryPointSize && !supported.shaderTessellationAndGeometryPointSize) return false;
+            if (required.shaderImageGatherExtended && !supported.shaderImageGatherExtended) return false;
+            if (required.shaderStorageImageExtendedFormats && !supported.shaderStorageImageExtendedFormats) return false;
+            if (required.shaderStorageImageMultisample && !supported.shaderStorageImageMultisample) return false;
+            if (required.shaderStorageImageReadWithoutFormat && !supported.shaderStorageImageReadWithoutFormat) return false;
+            if (required.shaderStorageImageWriteWithoutFormat && !supported.shaderStorageImageWriteWithoutFormat) return false;
+            if (required.shaderUniformBufferArrayDynamicIndexing && !supported.shaderUniformBufferArrayDynamicIndexing) return false;
+            if (required.shaderSampledImageArrayDynamicIndexing && !supported.shaderSampledImageArrayDynamicIndexing) return false;
+            if (required.shaderStorageBufferArrayDynamicIndexing && !supported.shaderStorageBufferArrayDynamicIndexing) return false;
+            if (required.shaderStorageImageArrayDynamicIndexing && !supported.shaderStorageImageArrayDynamicIndexing) return false;
+            if (required.shaderClipDistance && !supported.shaderClipDistance) return false;
+            if (required.shaderCullDistance && !supported.shaderCullDistance) return false;
+            if (required.shaderFloat64 && !supported.shaderFloat64) return false;
+            if (required.shaderInt64 && !supported.shaderInt64) return false;
+            if (required.shaderInt16 && !supported.shaderInt16) return false;
+            if (required.shaderResourceResidency && !supported.shaderResourceResidency) return false;
+            if (required.shaderResourceMinLod && !supported.shaderResourceMinLod) return false;
+            if (required.sparseBinding && !supported.sparseBinding) return false;
+            if (required.sparseResidencyBuffer && !supported.sparseResidencyBuffer) return false;
+            if (required.sparseResidencyImage2D && !supported.sparseResidencyImage2D) return false;
+            if (required.sparseResidencyImage3D && !supported.sparseResidencyImage3D) return false;
+            if (required.sparseResidency2Samples && !supported.sparseResidency2Samples) return false;
+            if (required.sparseResidency4Samples && !supported.sparseResidency4Samples) return false;
+            if (required.sparseResidency8Samples && !supported.sparseResidency8Samples) return false;
+            if (required.sparseResidency16Samples && !supported.sparseResidency16Samples) return false;
+            if (required.sparseResidencyAliased && !supported.sparseResidencyAliased) return false;
+            if (required.variableMultisampleRate && !supported.variableMultisampleRate) return false;
+            if (required.inheritedQueries && !supported.inheritedQueries) return false;
+            return true;
+        }
+    };
+
+    template<>
+    struct FeatureChecker<vk::PhysicalDeviceVulkan11Features> {
+        static bool check(const vk::PhysicalDeviceVulkan11Features& required, const vk::PhysicalDeviceVulkan11Features& supported) {
+            if (required.storageBuffer16BitAccess && !supported.storageBuffer16BitAccess) return false;
+            if (required.uniformAndStorageBuffer16BitAccess && !supported.uniformAndStorageBuffer16BitAccess) return false;
+            if (required.storagePushConstant16 && !supported.storagePushConstant16) return false;
+            if (required.storageInputOutput16 && !supported.storageInputOutput16) return false;
+            if (required.multiview && !supported.multiview) return false;
+            if (required.multiviewGeometryShader && !supported.multiviewGeometryShader) return false;
+            if (required.multiviewTessellationShader && !supported.multiviewTessellationShader) return false;
+            if (required.variablePointersStorageBuffer && !supported.variablePointersStorageBuffer) return false;
+            if (required.variablePointers && !supported.variablePointers) return false;
+            if (required.protectedMemory && !supported.protectedMemory) return false;
+            if (required.samplerYcbcrConversion && !supported.samplerYcbcrConversion) return false;
+            if (required.shaderDrawParameters && !supported.shaderDrawParameters) return false;
+            return true;
+        }
+    };
+
+    template<>
+    struct FeatureChecker<vk::PhysicalDeviceVulkan13Features> {
+        static bool check(const vk::PhysicalDeviceVulkan13Features& required, const vk::PhysicalDeviceVulkan13Features& supported) {
+            if (required.robustImageAccess && !supported.robustImageAccess) return false;
+            if (required.inlineUniformBlock && !supported.inlineUniformBlock) return false;
+            if (required.descriptorBindingInlineUniformBlockUpdateAfterBind && !supported.descriptorBindingInlineUniformBlockUpdateAfterBind) return false;
+            if (required.pipelineCreationCacheControl && !supported.pipelineCreationCacheControl) return false;
+            if (required.privateData && !supported.privateData) return false;
+            if (required.shaderDemoteToHelperInvocation && !supported.shaderDemoteToHelperInvocation) return false;
+            if (required.shaderTerminateInvocation && !supported.shaderTerminateInvocation) return false;
+            if (required.subgroupSizeControl && !supported.subgroupSizeControl) return false;
+            if (required.computeFullSubgroups && !supported.computeFullSubgroups) return false;
+            if (required.synchronization2 && !supported.synchronization2) return false;
+            if (required.textureCompressionASTC_HDR && !supported.textureCompressionASTC_HDR) return false;
+            if (required.shaderZeroInitializeWorkgroupMemory && !supported.shaderZeroInitializeWorkgroupMemory) return false;
+            if (required.dynamicRendering && !supported.dynamicRendering) return false;
+            if (required.shaderIntegerDotProduct && !supported.shaderIntegerDotProduct) return false;
+            if (required.maintenance4 && !supported.maintenance4) return false;
+            return true;
+        }
+    };
+
+    template<>
+    struct FeatureChecker<vk::PhysicalDeviceFeatures2> {
+        static bool check(const vk::PhysicalDeviceFeatures2& required, const vk::PhysicalDeviceFeatures2& supported) {
+            return FeatureChecker<vk::PhysicalDeviceFeatures>::check(required.features, supported.features);
+        }
+    };
+
+    template<>
+    struct FeatureChecker<vk::PhysicalDeviceSynchronization2Features> {
+        static bool check(const vk::PhysicalDeviceSynchronization2Features& required, const vk::PhysicalDeviceSynchronization2Features& supported) {
+            return (!required.synchronization2 || supported.synchronization2);
+        }
+    };
+
+    template<>
+    struct FeatureChecker<vk::PhysicalDeviceDynamicRenderingFeatures> {
+        static bool check(const vk::PhysicalDeviceDynamicRenderingFeatures& required, const vk::PhysicalDeviceDynamicRenderingFeatures& supported) {
+            return (!required.dynamicRendering || supported.dynamicRendering);
+        }
+    };
+
+    template<>
+    struct FeatureChecker<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> {
+        static bool check(const vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT& required, const vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT& supported) {
+            return (!required.extendedDynamicState || supported.extendedDynamicState);
+        }
+    };
+
+    template<>
+    struct FeatureChecker<vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT> {
+        static bool check(const vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT& required, const vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT& supported) {
+            return (!required.swapchainMaintenance1 || supported.swapchainMaintenance1);
+        }
+    };
+}
+
+class PhysicalDeviceSelector {
+public:
+    struct Selection {
+        vk::raii::PhysicalDevice physical_device = nullptr;
+        uint32_t queue_family_index = 0;
+    };
+
+private:
+const vk::raii::Instance& m_instance;
+    const vk::raii::SurfaceKHR* m_surface = nullptr;
+    uint32_t m_required_api_version = 0;
+    std::vector<std::string> m_required_extensions;
+    std::optional<vk::PhysicalDeviceType> m_required_type;
+    vk::QueueFlags m_required_queue_flags;
+    std::vector<std::function<bool(const vk::raii::PhysicalDevice&)>> m_feature_checkers;
+    std::vector<std::function<bool(const vk::raii::PhysicalDevice&)>> m_custom_checkers;
+
+public:
+
+    explicit PhysicalDeviceSelector(const vk::raii::Instance& instance) 
+        : m_instance(instance) {}
+
+    PhysicalDeviceSelector& set_surface(const vk::raii::SurfaceKHR& surface) {
+        m_surface = &surface;
+        return *this;
+    }
+
+    PhysicalDeviceSelector& require_api_version(uint32_t version) {
+        m_required_api_version = version;
+        return *this;
+    }
+
+    PhysicalDeviceSelector& require_extensions(const std::vector<std::string>& extensions) {
+        m_required_extensions = extensions;
+        return *this;
+    }
+
+    PhysicalDeviceSelector& require_gpu_type(vk::PhysicalDeviceType type) {
+        m_required_type = type;
+        return *this;
+    }
+
+    PhysicalDeviceSelector& require_queue_flags(vk::QueueFlags flags) {
+        m_required_queue_flags = flags;
+        return *this;
+    }
+
+    PhysicalDeviceSelector& require_custom_check(std::function<bool(const vk::raii::PhysicalDevice&)> check) {
+        m_custom_checkers.push_back(check);
+        return *this;
+    }
+
+    template<typename... Features>
+    PhysicalDeviceSelector& require_features(const vk::StructureChain<Features...>& required_features) {
+        m_feature_checkers.push_back([required_features](const vk::raii::PhysicalDevice& device) {
+            auto supported_features = device.getFeatures2<Features...>();
+            return (detail::FeatureChecker<Features>::check(
+                required_features.template get<Features>(),
+                supported_features.template get<Features>()
+            ) && ...);
+        });
+        return *this;
+    }
+    
+    std::optional<Selection> select() const {
+        vk::raii::PhysicalDevices devices(m_instance);
+        for (const auto& device : devices) {
+            if (check_device(device)) {
+                auto queue_idx = find_queue_family(device);
+                if (queue_idx) {
+                    return Selection{ device, *queue_idx };
+                }
+            }
+        }
+        return std::nullopt;
+    }
+
+private:
+    bool check_device(const vk::raii::PhysicalDevice& device) const {
+        auto properties = device.getProperties();
+        
+        // Check api version
+        if (properties.apiVersion < m_required_api_version) {
+            std::cout << "Device " << properties.deviceName << " API version too low." << std::endl;
+            return false;
+        }
+
+        // Check gpu type
+        if (m_required_type && properties.deviceType != *m_required_type) {
+            return false;
+        }
+
+        // Check extensions
+        if (!m_required_extensions.empty()) {
+            auto available_extensions = device.enumerateDeviceExtensionProperties();
+            for (const auto& req : m_required_extensions) {
+                bool found = std::ranges::any_of(available_extensions, [&](const auto& ext) {
+                    return req == ext.extensionName;
+                });
+                if (!found) {
+                    std::cout << "Device " << properties.deviceName << " missing extension: " << req << std::endl;
+                    return false;
+                }
+            }
+        }
+
+        for (const auto& checker : m_feature_checkers) {
+            if (!checker(device)) return false;
+        }
+
+        for (const auto& checker : m_custom_checkers) {
+            if (!checker(device)) return false;
+        }
+
+        return true;
+    }
+
+    std::optional<uint32_t> find_queue_family(const vk::raii::PhysicalDevice& device) const {
+        auto queue_families = device.getQueueFamilyProperties();
+        for (uint32_t i = 0; i < queue_families.size(); ++i) {
+            const auto& props = queue_families[i];
+            
+            if ((props.queueFlags & m_required_queue_flags) != m_required_queue_flags) continue;
+            
+            if (m_surface && !device.getSurfaceSupportKHR(i, *m_surface)) continue;
+            
+            return i;
+        }
+        return std::nullopt;
+    }
+};
+
+template<typename ... Features>
+inline std::optional<vk::raii::Device> make_device(
+    const vk::raii::PhysicalDevice& physical_device,
+    const std::vector<std::string>& required_device_extensions,
+    const vk::StructureChain<Features...>& feature_chain,
+    const uint32_t& device_queue_family_index
+) {
+    std::vector<float> queue_priorities { 0.0f };
+    vk::DeviceQueueCreateInfo queue_create_info{};
+    queue_create_info.queueFamilyIndex = device_queue_family_index;
+    queue_create_info.queueCount = static_cast<uint32_t>(queue_priorities.size());
+    queue_create_info.pQueuePriorities = queue_priorities.data();
+
+    std::vector<vk::DeviceQueueCreateInfo> device_queue_create_infos {
+        queue_create_info
+    };
+
+    vk::DeviceCreateInfo device_create_info{};
+    device_create_info.pNext = &std::get<0>(feature_chain);
+    device_create_info.queueCreateInfoCount = static_cast<uint32_t>(device_queue_create_infos.size());
+    device_create_info.pQueueCreateInfos = device_queue_create_infos.data();
+
+    std::vector<const char*> required_extensions_cstr{};
+    std::ranges::transform(
+        required_device_extensions,
+        std::back_inserter(required_extensions_cstr),
+        [](const std::string& ext) { return ext.c_str(); }
+    );
+
+    device_create_info.enabledExtensionCount = static_cast<uint32_t>(required_extensions_cstr.size());
+    device_create_info.ppEnabledExtensionNames = required_extensions_cstr.data();
+
+    return vk::raii::Device(physical_device, device_create_info);
+}
+
+class Device {
+private:
+    Context* m_context{}; 
+    vk::raii::PhysicalDevice m_physical_device{nullptr};
+    vk::raii::Device m_device{nullptr};
+    vk::raii::Queue m_queue{nullptr};
+    uint32_t m_queue_family_index{0};
+
+    std::vector<std::string> m_device_extensions = {
+        vk::KHRSwapchainExtensionName,
+        vk::KHRSpirv14ExtensionName,
+        vk::KHRSynchronization2ExtensionName,
+        vk::KHRCreateRenderpass2ExtensionName,
+        "VK_EXT_swapchain_maintenance1",
+#if defined(__APPLE__)
+        "VK_KHR_portability_subset",
+        "VK_KHR_dynamic_rendering"
+#endif
+    };
+
+#if defined(__APPLE__)
+    using DeviceFeatureChainType = vk::StructureChain<
+        vk::PhysicalDeviceFeatures2,
+        vk::PhysicalDeviceDynamicRenderingFeatures,
+        vk::PhysicalDeviceSynchronization2Features,
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
+        vk::PhysicalDeviceVulkan11Features,
+        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>;
+
+    std::function<DeviceFeatureChainType()> m_device_feature_chain_generator = []() {
+        vk::PhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features{};
+        dynamic_rendering_features.dynamicRendering = true;
+
+        vk::PhysicalDeviceSynchronization2Features synchronization2_features{};
+        synchronization2_features.synchronization2 = true;
+
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extended_dynamic_state_features{};
+        extended_dynamic_state_features.extendedDynamicState = true;
+
+        vk::PhysicalDeviceVulkan11Features vulkan11_features{};
+        vulkan11_features.shaderDrawParameters = true;
+
+        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT swapchain_maintenance_features{};
+        swapchain_maintenance_features.swapchainMaintenance1 = true;
+
+        vk::PhysicalDeviceFeatures2 physical_device_features2{};
+
+        return DeviceFeatureChainType{
+            physical_device_features2,
+            dynamic_rendering_features,
+            synchronization2_features,
+            extended_dynamic_state_features,
+            vulkan11_features,
+            swapchain_maintenance_features
+        };
+    };
+#else
+    using DeviceFeatureChainType = vk::StructureChain<
+        vk::PhysicalDeviceFeatures2,
+        vk::PhysicalDeviceVulkan11Features,
+        vk::PhysicalDeviceVulkan13Features,
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
+        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>;
+
+    std::function<DeviceFeatureChainType()> m_device_feature_chain_generator = []() {
+        vk::PhysicalDeviceVulkan13Features vulkan13_features{};
+        vulkan13_features.dynamicRendering = true;
+        vulkan13_features.synchronization2 = true;
+
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extended_dynamic_state_features{};
+        extended_dynamic_state_features.extendedDynamicState = true;
+
+        vk::PhysicalDeviceVulkan11Features vulkan11_features{};
+        vulkan11_features.shaderDrawParameters = true;
+
+        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT swapchain_maintenance_features{};
+        swapchain_maintenance_features.swapchainMaintenance1 = true;
+
+        vk::PhysicalDeviceFeatures2 physical_device_features2{};
+
+        return DeviceFeatureChainType{
+            physical_device_features2,
+            vulkan11_features,
+            vulkan13_features,
+            extended_dynamic_state_features,
+            swapchain_maintenance_features
+        };
+    };
+#endif
+
+private:
+    void select_physical_device(const vk::raii::Instance& instance, const vk::raii::SurfaceKHR& surface) {
+        PhysicalDeviceSelector selector(instance);
+        auto result = selector
+            .set_surface(surface)
+            .require_api_version(
+#if defined(__APPLE__)
+                vk::ApiVersion12
+#else
+                vk::ApiVersion13
+#endif
+            )
+            .require_extensions(m_device_extensions)
+            .require_queue_flags(vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer)
+            .require_features(m_device_feature_chain_generator())
+            .select();
+
+        if (result) {
+            m_physical_device = std::move(result->physical_device);
+            m_queue_family_index = result->queue_family_index;
+            std::cout << "Physical device selected: " << m_physical_device.getProperties().deviceName << std::endl;
+        } else {
+            throw std::runtime_error("Failed to find suitable physical device");
+        }
+    }
+
+    void create_logical_device() {
+        auto device_result = make_device(
+            m_physical_device,
+            m_device_extensions,
+            m_device_feature_chain_generator(),
+            m_queue_family_index
+        );
+
+        if (!device_result.has_value()) {
+            throw std::runtime_error("Failed to create logical device.");
+        }
+
+        m_device = std::move(device_result.value());
+    }
+
+    void create_queue() {
+        m_queue = m_device.getQueue(m_queue_family_index, 0);
+    }
+
+public:
+    Device(Context *context) : m_context(context) {
+        select_physical_device(context->instance(), context->surface());
+        create_logical_device();
+        create_queue();
+    }
+
+    const vk::raii::PhysicalDevice& physical_device() const { return m_physical_device; }
+    const vk::raii::Device& device() const { return m_device; }
+    const vk::raii::Queue& queue() const { return m_queue; }
+    uint32_t queue_family_index() const { return m_queue_family_index; }
+
+    void waitIdle() const {
+        m_device.waitIdle();
+    }
+
+    const Context* context() const {
+        return m_context;
+    }
+};
+
+}
+
+```
+
+## mesh.hpp
+
+```hpp
+#pragma once
+
+#include <array>
+#include <cstdint>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <glm/glm.hpp>
+
+#include "buffer.hpp"
+#include "device.hpp"
+#include "utils/obj_loader.hpp"
+
+#include "vulkan/vulkan_enums.hpp"
+#include "vulkan/vulkan_handles.hpp"
+
+namespace rtr::core {
+
+class Mesh {
+public:
+    using Vertex = rtr::utils::ObjVertex;
+
+    static Mesh from_obj(Device* device, const std::string& filepath) {
+        auto mesh_data = rtr::utils::load_obj(filepath);
+        if (mesh_data.vertices.empty() || mesh_data.indices.empty()) {
+            throw std::runtime_error("OBJ file is empty or contains no valid faces: " + filepath);
+        }
+
+        auto vertex_buffer = std::make_unique<Buffer>(
+            Buffer::create_device_local_with_data(
+                device,
+                mesh_data.vertices.data(),
+                sizeof(Vertex) * mesh_data.vertices.size(),
+                vk::BufferUsageFlagBits::eVertexBuffer
+            )
+        );
+
+        auto index_buffer = std::make_unique<Buffer>(
+            Buffer::create_device_local_with_data(
+                device,
+                mesh_data.indices.data(),
+                sizeof(uint32_t) * mesh_data.indices.size(),
+                vk::BufferUsageFlagBits::eIndexBuffer
+            )
+        );
+
+        return Mesh(
+            device,
+            static_cast<uint32_t>(mesh_data.vertices.size()),
+            static_cast<uint32_t>(mesh_data.indices.size()),
+            std::move(vertex_buffer),
+            std::move(index_buffer));
+    }
+
+    static vk::VertexInputBindingDescription binding_description() {
+        vk::VertexInputBindingDescription desc{};
+        desc.binding = 0;
+        desc.stride = sizeof(Vertex);
+        desc.inputRate = vk::VertexInputRate::eVertex;
+        return desc;
+    }
+
+    static std::array<vk::VertexInputAttributeDescription, 4> attribute_descriptions() {
+        std::array<vk::VertexInputAttributeDescription, 4> attributes{};
+
+        attributes[0].binding = 0;
+        attributes[0].location = 0;
+        attributes[0].format = vk::Format::eR32G32B32Sfloat;
+        attributes[0].offset = offsetof(Vertex, position);
+
+        attributes[1].binding = 0;
+        attributes[1].location = 1;
+        attributes[1].format = vk::Format::eR32G32B32Sfloat;
+        attributes[1].offset = offsetof(Vertex, color);
+
+        attributes[2].binding = 0;
+        attributes[2].location = 2;
+        attributes[2].format = vk::Format::eR32G32Sfloat;
+        attributes[2].offset = offsetof(Vertex, uv);
+
+        attributes[3].binding = 0;
+        attributes[3].location = 3;
+        attributes[3].format = vk::Format::eR32G32B32Sfloat;
+        attributes[3].offset = offsetof(Vertex, normal);
+
+        return attributes;
+    }
+
+    struct VertexInputState {
+        std::array<vk::VertexInputBindingDescription, 1> bindings;
+        std::array<vk::VertexInputAttributeDescription, 4> attributes;
+    };
+
+    static VertexInputState vertex_input_state() {
+        VertexInputState state{};
+        state.bindings[0] = binding_description();
+        state.attributes = attribute_descriptions();
+        return state;
+    }
+
+private:
+    Device* m_device{};
+    uint32_t m_vertex_count{0};
+    uint32_t m_index_count{0};
+    std::unique_ptr<Buffer> m_vertex_buffer;
+    std::unique_ptr<Buffer> m_index_buffer;
+   
+public:
+    Mesh(Device* device,
+         uint32_t vertex_count,
+         uint32_t index_count,
+         std::unique_ptr<Buffer> vertex_buffer,
+         std::unique_ptr<Buffer> index_buffer)
+        : m_device(device)
+        , m_vertex_count(vertex_count)
+        , m_index_count(index_count)
+        , m_vertex_buffer(std::move(vertex_buffer))
+        , m_index_buffer(std::move(index_buffer)) {}
+
+    Mesh(const Mesh&) = delete;
+    Mesh& operator=(const Mesh&) = delete;
+    Mesh(Mesh&&) noexcept = default;
+    Mesh& operator=(Mesh&&) noexcept = default;
+    ~Mesh() = default;
+
+    vk::Buffer vertex_buffer() const { return *m_vertex_buffer->buffer(); }
+    vk::Buffer index_buffer() const { return *m_index_buffer->buffer(); }
+    uint32_t index_count() const { return m_index_count; }
+    uint32_t vertex_count() const { return m_vertex_count; }
+};
+
+} // namespace rtr::core
+
+```
+
+## render_pipeline.hpp
+
+```hpp
+#pragma once
+
+#include <array>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "buffer.hpp"
+#include "descriptor.hpp"
+#include "mesh.hpp"
+#include "renderer.hpp"
+#include "shader_module.hpp"
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <chrono>
+
+namespace rtr::core {
+
+struct UniformBufferObject {
+    alignas(16) glm::mat4 model;
+    alignas(16) glm::mat4 view;
+    alignas(16) glm::mat4 proj;
+    alignas(16) glm::mat4 normal; // inverse-transpose of model for normals
+};
+
+/**
+ * @brief Linear render pipeline that owns draw resources and registers per-frame bindings.
+ */
+class RenderPipeline {
+private:
+    Device* m_device;
+    Renderer* m_renderer;
+
+    vk::raii::PipelineLayout m_pipeline_layout{nullptr};
+    vk::raii::Pipeline m_pipeline{nullptr};
+
+    vk::DeviceSize m_uniform_buffer_size{0};
+    uint32_t m_frame_count{0};
+
+    std::unique_ptr<ShaderModule> m_vertex_shader_module{nullptr};
+    std::unique_ptr<ShaderModule> m_fragment_shader_module{nullptr};
+
+    std::unique_ptr<Mesh> m_mesh{nullptr};
+
+    std::vector<std::unique_ptr<Buffer>> m_uniform_buffers{};
+    std::unique_ptr<DescriptorSystem> m_descriptor_system{nullptr};
+    
+public:
+    RenderPipeline(Device* device, Renderer* renderer)
+        : m_device(device), m_renderer(renderer) {}
+
+    void initialize(const std::string& shader_dir,
+                    const std::string& vertex_shader_filename,
+                    const std::string& fragment_shader_filename,
+                    const std::string& obj_path) {
+        m_uniform_buffer_size = sizeof(UniformBufferObject);
+        m_frame_count = m_renderer->max_frames_in_flight();
+
+        // Create shader modules
+        m_vertex_shader_module = std::make_unique<ShaderModule>(
+            ShaderModule::from_file(
+                m_device,
+                shader_dir + vertex_shader_filename,
+                vk::ShaderStageFlagBits::eVertex
+            )
+        );
+
+        m_fragment_shader_module = std::make_unique<ShaderModule>(
+            ShaderModule::from_file(
+                m_device,
+                shader_dir + fragment_shader_filename,
+                vk::ShaderStageFlagBits::eFragment
+            )
+        );
+
+        // Load mesh from OBJ and create GPU buffers
+        m_mesh = std::make_unique<Mesh>(Mesh::from_obj(m_device, obj_path));
+
+        m_uniform_buffers.clear();
+        m_uniform_buffers.reserve(m_frame_count);
+        for (uint32_t i = 0; i < m_frame_count; ++i) {
+            auto buffer = std::make_unique<Buffer>(
+                Buffer::create_host_visible_buffer(
+                    m_device,
+                    m_uniform_buffer_size,
+                    vk::BufferUsageFlagBits::eUniformBuffer
+                )
+            );
+            buffer->map();
+            m_uniform_buffers.emplace_back(std::move(buffer));
+        }
+
+        // Create descriptor system
+        m_descriptor_system = std::make_unique<DescriptorSystem>(
+            DescriptorSystem::Builder(m_device)
+                .add_set("per_frame", 0, m_frame_count, 
+                    [](DescriptorSetLayout::Builder& builder) {
+                        builder.add_binding(0, vk::DescriptorType::eUniformBuffer, 
+                                          vk::ShaderStageFlagBits::eVertex);
+                    })
+                .build()
+        );
+
+        m_descriptor_system->update_all_sets("per_frame", 
+            [this](DescriptorWriter& writer, uint32_t index) {
+                writer.write_buffer(
+                    0, 
+                    *m_uniform_buffers[index]->buffer(), 
+                    0, 
+                    m_uniform_buffer_size
+                );
+            });
+
+
+        auto layout_info = DescriptorSystem::make_pipeline_layout_info(*m_descriptor_system);
+        m_pipeline_layout = vk::raii::PipelineLayout{
+            m_device->device(), 
+            layout_info.info
+        };
+
+        // Create graphics pipeline
+        std::vector<vk::PipelineShaderStageCreateInfo> shader_stage_infos = {
+            m_vertex_shader_module->stage_create_info(),
+            m_fragment_shader_module->stage_create_info()
+        };
+
+        auto vertex_input_state = Mesh::vertex_input_state();
+        vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
+        vertex_input_info.vertexBindingDescriptionCount = static_cast<uint32_t>(vertex_input_state.bindings.size());
+        vertex_input_info.pVertexBindingDescriptions = vertex_input_state.bindings.data();
+        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertex_input_state.attributes.size());
+        vertex_input_info.pVertexAttributeDescriptions = vertex_input_state.attributes.data();
+
+        vk::PipelineInputAssemblyStateCreateInfo input_assembly_info{};
+        input_assembly_info.topology = vk::PrimitiveTopology::eTriangleList;
+
+        vk::PipelineViewportStateCreateInfo viewport_info{};
+        viewport_info.viewportCount = 1;
+        viewport_info.scissorCount = 1;
+
+        vk::PipelineRasterizationStateCreateInfo rasterization_info{};
+        rasterization_info.depthClampEnable = VK_FALSE;
+        rasterization_info.rasterizerDiscardEnable = VK_FALSE;
+        rasterization_info.polygonMode = vk::PolygonMode::eFill;
+        rasterization_info.cullMode = vk::CullModeFlagBits::eNone;
+        rasterization_info.frontFace = vk::FrontFace::eCounterClockwise;
+        rasterization_info.depthBiasEnable = VK_FALSE;
+        rasterization_info.lineWidth = 1.0f;
+
+        vk::PipelineMultisampleStateCreateInfo multisample_info{};
+        multisample_info.rasterizationSamples = vk::SampleCountFlagBits::e1;
+
+        vk::PipelineDepthStencilStateCreateInfo depth_info{};
+        depth_info.depthTestEnable = VK_TRUE;
+        depth_info.depthWriteEnable = VK_TRUE;
+        depth_info.depthCompareOp = vk::CompareOp::eLess;
+
+        vk::PipelineColorBlendAttachmentState color_blend_attachment{};
+        color_blend_attachment.blendEnable = VK_FALSE;
+        color_blend_attachment.colorWriteMask =
+            vk::ColorComponentFlagBits::eR |
+            vk::ColorComponentFlagBits::eG |
+            vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA;
+
+        std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments = {
+            color_blend_attachment};
+
+        vk::PipelineColorBlendStateCreateInfo color_blend_state{};
+        color_blend_state.logicOpEnable = VK_FALSE;
+        color_blend_state.logicOp = vk::LogicOp::eCopy;
+        color_blend_state.attachmentCount = static_cast<uint32_t>(color_blend_attachments.size());
+        color_blend_state.pAttachments = color_blend_attachments.data();
+
+        std::vector<vk::DynamicState> dynamic_states = {
+            vk::DynamicState::eViewport,
+            vk::DynamicState::eScissor};
+
+        vk::PipelineDynamicStateCreateInfo dynamic_state_info{};
+        dynamic_state_info.dynamicStateCount = static_cast<uint32_t>(dynamic_states.size());
+        dynamic_state_info.pDynamicStates = dynamic_states.data();
+
+        vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info{};
+        graphics_pipeline_create_info.stageCount = static_cast<uint32_t>(shader_stage_infos.size());
+        graphics_pipeline_create_info.pStages = shader_stage_infos.data();
+        graphics_pipeline_create_info.pVertexInputState = &vertex_input_info;
+        graphics_pipeline_create_info.pInputAssemblyState = &input_assembly_info;
+        graphics_pipeline_create_info.pViewportState = &viewport_info;
+        graphics_pipeline_create_info.pRasterizationState = &rasterization_info;
+        graphics_pipeline_create_info.pMultisampleState = &multisample_info;
+        graphics_pipeline_create_info.pDepthStencilState = &depth_info;
+        graphics_pipeline_create_info.pColorBlendState = &color_blend_state;
+        graphics_pipeline_create_info.pDynamicState = &dynamic_state_info;
+        graphics_pipeline_create_info.layout = *m_pipeline_layout;
+        graphics_pipeline_create_info.renderPass = VK_NULL_HANDLE;
+
+        vk::PipelineRenderingCreateInfo pipeline_rendering_info{};
+
+        std::vector<vk::Format> color_attachment_formats = {
+            m_renderer->render_format()};
+
+        pipeline_rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachment_formats.size());
+        pipeline_rendering_info.pColorAttachmentFormats = color_attachment_formats.data();
+        pipeline_rendering_info.depthAttachmentFormat = m_renderer->depth_format();
+
+        vk::StructureChain<
+            vk::GraphicsPipelineCreateInfo,
+            vk::PipelineRenderingCreateInfo
+        > pipeline_info_chain{
+            graphics_pipeline_create_info,
+            pipeline_rendering_info
+        };
+
+        m_pipeline = vk::raii::Pipeline{
+            m_device->device(),
+            nullptr,
+            pipeline_info_chain.get<vk::GraphicsPipelineCreateInfo>()
+        };
+
+        // Register per-frame resources in renderer's resource registry
+        m_renderer->set_frame_resource_provider(
+            [this](uint32_t frame_index, ResourceRegistry& registry) {
+                registry.set_buffer(frame_index, "uniform", m_uniform_buffers[frame_index].get());
+                registry.set_descriptor_set(frame_index, "per_frame", m_descriptor_system->get_set("per_frame", frame_index));
+            }
+        );
+    }
+
+    void execute_frame(FrameContext& ctx) {
+        update_uniform_buffer(ctx);
+        ctx.cmd()->record([&](CommandBuffer& cmd) {
+            vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}}; 
+            vk::RenderingAttachmentInfo color_attachment_info{};
+            color_attachment_info.imageView = *ctx.swapchain_image_view();
+            color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+            color_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
+            color_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
+            color_attachment_info.clearValue = clear_value;
+
+            vk::ClearValue depth_clear{vk::ClearDepthStencilValue{1.0f, 0}};
+            vk::RenderingAttachmentInfo depth_attachment_info{};
+            depth_attachment_info.imageView = *ctx.depth_resources().view;
+            depth_attachment_info.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+            depth_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
+            depth_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
+            depth_attachment_info.clearValue = depth_clear;
+
+            vk::RenderingInfo rendering_info{};
+            rendering_info.renderArea.offset = vk::Offset2D{0, 0};
+            rendering_info.renderArea.extent = m_renderer->render_extent();
+            rendering_info.layerCount = 1;
+            rendering_info.colorAttachmentCount = 1;
+            rendering_info.pColorAttachments = &color_attachment_info;
+            rendering_info.pDepthAttachment = &depth_attachment_info;
+
+            vk::ImageMemoryBarrier2 to_color{};
+            to_color.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe;
+            to_color.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+            to_color.srcAccessMask = vk::AccessFlagBits2::eNone;
+            to_color.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+            to_color.oldLayout = vk::ImageLayout::eUndefined;
+            to_color.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
+            to_color.image = ctx.swapchain_image();
+            to_color.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+            to_color.subresourceRange.baseMipLevel = 0;
+            to_color.subresourceRange.levelCount = 1;
+            to_color.subresourceRange.baseArrayLayer = 0;
+            to_color.subresourceRange.layerCount = 1;
+
+            vk::DependencyInfo to_color_dep{};
+            to_color_dep.imageMemoryBarrierCount = 1;
+            to_color_dep.pImageMemoryBarriers = &to_color;
+            cmd.pipeline_barrier_2(to_color_dep);
+
+            cmd.begin_rendering(rendering_info);
+
+            cmd.bind_pipeline(
+                vk::PipelineBindPoint::eGraphics,
+                m_pipeline);
+
+            std::vector<vk::Buffer> vertex_buffers = {m_mesh->vertex_buffer()};
+            std::vector<vk::DeviceSize> offsets = {0};
+            cmd.bind_vertex_buffers(0, vertex_buffers, offsets);
+
+            cmd.bind_index_buffer(
+                m_mesh->index_buffer(),
+                0,
+                vk::IndexType::eUint32);
+
+            cmd.bind_descriptor_sets(
+                vk::PipelineBindPoint::eGraphics,
+                m_pipeline_layout,
+                0,
+                ctx.get_descriptor_set("per_frame"));
+
+            vk::Viewport viewport{};
+            viewport.x = 0.0f;
+            viewport.y = 0.0f;
+            viewport.width = static_cast<float>(m_renderer->render_extent().width);
+            viewport.height = static_cast<float>(m_renderer->render_extent().height);
+            viewport.minDepth = 0.0f;
+            viewport.maxDepth = 1.0f;
+            cmd.set_viewport(viewport);
+
+            vk::Rect2D scissor{};
+            scissor.offset = vk::Offset2D{0, 0};
+            scissor.extent = m_renderer->render_extent();
+            cmd.set_scissor(scissor);
+
+            cmd.draw_indexed(
+                m_mesh->index_count(),
+                1,
+                0,
+                0,
+                0);
+
+            cmd.end_rendering();
+
+            vk::ImageMemoryBarrier2 to_present{};
+            to_present.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+            to_present.dstStageMask = vk::PipelineStageFlagBits2::eBottomOfPipe;
+            to_present.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+            to_present.dstAccessMask = vk::AccessFlagBits2::eNone;
+            to_present.oldLayout = vk::ImageLayout::eColorAttachmentOptimal;
+            to_present.newLayout = vk::ImageLayout::ePresentSrcKHR;
+            to_present.image = ctx.swapchain_image();
+            to_present.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+            to_present.subresourceRange.baseMipLevel = 0;
+            to_present.subresourceRange.levelCount = 1;
+            to_present.subresourceRange.baseArrayLayer = 0;
+            to_present.subresourceRange.layerCount = 1;
+
+            vk::DependencyInfo to_present_dep{};
+            to_present_dep.imageMemoryBarrierCount = 1;
+            to_present_dep.pImageMemoryBarriers = &to_present;
+            cmd.pipeline_barrier_2(to_present_dep);
+        }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    }
+
+    void update_uniform_buffer(FrameContext& ctx) {
+        static auto start_time = std::chrono::high_resolution_clock::now();
+        auto current_time = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
+
+        UniformBufferObject ubo{};
+        glm::mat4 model = glm::scale(
+            glm::mat4(1.0f),
+            glm::vec3(3.0f));
+        ubo.model = glm::rotate(
+            model,
+            time * glm::radians(90.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.view = glm::lookAt(
+            glm::vec3(0.0f, 0.0f, -3.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f));
+        auto extent = m_renderer->render_extent();
+        ubo.proj = glm::perspective(
+            glm::radians(45.0f),
+            static_cast<float>(extent.width) / static_cast<float>(extent.height),
+            0.1f,
+            10.0f);
+        ubo.proj[1][1] *= -1;
+        ubo.normal = glm::transpose(glm::inverse(ubo.model));
+
+        std::memcpy(ctx.get_buffer("uniform").mapped_data(), &ubo, sizeof(ubo));
+    }
+
+};
+
+} // namespace rtr::core
+
+```
+
+## renderer.hpp
+
+```hpp
+#pragma once
+
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "device.hpp"
+#include "buffer.hpp"
+#include "swap_chain.hpp"
+#include "window.hpp"
+#include "vulkan/vulkan_raii.hpp"
+
+#include "command.hpp"
+
+namespace rtr::core {
+
+class ResourceRegistry {
+public:
+    using BufferMap = std::unordered_map<std::string, Buffer*>;
+    using DescriptorSetMap = std::unordered_map<std::string, const vk::raii::DescriptorSet*>;
+
+    ResourceRegistry(uint32_t frames_in_flight = 0) { resize(frames_in_flight); }
+
+    void resize(uint32_t frames_in_flight) {
+        m_buffers.assign(frames_in_flight, {});
+        m_descriptor_sets.assign(frames_in_flight, {});
+    }
+
+    void clear_frame(uint32_t frame_index) {
+        m_buffers[frame_index].clear();
+        m_descriptor_sets[frame_index].clear();
+    }
+
+    void set_buffer(uint32_t frame_index, const std::string& name, Buffer* buffer) {
+        m_buffers[frame_index][name] = buffer;
+    }
+
+    void set_descriptor_set(uint32_t frame_index, const std::string& name, const vk::raii::DescriptorSet& set) {
+        m_descriptor_sets[frame_index][name] = &set;
+    }
+
+    Buffer& get_buffer(uint32_t frame_index, const std::string& name) const {
+        const auto& buffers = m_buffers[frame_index];
+        auto it = buffers.find(name);
+        if (it == buffers.end()) {
+            throw std::runtime_error("Buffer not found: " + name);
+        }
+        return *it->second;
+    }
+
+    const vk::raii::DescriptorSet& get_descriptor_set(uint32_t frame_index, const std::string& name) const {
+        const auto& sets = m_descriptor_sets[frame_index];
+        auto it = sets.find(name);
+        if (it == sets.end()) {
+            throw std::runtime_error("DescriptorSet not found: " + name);
+        }
+        return *it->second;
+    }
+
+    bool has_buffer(uint32_t frame_index, const std::string& name) const {
+        return m_buffers[frame_index].find(name) != m_buffers[frame_index].end();
+    }
+
+    bool has_descriptor_set(uint32_t frame_index, const std::string& name) const {
+        return m_descriptor_sets[frame_index].find(name) != m_descriptor_sets[frame_index].end();
+    }
+
+private:
+    std::vector<BufferMap> m_buffers;
+    std::vector<DescriptorSetMap> m_descriptor_sets;
+};
+
+struct DepthResources {
+    vk::raii::Image image{nullptr};
+    vk::raii::DeviceMemory memory{nullptr};
+    vk::raii::ImageView view{nullptr};
+};
+
+/**
+ * @brief Context for a single frame rendering
+ * 
+ * Provides access to the per-frame command buffer and swapchain image handles.
+ * The Renderer selects the correct frame resources, so render passes only see
+ * the "current frame" without tracking frame-in-flight indices.
+ */
+class FrameContext {
+
+private:
+    Device* m_device;
+    CommandBuffer* m_cmd;
+    ResourceRegistry* m_registry;
+    const vk::raii::ImageView* m_swapchain_image_view;  // Current swapchain image view to render to
+    const vk::Image* m_swapchain_image;  // Corresponding VkImage for barriers
+    const DepthResources* m_depth_resources;
+    uint32_t m_frame_index = 0;
+    
+public:
+    FrameContext(Device* device,
+                CommandBuffer* cmd,
+                ResourceRegistry* registry,
+                const vk::raii::ImageView& swapchain_image_view,
+                const vk::Image& swapchain_image,
+                const DepthResources& depth_resources,
+                uint32_t frame_index)
+        : m_device(device),
+          m_cmd(cmd),
+          m_swapchain_image_view(&swapchain_image_view),
+          m_swapchain_image(&swapchain_image),
+          m_depth_resources(&depth_resources),
+          m_registry(registry),
+          m_frame_index(frame_index) {}
+    
+    const vk::raii::ImageView& swapchain_image_view() const { return *m_swapchain_image_view; }
+    const vk::Image& swapchain_image() const { return *m_swapchain_image; }
+    const DepthResources& depth_resources() const { return *m_depth_resources; }
+
+    Device* device() const { return m_device; }
+    CommandBuffer* cmd() const { return m_cmd; }
+
+    Buffer& get_buffer(const std::string& name) {
+        return m_registry->get_buffer(m_frame_index, name);
+    }
+
+    const vk::raii::DescriptorSet& get_descriptor_set(const std::string& name) {
+        return m_registry->get_descriptor_set(m_frame_index, name);
+    }
+
+    bool has_buffer(const std::string& name) const {
+        return m_registry->has_buffer(m_frame_index, name);
+    }
+
+    bool has_descriptor_set(const std::string& name) const {
+        return m_registry->has_descriptor_set(m_frame_index, name);
+    }
+};
+
+/**
+ * @brief Renderer manages frame-in-flight synchronization and swapchain presentation
+ * 
+ * Responsibilities:
+ * - Own and manage SwapChain lifecycle
+ * - Handle frame-in-flight synchronization
+ * - Manage per-frame command buffers and sync objects
+ * - Build FrameContext for each frame
+ * - Handle swapchain recreation on window resize
+ * 
+ * Usage:
+ *   Renderer renderer(device, window, max_frames_in_flight);
+ *   while (!window->should_close()) {
+ *       renderer.draw_frame([](FrameContext& ctx) {
+ *           // Record rendering commands
+ *       });
+ *   }
+ */
+class Renderer {
+public:
+ /**
+     * @brief Per-frame resources (command buffer + synchronization objects)
+     */
+    struct PerFrameResources {
+        vk::raii::Semaphore image_available_semaphore{nullptr};
+        vk::raii::Fence in_flight_fence{nullptr};
+        CommandBuffer command_buffer;
+        
+        // Constructor taking CommandBuffer by move
+        PerFrameResources(CommandBuffer&& cmd)
+            : command_buffer(std::move(cmd)) {}
+        
+        PerFrameResources(PerFrameResources&&) = default;
+        PerFrameResources& operator=(PerFrameResources&&) = default;
+    };
+
+private:
+    Device* m_device;
+    Window* m_window;
+    
+    std::unique_ptr<SwapChain> m_swapchain;
+    std::unique_ptr<CommandPool> m_command_pool;
+
+    std::vector<DepthResources> m_depth_resources;
+    vk::Format m_depth_format{vk::Format::eD32Sfloat};
+
+    std::vector<vk::raii::Semaphore> m_render_finished_semaphores;
+    
+    uint32_t m_max_frames_in_flight;
+    uint32_t m_current_frame_index = 0;
+    uint32_t m_current_image_index = 0;
+    bool m_framebuffer_resized = false;
+    
+    std::vector<PerFrameResources> m_per_frame_resources;
+    ResourceRegistry m_resource_registry;
+    std::function<void(uint32_t, ResourceRegistry&)> m_frame_resource_provider;
+    
+public:
+    // Callback type for user rendering logic
+    using RenderCallback = std::function<void(FrameContext&)>;
+    
+    /**
+     * @brief Construct a new Renderer
+     * 
+     * @param device Vulkan device (non-owning)
+     * @param window Window for swapchain surface (non-owning)
+     * @param max_frames_in_flight Number of frames that can be processed concurrently
+     */
+    Renderer(Device* device, 
+             Window* window, 
+             uint32_t max_frames_in_flight = 2)
+        : m_device(device)
+        , m_window(window)
+        , m_max_frames_in_flight(max_frames_in_flight)
+        , m_resource_registry(max_frames_in_flight) {
+        
+        // Create swapchain
+        m_swapchain = std::make_unique<SwapChain>(device);
+        
+        // Create command pool with reset capability
+        m_command_pool = std::make_unique<CommandPool>(
+            device, 
+            vk::CommandPoolCreateFlagBits::eResetCommandBuffer
+        );
+
+        init_depth_resources();
+        init_render_finished_semaphores();
+        
+        // Initialize per-frame resources
+        init_per_frame_resources();
+    }
+    
+    ~Renderer() = default;
+    
+    // Non-copyable
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
+
+    void init_render_finished_semaphores() {
+        m_render_finished_semaphores.clear();
+        vk::SemaphoreCreateInfo semaphore_info{};
+        
+        // 为每一张 Swapchain Image 创建一个对应的信号量
+        for (size_t i = 0; i < m_swapchain->images().size(); i++) {
+            m_render_finished_semaphores.emplace_back(m_device->device(), semaphore_info);
+        }
+    }
+
+    /**
+     * @brief Set a provider that registers per-frame resources into the registry
+     */
+    void set_frame_resource_provider(std::function<void(uint32_t, ResourceRegistry&)> provider) {
+        m_frame_resource_provider = std::move(provider);
+    }
+    
+    /**
+     * @brief Main rendering function - acquires image, records commands, submits, presents
+     * 
+     * @param callback User-provided function to record rendering commands
+     */
+    void draw_frame(RenderCallback callback) {
+        auto& frame_res = m_per_frame_resources[m_current_frame_index];
+        
+        // 1. Wait for previous frame to finish
+        vk::Result wait_result = m_device->device().waitForFences(
+            *frame_res.in_flight_fence,
+            VK_TRUE,
+            UINT64_MAX
+        );
+
+        if (wait_result != vk::Result::eSuccess) {
+            std::cerr << "Failed to wait for fence" << std::endl;
+            return;
+        }
+
+        m_device->device().resetFences(*frame_res.in_flight_fence);
+        
+        // 2. Acquire next swapchain image
+        auto [result, image_index] = m_swapchain->acquire_next_image(
+            frame_res.image_available_semaphore
+        );
+        
+        if (result == vk::Result::eErrorOutOfDateKHR) {
+            // Swapchain is out of date, recreate it
+            recreate_swapchain();
+            init_depth_resources();
+            init_render_finished_semaphores();
+            return;
+        }
+        
+        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+            throw std::runtime_error("Failed to acquire swapchain image");
+        }
+        
+        m_current_image_index = image_index;
+        
+        // 3. Reset per-frame resource registry entries
+        m_resource_registry.clear_frame(m_current_frame_index);
+        
+        // 4. Let caller register per-frame resources (if provided)
+        if (m_frame_resource_provider) {
+            m_frame_resource_provider(m_current_frame_index, m_resource_registry);
+        }
+        
+        // 5. Build FrameContext
+        FrameContext frame_ctx = build_frame_context();
+        
+        // 6. Reset command buffer and let user record commands
+        frame_res.command_buffer.reset();
+        callback(frame_ctx);
+ 
+        // 7. Submit command buffer
+        CommandBuffer::SubmitInfo submit_info;
+        submit_info.wait_semaphores = {*frame_res.image_available_semaphore};
+        submit_info.wait_stages = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+        submit_info.signal_semaphores = {*m_render_finished_semaphores[image_index]};
+        submit_info.fence = *frame_res.in_flight_fence;
+        
+        frame_res.command_buffer.submit(submit_info);
+        
+        // 8. Present swapchain image
+        vk::Result present_result = m_swapchain->present(
+            image_index,
+            m_render_finished_semaphores[image_index],
+            nullptr
+        );
+        
+        // 9. Check if swapchain needs recreation
+        bool needs_recreation = false;
+        
+        if (present_result == vk::Result::eErrorOutOfDateKHR) {
+            needs_recreation = true;
+        } else if (present_result == vk::Result::eSuboptimalKHR) {
+            std::cout << "Swapchain suboptimal during presentation." << std::endl;
+            needs_recreation = true;
+        } else if (present_result != vk::Result::eSuccess) {
+            throw std::runtime_error("Failed to present swapchain image");
+        }
+        
+        if (needs_recreation || m_framebuffer_resized) {
+            m_framebuffer_resized = false;
+             // Wait for device to be idle before recreating
+            m_device->device().waitIdle();
+            recreate_swapchain();
+            init_depth_resources();
+            init_render_finished_semaphores();
+        }
+        
+        // 10. Advance to next frame
+        m_current_frame_index = (m_current_frame_index + 1) % m_max_frames_in_flight;
+    }
+    
+    /**
+     * @brief Notify renderer of window resize (triggers swapchain recreation)
+     * 
+     * @param width New window width
+     * @param height New window height
+     */
+    void on_window_resized(uint32_t width, uint32_t height) {
+        std::cout << "Renderer: Window resized to (" << width << ", " << height << ")" << std::endl;
+        m_framebuffer_resized = true;
+    }
+    
+    /**
+     * @brief Get current render extent (swapchain extent)
+     */
+    vk::Extent2D render_extent() const { return m_swapchain->extent(); }
+    
+    /**
+     * @brief Get current render format (swapchain image format)
+     */
+    vk::Format render_format() const { return m_swapchain->image_format(); }
+
+    vk::Format depth_format() const { return m_depth_format; }
+    
+    /**
+     * @brief Get number of swapchain images
+     */
+    uint32_t image_count() const { 
+        return static_cast<uint32_t>(m_swapchain->images().size()); 
+    }
+
+    /**
+     * @brief Get maximum frames in flight
+     */
+    uint32_t max_frames_in_flight() const { return m_max_frames_in_flight; }
+    
+    /**
+     * @brief Get current frame index (for accessing per-frame resources)
+     */
+    uint32_t current_frame_index() const { return m_current_frame_index; }
+    
+    /**
+     * @brief Get current swapchain image index
+     */
+    uint32_t current_image_index() const { return m_current_image_index; }
+    
+    /**
+     * @brief Get per-frame resources for a specific frame index
+     */
+    const PerFrameResources& get_frame_resources(uint32_t frame_index) const {
+        return m_per_frame_resources[frame_index];
+    }
+    
+    /**
+     * @brief Get current frame's resources
+     */
+    const PerFrameResources& current_frame_resources() const {
+        return m_per_frame_resources[m_current_frame_index];
+    }
+    
+    /**
+     * @brief Access to device (for advanced usage)
+     */
+    Device* device() const { return m_device; }
+    
+    /**
+     * @brief Access resource registry for the current renderer
+     */
+    ResourceRegistry& resource_registry() { return m_resource_registry; }
+    const ResourceRegistry& resource_registry() const { return m_resource_registry; }
+    
+    /**
+     * @brief Access to swapchain (for advanced usage)
+     */
+    const SwapChain& swapchain() const { return *m_swapchain; }
+
+    /**
+     * @brief Initialize per-frame resources (command buffers + sync objects)
+     */
+    void init_per_frame_resources() {
+        m_per_frame_resources.clear();
+        m_per_frame_resources.reserve(m_max_frames_in_flight);
+        
+        vk::SemaphoreCreateInfo semaphore_info{};
+        vk::FenceCreateInfo fence_info{};
+        fence_info.flags = vk::FenceCreateFlagBits::eSignaled;  // Start signaled
+        
+        // Create command buffers
+        auto command_buffers = m_command_pool->create_command_buffers(m_max_frames_in_flight);
+        
+        for (uint32_t i = 0; i < m_max_frames_in_flight; ++i) {
+            PerFrameResources resources(std::move(command_buffers[i]));
+            
+            resources.image_available_semaphore = vk::raii::Semaphore(
+                m_device->device(), semaphore_info
+            );
+            
+            resources.in_flight_fence = vk::raii::Fence(
+                m_device->device(), fence_info
+            );
+
+            m_per_frame_resources.push_back(std::move(resources));
+        }
+    }
+
+    void init_depth_resources() {
+        m_depth_resources.resize(m_swapchain->images().size());
+        for (auto& depth : m_depth_resources) {
+            create_depth_resources(depth);
+        }
+    }
+    
+    /**
+     * @brief Recreate swapchain (called on window resize or out-of-date)
+     */
+    void recreate_swapchain() {
+        // Recreate swapchain
+        m_swapchain->recreate();
+        
+        std::cout << "Swapchain recreated with extent (" 
+                  << m_swapchain->extent().width << ", " 
+                  << m_swapchain->extent().height << ")" << std::endl;
+    }
+    
+    /**
+     * @brief Build FrameContext for current frame
+     */
+    FrameContext build_frame_context() {
+        auto& frame_res = m_per_frame_resources[m_current_frame_index];
+        
+        return FrameContext(
+            m_device,
+            &frame_res.command_buffer,
+            &m_resource_registry,
+            m_swapchain->image_views()[m_current_image_index],
+            m_swapchain->images()[m_current_image_index],
+            m_depth_resources[m_current_image_index],
+            m_current_frame_index
+        );
+    }
+
+    void recreate_depth_resources() {
+        for (auto& depth : m_depth_resources) {
+            create_depth_resources(depth);
+        }
+    }
+
+    void create_depth_resources(DepthResources& depth) {
+        vk::ImageCreateInfo image_info{};
+        image_info.imageType = vk::ImageType::e2D;
+        auto extent = m_swapchain->extent();
+        image_info.extent = vk::Extent3D{extent.width, extent.height, 1};
+        image_info.mipLevels = 1;
+        image_info.arrayLayers = 1;
+        image_info.format = m_depth_format;
+        image_info.tiling = vk::ImageTiling::eOptimal;
+        image_info.initialLayout = vk::ImageLayout::eUndefined;
+        image_info.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
+        image_info.samples = vk::SampleCountFlagBits::e1;
+        image_info.sharingMode = vk::SharingMode::eExclusive;
+
+        depth.image = vk::raii::Image(m_device->device(), image_info);
+
+        auto mem_requirements = depth.image.getMemoryRequirements();
+        auto mem_properties = m_device->physical_device().getMemoryProperties();
+        auto mem_type_index = find_memory_type(
+            mem_properties,
+            mem_requirements.memoryTypeBits,
+            vk::MemoryPropertyFlagBits::eDeviceLocal);
+        if (!mem_type_index.has_value()) {
+            throw std::runtime_error("Failed to find memory for depth buffer.");
+        }
+
+        vk::MemoryAllocateInfo alloc_info{};
+        alloc_info.allocationSize = mem_requirements.size;
+        alloc_info.memoryTypeIndex = mem_type_index.value();
+        depth.memory = vk::raii::DeviceMemory(m_device->device(), alloc_info);
+        depth.image.bindMemory(*depth.memory, 0);
+
+        vk::ImageViewCreateInfo view_info{};
+        view_info.image = *depth.image;
+        view_info.viewType = vk::ImageViewType::e2D;
+        view_info.format = m_depth_format;
+        view_info.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+        view_info.subresourceRange.baseMipLevel = 0;
+        view_info.subresourceRange.levelCount = 1;
+        view_info.subresourceRange.baseArrayLayer = 0;
+        view_info.subresourceRange.layerCount = 1;
+        depth.view = vk::raii::ImageView(m_device->device(), view_info);
+
+        // Transition to depth attachment layout once.
+        CommandPool temp_pool(m_device, vk::CommandPoolCreateFlagBits::eTransient);
+        auto cmd = temp_pool.create_command_buffer();
+        cmd.record_and_submit([&](CommandBuffer& recorder) {
+            vk::ImageMemoryBarrier2 barrier{};
+            barrier.oldLayout = vk::ImageLayout::eUndefined;
+            barrier.newLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+            barrier.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe;
+            barrier.srcAccessMask = vk::AccessFlagBits2::eNone;
+            barrier.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests;
+            barrier.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite | vk::AccessFlagBits2::eDepthStencilAttachmentRead;
+            barrier.image = *depth.image;
+            barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            vk::DependencyInfo dep{};
+            dep.imageMemoryBarrierCount = 1;
+            dep.pImageMemoryBarriers = &barrier;
+            recorder.pipeline_barrier_2(dep);
+        });
+        m_device->queue().waitIdle();
+    }
+};
+
+} // namespace rtr::core
+
+```
+
+## shader_module.hpp
+
+```hpp
+#pragma once
+
+#include "device.hpp"
+#include "utils/file_loder.hpp"
+#include "vulkan/vulkan_raii.hpp"
+#include <string>
+#include <vector>
+
+namespace rtr::core {
+
+class ShaderModule {
+private:
+    Device* m_device;
+    vk::raii::ShaderModule m_module{nullptr};
+    vk::ShaderStageFlagBits m_stage;
+    std::string m_entry_point = "main";
+
+public:
+    // 从 SPIR-V 文件创建
+    static ShaderModule from_file(
+        Device* device,
+        const std::string& filepath,
+        vk::ShaderStageFlagBits stage,
+        const std::string& entry_point = "main"
+    ) {
+        auto code = rtr::utils::read_file(filepath);
+        return ShaderModule(device, code, stage, entry_point);
+    }
+
+    // 从 SPIR-V 字节码创建
+    ShaderModule(
+        Device* device,
+        const std::vector<char>& code,
+        vk::ShaderStageFlagBits stage,
+        const std::string& entry_point = "main"
+    ) : m_device(device), m_stage(stage), m_entry_point(entry_point) {
+        vk::ShaderModuleCreateInfo create_info{};
+        create_info.codeSize = code.size();
+        create_info.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        m_module = vk::raii::ShaderModule(device->device(), create_info);
+    }
+
+    // 获取 pipeline stage create info
+    vk::PipelineShaderStageCreateInfo stage_create_info() const {
+        vk::PipelineShaderStageCreateInfo stage_info{};
+        stage_info.stage = m_stage;
+        stage_info.module = *m_module;
+        stage_info.pName = m_entry_point.c_str();
+        return stage_info;
+    }
+
+    const vk::raii::ShaderModule& module() const { return m_module; }
+    const std::string& entry_point() const { return m_entry_point; }
+    vk::ShaderStageFlagBits stage() const { return m_stage; }
+};
+
+} // namespace rtr::core
+
+```
+
+## swap_chain.hpp
+
+```hpp
+#pragma once
+
+#include <algorithm>
+#include <functional>
+#include <cstdlib>
+#include <optional>
+#include <utility>
+#include <vector>
+#include <iostream>
+
+#include "device.hpp"
+#include "window.hpp"
+#include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan_enums.hpp"
+#include "vulkan/vulkan_handles.hpp"
+#include "vulkan/vulkan_raii.hpp"
+#include "vulkan/vulkan_structs.hpp"
+
+namespace rtr::core {
+
+class SwapChain {
+private:
+    Device* m_device;
+
+    vk::raii::SwapchainKHR m_swapchain{nullptr};
+    std::vector<vk::Image> m_images;
+    std::vector<vk::raii::ImageView> m_image_views;
+    vk::Format m_image_format;
+    vk::Extent2D m_extent;
+
+public:
+    SwapChain(Device* device) : m_device(device) {
+        create();
+    }
+
+    SwapChain(const SwapChain&) = delete;
+    SwapChain& operator=(const SwapChain&) = delete;
+
+    void cleanup() {
+        m_image_views.clear();
+        m_swapchain.clear();
+    }
+
+    void recreate() {
+        auto [width, height] = m_device->context()->window()->framebuffer_size();
+        while (width == 0 || height == 0) {
+            m_device->context()->window()->wait_events();
+            std::tie(width, height) = m_device->context()->window()->framebuffer_size();
+        }
+
+        m_device->device().waitIdle();
+        cleanup();
+        create();
+    }
+
+    std::pair<vk::Result, uint32_t> acquire_next_image(const vk::raii::Semaphore& semaphore) {
+        try {
+            return m_swapchain.acquireNextImage(UINT64_MAX, *semaphore, nullptr);
+        } catch (const vk::OutOfDateKHRError&) {
+            return {vk::Result::eErrorOutOfDateKHR, 0};
+        }
+    }
+
+    vk::Result present(uint32_t image_index, const vk::raii::Semaphore& wait_semaphore, const vk::raii::Fence& present_fence) {
+        vk::SwapchainKHR swapchains[] = {*m_swapchain};
+        vk::Semaphore wait_semaphores[] = {*wait_semaphore};
+        vk::Fence fences[] = {*present_fence};
+        
+        vk::SwapchainPresentFenceInfoEXT present_fence_info{};
+        present_fence_info.swapchainCount = 1;
+        present_fence_info.pFences = fences;
+
+        vk::PresentInfoKHR present_info{};
+        present_info.waitSemaphoreCount = 1;
+        present_info.pWaitSemaphores = wait_semaphores;
+        present_info.swapchainCount = 1;
+        present_info.pSwapchains = swapchains;
+        present_info.pImageIndices = &image_index;
+
+        vk::StructureChain<vk::PresentInfoKHR, vk::SwapchainPresentFenceInfoEXT> present_info_chain{
+            present_info,
+            present_fence_info
+        };
+
+        try {
+            return m_device->queue().presentKHR(present_info_chain.get<vk::PresentInfoKHR>());
+        } catch (const vk::OutOfDateKHRError&) {
+            return vk::Result::eErrorOutOfDateKHR;
+        }
+    }
+
+    vk::Format image_format() const { return m_image_format; }
+    vk::Extent2D extent() const { return m_extent; }
+    const std::vector<vk::raii::ImageView>& image_views() const { return m_image_views; }
+    const std::vector<vk::Image>& images() const { return m_images; }
+
+private:
+    void create() {
+        auto surface_formats = m_device->physical_device().getSurfaceFormatsKHR(*m_device->context()->surface());
+        auto surface_format = choose_surface_format(surface_formats);
+        auto present_mode = choose_present_mode(m_device->physical_device().getSurfacePresentModesKHR(*m_device->context()->surface()));
+        auto capabilities = m_device->physical_device().getSurfaceCapabilitiesKHR(*m_device->context()->surface());
+        auto extent = choose_extent(capabilities);
+
+        uint32_t image_count = capabilities.minImageCount + 1;
+        if (capabilities.maxImageCount > 0 && image_count > capabilities.maxImageCount) {
+            image_count = capabilities.maxImageCount;
+        }
+
+        std::cout << image_count << " swapchain images will be created with extent ("
+                  << extent.width << ", " << extent.height << ")." << std::endl;
+
+        vk::SwapchainCreateInfoKHR create_info{};
+        create_info.surface = *m_device->context()->surface();
+        create_info.minImageCount = image_count;
+        create_info.imageFormat = surface_format.format;
+        create_info.imageColorSpace = surface_format.colorSpace;
+        create_info.imageExtent = extent;
+        create_info.imageArrayLayers = 1;
+        create_info.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
+
+        create_info.imageSharingMode = vk::SharingMode::eExclusive;
+        create_info.preTransform = capabilities.currentTransform;
+        create_info.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+        create_info.presentMode = present_mode;
+        create_info.clipped = VK_TRUE;
+        create_info.oldSwapchain = VK_NULL_HANDLE;
+
+        m_swapchain = vk::raii::SwapchainKHR(m_device->device(), create_info);
+        m_images = m_swapchain.getImages();
+        m_image_format = surface_format.format;
+        m_extent = extent;
+
+        create_image_views();
+    }
+
+    void create_image_views() {
+        m_image_views.clear();
+        m_image_views.reserve(m_images.size());
+
+        for (const auto& image : m_images) {
+            vk::ImageViewCreateInfo create_info{};
+            create_info.image = image;
+            create_info.viewType = vk::ImageViewType::e2D;
+            create_info.format = m_image_format;
+            create_info.components.r = vk::ComponentSwizzle::eIdentity;
+            create_info.components.g = vk::ComponentSwizzle::eIdentity;
+            create_info.components.b = vk::ComponentSwizzle::eIdentity;
+            create_info.components.a = vk::ComponentSwizzle::eIdentity;
+            create_info.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+            create_info.subresourceRange.baseMipLevel = 0;
+            create_info.subresourceRange.levelCount = 1;
+            create_info.subresourceRange.baseArrayLayer = 0;
+            create_info.subresourceRange.layerCount = 1;
+
+            m_image_views.emplace_back(m_device->device(), create_info);
+        }
+    }
+
+    vk::SurfaceFormatKHR choose_surface_format(const std::vector<vk::SurfaceFormatKHR>& available_formats) {
+        for (const auto& available_format : available_formats) {
+            if (available_format.format == vk::Format::eB8G8R8A8Srgb &&
+                available_format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+                return available_format;
+            }
+        }
+        return available_formats[0];
+    }
+
+    vk::PresentModeKHR choose_present_mode(const std::vector<vk::PresentModeKHR>& available_present_modes) {
+        for (const auto& available_present_mode : available_present_modes) {
+            if (available_present_mode == vk::PresentModeKHR::eMailbox) {
+                return available_present_mode;
+            }
+        }
+        return vk::PresentModeKHR::eFifo;
+    }
+
+    vk::Extent2D choose_extent(const vk::SurfaceCapabilitiesKHR& capabilities) {
+        if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+            return capabilities.currentExtent;
+        } else {
+            auto [width, height] = m_device->context()->window()->framebuffer_size();
+
+            vk::Extent2D actual_extent = {
+                static_cast<uint32_t>(width),
+                static_cast<uint32_t>(height)
+            };
+
+            actual_extent.width = std::clamp(actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+            actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+
+            return actual_extent;
+        }
+    }
+
+    const Device* device() const {
+        return m_device;
+    }
+};
+
+}
+```
+
+## window.hpp
+
+```hpp
+#pragma once
+
+#include <optional>
+#include <stdexcept>
+#include <cstdlib>
+#include <string>
+#include <utility>
+#include <vector>
+
+#define GLFW_INCLUDE_VULKAN
+#include "GLFW/glfw3.h"
+
+#include "vulkan/vulkan_raii.hpp"
+
+namespace rtr::core {
+    
+class Window {
+private:
+    int m_width{800};
+    int m_height{600};
+    std::string m_title{"WindowGLFW"};
+    GLFWwindow* m_window{ nullptr };
+
+public:
+    Window(int width, int height, const std::string& title) : m_width(width), m_height(height), m_title(title) {
+        if (!glfwInit()) {
+            throw std::runtime_error("Failed to initialize GLFW");
+        }
+
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
+        m_window = glfwCreateWindow(
+            m_width, m_height, 
+            m_title.c_str(), 
+            nullptr, nullptr
+        );
+    }
+
+    ~Window() {
+        if (m_window) {
+            glfwDestroyWindow(m_window);
+        }
+        glfwTerminate();
+    }
+
+    const GLFWwindow* window() const {
+        return m_window;
+    }
+
+    std::string title() const {
+        return m_title;
+    }
+
+    std::pair<int, int> framebuffer_size() const {
+        int width, height;
+        glfwGetFramebufferSize(m_window, &width, &height);
+        return { width, height };
+    }
+
+    const int& width() const {
+        return m_width;
+    }
+
+    const int& height() const {
+        return m_height;
+    }
+
+    bool is_should_close() const {
+        return glfwWindowShouldClose(m_window);
+    }
+
+    void poll_events() const {
+        glfwPollEvents();
+    }
+
+    void wait_events() const {
+        glfwWaitEvents();
+    }
+
+    void set_user_pointer(void* pointer) {
+        glfwSetWindowUserPointer(m_window, pointer);
+    }
+
+    void set_framebuffer_size_callback(GLFWframebuffersizefun callback) {
+        glfwSetFramebufferSizeCallback(m_window, callback);
+    }
+
+    std::vector<std::string> required_extensions() const {
+        uint32_t glfw_extension_count = 0;
+        const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
+
+        std::vector<std::string> extensions;
+        for (uint32_t i = 0; i < glfw_extension_count; i++) {
+            extensions.push_back(glfw_extensions[i]);
+        }
+
+        return extensions;
+    } 
+
+    std::optional<VkSurfaceKHR> create_vk_surface(const vk::raii::Instance& instance) const {
+        VkSurfaceKHR surface;
+        if (glfwCreateWindowSurface(*instance, m_window, nullptr, &surface) != VK_SUCCESS) {
+            return std::nullopt;
+        }
+        return surface;
+    }
+};
+
+}
+
+```

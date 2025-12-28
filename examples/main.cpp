@@ -6,10 +6,9 @@
 
 
 int main() {
-    
     rtr::core::Application app{};
 
-    rtr::utils::Image image{"assets/textures/test.png"};
+    rtr::utils::ImageLoader image{"assets/textures/test.png"};
     std::cout << 
         "Loaded image with dimensions: " << image.width() << "x" << image.height() << 
         " channels: " << image.channels() << 

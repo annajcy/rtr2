@@ -12,6 +12,7 @@
 #include "mesh.hpp"
 #include "renderer.hpp"
 #include "shader_module.hpp"
+#include "vulkan/vulkan.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -231,7 +232,8 @@ public:
 
     void execute_frame(FrameContext& ctx) {
         update_uniform_buffer(ctx);
-        ctx.cmd()->record([&](CommandBuffer& cmd) {
+        ctx.cmd()->record([&](CommandBuffer& cb) {
+            auto& cmd = cb.command_buffer();
             vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}}; 
             vk::RenderingAttachmentInfo color_attachment_info{};
             color_attachment_info.imageView = *ctx.swapchain_image_view();
@@ -273,28 +275,30 @@ public:
             vk::DependencyInfo to_color_dep{};
             to_color_dep.imageMemoryBarrierCount = 1;
             to_color_dep.pImageMemoryBarriers = &to_color;
-            cmd.pipeline_barrier_2(to_color_dep);
+            cmd.pipelineBarrier2(to_color_dep);
 
-            cmd.begin_rendering(rendering_info);
+            cmd.beginRendering(rendering_info);
 
-            cmd.bind_pipeline(
+            cmd.bindPipeline(
                 vk::PipelineBindPoint::eGraphics,
                 m_pipeline);
 
             std::vector<vk::Buffer> vertex_buffers = {m_mesh->vertex_buffer()};
             std::vector<vk::DeviceSize> offsets = {0};
-            cmd.bind_vertex_buffers(0, vertex_buffers, offsets);
+            cmd.bindVertexBuffers(0, vertex_buffers, offsets);
 
-            cmd.bind_index_buffer(
+            cmd.bindIndexBuffer(
                 m_mesh->index_buffer(),
                 0,
                 vk::IndexType::eUint32);
 
-            cmd.bind_descriptor_sets(
+            cmd.bindDescriptorSets(
                 vk::PipelineBindPoint::eGraphics,
-                m_pipeline_layout,
+                *m_pipeline_layout,
                 0,
-                ctx.get_descriptor_set("per_frame"));
+                *ctx.get_descriptor_set("per_frame"), 
+                {}
+            );
 
             vk::Viewport viewport{};
             viewport.x = 0.0f;
@@ -303,21 +307,22 @@ public:
             viewport.height = static_cast<float>(m_renderer->render_extent().height);
             viewport.minDepth = 0.0f;
             viewport.maxDepth = 1.0f;
-            cmd.set_viewport(viewport);
+            cmd.setViewport(0, viewport);
 
             vk::Rect2D scissor{};
             scissor.offset = vk::Offset2D{0, 0};
             scissor.extent = m_renderer->render_extent();
-            cmd.set_scissor(scissor);
+            cmd.setScissor(0, scissor);
 
-            cmd.draw_indexed(
+            cmd.drawIndexed(
                 m_mesh->index_count(),
                 1,
                 0,
                 0,
-                0);
+                0
+            );
 
-            cmd.end_rendering();
+            cmd.endRendering();
 
             vk::ImageMemoryBarrier2 to_present{};
             to_present.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
@@ -336,7 +341,7 @@ public:
             vk::DependencyInfo to_present_dep{};
             to_present_dep.imageMemoryBarrierCount = 1;
             to_present_dep.pImageMemoryBarriers = &to_present;
-            cmd.pipeline_barrier_2(to_present_dep);
+            cmd.pipelineBarrier2(to_present_dep);
         }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     }
 
