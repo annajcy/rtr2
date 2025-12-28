@@ -624,6 +624,25 @@ public:
         return m_allocated_sets.at(set_name).size();
     }
 
+    struct PipelineLayoutInfo {
+        vk::PipelineLayoutCreateInfo info{};
+        std::vector<vk::DescriptorSetLayout> set_layouts;
+    };
+
+    static PipelineLayoutInfo make_pipeline_layout_info(
+        const DescriptorSystem& system,
+        std::span<const vk::PushConstantRange> push_constants = {}
+    ) {
+        PipelineLayoutInfo result{};
+        result.set_layouts = system.get_all_layouts();
+        result.info.setLayoutCount = static_cast<uint32_t>(result.set_layouts.size());
+        result.info.pSetLayouts = result.set_layouts.data();
+        result.info.pushConstantRangeCount = static_cast<uint32_t>(push_constants.size());
+        result.info.pPushConstantRanges = push_constants.data();
+        return result;
+    }
+
+
 private:
     void create_pool(vk::DescriptorPoolCreateFlags flags) {
         DescriptorPool::Builder pool_builder;

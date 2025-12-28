@@ -74,6 +74,14 @@ private:
     std::vector<DescriptorSetMap> m_descriptor_sets;
 };
 
+
+struct DepthResources {
+    vk::raii::Image image{nullptr};
+    vk::raii::DeviceMemory memory{nullptr};
+    vk::raii::ImageView view{nullptr};
+};
+
+
 /**
  * @brief Context for a single frame rendering
  * 
@@ -86,27 +94,31 @@ class FrameContext {
 private:
     Device* m_device;
     CommandBuffer* m_cmd;
+    ResourceRegistry* m_registry;
     const vk::raii::ImageView* m_swapchain_image_view;  // Current swapchain image view to render to
     const vk::Image* m_swapchain_image;  // Corresponding VkImage for barriers
-    ResourceRegistry* m_registry;
+    const DepthResources* m_depth_resources;
     uint32_t m_frame_index = 0;
     
 public:
     FrameContext(Device* device,
-                 CommandBuffer* cmd,
-                 const vk::raii::ImageView& swapchain_image_view,
-                 const vk::Image& swapchain_image,
-                 ResourceRegistry* registry,
-                 uint32_t frame_index)
+                CommandBuffer* cmd,
+                ResourceRegistry* registry,
+                const vk::raii::ImageView& swapchain_image_view,
+                const vk::Image& swapchain_image,
+                const DepthResources& depth_resources,
+                uint32_t frame_index)
         : m_device(device),
           m_cmd(cmd),
           m_swapchain_image_view(&swapchain_image_view),
           m_swapchain_image(&swapchain_image),
+          m_depth_resources(&depth_resources),
           m_registry(registry),
           m_frame_index(frame_index) {}
     
     const vk::raii::ImageView& swapchain_image_view() const { return *m_swapchain_image_view; }
     const vk::Image& swapchain_image() const { return *m_swapchain_image; }
+    const DepthResources& depth_resources() const { return *m_depth_resources; }
 
     Device* device() const { return m_device; }
     CommandBuffer* cmd() const { return m_cmd; }
@@ -153,7 +165,6 @@ public:
      */
     struct PerFrameResources {
         vk::raii::Semaphore image_available_semaphore{nullptr};
-        vk::raii::Semaphore render_finished_semaphore{nullptr};
         vk::raii::Fence in_flight_fence{nullptr};
         CommandBuffer command_buffer;
         
@@ -165,20 +176,17 @@ public:
         PerFrameResources& operator=(PerFrameResources&&) = default;
     };
 
-    struct DepthResources {
-        vk::raii::Image image{nullptr};
-        vk::raii::DeviceMemory memory{nullptr};
-        vk::raii::ImageView view{nullptr};
-        vk::Format format{vk::Format::eD32Sfloat};
-    };
-
 private:
     Device* m_device;
     Window* m_window;
     
-    DepthResources m_depth;
     std::unique_ptr<SwapChain> m_swapchain;
     std::unique_ptr<CommandPool> m_command_pool;
+
+    std::vector<DepthResources> m_depth_resources;
+    vk::Format m_depth_format{vk::Format::eD32Sfloat};
+
+    std::vector<vk::raii::Semaphore> m_render_finished_semaphores;
     
     uint32_t m_max_frames_in_flight;
     uint32_t m_current_frame = 0;
@@ -210,13 +218,15 @@ public:
         
         // Create swapchain
         m_swapchain = std::make_unique<SwapChain>(device);
-        create_depth_resources();
         
         // Create command pool with reset capability
         m_command_pool = std::make_unique<CommandPool>(
             device, 
             vk::CommandPoolCreateFlagBits::eResetCommandBuffer
         );
+
+        init_depth_resources();
+        init_render_finished_semaphores();
         
         // Initialize per-frame resources
         init_per_frame_resources();
@@ -227,6 +237,16 @@ public:
     // Non-copyable
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
+
+    void init_render_finished_semaphores() {
+        m_render_finished_semaphores.clear();
+        vk::SemaphoreCreateInfo semaphore_info{};
+        
+        // 为每一张 Swapchain Image 创建一个对应的信号量
+        for (size_t i = 0; i < m_swapchain->images().size(); i++) {
+            m_render_finished_semaphores.emplace_back(m_device->device(), semaphore_info);
+        }
+    }
 
     /**
      * @brief Set a provider that registers per-frame resources into the registry
@@ -249,11 +269,13 @@ public:
             VK_TRUE,
             UINT64_MAX
         );
-        
+
         if (wait_result != vk::Result::eSuccess) {
             std::cerr << "Failed to wait for fence" << std::endl;
             return;
         }
+
+        m_device->device().resetFences(*frame_res.in_flight_fence);
         
         // 2. Acquire next swapchain image
         auto [result, image_index] = m_swapchain->acquire_next_image(
@@ -286,36 +308,24 @@ public:
         // 6. Reset command buffer and let user record commands
         frame_res.command_buffer.reset();
         callback(frame_ctx);
-        
-        // 7. Reset fence before submission
-        m_device->device().resetFences(*frame_res.in_flight_fence);
-        
-        // 8. Submit command buffer
+ 
+        // 7. Submit command buffer
         CommandBuffer::SubmitInfo submit_info;
         submit_info.wait_semaphores = {*frame_res.image_available_semaphore};
         submit_info.wait_stages = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
-        submit_info.signal_semaphores = {*frame_res.render_finished_semaphore};
+        submit_info.signal_semaphores = {*m_render_finished_semaphores[image_index]};
         submit_info.fence = *frame_res.in_flight_fence;
         
         frame_res.command_buffer.submit(submit_info);
         
-        // 9. Present image
-        // With VK_EXT_swapchain_maintenance1, we can use a fence with present
-        // Wait for the fence to complete before reusing it
-        wait_result = m_device->device().waitForFences(*frame_res.in_flight_fence, VK_TRUE, UINT64_MAX);
-        if (wait_result != vk::Result::eSuccess) {
-            std::cerr << "Failed to wait for fence before present" << std::endl;
-            return;
-        }
-        m_device->device().resetFences(*frame_res.in_flight_fence);
-        
+        // 8. Present swapchain image
         vk::Result present_result = m_swapchain->present(
             image_index,
-            frame_res.render_finished_semaphore,
-            frame_res.in_flight_fence  // Reuse in_flight_fence for present
+            m_render_finished_semaphores[image_index],
+            nullptr
         );
         
-        // 10. Check if swapchain needs recreation
+        // 9. Check if swapchain needs recreation
         bool needs_recreation = false;
         
         if (present_result == vk::Result::eErrorOutOfDateKHR) {
@@ -329,10 +339,14 @@ public:
         
         if (needs_recreation || m_framebuffer_resized) {
             m_framebuffer_resized = false;
+             // Wait for device to be idle before recreating
+            m_device->device().waitIdle();
             recreate_swapchain();
+            init_depth_resources();
+            init_render_finished_semaphores();
         }
         
-        // 9. Advance to next frame
+        // 10. Advance to next frame
         m_current_frame = (m_current_frame + 1) % m_max_frames_in_flight;
     }
     
@@ -356,9 +370,8 @@ public:
      * @brief Get current render format (swapchain image format)
      */
     vk::Format render_format() const { return m_swapchain->image_format(); }
-    vk::Format depth_format() const { return m_depth.format; }
-    const vk::raii::ImageView& depth_image_view() const { return m_depth.view; }
-    const vk::Image& depth_image() const { return *m_depth.image; }
+
+    vk::Format depth_format() const { return m_depth_format; }
     
     /**
      * @brief Get number of swapchain images
@@ -433,15 +446,18 @@ public:
                 m_device->device(), semaphore_info
             );
             
-            resources.render_finished_semaphore = vk::raii::Semaphore(
-                m_device->device(), semaphore_info
-            );
-            
             resources.in_flight_fence = vk::raii::Fence(
                 m_device->device(), fence_info
             );
-            
+
             m_per_frame_resources.push_back(std::move(resources));
+        }
+    }
+
+    void init_depth_resources() {
+        m_depth_resources.resize(m_swapchain->images().size());
+        for (auto& depth : m_depth_resources) {
+            create_depth_resources(depth);
         }
     }
     
@@ -449,12 +465,8 @@ public:
      * @brief Recreate swapchain (called on window resize or out-of-date)
      */
     void recreate_swapchain() {
-        // Wait for device to be idle before recreating
-        m_device->device().waitIdle();
-        
         // Recreate swapchain
         m_swapchain->recreate();
-        recreate_depth_resources();
         
         std::cout << "Swapchain recreated with extent (" 
                   << m_swapchain->extent().width << ", " 
@@ -470,37 +482,37 @@ public:
         return FrameContext(
             m_device,
             &frame_res.command_buffer,
+            &m_resource_registry,
             m_swapchain->image_views()[m_current_image],
             m_swapchain->images()[m_current_image],
-            &m_resource_registry,
+            m_depth_resources[m_current_image],
             m_current_frame
         );
     }
 
     void recreate_depth_resources() {
-        m_depth.view.clear();
-        m_depth.image.clear();
-        m_depth.memory.clear();
-        create_depth_resources();
+        for (auto& depth : m_depth_resources) {
+            create_depth_resources(depth);
+        }
     }
 
-    void create_depth_resources() {
+    void create_depth_resources(DepthResources& depth) {
         vk::ImageCreateInfo image_info{};
         image_info.imageType = vk::ImageType::e2D;
         auto extent = m_swapchain->extent();
         image_info.extent = vk::Extent3D{extent.width, extent.height, 1};
         image_info.mipLevels = 1;
         image_info.arrayLayers = 1;
-        image_info.format = m_depth.format;
+        image_info.format = m_depth_format;
         image_info.tiling = vk::ImageTiling::eOptimal;
         image_info.initialLayout = vk::ImageLayout::eUndefined;
         image_info.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
         image_info.samples = vk::SampleCountFlagBits::e1;
         image_info.sharingMode = vk::SharingMode::eExclusive;
 
-        m_depth.image = vk::raii::Image(m_device->device(), image_info);
+        depth.image = vk::raii::Image(m_device->device(), image_info);
 
-        auto mem_requirements = m_depth.image.getMemoryRequirements();
+        auto mem_requirements = depth.image.getMemoryRequirements();
         auto mem_properties = m_device->physical_device().getMemoryProperties();
         auto mem_type_index = find_memory_type(
             mem_properties,
@@ -513,19 +525,19 @@ public:
         vk::MemoryAllocateInfo alloc_info{};
         alloc_info.allocationSize = mem_requirements.size;
         alloc_info.memoryTypeIndex = mem_type_index.value();
-        m_depth.memory = vk::raii::DeviceMemory(m_device->device(), alloc_info);
-        m_depth.image.bindMemory(*m_depth.memory, 0);
+        depth.memory = vk::raii::DeviceMemory(m_device->device(), alloc_info);
+        depth.image.bindMemory(*depth.memory, 0);
 
         vk::ImageViewCreateInfo view_info{};
-        view_info.image = *m_depth.image;
+        view_info.image = *depth.image;
         view_info.viewType = vk::ImageViewType::e2D;
-        view_info.format = m_depth.format;
+        view_info.format = m_depth_format;
         view_info.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
         view_info.subresourceRange.baseMipLevel = 0;
         view_info.subresourceRange.levelCount = 1;
         view_info.subresourceRange.baseArrayLayer = 0;
         view_info.subresourceRange.layerCount = 1;
-        m_depth.view = vk::raii::ImageView(m_device->device(), view_info);
+        depth.view = vk::raii::ImageView(m_device->device(), view_info);
 
         // Transition to depth attachment layout once.
         CommandPool temp_pool(m_device, vk::CommandPoolCreateFlagBits::eTransient);
@@ -538,7 +550,7 @@ public:
             barrier.srcAccessMask = vk::AccessFlagBits2::eNone;
             barrier.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests;
             barrier.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite | vk::AccessFlagBits2::eDepthStencilAttachmentRead;
-            barrier.image = *m_depth.image;
+            barrier.image = *depth.image;
             barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
             barrier.subresourceRange.baseMipLevel = 0;
             barrier.subresourceRange.levelCount = 1;

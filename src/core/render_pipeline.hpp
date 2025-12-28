@@ -114,25 +114,25 @@ public:
                 );
             });
 
+
+        auto layout_info = DescriptorSystem::make_pipeline_layout_info(*m_descriptor_system);
+        m_pipeline_layout = vk::raii::PipelineLayout{
+            m_device->device(), 
+            layout_info.info
+        };
+
         // Create graphics pipeline
         std::vector<vk::PipelineShaderStageCreateInfo> shader_stage_infos = {
             m_vertex_shader_module->stage_create_info(),
             m_fragment_shader_module->stage_create_info()
         };
 
+        auto vertex_input_state = Mesh::vertex_input_state();
         vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
-        auto vertex_binding_description = Mesh::binding_description();
-
-        std::vector<vk::VertexInputBindingDescription> binding_descriptions = {
-            vertex_binding_description};
-
-        vertex_input_info.vertexBindingDescriptionCount = static_cast<uint32_t>(binding_descriptions.size());
-        vertex_input_info.pVertexBindingDescriptions = binding_descriptions.data();
-
-        auto attribute_descriptions = Mesh::attribute_descriptions();
-
-        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descriptions.size());
-        vertex_input_info.pVertexAttributeDescriptions = attribute_descriptions.data();
+        vertex_input_info.vertexBindingDescriptionCount = static_cast<uint32_t>(vertex_input_state.bindings.size());
+        vertex_input_info.pVertexBindingDescriptions = vertex_input_state.bindings.data();
+        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertex_input_state.attributes.size());
+        vertex_input_info.pVertexAttributeDescriptions = vertex_input_state.attributes.data();
 
         vk::PipelineInputAssemblyStateCreateInfo input_assembly_info{};
         input_assembly_info.topology = vk::PrimitiveTopology::eTriangleList;
@@ -183,17 +183,6 @@ public:
         dynamic_state_info.dynamicStateCount = static_cast<uint32_t>(dynamic_states.size());
         dynamic_state_info.pDynamicStates = dynamic_states.data();
 
-        vk::PipelineLayoutCreateInfo pipeline_layout_info{};
-        std::vector<vk::DescriptorSetLayout> set_layouts = {
-            *m_descriptor_system->get_layout("per_frame").layout()
-        };
-        pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(set_layouts.size());
-        pipeline_layout_info.pSetLayouts = set_layouts.data();
-
-        m_pipeline_layout = vk::raii::PipelineLayout{
-            m_device->device(),
-            pipeline_layout_info};
-
         vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info{};
         graphics_pipeline_create_info.stageCount = static_cast<uint32_t>(shader_stage_infos.size());
         graphics_pipeline_create_info.pStages = shader_stage_infos.data();
@@ -243,7 +232,7 @@ public:
     void execute_frame(FrameContext& ctx) {
         update_uniform_buffer(ctx);
         ctx.cmd()->record([&](CommandBuffer& cmd) {
-            vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{1.0f, 0.0f, 1.0f, 1.0f}}; 
+            vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}}; 
             vk::RenderingAttachmentInfo color_attachment_info{};
             color_attachment_info.imageView = *ctx.swapchain_image_view();
             color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
@@ -253,7 +242,7 @@ public:
 
             vk::ClearValue depth_clear{vk::ClearDepthStencilValue{1.0f, 0}};
             vk::RenderingAttachmentInfo depth_attachment_info{};
-            depth_attachment_info.imageView = m_renderer->depth_image_view();
+            depth_attachment_info.imageView = *ctx.depth_resources().view;
             depth_attachment_info.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
             depth_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
             depth_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;

@@ -90,6 +90,18 @@ public:
         return attributes;
     }
 
+    struct VertexInputState {
+        std::array<vk::VertexInputBindingDescription, 1> bindings;
+        std::array<vk::VertexInputAttributeDescription, 4> attributes;
+    };
+
+    static VertexInputState vertex_input_state() {
+        VertexInputState state{};
+        state.bindings[0] = binding_description();
+        state.attributes = attribute_descriptions();
+        return state;
+    }
+
 private:
     Device* m_device{};
     uint32_t m_vertex_count{0};
