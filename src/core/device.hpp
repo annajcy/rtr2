@@ -22,61 +22,7 @@ namespace detail {
     template<>
     struct FeatureChecker<vk::PhysicalDeviceFeatures> {
         static bool check(const vk::PhysicalDeviceFeatures& required, const vk::PhysicalDeviceFeatures& supported) {
-            if (required.robustBufferAccess && !supported.robustBufferAccess) return false;
-            if (required.fullDrawIndexUint32 && !supported.fullDrawIndexUint32) return false;
-            if (required.imageCubeArray && !supported.imageCubeArray) return false;
-            if (required.independentBlend && !supported.independentBlend) return false;
-            if (required.geometryShader && !supported.geometryShader) return false;
-            if (required.tessellationShader && !supported.tessellationShader) return false;
-            if (required.sampleRateShading && !supported.sampleRateShading) return false;
-            if (required.dualSrcBlend && !supported.dualSrcBlend) return false;
-            if (required.logicOp && !supported.logicOp) return false;
-            if (required.multiDrawIndirect && !supported.multiDrawIndirect) return false;
-            if (required.drawIndirectFirstInstance && !supported.drawIndirectFirstInstance) return false;
-            if (required.depthClamp && !supported.depthClamp) return false;
-            if (required.depthBiasClamp && !supported.depthBiasClamp) return false;
-            if (required.fillModeNonSolid && !supported.fillModeNonSolid) return false;
-            if (required.depthBounds && !supported.depthBounds) return false;
-            if (required.wideLines && !supported.wideLines) return false;
-            if (required.largePoints && !supported.largePoints) return false;
-            if (required.alphaToOne && !supported.alphaToOne) return false;
-            if (required.multiViewport && !supported.multiViewport) return false;
             if (required.samplerAnisotropy && !supported.samplerAnisotropy) return false;
-            if (required.textureCompressionETC2 && !supported.textureCompressionETC2) return false;
-            if (required.textureCompressionASTC_LDR && !supported.textureCompressionASTC_LDR) return false;
-            if (required.textureCompressionBC && !supported.textureCompressionBC) return false;
-            if (required.occlusionQueryPrecise && !supported.occlusionQueryPrecise) return false;
-            if (required.pipelineStatisticsQuery && !supported.pipelineStatisticsQuery) return false;
-            if (required.vertexPipelineStoresAndAtomics && !supported.vertexPipelineStoresAndAtomics) return false;
-            if (required.fragmentStoresAndAtomics && !supported.fragmentStoresAndAtomics) return false;
-            if (required.shaderTessellationAndGeometryPointSize && !supported.shaderTessellationAndGeometryPointSize) return false;
-            if (required.shaderImageGatherExtended && !supported.shaderImageGatherExtended) return false;
-            if (required.shaderStorageImageExtendedFormats && !supported.shaderStorageImageExtendedFormats) return false;
-            if (required.shaderStorageImageMultisample && !supported.shaderStorageImageMultisample) return false;
-            if (required.shaderStorageImageReadWithoutFormat && !supported.shaderStorageImageReadWithoutFormat) return false;
-            if (required.shaderStorageImageWriteWithoutFormat && !supported.shaderStorageImageWriteWithoutFormat) return false;
-            if (required.shaderUniformBufferArrayDynamicIndexing && !supported.shaderUniformBufferArrayDynamicIndexing) return false;
-            if (required.shaderSampledImageArrayDynamicIndexing && !supported.shaderSampledImageArrayDynamicIndexing) return false;
-            if (required.shaderStorageBufferArrayDynamicIndexing && !supported.shaderStorageBufferArrayDynamicIndexing) return false;
-            if (required.shaderStorageImageArrayDynamicIndexing && !supported.shaderStorageImageArrayDynamicIndexing) return false;
-            if (required.shaderClipDistance && !supported.shaderClipDistance) return false;
-            if (required.shaderCullDistance && !supported.shaderCullDistance) return false;
-            if (required.shaderFloat64 && !supported.shaderFloat64) return false;
-            if (required.shaderInt64 && !supported.shaderInt64) return false;
-            if (required.shaderInt16 && !supported.shaderInt16) return false;
-            if (required.shaderResourceResidency && !supported.shaderResourceResidency) return false;
-            if (required.shaderResourceMinLod && !supported.shaderResourceMinLod) return false;
-            if (required.sparseBinding && !supported.sparseBinding) return false;
-            if (required.sparseResidencyBuffer && !supported.sparseResidencyBuffer) return false;
-            if (required.sparseResidencyImage2D && !supported.sparseResidencyImage2D) return false;
-            if (required.sparseResidencyImage3D && !supported.sparseResidencyImage3D) return false;
-            if (required.sparseResidency2Samples && !supported.sparseResidency2Samples) return false;
-            if (required.sparseResidency4Samples && !supported.sparseResidency4Samples) return false;
-            if (required.sparseResidency8Samples && !supported.sparseResidency8Samples) return false;
-            if (required.sparseResidency16Samples && !supported.sparseResidency16Samples) return false;
-            if (required.sparseResidencyAliased && !supported.sparseResidencyAliased) return false;
-            if (required.variableMultisampleRate && !supported.variableMultisampleRate) return false;
-            if (required.inheritedQueries && !supported.inheritedQueries) return false;
             return true;
         }
     };
@@ -84,17 +30,6 @@ namespace detail {
     template<>
     struct FeatureChecker<vk::PhysicalDeviceVulkan11Features> {
         static bool check(const vk::PhysicalDeviceVulkan11Features& required, const vk::PhysicalDeviceVulkan11Features& supported) {
-            if (required.storageBuffer16BitAccess && !supported.storageBuffer16BitAccess) return false;
-            if (required.uniformAndStorageBuffer16BitAccess && !supported.uniformAndStorageBuffer16BitAccess) return false;
-            if (required.storagePushConstant16 && !supported.storagePushConstant16) return false;
-            if (required.storageInputOutput16 && !supported.storageInputOutput16) return false;
-            if (required.multiview && !supported.multiview) return false;
-            if (required.multiviewGeometryShader && !supported.multiviewGeometryShader) return false;
-            if (required.multiviewTessellationShader && !supported.multiviewTessellationShader) return false;
-            if (required.variablePointersStorageBuffer && !supported.variablePointersStorageBuffer) return false;
-            if (required.variablePointers && !supported.variablePointers) return false;
-            if (required.protectedMemory && !supported.protectedMemory) return false;
-            if (required.samplerYcbcrConversion && !supported.samplerYcbcrConversion) return false;
             if (required.shaderDrawParameters && !supported.shaderDrawParameters) return false;
             return true;
         }
@@ -103,21 +38,8 @@ namespace detail {
     template<>
     struct FeatureChecker<vk::PhysicalDeviceVulkan13Features> {
         static bool check(const vk::PhysicalDeviceVulkan13Features& required, const vk::PhysicalDeviceVulkan13Features& supported) {
-            if (required.robustImageAccess && !supported.robustImageAccess) return false;
-            if (required.inlineUniformBlock && !supported.inlineUniformBlock) return false;
-            if (required.descriptorBindingInlineUniformBlockUpdateAfterBind && !supported.descriptorBindingInlineUniformBlockUpdateAfterBind) return false;
-            if (required.pipelineCreationCacheControl && !supported.pipelineCreationCacheControl) return false;
-            if (required.privateData && !supported.privateData) return false;
-            if (required.shaderDemoteToHelperInvocation && !supported.shaderDemoteToHelperInvocation) return false;
-            if (required.shaderTerminateInvocation && !supported.shaderTerminateInvocation) return false;
-            if (required.subgroupSizeControl && !supported.subgroupSizeControl) return false;
-            if (required.computeFullSubgroups && !supported.computeFullSubgroups) return false;
             if (required.synchronization2 && !supported.synchronization2) return false;
-            if (required.textureCompressionASTC_HDR && !supported.textureCompressionASTC_HDR) return false;
-            if (required.shaderZeroInitializeWorkgroupMemory && !supported.shaderZeroInitializeWorkgroupMemory) return false;
             if (required.dynamicRendering && !supported.dynamicRendering) return false;
-            if (required.shaderIntegerDotProduct && !supported.shaderIntegerDotProduct) return false;
-            if (required.maintenance4 && !supported.maintenance4) return false;
             return true;
         }
     };
@@ -132,28 +54,32 @@ namespace detail {
     template<>
     struct FeatureChecker<vk::PhysicalDeviceSynchronization2Features> {
         static bool check(const vk::PhysicalDeviceSynchronization2Features& required, const vk::PhysicalDeviceSynchronization2Features& supported) {
-            return (!required.synchronization2 || supported.synchronization2);
+            if (required.synchronization2 && !supported.synchronization2) return false;
+            return true;
         }
     };
 
     template<>
     struct FeatureChecker<vk::PhysicalDeviceDynamicRenderingFeatures> {
         static bool check(const vk::PhysicalDeviceDynamicRenderingFeatures& required, const vk::PhysicalDeviceDynamicRenderingFeatures& supported) {
-            return (!required.dynamicRendering || supported.dynamicRendering);
+            if (required.dynamicRendering && !supported.dynamicRendering) return false;
+            return true;
         }
     };
 
     template<>
     struct FeatureChecker<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> {
         static bool check(const vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT& required, const vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT& supported) {
-            return (!required.extendedDynamicState || supported.extendedDynamicState);
+            if (required.extendedDynamicState && !supported.extendedDynamicState) return false;
+            return true;
         }
     };
 
     template<>
     struct FeatureChecker<vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT> {
         static bool check(const vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT& required, const vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT& supported) {
-            return (!required.swapchainMaintenance1 || supported.swapchainMaintenance1);
+            if (required.swapchainMaintenance1 && !supported.swapchainMaintenance1) return false;
+            return true;
         }
     };
 }
@@ -320,6 +246,9 @@ private:
         vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>;
 
     std::function<DeviceFeatureChainType()> m_device_feature_chain_generator = []() {
+        vk::PhysicalDeviceFeatures2 physical_device_features2{};
+        physical_device_features2.features.samplerAnisotropy = true;
+
         vk::PhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features{};
         dynamic_rendering_features.dynamicRendering = true;
 
@@ -334,8 +263,6 @@ private:
 
         vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT swapchain_maintenance_features{};
         swapchain_maintenance_features.swapchainMaintenance1 = true;
-
-        vk::PhysicalDeviceFeatures2 physical_device_features2{};
 
         return DeviceFeatureChainType{
             physical_device_features2,
@@ -355,6 +282,10 @@ private:
         vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>;
 
     std::function<DeviceFeatureChainType()> m_device_feature_chain_generator = []() {
+
+        vk::PhysicalDeviceFeatures2 physical_device_features2{};
+        physical_device_features2.features.samplerAnisotropy = true;
+
         vk::PhysicalDeviceVulkan13Features vulkan13_features{};
         vulkan13_features.dynamicRendering = true;
         vulkan13_features.synchronization2 = true;
@@ -367,8 +298,6 @@ private:
 
         vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT swapchain_maintenance_features{};
         swapchain_maintenance_features.swapchainMaintenance1 = true;
-
-        vk::PhysicalDeviceFeatures2 physical_device_features2{};
 
         return DeviceFeatureChainType{
             physical_device_features2,

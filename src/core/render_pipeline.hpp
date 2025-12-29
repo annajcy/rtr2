@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -105,7 +106,8 @@ public:
                 .build()
         );
 
-        m_descriptor_system->update_all_sets("per_frame", 
+        m_descriptor_system->update_all_sets(
+            "per_frame", 
             [this](DescriptorWriter& writer, uint32_t index) {
                 writer.write_buffer(
                     0, 
@@ -113,8 +115,16 @@ public:
                     0, 
                     m_uniform_buffer_size
                 );
-            });
+            }   
+        );
 
+         // Register per-frame resources in renderer's resource registry
+        m_renderer->set_frame_resource_provider(
+            [this](uint32_t frame_index, ResourceRegistry& registry) {
+                registry.set_buffer(frame_index, "uniform", m_uniform_buffers[frame_index].get());
+                registry.set_descriptor_set(frame_index, "per_frame", m_descriptor_system->get_set("per_frame", frame_index));
+            }
+        );
 
         auto layout_info = DescriptorSystem::make_pipeline_layout_info(*m_descriptor_system);
         m_pipeline_layout = vk::raii::PipelineLayout{
@@ -220,17 +230,11 @@ public:
             nullptr,
             pipeline_info_chain.get<vk::GraphicsPipelineCreateInfo>()
         };
-
-        // Register per-frame resources in renderer's resource registry
-        m_renderer->set_frame_resource_provider(
-            [this](uint32_t frame_index, ResourceRegistry& registry) {
-                registry.set_buffer(frame_index, "uniform", m_uniform_buffers[frame_index].get());
-                registry.set_descriptor_set(frame_index, "per_frame", m_descriptor_system->get_set("per_frame", frame_index));
-            }
-        );
     }
 
-    void execute_frame(FrameContext& ctx) {
+    void execute_frame(
+        FrameContext& ctx,
+        const std::function<void(const vk::raii::CommandBuffer&)>& overlay_draw = nullptr) {
         update_uniform_buffer(ctx);
         ctx.cmd()->record([&](CommandBuffer& cb) {
             auto& cmd = cb.command_buffer();
@@ -321,6 +325,10 @@ public:
                 0,
                 0
             );
+
+            if (overlay_draw) {
+                overlay_draw(cmd);
+            }
 
             cmd.endRendering();
 

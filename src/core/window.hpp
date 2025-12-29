@@ -44,7 +44,7 @@ public:
         glfwTerminate();
     }
 
-    const GLFWwindow* window() const {
+    GLFWwindow* window() const {
         return m_window;
     }
 
