@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <stdexcept>
 
 #include "command.hpp"
 #include "device.hpp"
@@ -29,6 +30,7 @@ public:
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGui::StyleColorsDark();
+        setup_fonts();
 
         create_descriptor_pool();
 
@@ -100,6 +102,20 @@ public:
     }
 
 private:
+    void setup_fonts() {
+        ImGuiIO& io = ImGui::GetIO();
+        ImFontConfig config;
+        config.FontNo = 0; // Use first face in the TTC
+        const char* font_path = "/Users/jinceyang/Desktop/codebase/graphics/rtr2/assets/fonts/Helvetica.ttc";
+        if (!io.Fonts->AddFontFromFileTTF(
+                font_path,
+                12.0f,
+                &config,
+                io.Fonts->GetGlyphRangesChineseFull())) {
+            throw std::runtime_error("Failed to load font: /Users/jinceyang/Desktop/codebase/graphics/rtr2/assets/fonts/Helvetica.ttc");
+        }
+    }
+
     void create_descriptor_pool() {
         std::array<vk::DescriptorPoolSize, 11> pool_sizes = {{
             {vk::DescriptorType::eSampler, 1000},
