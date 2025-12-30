@@ -607,7 +607,7 @@ public:
     }
 
     // 批量更新某类型的所有描述符集
-    void update_all_sets(
+    DescriptorSystem& update_set(
         const std::string& set_name,
         std::function<void(DescriptorWriter&, uint32_t index)> write_fn
     ) {
@@ -617,6 +617,7 @@ public:
             write_fn(writer, i);
             writer.update(m_device, *sets[i]);
         }
+        return *this;
     }
 
     // 获取 set 的数量
@@ -641,7 +642,6 @@ public:
         result.info.pPushConstantRanges = push_constants.data();
         return result;
     }
-
 
 private:
     void create_pool(vk::DescriptorPoolCreateFlags flags) {

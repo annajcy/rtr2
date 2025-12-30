@@ -36,14 +36,6 @@ constexpr uint32_t HEIGHT = 600;
 
 constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
-//const std::string shader_output_dir = "C:\\Users\\annaj\\Desktop\\codebase\\lightmap_compression\\build\\Debug\\shaders\\compiled\\";
-//const std::string shader_output_dir = "/home/annaj/codebase/lightmap_compression/build/Debug/shaders/compiled/";
-const std::string shader_output_dir = "/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/";
-const std::string vertex_shader_filename = "vert_buffer_vert.spv";
-const std::string fragment_shader_filename = "vert_buffer_frag.spv";
-
-const std::string model_path = "assets/models/stanford_bunny.obj";
-
 class Application {
 private:
     std::unique_ptr<Window> m_window{};
@@ -74,16 +66,12 @@ public:
         m_imgui_layer = std::make_unique<ImGuiLayer>(
             m_device.get(),
             m_renderer.get(),
-            m_window.get());
+            m_window.get()
+        );
         m_imgui_layer->initialize();
 
         // Build render pipeline (owns shaders/buffers/descriptor sets/pipeline state)
         m_render_pipeline = std::make_unique<RenderPipeline>(m_device.get(), m_renderer.get());
-        m_render_pipeline->initialize(
-            shader_output_dir,
-            vertex_shader_filename,
-            fragment_shader_filename,
-            model_path);
     }
 
     void run() { loop(); }

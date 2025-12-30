@@ -13,11 +13,21 @@
 #include "mesh.hpp"
 #include "renderer.hpp"
 #include "shader_module.hpp"
+#include "texture.hpp"
 #include "vulkan/vulkan.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
+
+//const std::string shader_output_dir = "C:\\Users\\annaj\\Desktop\\codebase\\lightmap_compression\\build\\Debug\\shaders\\compiled\\";
+//const std::string shader_output_dir = "/home/annaj/codebase/lightmap_compression/build/Debug/shaders/compiled/";
+const std::string shader_output_dir = "/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/";
+const std::string vertex_shader_filename = "vert_buffer_vert.spv";
+const std::string fragment_shader_filename = "vert_buffer_frag.spv";
+
+const std::string model_path = "/Users/jinceyang/Desktop/codebase/graphics/rtr2/assets/models/spot.obj";
+const std::string texture_path = "/Users/jinceyang/Desktop/codebase/graphics/rtr2/assets/textures/spot_texture.png";
 
 namespace rtr::core {
 
@@ -49,15 +59,14 @@ private:
 
     std::vector<std::unique_ptr<Buffer>> m_uniform_buffers{};
     std::unique_ptr<DescriptorSystem> m_descriptor_system{nullptr};
+
+    std::unique_ptr<Image> m_texture_image{nullptr};
+    std::unique_ptr<Sampler> m_texture_sampler{nullptr};
     
 public:
     RenderPipeline(Device* device, Renderer* renderer)
-        : m_device(device), m_renderer(renderer) {}
-
-    void initialize(const std::string& shader_dir,
-                    const std::string& vertex_shader_filename,
-                    const std::string& fragment_shader_filename,
-                    const std::string& obj_path) {
+        : m_device(device), m_renderer(renderer) 
+    {
         m_uniform_buffer_size = sizeof(UniformBufferObject);
         m_frame_count = m_renderer->max_frames_in_flight();
 
@@ -65,7 +74,7 @@ public:
         m_vertex_shader_module = std::make_unique<ShaderModule>(
             ShaderModule::from_file(
                 m_device,
-                shader_dir + vertex_shader_filename,
+                shader_output_dir + vertex_shader_filename,
                 vk::ShaderStageFlagBits::eVertex
             )
         );
@@ -73,14 +82,28 @@ public:
         m_fragment_shader_module = std::make_unique<ShaderModule>(
             ShaderModule::from_file(
                 m_device,
-                shader_dir + fragment_shader_filename,
+                shader_output_dir + fragment_shader_filename,
                 vk::ShaderStageFlagBits::eFragment
             )
         );
 
         // Load mesh from OBJ and create GPU buffers
-        m_mesh = std::make_unique<Mesh>(Mesh::from_obj(m_device, obj_path));
+        m_mesh = std::make_unique<Mesh>(Mesh::from_obj(m_device, model_path));
 
+        // Create texture image and sampler
+        m_texture_image = std::make_unique<Image>(
+            Image::create_image_from_file(
+                m_device,
+                texture_path,
+                true // sRGB
+            )
+        );
+
+        m_texture_sampler = std::make_unique<Sampler>(
+            Sampler::create_default(m_device)
+        );
+
+        // Create per-frame uniform buffers
         m_uniform_buffers.clear();
         m_uniform_buffers.reserve(m_frame_count);
         for (uint32_t i = 0; i < m_frame_count; ++i) {
@@ -100,13 +123,20 @@ public:
             DescriptorSystem::Builder(m_device)
                 .add_set("per_frame", 0, m_frame_count, 
                     [](DescriptorSetLayout::Builder& builder) {
-                        builder.add_binding(0, vk::DescriptorType::eUniformBuffer, 
-                                          vk::ShaderStageFlagBits::eVertex);
-                    })
-                .build()
+                        builder.add_binding(
+                                    0, 
+                                    vk::DescriptorType::eUniformBuffer, 
+                                    vk::ShaderStageFlagBits::eVertex);
+                }).add_set("texture", 1, 1, 
+                    [](DescriptorSetLayout::Builder& builder) {
+                        builder.add_binding(
+                                    0, 
+                                    vk::DescriptorType::eCombinedImageSampler, 
+                                    vk::ShaderStageFlagBits::eFragment);
+                }).build()
         );
 
-        m_descriptor_system->update_all_sets(
+        m_descriptor_system->update_set(
             "per_frame", 
             [this](DescriptorWriter& writer, uint32_t index) {
                 writer.write_buffer(
@@ -116,6 +146,15 @@ public:
                     m_uniform_buffer_size
                 );
             }   
+        ).update_set(
+            "texture",
+            [this](DescriptorWriter& writer, uint32_t /*index*/) {
+                writer.write_combined_image(
+                    0, 
+                    *m_texture_image->image_view(), 
+                    *m_texture_sampler->sampler(), 
+                    vk::ImageLayout::eShaderReadOnlyOptimal);
+            }
         );
 
          // Register per-frame resources in renderer's resource registry
@@ -123,6 +162,7 @@ public:
             [this](uint32_t frame_index, ResourceRegistry& registry) {
                 registry.set_buffer(frame_index, "uniform", m_uniform_buffers[frame_index].get());
                 registry.set_descriptor_set(frame_index, "per_frame", m_descriptor_system->get_set("per_frame", frame_index));
+                registry.set_descriptor_set(frame_index, "texture", m_descriptor_system->get_set("texture", 0));
             }
         );
 
@@ -233,8 +273,9 @@ public:
     }
 
     void execute_frame(
-        FrameContext& ctx,
-        const std::function<void(const vk::raii::CommandBuffer&)>& overlay_draw = nullptr) {
+        FrameContext& ctx, 
+        const std::function<void(const vk::raii::CommandBuffer&)>& overlay_draw = nullptr
+    ) {
         update_uniform_buffer(ctx);
         ctx.cmd()->record([&](CommandBuffer& cb) {
             auto& cmd = cb.command_buffer();
@@ -285,7 +326,8 @@ public:
 
             cmd.bindPipeline(
                 vk::PipelineBindPoint::eGraphics,
-                m_pipeline);
+                m_pipeline
+            );
 
             std::vector<vk::Buffer> vertex_buffers = {m_mesh->vertex_buffer()};
             std::vector<vk::DeviceSize> offsets = {0};
@@ -301,6 +343,14 @@ public:
                 *m_pipeline_layout,
                 0,
                 *ctx.get_descriptor_set("per_frame"), 
+                {}
+            );
+
+            cmd.bindDescriptorSets(
+                vk::PipelineBindPoint::eGraphics,
+                *m_pipeline_layout,
+                1,
+                *ctx.get_descriptor_set("texture"), 
                 {}
             );
 
@@ -361,7 +411,7 @@ public:
         UniformBufferObject ubo{};
         glm::mat4 model = glm::scale(
             glm::mat4(1.0f),
-            glm::vec3(3.0f));
+            glm::vec3(1.0f));
         ubo.model = glm::rotate(
             model,
             time * glm::radians(90.0f),

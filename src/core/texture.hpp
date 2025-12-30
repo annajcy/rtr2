@@ -100,9 +100,10 @@ public:
     static Image create_image_from_file(
         Device* device,
         const std::string& file_path,
-        bool use_srgb = true // 默认为 true，即颜色贴图
+        bool use_srgb = true, // 默认为 true，即颜色贴图
+        bool flip_y = true
     ) {
-        auto image_loader = rtr::utils::ImageLoader(file_path, true, 4);
+        auto image_loader = rtr::utils::ImageLoader(file_path, flip_y, 4);
 
         auto stage_buffer = Buffer::create_host_visible_buffer(
             device,
@@ -224,6 +225,9 @@ private:
     void upload(Buffer& m_stage_buffer) {
         CommandPool command_pool(m_device, vk::CommandPoolCreateFlagBits::eTransient);
         auto cmd = command_pool.create_command_buffer();
+        vk::raii::Fence upload_fence(m_device->device(), vk::FenceCreateInfo{});
+        CommandBuffer::SubmitInfo submit_info{};
+        submit_info.fence = *upload_fence;
         // Transition image layout and copy buffer to image
         cmd.record_and_submit([&](CommandBuffer& cb){
 
@@ -248,11 +252,16 @@ private:
                 vk::ImageLayout::eTransferDstOptimal, 
                 vk::ImageLayout::eShaderReadOnlyOptimal
             );
-            
-        });
+        }, submit_info);
+
+        
+        auto result = m_device->device().waitForFences(*upload_fence, VK_TRUE, UINT64_MAX);
+        if (result != vk::Result::eSuccess) {
+            throw std::runtime_error("Failed to wait for image upload fence!");
+        }
+
     }
 };
-
 
 class Sampler {
 private:
