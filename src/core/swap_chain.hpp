@@ -30,28 +30,51 @@ private:
 
 public:
     SwapChain(Device* device) : m_device(device) {
-        create();
+        auto surface_formats = m_device->physical_device().getSurfaceFormatsKHR(*m_device->context()->surface());
+        auto surface_format = choose_surface_format(surface_formats);
+        auto present_mode = choose_present_mode(m_device->physical_device().getSurfacePresentModesKHR(*m_device->context()->surface()));
+        auto capabilities = m_device->physical_device().getSurfaceCapabilitiesKHR(*m_device->context()->surface());
+        auto extent = choose_extent(capabilities);
+
+        uint32_t image_count = capabilities.minImageCount + 1;
+        if (capabilities.maxImageCount > 0 && image_count > capabilities.maxImageCount) {
+            image_count = capabilities.maxImageCount;
+        }
+
+        std::cout << image_count << " swapchain images will be created with extent ("
+                  << extent.width << ", " << extent.height << ")." << std::endl;
+
+        vk::SwapchainCreateInfoKHR create_info{};
+        create_info.surface = *m_device->context()->surface();
+        create_info.minImageCount = image_count;
+        create_info.imageFormat = surface_format.format;
+        create_info.imageColorSpace = surface_format.colorSpace;
+        create_info.imageExtent = extent;
+        create_info.imageArrayLayers = 1;
+        create_info.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
+
+        create_info.imageSharingMode = vk::SharingMode::eExclusive;
+        create_info.preTransform = capabilities.currentTransform;
+        create_info.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+        create_info.presentMode = present_mode;
+        create_info.clipped = VK_TRUE;
+        create_info.oldSwapchain = VK_NULL_HANDLE;
+
+        m_swapchain = vk::raii::SwapchainKHR(m_device->device(), create_info);
+        m_images = m_swapchain.getImages();
+        m_image_format = surface_format.format;
+        m_extent = extent;
+
+        create_image_views();
     }
 
-    SwapChain(const SwapChain&) = delete;
-    SwapChain& operator=(const SwapChain&) = delete;
-
-    void cleanup() {
+    ~SwapChain() {
         m_image_views.clear();
         m_swapchain.clear();
     }
 
-    void recreate() {
-        auto [width, height] = m_device->context()->window()->framebuffer_size();
-        while (width == 0 || height == 0) {
-            m_device->context()->window()->wait_events();
-            std::tie(width, height) = m_device->context()->window()->framebuffer_size();
-        }
-
-        m_device->device().waitIdle();
-        cleanup();
-        create();
-    }
+    SwapChain(const SwapChain&) = delete;
+    SwapChain& operator=(const SwapChain&) = delete;
 
     std::pair<vk::Result, uint32_t> acquire_next_image(const vk::raii::Semaphore& semaphore) {
         try {
@@ -95,44 +118,6 @@ public:
     const std::vector<vk::Image>& images() const { return m_images; }
 
 private:
-    void create() {
-        auto surface_formats = m_device->physical_device().getSurfaceFormatsKHR(*m_device->context()->surface());
-        auto surface_format = choose_surface_format(surface_formats);
-        auto present_mode = choose_present_mode(m_device->physical_device().getSurfacePresentModesKHR(*m_device->context()->surface()));
-        auto capabilities = m_device->physical_device().getSurfaceCapabilitiesKHR(*m_device->context()->surface());
-        auto extent = choose_extent(capabilities);
-
-        uint32_t image_count = capabilities.minImageCount + 1;
-        if (capabilities.maxImageCount > 0 && image_count > capabilities.maxImageCount) {
-            image_count = capabilities.maxImageCount;
-        }
-
-        std::cout << image_count << " swapchain images will be created with extent ("
-                  << extent.width << ", " << extent.height << ")." << std::endl;
-
-        vk::SwapchainCreateInfoKHR create_info{};
-        create_info.surface = *m_device->context()->surface();
-        create_info.minImageCount = image_count;
-        create_info.imageFormat = surface_format.format;
-        create_info.imageColorSpace = surface_format.colorSpace;
-        create_info.imageExtent = extent;
-        create_info.imageArrayLayers = 1;
-        create_info.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
-
-        create_info.imageSharingMode = vk::SharingMode::eExclusive;
-        create_info.preTransform = capabilities.currentTransform;
-        create_info.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-        create_info.presentMode = present_mode;
-        create_info.clipped = VK_TRUE;
-        create_info.oldSwapchain = VK_NULL_HANDLE;
-
-        m_swapchain = vk::raii::SwapchainKHR(m_device->device(), create_info);
-        m_images = m_swapchain.getImages();
-        m_image_format = surface_format.format;
-        m_extent = extent;
-
-        create_image_views();
-    }
 
     void create_image_views() {
         m_image_views.clear();

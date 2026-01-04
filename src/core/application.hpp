@@ -16,7 +16,6 @@
 #include "renderer.hpp"
 #include "render_pipeline.hpp"
 #include "texture.hpp"
-#include "imgui_layer.hpp"
 
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_enums.hpp"
@@ -24,9 +23,6 @@
 #include "vulkan/vulkan_raii.hpp"
 #include "vulkan/vulkan_structs.hpp"
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include "imgui.h"
 
 namespace rtr::core {
@@ -45,7 +41,6 @@ private:
     // Renderer now manages swapchain, command pool, and sync objects
     std::unique_ptr<Renderer> m_renderer{};
     std::unique_ptr<RenderPipeline> m_render_pipeline{};
-    std::unique_ptr<ImGuiLayer> m_imgui_layer{};
 
 public:
     Application() {
@@ -63,15 +58,12 @@ public:
             MAX_FRAMES_IN_FLIGHT
         );
 
-        m_imgui_layer = std::make_unique<ImGuiLayer>(
-            m_device.get(),
+        // Build render pipeline (owns shaders/buffers/descriptor sets/pipeline state)
+        m_render_pipeline = std::make_unique<RenderPipeline>(
+            m_device.get(), 
             m_renderer.get(),
             m_window.get()
         );
-        m_imgui_layer->initialize();
-
-        // Build render pipeline (owns shaders/buffers/descriptor sets/pipeline state)
-        m_render_pipeline = std::make_unique<RenderPipeline>(m_device.get(), m_renderer.get());
     }
 
     void run() { loop(); }
@@ -82,14 +74,8 @@ public:
         while (!m_window->is_should_close()) {
             m_window->poll_events();
 
-            m_imgui_layer->begin_frame();
-            render_ui();
-            
-            // Execute linear pipeline
             m_renderer->draw_frame([this](FrameContext& ctx) {
-                this->m_render_pipeline->execute_frame(ctx, [this](const vk::raii::CommandBuffer& cmd) {
-                    this->m_imgui_layer->render_draw_data(cmd);
-                });
+                this->m_render_pipeline->execute_frame(ctx);
             });
         }
         
@@ -100,14 +86,6 @@ public:
         auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
         if (!app) { return; }
         app->m_renderer->on_window_resized(width, height);
-    }
-
-private:
-    void render_ui() {
-        ImGui::Begin("RTR2");
-        ImGui::Text("ImGui overlay active");
-        ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-        ImGui::End();
     }
 };
 

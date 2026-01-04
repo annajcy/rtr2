@@ -16,13 +16,18 @@
 namespace rtr::core {
 
 class ImGuiLayer {
+private:
+Device* m_device;
+    Renderer* m_renderer;
+    Window* m_window;
+    vk::raii::DescriptorPool m_descriptor_pool{nullptr};
+    bool m_initialized{false};
+    uint32_t m_last_image_count{0};
+
 public:
     ImGuiLayer(Device* device, Renderer* renderer, Window* window)
-        : m_device(device), m_renderer(renderer), m_window(window) {}
+        : m_device(device), m_renderer(renderer), m_window(window) {
 
-    ~ImGuiLayer() { shutdown(); }
-
-    void initialize() {
         if (m_initialized) {
             return;
         }
@@ -63,7 +68,7 @@ public:
         m_initialized = true;
     }
 
-    void shutdown() {
+    ~ImGuiLayer() { 
         if (!m_initialized) {
             return;
         }
@@ -73,7 +78,7 @@ public:
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
         m_descriptor_pool.reset();
-        m_initialized = false;
+        m_initialized = false; 
     }
 
     void begin_frame() {
@@ -106,13 +111,13 @@ private:
         ImGuiIO& io = ImGui::GetIO();
         ImFontConfig config;
         config.FontNo = 0; // Use first face in the TTC
-        const char* font_path = "/Users/jinceyang/Desktop/codebase/graphics/rtr2/assets/fonts/Helvetica.ttc";
+        const char* font_path = "/Users/jinceyang/Desktop/codebase/graphics/rtr2/assets/fonts/Arial.ttf";
         if (!io.Fonts->AddFontFromFileTTF(
                 font_path,
-                12.0f,
+                15.0f,
                 &config,
                 io.Fonts->GetGlyphRangesChineseFull())) {
-            throw std::runtime_error("Failed to load font: /Users/jinceyang/Desktop/codebase/graphics/rtr2/assets/fonts/Helvetica.ttc");
+            throw std::runtime_error("Failed to load font: /Users/jinceyang/Desktop/codebase/graphics/rtr2/assets/fonts/Arial.ttf");
         }
     }
 
@@ -139,13 +144,6 @@ private:
 
         m_descriptor_pool = vk::raii::DescriptorPool(m_device->device(), pool_info);
     }
-
-    Device* m_device;
-    Renderer* m_renderer;
-    Window* m_window;
-    vk::raii::DescriptorPool m_descriptor_pool{nullptr};
-    bool m_initialized{false};
-    uint32_t m_last_image_count{0};
 };
 
 } // namespace rtr::core

@@ -14,8 +14,10 @@
 #include "renderer.hpp"
 #include "shader_module.hpp"
 #include "texture.hpp"
+#include "imgui_layer.hpp"
 #include "vulkan/vulkan.hpp"
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
@@ -45,6 +47,7 @@ class RenderPipeline {
 private:
     Device* m_device;
     Renderer* m_renderer;
+    std::unique_ptr<ImGuiLayer> m_imgui_layer{nullptr};
 
     vk::raii::PipelineLayout m_pipeline_layout{nullptr};
     vk::raii::Pipeline m_pipeline{nullptr};
@@ -64,11 +67,17 @@ private:
     std::unique_ptr<Sampler> m_texture_sampler{nullptr};
     
 public:
-    RenderPipeline(Device* device, Renderer* renderer)
+    RenderPipeline(Device* device, Renderer* renderer, Window* window)
         : m_device(device), m_renderer(renderer) 
     {
         m_uniform_buffer_size = sizeof(UniformBufferObject);
         m_frame_count = m_renderer->max_frames_in_flight();
+
+        m_imgui_layer = std::make_unique<ImGuiLayer>(
+            m_device,
+            m_renderer,
+            window
+        );
 
         // Create shader modules
         m_vertex_shader_module = std::make_unique<ShaderModule>(
@@ -251,7 +260,8 @@ public:
         vk::PipelineRenderingCreateInfo pipeline_rendering_info{};
 
         std::vector<vk::Format> color_attachment_formats = {
-            m_renderer->render_format()};
+            m_renderer->render_format()
+        };
 
         pipeline_rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_attachment_formats.size());
         pipeline_rendering_info.pColorAttachmentFormats = color_attachment_formats.data();
@@ -272,10 +282,9 @@ public:
         };
     }
 
-    void execute_frame(
-        FrameContext& ctx, 
-        const std::function<void(const vk::raii::CommandBuffer&)>& overlay_draw = nullptr
-    ) {
+    void execute_frame(FrameContext& ctx) {
+        m_imgui_layer->begin_frame();
+        render_ui();
         update_uniform_buffer(ctx);
         ctx.cmd()->record([&](CommandBuffer& cb) {
             auto& cmd = cb.command_buffer();
@@ -289,7 +298,7 @@ public:
 
             vk::ClearValue depth_clear{vk::ClearDepthStencilValue{1.0f, 0}};
             vk::RenderingAttachmentInfo depth_attachment_info{};
-            depth_attachment_info.imageView = *ctx.depth_resources().view;
+            depth_attachment_info.imageView = *ctx.depth_image().image_view();
             depth_attachment_info.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
             depth_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
             depth_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
@@ -317,10 +326,30 @@ public:
             to_color.subresourceRange.baseArrayLayer = 0;
             to_color.subresourceRange.layerCount = 1;
 
-            vk::DependencyInfo to_color_dep{};
-            to_color_dep.imageMemoryBarrierCount = 1;
-            to_color_dep.pImageMemoryBarriers = &to_color;
-            cmd.pipelineBarrier2(to_color_dep);
+            // --- [新增] 深度图 Barrier ---
+            vk::ImageMemoryBarrier2 to_depth{};
+            to_depth.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
+            to_depth.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
+            to_depth.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite; // 上一帧写完
+            to_depth.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite; // 这一帧也要写(Clear也是写)
+            to_depth.oldLayout = vk::ImageLayout::eUndefined; // 我们不关心上一帧的深度内容（因为 LoadOp 是 Clear）
+            to_depth.newLayout = vk::ImageLayout::eDepthAttachmentOptimal; // 目标布局
+            to_depth.image = *ctx.depth_image().image(); // <--- 获取你的深度图 image handle
+            to_depth.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth; // 只操作深度
+            // 如果你的格式包含 Stencil，这里可能需要 | vk::ImageAspectFlagBits::eStencil
+            to_depth.subresourceRange.baseMipLevel = 0;
+            to_depth.subresourceRange.levelCount = 1;
+            to_depth.subresourceRange.baseArrayLayer = 0;
+            to_depth.subresourceRange.layerCount = 1;
+
+            std::array<vk::ImageMemoryBarrier2, 2> barriers = {to_color, to_depth};
+
+            vk::DependencyInfo to_depth_color_dep{};
+            to_depth_color_dep.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+            to_depth_color_dep.pImageMemoryBarriers = barriers.data();
+            cmd.pipelineBarrier2(to_depth_color_dep);
+
+            // ... (然后才是 cmd.beginRendering)
 
             cmd.beginRendering(rendering_info);
 
@@ -376,9 +405,7 @@ public:
                 0
             );
 
-            if (overlay_draw) {
-                overlay_draw(cmd);
-            }
+            m_imgui_layer->render_draw_data(cmd);            
 
             cmd.endRendering();
 
@@ -401,6 +428,13 @@ public:
             to_present_dep.pImageMemoryBarriers = &to_present;
             cmd.pipelineBarrier2(to_present_dep);
         }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    }
+
+    void render_ui() {
+        ImGui::Begin("RTR2");
+        ImGui::Text("ImGui overlay active");
+        ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+        ImGui::End();
     }
 
     void update_uniform_buffer(FrameContext& ctx) {
