@@ -8,4 +8,5 @@ target_link_libraries(rtr INTERFACE
     assimp::assimp 
     slang::slang
     glm::glm
+    tinyobjloader::tinyobjloader
 )

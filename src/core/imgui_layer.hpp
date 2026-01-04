@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <stdexcept>
 
-#include "command.hpp"
 #include "device.hpp"
 #include "renderer.hpp"
 #include "window.hpp"

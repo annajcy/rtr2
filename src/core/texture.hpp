@@ -7,10 +7,8 @@
 #include "vulkan/vulkan_raii.hpp"
 #include "vulkan/vulkan_structs.hpp"
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <sys/types.h>
-
 #include "device.hpp"
 #include "buffer.hpp"
 #include "utils/image_loader.hpp"
@@ -18,7 +16,6 @@
 namespace rtr::core {
 
 class Image {
-
 public:
     struct LayoutTransitionConfig {
         vk::ImageLayout old_layout{vk::ImageLayout::eUndefined};
@@ -30,12 +27,76 @@ public:
         vk::ImageAspectFlags aspect_mask{vk::ImageAspectFlagBits::eColor};
     };
 
+    template<vk::ImageLayout From, vk::ImageLayout To>
+    struct TransitionTraits {
+        static_assert(From != From, "Unsupported layout transition! Check template arguments.");
+    };
+
+    template<>
+    struct TransitionTraits<vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal> {
+        static constexpr vk::AccessFlags src_access{};
+        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eTransferWrite};
+        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTopOfPipe};
+        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eTransfer};
+    };
+
+    template<>
+    struct TransitionTraits<vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal> {
+        static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferWrite};
+        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eShaderRead};
+        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
+        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eFragmentShader};
+    };
+
+    template<>
+    struct TransitionTraits<vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal> {
+        static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferWrite};
+        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eTransferRead};
+        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
+        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eTransfer};
+    };
+
+    template<>
+    struct TransitionTraits<vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eShaderReadOnlyOptimal> {
+        static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferRead};
+        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eShaderRead};
+        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
+        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eFragmentShader};
+    };
+
+    template<>
+    struct TransitionTraits<vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal> {
+        static constexpr vk::AccessFlags src_access{};
+        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead};
+        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTopOfPipe};
+        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eEarlyFragmentTests};
+    };
+
+    template<>
+    struct TransitionTraits<vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eDepthAttachmentOptimal> {
+        static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferWrite};
+        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead};
+        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
+        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eEarlyFragmentTests};
+    };
+
+    template<vk::ImageLayout From, vk::ImageLayout To>
+    static LayoutTransitionConfig get_transition_config(vk::ImageAspectFlags aspect_mask) {
+        using Traits = TransitionTraits<From, To>;
+        LayoutTransitionConfig config{};
+        config.old_layout = From;
+        config.new_layout = To;
+        config.aspect_mask = aspect_mask;
+        config.src_access = Traits::src_access;
+        config.dst_access = Traits::dst_access;
+        config.src_stage = Traits::src_stage;
+        config.dst_stage = Traits::dst_stage;
+        return config;
+    }
+
     static void copy_buffer_to_image(
-        vk::CommandBuffer cmd,
-        vk::Buffer src,
-        vk::Image image,
-        uint32_t width,
-        uint32_t height,
+        vk::CommandBuffer cmd, vk::Buffer src, vk::Image image,
+        uint32_t width, uint32_t height,
         vk::ImageAspectFlags aspect_mask
     ) {
         
@@ -50,9 +111,9 @@ public:
     }
 
     static void transition_image_layout(
-        vk::CommandBuffer cmd,
-        vk::Image image,
-        const LayoutTransitionConfig& config
+        vk::CommandBuffer cmd, vk::Image image,
+        const LayoutTransitionConfig& config,
+        uint32_t base_mip_level = 0, uint32_t mip_levels = 1
     ) {
         vk::ImageMemoryBarrier barrier{};
         barrier.oldLayout = config.old_layout;
@@ -61,8 +122,8 @@ public:
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.image = image;
         barrier.subresourceRange.aspectMask = config.aspect_mask;
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseMipLevel = base_mip_level;
+        barrier.subresourceRange.levelCount = mip_levels;
         barrier.subresourceRange.baseArrayLayer = 0;
         barrier.subresourceRange.layerCount = 1;
         barrier.srcAccessMask = config.src_access;
@@ -78,62 +139,66 @@ public:
         );
     }
 
-    static LayoutTransitionConfig make_default_transition(
+    static LayoutTransitionConfig make_transition_config(
         vk::ImageLayout old_layout,
         vk::ImageLayout new_layout,
         vk::ImageAspectFlags aspect_mask
     ) {
-        LayoutTransitionConfig config{};
-        config.old_layout = old_layout;
-        config.new_layout = new_layout;
-        config.aspect_mask = aspect_mask;
-
         if (old_layout == vk::ImageLayout::eUndefined &&
             new_layout == vk::ImageLayout::eTransferDstOptimal) {
-            config.src_access = {};
-            config.dst_access = vk::AccessFlagBits::eTransferWrite;
-            config.src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
-            config.dst_stage = vk::PipelineStageFlagBits::eTransfer;
+            return get_transition_config<
+                vk::ImageLayout::eUndefined,
+                vk::ImageLayout::eTransferDstOptimal
+            >(aspect_mask);
         } else if (old_layout == vk::ImageLayout::eTransferDstOptimal &&
                    new_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
-            config.src_access = vk::AccessFlagBits::eTransferWrite;
-            config.dst_access = vk::AccessFlagBits::eShaderRead;
-            config.src_stage = vk::PipelineStageFlagBits::eTransfer;
-            config.dst_stage = vk::PipelineStageFlagBits::eFragmentShader;
+            return get_transition_config<
+                vk::ImageLayout::eTransferDstOptimal,
+                vk::ImageLayout::eShaderReadOnlyOptimal
+            >(aspect_mask);
+        } else if (old_layout == vk::ImageLayout::eTransferDstOptimal &&
+                   new_layout == vk::ImageLayout::eTransferSrcOptimal) {
+            return get_transition_config<
+                vk::ImageLayout::eTransferDstOptimal,
+                vk::ImageLayout::eTransferSrcOptimal
+            >(aspect_mask);
+        } else if (old_layout == vk::ImageLayout::eTransferSrcOptimal &&
+                   new_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+            return get_transition_config<
+                vk::ImageLayout::eTransferSrcOptimal,
+                vk::ImageLayout::eShaderReadOnlyOptimal
+            >(aspect_mask);
         } else if (old_layout == vk::ImageLayout::eUndefined &&
                    new_layout == vk::ImageLayout::eDepthAttachmentOptimal) {
-            config.src_access = {};
-            config.dst_access = vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead;
-            config.src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
-            config.dst_stage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
+            return get_transition_config<
+                vk::ImageLayout::eUndefined,
+                vk::ImageLayout::eDepthAttachmentOptimal
+            >(aspect_mask);
         } else if (old_layout == vk::ImageLayout::eTransferDstOptimal &&
                    new_layout == vk::ImageLayout::eDepthAttachmentOptimal) {
-            config.src_access = vk::AccessFlagBits::eTransferWrite;
-            config.dst_access = vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead;
-            config.src_stage = vk::PipelineStageFlagBits::eTransfer;
-            config.dst_stage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
-        } else {
-            throw std::invalid_argument("Unsupported layout transition!");
+            return get_transition_config<
+                vk::ImageLayout::eTransferDstOptimal,
+                vk::ImageLayout::eDepthAttachmentOptimal
+            >(aspect_mask);
         }
 
-        return config;
+        throw std::invalid_argument("Unsupported layout transition!");
     }
 
     static Image create_depth_image(
         Device* device,
-        uint32_t width,
-        uint32_t height,
+        uint32_t width, uint32_t height,
         vk::Format format
     ) {
         Image image(
             device,
-            width,
-            height,
+            width, height,
             format,
             vk::ImageTiling::eOptimal,
             vk::ImageUsageFlagBits::eDepthStencilAttachment,
             vk::MemoryPropertyFlagBits::eDeviceLocal,
-            vk::ImageAspectFlagBits::eDepth
+            vk::ImageAspectFlagBits::eDepth,
+            false
         );
         return image;
     }
@@ -142,7 +207,8 @@ public:
         Device* device,
         const std::string& file_path,
         bool use_srgb = true, // 默认为 true，即颜色贴图
-        bool flip_y = true
+        bool flip_y = true,
+        bool generate_mipmaps = true
     ) {
         auto image_loader = rtr::utils::ImageLoader(file_path, flip_y, 4);
 
@@ -151,7 +217,6 @@ public:
             image_loader.data_size(),
             vk::BufferUsageFlagBits::eTransferSrc
         );
-        
 
         // 将图像数据复制到 staging buffer
         stage_buffer.map();
@@ -160,15 +225,21 @@ public:
 
         vk::Format format = use_srgb ? vk::Format::eR8G8B8A8Srgb : vk::Format::eR8G8B8A8Unorm;
 
+        auto usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled;
+        if (generate_mipmaps) {
+            usage |= vk::ImageUsageFlagBits::eTransferSrc;
+        }
+
         auto image = Image(
             device,
             static_cast<uint32_t>(image_loader.width()),
             static_cast<uint32_t>(image_loader.height()),
             format,
             vk::ImageTiling::eOptimal,
-            vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+            usage,
             vk::MemoryPropertyFlagBits::eDeviceLocal,
-            vk::ImageAspectFlagBits::eColor
+            vk::ImageAspectFlagBits::eColor,
+            generate_mipmaps
         );
 
         image.upload(stage_buffer, vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -187,22 +258,29 @@ private:
     vk::ImageAspectFlags m_aspect_mask{vk::ImageAspectFlagBits::eColor};
     vk::ImageUsageFlags m_usage{};
     vk::ImageLayout m_current_layout{vk::ImageLayout::eUndefined};
+    uint32_t m_mip_levels{1};
 
 public:
-    Image(Device* device,
-          uint32_t width,
-          uint32_t height,
-          vk::Format format,
-          vk::ImageTiling tiling,
-          vk::ImageUsageFlags usage,
-          vk::MemoryPropertyFlags properties,
-          vk::ImageAspectFlags aspect_mask)
-        : m_device(device), m_width(width), m_height(height), m_format(format), m_aspect_mask(aspect_mask), m_usage(usage) {
+    Image(
+        Device* device,
+        uint32_t width, uint32_t height,
+        vk::Format format, vk::ImageTiling tiling,
+        vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::ImageAspectFlags aspect_mask,
+        bool generate_mipmaps
+    ) : m_device(device), m_width(width), m_height(height), m_format(format), m_aspect_mask(aspect_mask), m_usage(usage) {
+
+        if (generate_mipmaps && (usage & vk::ImageUsageFlagBits::eSampled)) {
+            m_mip_levels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+        } else {
+            m_mip_levels = 1;
+        }
 
         auto resources_opt = make_image_with_memory(
             device->device(),
             device->physical_device(),
-            width, height, format, tiling, usage, properties
+            width, height, 
+            m_mip_levels,
+            format, tiling, usage, properties
         );
 
         if (!resources_opt.has_value()) {
@@ -219,7 +297,7 @@ public:
         view_info.format = format;
         view_info.subresourceRange.aspectMask = m_aspect_mask;
         view_info.subresourceRange.baseMipLevel = 0;
-        view_info.subresourceRange.levelCount = 1;
+        view_info.subresourceRange.levelCount = m_mip_levels;
         view_info.subresourceRange.baseArrayLayer = 0;
         view_info.subresourceRange.layerCount = 1;
 
@@ -230,16 +308,17 @@ public:
     Image& operator=(const Image&) = delete;
 
     Image(Image&& other) noexcept 
-        : m_device(other.m_device),
-          m_image(std::move(other.m_image)),
-          m_image_view(std::move(other.m_image_view)),
-          m_image_memory(std::move(other.m_image_memory)),
-          m_width(other.m_width),
-          m_height(other.m_height),
-          m_format(other.m_format),
-          m_aspect_mask(other.m_aspect_mask),
-          m_usage(other.m_usage),
-          m_current_layout(other.m_current_layout)
+    : m_device(other.m_device),
+        m_image(std::move(other.m_image)),
+        m_image_view(std::move(other.m_image_view)),
+        m_image_memory(std::move(other.m_image_memory)),
+        m_width(other.m_width),
+        m_height(other.m_height),
+        m_format(other.m_format),
+        m_aspect_mask(other.m_aspect_mask),
+        m_usage(other.m_usage),
+        m_current_layout(other.m_current_layout),
+        m_mip_levels(other.m_mip_levels)
     {
         other.m_width = 0;
         other.m_height = 0;
@@ -258,6 +337,7 @@ public:
             m_aspect_mask = other.m_aspect_mask;
             m_usage = other.m_usage;
             m_current_layout = other.m_current_layout;
+            m_mip_levels = other.m_mip_levels;
 
             other.m_width = 0;
             other.m_height = 0;
@@ -275,12 +355,74 @@ public:
     vk::ImageUsageFlags usage() const { return m_usage; }
     vk::ImageLayout layout() const { return m_current_layout; }
 
-    void apply_transition(vk::CommandBuffer cmd, const LayoutTransitionConfig& config) {
-        transition_image_layout(cmd, *m_image, config);
+    uint32_t mip_levels() const { return m_mip_levels; }
+
+    void apply_transition(vk::CommandBuffer cmd, const LayoutTransitionConfig& config, int base_mip_level = 0, int mip_levels = 1) {
+        transition_image_layout(cmd, *m_image, config, base_mip_level, mip_levels);
         m_current_layout = config.new_layout;
     }
 
 private:
+    void generate_mipmaps(CommandBuffer& cb) {
+        auto cmd = *cb.command_buffer();
+        auto format_properties = m_device->physical_device().getFormatProperties(m_format);
+        if (!(format_properties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear)) {
+            throw std::runtime_error("Texture image format does not support linear blitting!");
+        }
+
+        int32_t mip_width = static_cast<int32_t>(m_width);
+        int32_t mip_height = static_cast<int32_t>(m_height);
+
+        for (int i = 1; i < m_mip_levels; i++) {
+            auto to_src = get_transition_config<
+                vk::ImageLayout::eTransferDstOptimal,
+                vk::ImageLayout::eTransferSrcOptimal
+            >(m_aspect_mask);
+            apply_transition(cmd, to_src, i - 1, 1);
+
+            vk::ImageBlit blit{};
+            blit.srcOffsets[0] = vk::Offset3D{0, 0, 0};
+            blit.srcOffsets[1] = vk::Offset3D{mip_width, mip_height, 1};
+            blit.srcSubresource.aspectMask = m_aspect_mask;
+            blit.srcSubresource.mipLevel = i - 1;
+            blit.srcSubresource.baseArrayLayer = 0;
+            blit.srcSubresource.layerCount = 1;
+            blit.dstOffsets[0] = vk::Offset3D{0, 0, 0};
+            blit.dstOffsets[1] = vk::Offset3D{
+                mip_width > 1 ? mip_width / 2 : 1,
+                mip_height > 1 ? mip_height / 2 : 1,
+                1
+            };
+            blit.dstSubresource.aspectMask = m_aspect_mask;
+            blit.dstSubresource.mipLevel = i;
+            blit.dstSubresource.baseArrayLayer = 0;
+            blit.dstSubresource.layerCount = 1;
+
+            cmd.blitImage(
+                *m_image, vk::ImageLayout::eTransferSrcOptimal,
+                *m_image, vk::ImageLayout::eTransferDstOptimal,
+                blit,
+                vk::Filter::eLinear
+            );
+
+            auto to_shader = get_transition_config<
+                vk::ImageLayout::eTransferSrcOptimal,
+                vk::ImageLayout::eShaderReadOnlyOptimal
+            >(m_aspect_mask);
+            apply_transition(cmd, to_shader, i - 1, 1);
+
+            if (mip_width > 1) mip_width /= 2;
+            if (mip_height > 1) mip_height /= 2;
+        }
+
+        auto last_to_shader = get_transition_config<
+            vk::ImageLayout::eTransferDstOptimal,
+            vk::ImageLayout::eShaderReadOnlyOptimal
+        >(m_aspect_mask);
+        apply_transition(cmd, last_to_shader, m_mip_levels - 1, 1);
+        m_current_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    }
+
     void upload(Buffer& stage_buffer, vk::ImageLayout final_layout) {
         CommandPool command_pool(m_device, vk::CommandPoolCreateFlagBits::eTransient);
         auto cmd = command_pool.create_command_buffer();
@@ -290,12 +432,21 @@ private:
         // Transition image layout and copy buffer to image
         cmd.record_and_submit([&](CommandBuffer& cb){
 
-            auto to_transfer = make_default_transition(
-                m_current_layout,
-                vk::ImageLayout::eTransferDstOptimal,
-                m_aspect_mask
-            );
-            apply_transition(*cb.command_buffer(), to_transfer);
+            LayoutTransitionConfig to_transfer{};
+            if (m_current_layout == vk::ImageLayout::eUndefined) {
+                to_transfer = get_transition_config<
+                    vk::ImageLayout::eUndefined,
+                    vk::ImageLayout::eTransferDstOptimal
+                >(m_aspect_mask);
+            } else {
+                to_transfer = make_transition_config(
+                    m_current_layout,
+                    vk::ImageLayout::eTransferDstOptimal,
+                    m_aspect_mask
+                );
+            }
+            // Transition all mip levels so subsequent blits have a valid dst layout
+            apply_transition(*cb.command_buffer(), to_transfer, 0, m_mip_levels);
 
             copy_buffer_to_image(
                 *cb.command_buffer(),
@@ -306,12 +457,24 @@ private:
                 m_aspect_mask
             );
 
-            auto to_shader = make_default_transition(
-                m_current_layout,
-                final_layout,
-                m_aspect_mask
-            );
-            apply_transition(*cb.command_buffer(), to_shader);
+            if (m_mip_levels > 1) {
+                generate_mipmaps(cb);
+            }  else {
+                LayoutTransitionConfig to_shader{};
+                if (final_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+                    to_shader = get_transition_config<
+                        vk::ImageLayout::eTransferDstOptimal,
+                        vk::ImageLayout::eShaderReadOnlyOptimal
+                    >(m_aspect_mask);
+                } else {
+                    to_shader = make_transition_config(
+                        vk::ImageLayout::eTransferDstOptimal,
+                        final_layout,
+                        m_aspect_mask
+                    );
+                }
+                apply_transition(*cb.command_buffer(), to_shader, 0, m_mip_levels);
+            }
         }, submit_info);
 
         
@@ -333,7 +496,7 @@ public:
     // 静态工厂方法：创建一个标准的、高质量的采样器
     // 特性：线性过滤 (Linear), 重复平铺 (Repeat), 开启最大各向异性过滤 (Anisotropy)
     // =========================================================================
-    static Sampler create_default(Device* device) {
+    static Sampler create_default(Device* device, uint32_t mip_levels = 1) {
         // 1. 获取物理设备属性，用于查询支持的最大各向异性过滤级别
         vk::PhysicalDeviceProperties properties = device->physical_device().getProperties();
 
@@ -371,11 +534,10 @@ public:
         info.compareOp = vk::CompareOp::eAlways;
 
         // --- Mipmap 设置 ---
-        // 暂时还没生成 Mipmap，但设置线性模式是安全的标准做法
         info.mipmapMode = vk::SamplerMipmapMode::eLinear;
         info.mipLodBias = 0.0f;
         info.minLod = 0.0f;
-        info.maxLod = 0.0f;
+        info.maxLod = static_cast<float>(mip_levels - 1);
 
         return Sampler(device, info);
     }

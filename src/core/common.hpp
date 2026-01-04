@@ -110,6 +110,7 @@ inline std::optional<std::pair<vk::raii::Image, vk::raii::DeviceMemory>> make_im
     const vk::raii::PhysicalDevice& physical_device,
     uint32_t width,
     uint32_t height,
+    uint32_t mip_levels,
     vk::Format format,
     vk::ImageTiling tiling,
     vk::ImageUsageFlags usage,
@@ -121,7 +122,7 @@ inline std::optional<std::pair<vk::raii::Image, vk::raii::DeviceMemory>> make_im
     image_info.extent.width = width;
     image_info.extent.height = height;
     image_info.extent.depth = 1;
-    image_info.mipLevels = 1;
+    image_info.mipLevels = mip_levels;
     image_info.arrayLayers = 1;
     image_info.format = format;
     image_info.tiling = tiling;           // 关键点：Linear vs Optimal

@@ -1,18 +1,14 @@
 #pragma once
 
-#include <array>
-#include <cctype>
 #include <cstdint>
-#include <fstream>
 #include <functional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <tiny_obj_loader.h>
 
 namespace rtr::utils {
 
@@ -47,170 +43,122 @@ struct VertexKeyHash {
     }
 };
 
-inline int to_index(int idx, int count) {
-    // OBJ indices are 1-based; negative indices are relative to the end.
-    if (idx > 0) {
-        return idx - 1;
-    } else if (idx < 0) {
-        return count + idx;
-    } else {
-        return -1;
+inline glm::vec3 read_position(const std::vector<tinyobj::real_t>& vertices,
+                               int index,
+                               const std::string& filepath) {
+    size_t base = static_cast<size_t>(index) * 3;
+    if (base + 2 >= vertices.size()) {
+        throw std::runtime_error("OBJ vertex index out of range in " + filepath);
     }
+    return glm::vec3(
+        static_cast<float>(vertices[base]),
+        static_cast<float>(vertices[base + 1]),
+        static_cast<float>(vertices[base + 2]));
 }
 
-inline std::vector<std::string> split_whitespace(const std::string& line) {
-    std::istringstream iss(line);
-    std::vector<std::string> tokens;
-    std::string token;
-    while (iss >> token) {
-        tokens.push_back(token);
+inline glm::vec2 read_texcoord(const std::vector<tinyobj::real_t>& texcoords,
+                               int index,
+                               const std::string& filepath) {
+    size_t base = static_cast<size_t>(index) * 2;
+    if (base + 1 >= texcoords.size()) {
+        throw std::runtime_error("OBJ texcoord index out of range in " + filepath);
     }
-    return tokens;
+    return glm::vec2(
+        static_cast<float>(texcoords[base]),
+        static_cast<float>(texcoords[base + 1]));
 }
 
-inline VertexKey parse_face_token(const std::string& token) {
-    VertexKey key{};
-    std::array<int*, 3> targets = {&key.pos, &key.tex, &key.norm};
-
-    size_t start = 0;
-    int field = 0;
-    while (start <= token.size() && field < 3) {
-        size_t slash = token.find('/', start);
-        std::string part = token.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
-        if (!part.empty()) {
-            *targets[field] = std::stoi(part);
-        }
-        if (slash == std::string::npos) {
-            break;
-        }
-        start = slash + 1;
-        ++field;
+inline glm::vec3 read_normal(const std::vector<tinyobj::real_t>& normals,
+                             int index,
+                             const std::string& filepath) {
+    size_t base = static_cast<size_t>(index) * 3;
+    if (base + 2 >= normals.size()) {
+        throw std::runtime_error("OBJ normal index out of range in " + filepath);
     }
-    return key;
-}
-
-inline glm::vec3 parse_vec3(const std::vector<std::string>& tokens, size_t start) {
-    return glm::vec3{
-        std::stof(tokens[start]),
-        std::stof(tokens[start + 1]),
-        std::stof(tokens[start + 2])
-    };
-}
-
-inline glm::vec2 parse_vec2(const std::vector<std::string>& tokens, size_t start) {
-    return glm::vec2{
-        std::stof(tokens[start]),
-        std::stof(tokens[start + 1])
-    };
+    return glm::vec3(
+        static_cast<float>(normals[base]),
+        static_cast<float>(normals[base + 1]),
+        static_cast<float>(normals[base + 2]));
 }
 } // namespace detail
 
 inline ObjMeshData load_obj(const std::string& filepath) {
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open OBJ file: " + filepath);
+    tinyobj::ObjReaderConfig config;
+    config.triangulate = true;
+
+    tinyobj::ObjReader reader;
+    if (!reader.ParseFromFile(filepath, config)) {
+        std::string err = reader.Error();
+        if (err.empty()) {
+            err = reader.Warning();
+        }
+        throw std::runtime_error(
+            "Failed to parse OBJ file with tinyobjloader: " + filepath +
+            (err.empty() ? "" : " | " + err));
     }
 
-    std::vector<glm::vec3> positions;
-    std::vector<glm::vec2> texcoords;
-    std::vector<glm::vec3> normals;
+    const auto& attrib = reader.GetAttrib();
+    const auto& shapes = reader.GetShapes();
 
-    std::vector<ObjVertex> vertices;
-    std::vector<uint32_t> indices;
+    ObjMeshData data{};
     std::unordered_map<detail::VertexKey, uint32_t, detail::VertexKeyHash> vertex_lookup;
-    bool has_input_normals = false;
+    bool has_input_normals = !attrib.normals.empty();
 
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty() || line[0] == '#') {
-            continue;
-        }
-
-        auto tokens = detail::split_whitespace(line);
-        if (tokens.empty()) continue;
-
-        if (tokens[0] == "v" && tokens.size() >= 4) {
-            positions.push_back(detail::parse_vec3(tokens, 1));
-        } else if (tokens[0] == "vt" && tokens.size() >= 3) {
-            texcoords.push_back(detail::parse_vec2(tokens, 1));
-        } else if (tokens[0] == "vn" && tokens.size() >= 4) {
-            normals.push_back(detail::parse_vec3(tokens, 1));
-            has_input_normals = true;
-        } else if (tokens[0] == "f" && tokens.size() >= 4) {
-            // Triangulate faces by fan method if there are more than 3 vertices.
-            std::vector<detail::VertexKey> face_keys;
-            for (size_t i = 1; i < tokens.size(); ++i) {
-                face_keys.push_back(detail::parse_face_token(tokens[i]));
+    for (const auto& shape : shapes) {
+        for (const auto& idx : shape.mesh.indices) {
+            if (idx.vertex_index < 0) {
+                throw std::runtime_error("OBJ face references missing position data in " + filepath);
             }
 
-            for (size_t tri = 1; tri + 1 < face_keys.size(); ++tri) {
-                const detail::VertexKey tri_keys[3] = {
-                    face_keys[0], face_keys[tri], face_keys[tri + 1]
-                };
+            detail::VertexKey key{idx.vertex_index, idx.texcoord_index, idx.normal_index};
 
-                for (const auto& key_raw : tri_keys) {
-                    detail::VertexKey key = key_raw;
-                    key.pos = detail::to_index(key.pos, static_cast<int>(positions.size()));
-                    key.tex = detail::to_index(key.tex, static_cast<int>(texcoords.size()));
-                    key.norm = detail::to_index(key.norm, static_cast<int>(normals.size()));
-
-                    if (key.pos < 0 || key.pos >= static_cast<int>(positions.size())) {
-                        throw std::runtime_error("OBJ face references missing position data in " + filepath);
-                    }
-
-                    auto it = vertex_lookup.find(key);
-                    if (it != vertex_lookup.end()) {
-                        indices.push_back(it->second);
-                        continue;
-                    }
-
-                    ObjVertex vert{};
-                    if (key.pos >= 0 && key.pos < static_cast<int>(positions.size())) {
-                        vert.position = positions[key.pos];
-                    }
-                    if (key.tex >= 0 && key.tex < static_cast<int>(texcoords.size())) {
-                        vert.uv = texcoords[key.tex];
-                    }
-                    if (key.norm >= 0 && key.norm < static_cast<int>(normals.size())) {
-                        vert.normal = normals[key.norm];
-                    }
-
-                    uint32_t new_index = static_cast<uint32_t>(vertices.size());
-                    vertices.push_back(vert);
-                    vertex_lookup.emplace(key, new_index);
-                    indices.push_back(new_index);
-                }
+            auto it = vertex_lookup.find(key);
+            if (it != vertex_lookup.end()) {
+                data.indices.push_back(it->second);
+                continue;
             }
+
+            ObjVertex vertex{};
+            vertex.position = detail::read_position(attrib.vertices, idx.vertex_index, filepath);
+
+            if (idx.texcoord_index >= 0) {
+                vertex.uv = detail::read_texcoord(attrib.texcoords, idx.texcoord_index, filepath);
+            }
+
+            if (idx.normal_index >= 0) {
+                vertex.normal = detail::read_normal(attrib.normals, idx.normal_index, filepath);
+            }
+
+            uint32_t new_index = static_cast<uint32_t>(data.vertices.size());
+            data.vertices.push_back(vertex);
+            vertex_lookup.emplace(key, new_index);
+            data.indices.push_back(new_index);
         }
     }
 
-    // Generate smooth normals if source mesh had none.
     if (!has_input_normals) {
-        std::vector<glm::vec3> accum_normals(vertices.size(), glm::vec3(0.0f));
-        for (size_t i = 0; i + 2 < indices.size(); i += 3) {
-            auto i0 = indices[i];
-            auto i1 = indices[i + 1];
-            auto i2 = indices[i + 2];
-            const glm::vec3& p0 = vertices[i0].position;
-            const glm::vec3& p1 = vertices[i1].position;
-            const glm::vec3& p2 = vertices[i2].position;
+        std::vector<glm::vec3> accum_normals(data.vertices.size(), glm::vec3(0.0f));
+        for (size_t i = 0; i + 2 < data.indices.size(); i += 3) {
+            auto i0 = data.indices[i];
+            auto i1 = data.indices[i + 1];
+            auto i2 = data.indices[i + 2];
+            const glm::vec3& p0 = data.vertices[i0].position;
+            const glm::vec3& p1 = data.vertices[i1].position;
+            const glm::vec3& p2 = data.vertices[i2].position;
             glm::vec3 face_normal = glm::normalize(glm::cross(p1 - p0, p2 - p0));
             accum_normals[i0] += face_normal;
             accum_normals[i1] += face_normal;
             accum_normals[i2] += face_normal;
         }
-        for (size_t v = 0; v < vertices.size(); ++v) {
+        for (size_t v = 0; v < data.vertices.size(); ++v) {
             if (glm::length(accum_normals[v]) > 0.0f) {
-                vertices[v].normal = glm::normalize(accum_normals[v]);
+                data.vertices[v].normal = glm::normalize(accum_normals[v]);
             } else {
-                vertices[v].normal = glm::vec3(0.0f, 1.0f, 0.0f);
+                data.vertices[v].normal = glm::vec3(0.0f, 1.0f, 0.0f);
             }
         }
     }
 
-    ObjMeshData data;
-    data.vertices = std::move(vertices);
-    data.indices = std::move(indices);
     return data;
 }
 
