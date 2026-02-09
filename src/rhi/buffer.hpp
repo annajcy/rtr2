@@ -3,7 +3,7 @@
 #include <cstring>
 #include <utility>
 
-#include "common.hpp"
+#include "rhi/common.hpp"
 #include "device.hpp"
 #include "command.hpp"
 
@@ -14,7 +14,7 @@
 #include "vulkan/vulkan_raii.hpp"
 #include "vulkan/vulkan_structs.hpp"
 
-namespace rtr::core {
+namespace rtr::rhi {
 
 class Buffer {
 private:
@@ -171,4 +171,4 @@ public:
 };
 
 
-}
+} // namespace rtr::rhi

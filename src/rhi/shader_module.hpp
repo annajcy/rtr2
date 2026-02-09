@@ -1,22 +1,22 @@
 #pragma once
 
-#include "device.hpp"
-#include "utils/file_loder.hpp"
-#include "vulkan/vulkan_raii.hpp"
 #include <string>
 #include <vector>
 
-namespace rtr::core {
+#include "rhi/device.hpp"
+#include "utils/file_loder.hpp"
+#include "vulkan/vulkan_raii.hpp"
+
+namespace rtr::rhi {
 
 class ShaderModule {
 private:
-    Device* m_device;
+    Device* m_device{};
     vk::raii::ShaderModule m_module{nullptr};
-    vk::ShaderStageFlagBits m_stage;
-    std::string m_entry_point = "main";
+    vk::ShaderStageFlagBits m_stage{};
+    std::string m_entry_point{"main"};
 
 public:
-    // 从 SPIR-V 文件创建
     static ShaderModule from_file(
         Device* device,
         const std::string& filepath,
@@ -27,13 +27,13 @@ public:
         return ShaderModule(device, code, stage, entry_point);
     }
 
-    // 从 SPIR-V 字节码创建
     ShaderModule(
         Device* device,
         const std::vector<char>& code,
         vk::ShaderStageFlagBits stage,
         const std::string& entry_point = "main"
-    ) : m_device(device), m_stage(stage), m_entry_point(entry_point) {
+    )
+        : m_device(device), m_stage(stage), m_entry_point(entry_point) {
         vk::ShaderModuleCreateInfo create_info{};
         create_info.codeSize = code.size();
         create_info.pCode = reinterpret_cast<const uint32_t*>(code.data());
@@ -41,7 +41,6 @@ public:
         m_module = vk::raii::ShaderModule(device->device(), create_info);
     }
 
-    // 获取 pipeline stage create info
     vk::PipelineShaderStageCreateInfo stage_create_info() const {
         vk::PipelineShaderStageCreateInfo stage_info{};
         stage_info.stage = m_stage;
@@ -55,4 +54,4 @@ public:
     vk::ShaderStageFlagBits stage() const { return m_stage; }
 };
 
-} // namespace rtr::core
+} // namespace rtr::rhi

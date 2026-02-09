@@ -7,7 +7,7 @@
 #include <string>
 #include <sstream>
 
-namespace rtr::core {
+namespace rtr::rhi {
 
 // ============================================================================
 // DescriptorSetLayout
@@ -698,4 +698,4 @@ inline std::string to_string(const DescriptorSystem& descriptor_system) {
     return oss.str();
 }
 
-} // namespace rtr::core
+} // namespace rtr::rhi

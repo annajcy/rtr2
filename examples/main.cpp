@@ -2,8 +2,6 @@
 #include <cstdlib>
 
 #include "core/application.hpp"
-#include "utils/image_loader.hpp"
-
 
 int main() {
     rtr::core::Application app{};

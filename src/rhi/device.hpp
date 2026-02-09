@@ -13,7 +13,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace rtr::core {
+namespace rtr::rhi {
 
 namespace detail {
     template<typename T>
@@ -366,13 +366,9 @@ public:
     const vk::raii::Queue& queue() const { return m_queue; }
     uint32_t queue_family_index() const { return m_queue_family_index; }
 
-    void waitIdle() const {
+    void wait_idle() const {
         m_device.waitIdle();
-    }
-
-    const Context* context() const {
-        return m_context;
     }
 };
 
-}
+} // namespace rtr::rhi

@@ -4,7 +4,7 @@
 #include "vulkan/vulkan_raii.hpp"
 #include <vector>
 
-namespace rtr::core {
+namespace rtr::rhi {
 
 class CommandBuffer {
 private:
@@ -162,4 +162,4 @@ public:
 
 };
 
-}
+} // namespace rtr::rhi

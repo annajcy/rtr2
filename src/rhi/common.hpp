@@ -1,4 +1,4 @@
-// Utility free functions shared across rtr::core
+// Utility free functions shared across rtr::rhi
 #pragma once
 
 #include <algorithm>
@@ -19,7 +19,7 @@
 #include "vulkan/vulkan_raii.hpp"
 #include "vulkan/vulkan_structs.hpp"
 
-namespace rtr::core {
+namespace rtr::rhi {
 
 // Buffer helpers
 inline std::optional<uint32_t> find_memory_type(
@@ -333,4 +333,4 @@ inline std::optional<vk::raii::Device> make_device(
     return vk::raii::Device(physical_device, device_create_info);
 }
 
-} // namespace rtr::core
+} // namespace rtr::rhi

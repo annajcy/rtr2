@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <limits>
 #include <functional>
 #include <cstdlib>
 #include <optional>
@@ -9,17 +10,20 @@
 #include <iostream>
 
 #include "device.hpp"
-#include "window.hpp"
+#include "rhi/context.hpp"
+#include "rhi/window.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
 #include "vulkan/vulkan_raii.hpp"
 #include "vulkan/vulkan_structs.hpp"
 
-namespace rtr::core {
+namespace rtr::rhi {
 
 class SwapChain {
 private:
+    Window* m_window;
+    Context* m_context;
     Device* m_device;
 
     vk::raii::SwapchainKHR m_swapchain{nullptr};
@@ -29,11 +33,11 @@ private:
     vk::Extent2D m_extent;
 
 public:
-    SwapChain(Device* device) : m_device(device) {
-        auto surface_formats = m_device->physical_device().getSurfaceFormatsKHR(*m_device->context()->surface());
+    SwapChain(Window* window, Context* context, Device* device) : m_window(window), m_context(context), m_device(device) {
+        auto surface_formats = m_device->physical_device().getSurfaceFormatsKHR(*m_context->surface());
         auto surface_format = choose_surface_format(surface_formats);
-        auto present_mode = choose_present_mode(m_device->physical_device().getSurfacePresentModesKHR(*m_device->context()->surface()));
-        auto capabilities = m_device->physical_device().getSurfaceCapabilitiesKHR(*m_device->context()->surface());
+        auto present_mode = choose_present_mode(m_device->physical_device().getSurfacePresentModesKHR(*m_context->surface()));
+        auto capabilities = m_device->physical_device().getSurfaceCapabilitiesKHR(*m_context->surface());
         auto extent = choose_extent(capabilities);
 
         uint32_t image_count = capabilities.minImageCount + 1;
@@ -45,7 +49,7 @@ public:
                   << extent.width << ", " << extent.height << ")." << std::endl;
 
         vk::SwapchainCreateInfoKHR create_info{};
-        create_info.surface = *m_device->context()->surface();
+        create_info.surface = *m_context->surface();
         create_info.minImageCount = image_count;
         create_info.imageFormat = surface_format.format;
         create_info.imageColorSpace = surface_format.colorSpace;
@@ -165,7 +169,7 @@ private:
         if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
             return capabilities.currentExtent;
         } else {
-            auto [width, height] = m_device->context()->window()->framebuffer_size();
+            auto [width, height] = m_window->framebuffer_size();
 
             vk::Extent2D actual_extent = {
                 static_cast<uint32_t>(width),
@@ -184,4 +188,4 @@ private:
     }
 };
 
-}
+} // namespace rtr::rhi

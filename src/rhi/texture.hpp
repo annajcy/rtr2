@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/command.hpp"
+#include "command.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
@@ -9,11 +9,70 @@
 #include <cstdint>
 #include <string>
 #include <sys/types.h>
+#include <algorithm>
+#include <cmath>
 #include "device.hpp"
 #include "buffer.hpp"
 #include "utils/image_loader.hpp"
 
-namespace rtr::core {
+namespace rtr::rhi {
+
+namespace detail {
+
+template<vk::ImageLayout From, vk::ImageLayout To>
+struct TransitionTraits {
+    static_assert(From != From, "Unsupported layout transition! Check template arguments.");
+};
+
+template<>
+struct TransitionTraits<vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal> {
+    static constexpr vk::AccessFlags src_access{};
+    static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eTransferWrite};
+    static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTopOfPipe};
+    static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eTransfer};
+};
+
+template<>
+struct TransitionTraits<vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal> {
+    static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferWrite};
+    static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eShaderRead};
+    static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
+    static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eFragmentShader};
+};
+
+template<>
+struct TransitionTraits<vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal> {
+    static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferWrite};
+    static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eTransferRead};
+    static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
+    static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eTransfer};
+};
+
+template<>
+struct TransitionTraits<vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eShaderReadOnlyOptimal> {
+    static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferRead};
+    static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eShaderRead};
+    static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
+    static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eFragmentShader};
+};
+
+template<>
+struct TransitionTraits<vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal> {
+    static constexpr vk::AccessFlags src_access{};
+    static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead};
+    static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTopOfPipe};
+    static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eEarlyFragmentTests};
+};
+
+template<>
+struct TransitionTraits<vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eDepthAttachmentOptimal> {
+    static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferWrite};
+    static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead};
+    static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
+    static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eEarlyFragmentTests};
+};
+
+} // namespace detail
 
 class Image {
 public:
@@ -28,57 +87,7 @@ public:
     };
 
     template<vk::ImageLayout From, vk::ImageLayout To>
-    struct TransitionTraits {
-        static_assert(From != From, "Unsupported layout transition! Check template arguments.");
-    };
-
-    template<>
-    struct TransitionTraits<vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal> {
-        static constexpr vk::AccessFlags src_access{};
-        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eTransferWrite};
-        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTopOfPipe};
-        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eTransfer};
-    };
-
-    template<>
-    struct TransitionTraits<vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal> {
-        static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferWrite};
-        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eShaderRead};
-        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
-        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eFragmentShader};
-    };
-
-    template<>
-    struct TransitionTraits<vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal> {
-        static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferWrite};
-        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eTransferRead};
-        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
-        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eTransfer};
-    };
-
-    template<>
-    struct TransitionTraits<vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eShaderReadOnlyOptimal> {
-        static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferRead};
-        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eShaderRead};
-        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
-        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eFragmentShader};
-    };
-
-    template<>
-    struct TransitionTraits<vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentOptimal> {
-        static constexpr vk::AccessFlags src_access{};
-        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead};
-        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTopOfPipe};
-        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eEarlyFragmentTests};
-    };
-
-    template<>
-    struct TransitionTraits<vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eDepthAttachmentOptimal> {
-        static constexpr vk::AccessFlags src_access{vk::AccessFlagBits::eTransferWrite};
-        static constexpr vk::AccessFlags dst_access{vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead};
-        static constexpr vk::PipelineStageFlags src_stage{vk::PipelineStageFlagBits::eTransfer};
-        static constexpr vk::PipelineStageFlags dst_stage{vk::PipelineStageFlagBits::eEarlyFragmentTests};
-    };
+    using TransitionTraits = detail::TransitionTraits<From, To>;
 
     template<vk::ImageLayout From, vk::ImageLayout To>
     static LayoutTransitionConfig get_transition_config(vk::ImageAspectFlags aspect_mask) {
@@ -583,4 +592,4 @@ public:
     const vk::raii::Sampler& sampler() const { return m_sampler; }
 };
 
-}
+} // namespace rtr::rhi

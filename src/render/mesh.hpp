@@ -10,73 +10,72 @@
 
 #include <glm/glm.hpp>
 
-#include "buffer.hpp"
-#include "device.hpp"
+#include "rhi/buffer.hpp"
+#include "rhi/device.hpp"
 #include "utils/obj_loader.hpp"
-
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
 
-namespace rtr::core {
+namespace rtr::render {
 
 class Mesh {
 public:
     using Vertex = rtr::utils::ObjVertex;
 
     static void copy_buffer(
-        Device* device,
+        rhi::Device* device,
         vk::Buffer src,
         vk::Buffer dst,
         vk::DeviceSize size
     ) {
-        CommandPool command_pool(device, vk::CommandPoolCreateFlagBits::eTransient);
+        rhi::CommandPool command_pool(device, vk::CommandPoolCreateFlagBits::eTransient);
         auto cmd = command_pool.create_command_buffer();
-        
-        cmd.record_and_submit([&](CommandBuffer& cmd) {
+
+        cmd.record_and_submit([&](rhi::CommandBuffer& cb) {
             vk::BufferCopy buffer_copy{};
             buffer_copy.srcOffset = 0;
             buffer_copy.dstOffset = 0;
             buffer_copy.size = size;
-            cmd.command_buffer().copyBuffer(src, dst, buffer_copy);
+            cb.command_buffer().copyBuffer(src, dst, buffer_copy);
         });
-        
+
         device->queue().waitIdle();
     }
 
-    static Buffer create_device_local_with_data(
-        Device* device,
+    static rhi::Buffer create_device_local_with_data(
+        rhi::Device* device,
         const void* data,
         vk::DeviceSize size,
         vk::BufferUsageFlags usage = {}
     ) {
-        auto buffer = Buffer::create_device_local_buffer(
-            device, 
-            size, 
+        auto buffer = rhi::Buffer::create_device_local_buffer(
+            device,
+            size,
             usage | vk::BufferUsageFlagBits::eTransferDst
         );
-        
-        auto staging_buffer = Buffer::create_host_visible_buffer(
-            device, 
-            size, 
+
+        auto staging_buffer = rhi::Buffer::create_host_visible_buffer(
+            device,
+            size,
             vk::BufferUsageFlagBits::eTransferSrc
         );
-        
+
         staging_buffer.map();
         std::memcpy(staging_buffer.mapped_data(), data, size);
         staging_buffer.unmap();
-        
+
         copy_buffer(device, *staging_buffer.buffer(), *buffer.buffer(), size);
-        
+
         return buffer;
     }
 
-    static Mesh from_obj(Device* device, const std::string& filepath) {
+    static Mesh from_obj(rhi::Device* device, const std::string& filepath) {
         auto mesh_data = rtr::utils::load_obj(filepath);
         if (mesh_data.vertices.empty() || mesh_data.indices.empty()) {
             throw std::runtime_error("OBJ file is empty or contains no valid faces: " + filepath);
         }
 
-        auto vertex_buffer = std::make_unique<Buffer>(
+        auto vertex_buffer = std::make_unique<rhi::Buffer>(
             Mesh::create_device_local_with_data(
                 device,
                 mesh_data.vertices.data(),
@@ -85,7 +84,7 @@ public:
             )
         );
 
-        auto index_buffer = std::make_unique<Buffer>(
+        auto index_buffer = std::make_unique<rhi::Buffer>(
             Mesh::create_device_local_with_data(
                 device,
                 mesh_data.indices.data(),
@@ -99,7 +98,8 @@ public:
             static_cast<uint32_t>(mesh_data.vertices.size()),
             static_cast<uint32_t>(mesh_data.indices.size()),
             std::move(vertex_buffer),
-            std::move(index_buffer));
+            std::move(index_buffer)
+        );
     }
 
     static vk::VertexInputBindingDescription binding_description() {
@@ -144,23 +144,25 @@ public:
     }
 
 private:
-    Device* m_device{};
+    rhi::Device* m_device{};
     uint32_t m_vertex_count{0};
     uint32_t m_index_count{0};
-    std::unique_ptr<Buffer> m_vertex_buffer;
-    std::unique_ptr<Buffer> m_index_buffer;
-   
+    std::unique_ptr<rhi::Buffer> m_vertex_buffer{};
+    std::unique_ptr<rhi::Buffer> m_index_buffer{};
+
 public:
-    Mesh(Device* device,
-         uint32_t vertex_count,
-         uint32_t index_count,
-         std::unique_ptr<Buffer> vertex_buffer,
-         std::unique_ptr<Buffer> index_buffer)
-        : m_device(device)
-        , m_vertex_count(vertex_count)
-        , m_index_count(index_count)
-        , m_vertex_buffer(std::move(vertex_buffer))
-        , m_index_buffer(std::move(index_buffer)) {}
+    Mesh(
+        rhi::Device* device,
+        uint32_t vertex_count,
+        uint32_t index_count,
+        std::unique_ptr<rhi::Buffer> vertex_buffer,
+        std::unique_ptr<rhi::Buffer> index_buffer
+    )
+        : m_device(device),
+          m_vertex_count(vertex_count),
+          m_index_count(index_count),
+          m_vertex_buffer(std::move(vertex_buffer)),
+          m_index_buffer(std::move(index_buffer)) {}
 
     Mesh(const Mesh&) = delete;
     Mesh& operator=(const Mesh&) = delete;
@@ -174,4 +176,4 @@ public:
     uint32_t vertex_count() const { return m_vertex_count; }
 };
 
-} // namespace rtr::core
+} // namespace rtr::render

@@ -1,8 +1,8 @@
 #pragma once
 
+#include <cstdlib>
 #include <optional>
 #include <stdexcept>
-#include <cstdlib>
 #include <string>
 #include <utility>
 #include <vector>
@@ -12,17 +12,18 @@
 
 #include "vulkan/vulkan_raii.hpp"
 
-namespace rtr::core {
-    
+namespace rtr::rhi {
+
 class Window {
 private:
     int m_width{800};
     int m_height{600};
     std::string m_title{"WindowGLFW"};
-    GLFWwindow* m_window{ nullptr };
+    GLFWwindow* m_window{nullptr};
 
 public:
-    Window(int width, int height, const std::string& title) : m_width(width), m_height(height), m_title(title) {
+    Window(int width, int height, const std::string& title)
+        : m_width(width), m_height(height), m_title(title) {
         if (!glfwInit()) {
             throw std::runtime_error("Failed to initialize GLFW");
         }
@@ -31,9 +32,11 @@ public:
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
         m_window = glfwCreateWindow(
-            m_width, m_height, 
-            m_title.c_str(), 
-            nullptr, nullptr
+            m_width,
+            m_height,
+            m_title.c_str(),
+            nullptr,
+            nullptr
         );
     }
 
@@ -53,9 +56,10 @@ public:
     }
 
     std::pair<int, int> framebuffer_size() const {
-        int width, height;
+        int width{};
+        int height{};
         glfwGetFramebufferSize(m_window, &width, &height);
-        return { width, height };
+        return {width, height};
     }
 
     const int& width() const {
@@ -91,15 +95,16 @@ public:
         const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
 
         std::vector<std::string> extensions;
+        extensions.reserve(glfw_extension_count);
         for (uint32_t i = 0; i < glfw_extension_count; i++) {
-            extensions.push_back(glfw_extensions[i]);
+            extensions.emplace_back(glfw_extensions[i]);
         }
 
         return extensions;
-    } 
+    }
 
     std::optional<VkSurfaceKHR> create_vk_surface(const vk::raii::Instance& instance) const {
-        VkSurfaceKHR surface;
+        VkSurfaceKHR surface{};
         if (glfwCreateWindowSurface(*instance, m_window, nullptr, &surface) != VK_SUCCESS) {
             return std::nullopt;
         }
@@ -107,4 +112,4 @@ public:
     }
 };
 
-}
+} // namespace rtr::rhi
