@@ -32,10 +32,13 @@ private:
     std::unique_ptr<rhi::Device> m_device{};
 
     std::unique_ptr<FrameScheduler> m_frame_scheduler{};
-    std::unique_ptr<ImGuiLayer> m_imgui_layer{};
+    std::unique_ptr<ImGuiLayer> m_imgui_renderer{};
     std::unique_ptr<IRenderPipeline> m_active_pipeline{};
     
     UiCallback m_ui_callback{};
+    
+    rhi::Window::WindowResizeEvent::ActionHandle m_window_resize_handle{0};
+
     ResourceRegistries m_resource_registries;
     bool m_static_bindings_dirty{true};
     std::vector<bool> m_perframe_bindings_dirty;
@@ -50,15 +53,10 @@ public:
         : m_resource_registries(max_frames_in_flight),
           m_perframe_bindings_dirty(max_frames_in_flight, true) {
         m_window = std::make_unique<rhi::Window>(width, height, title);
-        m_window->set_user_pointer(this);
-        m_window->set_framebuffer_size_callback([](GLFWwindow* window, int width, int height) {
-            auto* renderer = reinterpret_cast<Renderer*>(glfwGetWindowUserPointer(window));
-            if (!renderer) {
-                return;
-            }
-            renderer->on_window_resized(
-                static_cast<uint32_t>(width),
-                static_cast<uint32_t>(height)
+        m_window_resize_handle = m_window->window_resize_event().add([this](int resize_width, int resize_height) {
+            on_window_resized(
+                static_cast<uint32_t>(resize_width),
+                static_cast<uint32_t>(resize_height)
             );
         });
 
@@ -76,7 +74,7 @@ public:
             m_device.get(),
             max_frames_in_flight
         );
-        m_imgui_layer = std::make_unique<ImGuiLayer>(
+        m_imgui_renderer = std::make_unique<ImGuiLayer>(
             m_device.get(),
             m_context.get(),
             m_window.get(),
@@ -87,7 +85,12 @@ public:
         m_last_swapchain_generation = m_frame_scheduler->swapchain_state().generation;
     }
 
-    ~Renderer() = default;
+    ~Renderer() {
+        if (m_window && m_window_resize_handle != 0) {
+            m_window->window_resize_event().remove(m_window_resize_handle);
+            m_window_resize_handle = 0;
+        }
+    }
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
@@ -149,11 +152,11 @@ public:
     }
 
     bool imgui_wants_capture_mouse() const {
-        return m_imgui_layer && m_imgui_layer->wants_capture_mouse();
+        return m_imgui_renderer && m_imgui_renderer->wants_capture_mouse();
     }
 
     bool imgui_wants_capture_keyboard() const {
-        return m_imgui_layer && m_imgui_layer->wants_capture_keyboard();
+        return m_imgui_renderer && m_imgui_renderer->wants_capture_keyboard();
     }
 
     void draw_frame() {
@@ -181,12 +184,12 @@ public:
             m_perframe_bindings_dirty[ticket.frame_index] = false;
         }
 
-        m_imgui_layer->begin_frame();
-        m_imgui_layer->build_dockspace();
+        m_imgui_renderer->begin_frame();
+        m_imgui_renderer->build_dockspace();
         if (m_ui_callback) {
             m_ui_callback();
         }
-        ImDrawData* imgui_draw_data = m_imgui_layer->prepare_draw_data();
+        ImDrawData* imgui_draw_data = m_imgui_renderer->prepare_draw_data();
 
         FrameContext frame_ctx = build_frame_context(ticket);
         ticket.command_buffer->reset();
@@ -230,7 +233,7 @@ private:
             return;
         }
 
-        m_imgui_layer->on_swapchain_recreated(state.image_count, state.color_format, state.depth_format);
+        m_imgui_renderer->on_swapchain_recreated(state.image_count, state.color_format, state.depth_format);
         if (m_active_pipeline) {
             m_active_pipeline->on_swapchain_state_changed(state);
         }
@@ -268,7 +271,7 @@ private:
         rendering_info.pDepthAttachment = &depth_attachment_info;
 
         command_buffer.beginRendering(rendering_info);
-        m_imgui_layer->render_draw_data(command_buffer, draw_data);
+        m_imgui_renderer->render_draw_data(command_buffer, draw_data);
         command_buffer.endRendering();
     }
 
