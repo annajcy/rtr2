@@ -23,19 +23,14 @@ namespace rtr::render {
 class FrameScheduler {
 public:
     struct PerFrameResources {
+        rhi::CommandBuffer command_buffer;
+        rhi::Image depth_image;
+
         vk::raii::Semaphore image_available_semaphore{nullptr};
         vk::raii::Fence in_flight_fence{nullptr};
-        rhi::CommandBuffer command_buffer;
-
-        explicit PerFrameResources(rhi::CommandBuffer&& cmd)
-            : command_buffer(std::move(cmd)) {}
-
-        PerFrameResources(PerFrameResources&&) = default;
-        PerFrameResources& operator=(PerFrameResources&&) = default;
     };
 
     struct PerImageResources {
-        rhi::Image depth_image;
         vk::raii::Semaphore render_finished_semaphore{nullptr};
     };
 
@@ -69,12 +64,12 @@ public:
           m_context(context),
           m_device(device),
           m_max_frames_in_flight(max_frames_in_flight) {
+
         m_swapchain = std::make_unique<rhi::SwapChain>(window, context, device);
         m_command_pool = std::make_unique<rhi::CommandPool>(
             device,
             vk::CommandPoolCreateFlagBits::eResetCommandBuffer
         );
-
         m_depth_format = find_supported_format(
             {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
             vk::ImageTiling::eOptimal,
@@ -107,8 +102,10 @@ public:
             frame_res.image_available_semaphore
         );
         if (result == vk::Result::eErrorOutOfDateKHR) {
+            m_device->device().waitIdle();
             init_swapchain();
             init_per_image_resource();
+            init_per_frame_resources();
             return std::nullopt;
         }
         if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
@@ -155,6 +152,7 @@ public:
             m_device->device().waitIdle();
             init_swapchain();
             init_per_image_resource();
+            init_per_frame_resources();
         }
 
         m_current_frame_index = (m_current_frame_index + 1) % m_max_frames_in_flight;
@@ -185,17 +183,12 @@ private:
 
     void init_per_image_resource() {
         m_per_image_resources.clear();
+        m_per_image_resources.reserve(m_swapchain->images().size());
         vk::SemaphoreCreateInfo semaphore_info{};
 
         for (size_t i = 0; i < m_swapchain->images().size(); ++i) {
             PerImageResources image_res{
-                rhi::Image::create_depth_image(
-                    m_device,
-                    m_swapchain->extent().width,
-                    m_swapchain->extent().height,
-                    m_depth_format
-                ),
-                vk::raii::Semaphore(m_device->device(), semaphore_info)
+                .render_finished_semaphore = vk::raii::Semaphore(m_device->device(), semaphore_info)
             };
             m_per_image_resources.push_back(std::move(image_res));
         }
@@ -211,15 +204,23 @@ private:
 
         auto command_buffers = m_command_pool->create_command_buffers(m_max_frames_in_flight);
         for (uint32_t i = 0; i < m_max_frames_in_flight; ++i) {
-            PerFrameResources resources(std::move(command_buffers[i]));
-            resources.image_available_semaphore = vk::raii::Semaphore(
-                m_device->device(),
-                semaphore_info
-            );
-            resources.in_flight_fence = vk::raii::Fence(
-                m_device->device(),
-                fence_info
-            );
+            PerFrameResources resources{
+                .command_buffer = std::move(command_buffers[i]),
+                .depth_image = rhi::Image::create_depth_image(
+                    m_device,
+                    m_swapchain->extent().width,
+                    m_swapchain->extent().height,
+                    m_depth_format
+                ),
+                .image_available_semaphore = vk::raii::Semaphore(
+                    m_device->device(),
+                    semaphore_info
+                ),
+                .in_flight_fence = vk::raii::Fence(
+                    m_device->device(),
+                    fence_info
+                )
+            };
             m_per_frame_resources.push_back(std::move(resources));
         }
     }

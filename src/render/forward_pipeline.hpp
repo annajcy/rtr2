@@ -95,7 +95,7 @@ public:
 
         update_uniform_buffer(ctx);
 
-        ctx.cmd()->record([&](rhi::CommandBuffer& cb) {
+        ctx.cmd().record([&](rhi::CommandBuffer& cb) {
             auto& cmd = cb.command_buffer();
 
             vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}};
@@ -246,7 +246,7 @@ private:
     }
 };
 
-class ForwardPipeline {
+class ForwardPipeline : public IFrameResourceBinder {
 private:
     using BuildUiCallback = std::function<void()>;
 
@@ -347,13 +347,7 @@ public:
             }
         );
 
-        m_renderer->set_frame_resource_provider(
-            [this](uint32_t frame_index, render::ResourceRegistry& registry) {
-                registry.set_buffer(frame_index, "uniform", m_uniform_buffers[frame_index].get());
-                registry.set_descriptor_set(frame_index, "per_frame", m_descriptor_system->get_set("per_frame", frame_index));
-                registry.set_descriptor_set(frame_index, "texture", m_descriptor_system->get_set("texture", 0));
-            }
-        );
+        m_renderer->register_frame_resource_binder(*this);
 
         auto layout_info = rhi::DescriptorSystem::make_pipeline_layout_info(*m_descriptor_system);
         m_pipeline_layout = vk::raii::PipelineLayout{m_device->device(), layout_info.info};
@@ -456,6 +450,32 @@ public:
             m_imgui_layer.get(),
             &m_pipeline_layout,
             &m_pipeline
+        );
+    }
+
+    ~ForwardPipeline() override {
+        if (m_renderer != nullptr) {
+            m_renderer->unregister_frame_resource_binder(*this);
+        }
+    }
+
+    void bind_static_resources(render::ResourceRegistries& registries) override {
+        registries.registry<vk::raii::DescriptorSet>().set_global_resource(
+            "texture", 
+            m_descriptor_system->get_set("texture", 0)
+        );
+    }
+
+    void bind_frame_resources(uint32_t frame_index, render::ResourceRegistries& registries) override {
+        registries.registry<rhi::Buffer>().set_frame_resource(
+            frame_index, 
+            "uniform", 
+            *m_uniform_buffers.at(frame_index)
+        );
+        registries.registry<vk::raii::DescriptorSet>().set_frame_resource(
+            frame_index,
+            "per_frame",
+            m_descriptor_system->get_set("per_frame", frame_index)
         );
     }
 

@@ -179,7 +179,6 @@ public:
     const std::vector<vk::DescriptorPoolSize>& pool_sizes() const { return m_pool_sizes; }
     uint32_t max_sets() const { return m_max_sets; }
     vk::DescriptorPoolCreateFlags flags() const { return m_flags; }
-    const Device* device() const { return m_device; }
 };
 
   // 打印 Pool 信息
@@ -554,7 +553,6 @@ public:
         allocate_all_sets();
     }
 
-    Device* device() const { return m_device; }
     const std::unordered_map<std::string, SetConfig>& set_configs() const { return m_set_configs; }
     const std::unordered_map<std::string, std::vector<vk::raii::DescriptorSet>>& allocated_sets() const { return m_allocated_sets; }
     const DescriptorPool& pool() const { return *m_pool; }
@@ -590,8 +588,17 @@ public:
         return sets.at(index);
     }
 
+    vk::raii::DescriptorSet& get_set(const std::string& set_name, uint32_t index = 0) {
+        auto& sets = m_allocated_sets.at(set_name);
+        return sets.at(index);
+    }
+
     // 获取所有描述符集（某个类型的）
     const std::vector<vk::raii::DescriptorSet>& get_sets(const std::string& set_name) const {
+        return m_allocated_sets.at(set_name);
+    }
+
+    std::vector<vk::raii::DescriptorSet>& get_sets(const std::string& set_name) {
         return m_allocated_sets.at(set_name);
     }
 
