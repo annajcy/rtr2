@@ -5,216 +5,26 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <tuple>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
-#include "rhi/buffer.hpp"
-#include "rhi/command.hpp"
 #include "rhi/context.hpp"
 #include "rhi/device.hpp"
-#include "rhi/texture.hpp"
 #include "rhi/window.hpp"
+#include "render/frame_context.hpp"
 #include "render/frame_scheduler.hpp"
-#include "vulkan/vulkan_raii.hpp"
+#include "render/imgui_renderer.hpp"
+#include "render/pipeline.hpp"
+#include "render/resource_registries.hpp"
 
 namespace rtr::render {
-
-template <class T>
-class TypedResourceRegistry {
-public:
-    using ResourceMap = std::unordered_map<std::string, T*>;
-
-private:
-    std::vector<ResourceMap> m_per_frame;
-    ResourceMap m_global;
-
-public:
-    explicit TypedResourceRegistry(uint32_t frames_in_flight = 0)
-        : m_per_frame(frames_in_flight) {}
-    void clear_frame(uint32_t frame_index) {
-        frame_resources(frame_index).clear();
-    }
-
-    void set_frame_resource(uint32_t frame_index, const std::string& name, T& resource) {
-        auto& per_frame_map = frame_resources(frame_index);
-        if (m_global.find(name) != m_global.end()) {
-            throw std::runtime_error(
-                "Resource name conflict: '" + name +
-                "' already exists in global scope and cannot be set in per-frame scope (frame index: " +
-                std::to_string(frame_index) + ")."
-            );
-        }
-        per_frame_map[name] = &resource;
-    }
-
-    void set_global_resource(const std::string& name, T& resource) {
-        for (size_t frame_index = 0; frame_index < m_per_frame.size(); ++frame_index) {
-            if (m_per_frame[frame_index].find(name) != m_per_frame[frame_index].end()) {
-                throw std::runtime_error(
-                    "Resource name conflict: '" + name +
-                    "' already exists in per-frame scope (frame index: " +
-                    std::to_string(frame_index) + ") and cannot be set in global scope."
-                );
-            }
-        }
-        m_global[name] = &resource;
-    }
-
-    T& get_perframe_resource(uint32_t frame_index, const std::string& name) const {
-        const auto& per_frame_map = frame_resources(frame_index);
-        auto per_frame_it = per_frame_map.find(name);
-        if (per_frame_it != per_frame_map.end()) {
-            return *per_frame_it->second;
-        }
-        throw std::runtime_error(
-            "Per-frame resource not found: '" + name + "' (frame index: " + std::to_string(frame_index) + ")."
-        );
-    }
-
-    T& get_global_resource(const std::string& name) const {
-        auto global_it = m_global.find(name);
-        if (global_it != m_global.end()) {
-            return *global_it->second;
-        }
-        throw std::runtime_error("Global resource not found: '" + name + "'.");
-    }
-
-    bool has_perframe_resource(uint32_t frame_index, const std::string& name) const {
-        const auto& per_frame_map = frame_resources(frame_index);
-        return per_frame_map.find(name) != per_frame_map.end();
-    }
-
-    bool has_global_resource(const std::string& name) const {
-        return m_global.find(name) != m_global.end();
-    }
-
-private:
-    ResourceMap& frame_resources(uint32_t frame_index) {
-        return m_per_frame[frame_index];
-    }
-
-    const ResourceMap& frame_resources(uint32_t frame_index) const {
-        return m_per_frame[frame_index];
-    }
-};
-
-using BufferRegistry = TypedResourceRegistry<rhi::Buffer>;
-using DescriptorSetRegistry = TypedResourceRegistry<vk::raii::DescriptorSet>;
-
-template <class... Ts>
-class ResourceRegistryAggregate {
-private:
-    std::tuple<TypedResourceRegistry<Ts>...> m_registries;
-    uint32_t m_frame_count{0};
-
-    static std::tuple<TypedResourceRegistry<Ts>...> make_registries(uint32_t frames_count) {
-        return std::tuple<TypedResourceRegistry<Ts>...>{TypedResourceRegistry<Ts>(frames_count)...};
-    }
-
-public:
-    explicit ResourceRegistryAggregate(uint32_t frames_count = 0)
-        : m_registries(make_registries(frames_count)),
-          m_frame_count(frames_count) {}
-
-    void clear_frame(uint32_t frame_index) {
-        (registry<Ts>().clear_frame(frame_index), ...);
-    }
-
-    void clear_all() {
-        for (uint32_t i = 0; i < m_frame_count; ++i) {
-            clear_frame(i);
-        }
-    }
-
-    template <class T>
-    TypedResourceRegistry<T>& registry() {
-        return std::get<TypedResourceRegistry<T>>(m_registries);
-    }
-
-    template <class T>
-    const TypedResourceRegistry<T>& registry() const {
-        return std::get<TypedResourceRegistry<T>>(m_registries);
-    }
-};
-
-using ResourceRegistries = ResourceRegistryAggregate<rhi::Buffer, vk::raii::DescriptorSet>;
-
-class IFrameResourceBinder {
-public:
-    virtual ~IFrameResourceBinder() = default;
-
-    virtual void bind_static_resources(ResourceRegistries& /*registries*/) {}
-    virtual void bind_frame_resources(uint32_t frame_index, ResourceRegistries& registries) = 0;
-};
-
-class FrameContext {
-private:
-    rhi::Device* m_device{};
-    rhi::CommandBuffer* m_cmd{};
-    ResourceRegistries* m_registries{};
-    const vk::raii::ImageView* m_swapchain_image_view{};
-    const vk::Image* m_swapchain_image{};
-    const rhi::Image* m_depth_image{};
-    uint32_t m_frame_index{0};
-
-public:
-    FrameContext(
-        rhi::Device* device,
-        rhi::CommandBuffer* cmd,
-        ResourceRegistries* registries,
-        const vk::raii::ImageView& swapchain_image_view,
-        const vk::Image& swapchain_image,
-        const rhi::Image& depth_image,
-        uint32_t frame_index
-    )
-        : m_device(device),
-          m_cmd(cmd),
-          m_registries(registries),
-          m_swapchain_image_view(&swapchain_image_view),
-          m_swapchain_image(&swapchain_image),
-          m_depth_image(&depth_image),
-          m_frame_index(frame_index) {}
-
-    const rhi::CommandBuffer& cmd() const { return *m_cmd; }
-    rhi::CommandBuffer& cmd() { return *m_cmd; }
-
-    const vk::raii::ImageView& swapchain_image_view() const { return *m_swapchain_image_view; }
-    const vk::Image& swapchain_image() const { return *m_swapchain_image; }
-    const rhi::Image& depth_image() const { return *m_depth_image; }
-
-    rhi::Buffer& get_buffer(const std::string& name) {
-        auto& registry = m_registries->registry<rhi::Buffer>();
-        if (registry.has_perframe_resource(m_frame_index, name)) {
-            return registry.get_perframe_resource(m_frame_index, name);
-        }
-        return registry.get_global_resource(name);
-    }
-
-    vk::raii::DescriptorSet& get_descriptor_set(const std::string& name) {
-        auto& registry = m_registries->registry<vk::raii::DescriptorSet>();
-        if (registry.has_perframe_resource(m_frame_index, name)) {
-            return registry.get_perframe_resource(m_frame_index, name);
-        }
-        return registry.get_global_resource(name);
-    }
-
-    bool has_buffer(const std::string& name) const {
-        return m_registries->registry<rhi::Buffer>().has_perframe_resource(m_frame_index, name) ||
-               m_registries->registry<rhi::Buffer>().has_global_resource(name);
-    }
-
-    bool has_descriptor_set(const std::string& name) const {
-        return m_registries->registry<vk::raii::DescriptorSet>().has_perframe_resource(m_frame_index, name) ||
-               m_registries->registry<vk::raii::DescriptorSet>().has_global_resource(name);
-    }
-};
 
 class Renderer {
 public:
     using PerFrameResources = FrameScheduler::PerFrameResources;
     using PerImageResources = FrameScheduler::PerImageResources;
     using RenderCallback = std::function<void(FrameContext&)>;
+    using UiCallback = std::function<void()>;
 
 private:
     std::unique_ptr<rhi::Window> m_window{};
@@ -222,9 +32,14 @@ private:
     std::unique_ptr<rhi::Device> m_device{};
 
     std::unique_ptr<FrameScheduler> m_frame_scheduler{};
+    std::unique_ptr<ImGuiLayer> m_imgui_layer{};
+    std::unique_ptr<IRenderPipeline> m_active_pipeline{};
+    
+    UiCallback m_ui_callback{};
     ResourceRegistries m_resource_registries;
-
-    std::vector<IFrameResourceBinder*> m_frame_resource_binders;
+    bool m_static_bindings_dirty{true};
+    std::vector<bool> m_perframe_bindings_dirty;
+    uint64_t m_last_swapchain_generation{0};
 
 public:
     Renderer(
@@ -232,7 +47,8 @@ public:
         std::string title,
         uint32_t max_frames_in_flight = 2
     )
-        : m_resource_registries(max_frames_in_flight) {
+        : m_resource_registries(max_frames_in_flight),
+          m_perframe_bindings_dirty(max_frames_in_flight, true) {
         m_window = std::make_unique<rhi::Window>(width, height, title);
         m_window->set_user_pointer(this);
         m_window->set_framebuffer_size_callback([](GLFWwindow* window, int width, int height) {
@@ -260,6 +76,15 @@ public:
             m_device.get(),
             max_frames_in_flight
         );
+        m_imgui_layer = std::make_unique<ImGuiLayer>(
+            m_device.get(),
+            m_context.get(),
+            m_window.get(),
+            m_frame_scheduler->image_count(),
+            m_frame_scheduler->render_format(),
+            m_frame_scheduler->depth_format()
+        );
+        m_last_swapchain_generation = m_frame_scheduler->swapchain_state().generation;
     }
 
     ~Renderer() = default;
@@ -267,52 +92,118 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    void bind_resource() {
-        m_resource_registries.clear_all();
-        // bind static resources
-        for (auto* binder : m_frame_resource_binders) {
-            binder->bind_static_resources(m_resource_registries);
-        }
-        // bind per-frame resources
-        for (uint32_t i = 0; i < m_frame_scheduler->max_frames_in_flight(); ++i) {
-            for (auto* binder : m_frame_resource_binders) {
-                binder->bind_frame_resources(i, m_resource_registries);
-            }
-        }   
+    PipelineRuntime build_pipeline_runtime() const {
+        return PipelineRuntime{
+            .device = m_device.get(),
+            .context = m_context.get(),
+            .window = m_window.get(),
+            .frame_count = m_frame_scheduler->max_frames_in_flight(),
+            .image_count = m_frame_scheduler->image_count(),
+            .color_format = m_frame_scheduler->render_format(),
+            .depth_format = m_frame_scheduler->depth_format()
+        };
     }
 
-    void register_frame_resource_binder(IFrameResourceBinder& binder) {
-        auto it = std::find(m_frame_resource_binders.begin(), m_frame_resource_binders.end(), &binder);
-        if (it != m_frame_resource_binders.end()) {
-            throw std::runtime_error("Frame resource binder already registered.");
-        }
-        m_frame_resource_binders.push_back(&binder);
+    void invalidate_static_bindings() {
+        m_static_bindings_dirty = true;
     }
 
-    void unregister_frame_resource_binder(IFrameResourceBinder& binder) {
-        auto it = std::find(m_frame_resource_binders.begin(), m_frame_resource_binders.end(), &binder);
-        if (it == m_frame_resource_binders.end()) {
-            return;
-        }
-        m_frame_resource_binders.erase(it);
+    void invalidate_all_perframe_bindings() {
+        std::fill(m_perframe_bindings_dirty.begin(), m_perframe_bindings_dirty.end(), true);
     }
 
-    void draw_frame(RenderCallback callback) {
-        bind_resource();
+    void invalidate_perframe_binding(uint32_t frame_index) {
+        validate_perframe_binding_index(frame_index);
+        m_perframe_bindings_dirty[frame_index] = true;
+    }
+
+    void invalidate_all_bindings() {
+        invalidate_static_bindings();
+        invalidate_all_perframe_bindings();
+    }
+
+    void set_pipeline(std::unique_ptr<IRenderPipeline> pipeline) {
+        if (!pipeline) {
+            throw std::runtime_error("set_pipeline received null pipeline.");
+        }
+        if (m_active_pipeline) {
+            throw std::runtime_error("Renderer pipeline is immutable at runtime and cannot be replaced.");
+        }
+        m_active_pipeline = std::move(pipeline);
+        m_active_pipeline->on_swapchain_state_changed(m_frame_scheduler->swapchain_state());
+        invalidate_all_bindings();
+    }
+
+    IRenderPipeline* pipeline() { return m_active_pipeline.get(); }
+    const IRenderPipeline* pipeline() const { return m_active_pipeline.get(); }
+
+    void set_ui_callback(UiCallback cb) {
+        if (!cb) {
+            throw std::runtime_error("UI callback must be valid.");
+        }
+        m_ui_callback = std::move(cb);
+    }
+
+    void clear_ui_callback() {
+        m_ui_callback = UiCallback{};
+    }
+
+    bool imgui_wants_capture_mouse() const {
+        return m_imgui_layer && m_imgui_layer->wants_capture_mouse();
+    }
+
+    bool imgui_wants_capture_keyboard() const {
+        return m_imgui_layer && m_imgui_layer->wants_capture_keyboard();
+    }
+
+    void draw_frame() {
+        if (!m_active_pipeline) {
+            throw std::runtime_error("No active pipeline. Call set_pipeline(...) before draw_frame().");
+        }
+
         auto ticket_opt = m_frame_scheduler->begin_frame();
         if (!ticket_opt.has_value()) {
             return;
         }
         auto ticket = ticket_opt.value();
+        handle_swapchain_state_change(m_frame_scheduler->swapchain_state());
+
+        if (m_static_bindings_dirty) {
+            m_resource_registries.clear_global();
+            m_active_pipeline->bind_static_resources(m_resource_registries);
+            m_static_bindings_dirty = false;
+        }
+
+        validate_perframe_binding_index(ticket.frame_index);
+        if (m_perframe_bindings_dirty[ticket.frame_index]) {
+            m_resource_registries.clear_frame(ticket.frame_index);
+            m_active_pipeline->bind_frame_resources(ticket.frame_index, m_resource_registries);
+            m_perframe_bindings_dirty[ticket.frame_index] = false;
+        }
+
+        m_imgui_layer->begin_frame();
+        m_imgui_layer->build_dockspace();
+        if (m_ui_callback) {
+            m_ui_callback();
+        }
+        ImDrawData* imgui_draw_data = m_imgui_layer->prepare_draw_data();
+
         FrameContext frame_ctx = build_frame_context(ticket);
         ticket.command_buffer->reset();
-        callback(frame_ctx);
-
+        ticket.command_buffer->record([&](rhi::CommandBuffer& cb) {
+            m_active_pipeline->render(frame_ctx);
+            record_imgui_overlay(frame_ctx, cb.command_buffer(), imgui_draw_data);
+            transition_swapchain_to_present(cb.command_buffer(), frame_ctx.swapchain_image());
+        }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
         m_frame_scheduler->submit_and_present(ticket);
     }
 
     void on_window_resized(uint32_t width, uint32_t height) {
         m_frame_scheduler->on_window_resized(width, height);
+        if (m_active_pipeline) {
+            m_active_pipeline->on_resize(width, height);
+        }
+        invalidate_all_bindings();
     }
 
     const rhi::Device& device() const { return *m_device.get(); }
@@ -333,6 +224,84 @@ public:
     const DescriptorSetRegistry& descriptor_registry() const { return m_resource_registries.registry<vk::raii::DescriptorSet>(); }
 
 private:
+
+    void handle_swapchain_state_change(const FrameScheduler::SwapchainState& state) {
+        if (state.generation == m_last_swapchain_generation) {
+            return;
+        }
+
+        m_imgui_layer->on_swapchain_recreated(state.image_count, state.color_format, state.depth_format);
+        if (m_active_pipeline) {
+            m_active_pipeline->on_swapchain_state_changed(state);
+        }
+        invalidate_all_perframe_bindings();
+        m_last_swapchain_generation = state.generation;
+    }
+
+    void record_imgui_overlay(
+        const FrameContext& ctx,
+        const vk::raii::CommandBuffer& command_buffer,
+        ImDrawData* draw_data
+    ) {
+        if (draw_data == nullptr) {
+            return;
+        }
+
+        vk::RenderingAttachmentInfo color_attachment_info{};
+        color_attachment_info.imageView = *ctx.swapchain_image_view();
+        color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        color_attachment_info.loadOp = vk::AttachmentLoadOp::eLoad;
+        color_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
+
+        vk::RenderingAttachmentInfo depth_attachment_info{};
+        depth_attachment_info.imageView = *ctx.depth_image().image_view();
+        depth_attachment_info.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+        depth_attachment_info.loadOp = vk::AttachmentLoadOp::eLoad;
+        depth_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
+
+        vk::RenderingInfo rendering_info{};
+        rendering_info.renderArea.offset = vk::Offset2D{0, 0};
+        rendering_info.renderArea.extent = ctx.render_extent();
+        rendering_info.layerCount = 1;
+        rendering_info.colorAttachmentCount = 1;
+        rendering_info.pColorAttachments = &color_attachment_info;
+        rendering_info.pDepthAttachment = &depth_attachment_info;
+
+        command_buffer.beginRendering(rendering_info);
+        m_imgui_layer->render_draw_data(command_buffer, draw_data);
+        command_buffer.endRendering();
+    }
+
+    void transition_swapchain_to_present(const vk::raii::CommandBuffer& command_buffer, const vk::Image& swapchain_image) {
+        vk::ImageMemoryBarrier2 to_present{};
+        to_present.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+        to_present.dstStageMask = vk::PipelineStageFlagBits2::eBottomOfPipe;
+        to_present.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+        to_present.dstAccessMask = vk::AccessFlagBits2::eNone;
+        to_present.oldLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        to_present.newLayout = vk::ImageLayout::ePresentSrcKHR;
+        to_present.image = swapchain_image;
+        to_present.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+        to_present.subresourceRange.baseMipLevel = 0;
+        to_present.subresourceRange.levelCount = 1;
+        to_present.subresourceRange.baseArrayLayer = 0;
+        to_present.subresourceRange.layerCount = 1;
+
+        vk::DependencyInfo to_present_dep{};
+        to_present_dep.imageMemoryBarrierCount = 1;
+        to_present_dep.pImageMemoryBarriers = &to_present;
+        command_buffer.pipelineBarrier2(to_present_dep);
+    }
+
+    void validate_perframe_binding_index(uint32_t frame_index) const {
+        if (frame_index >= m_perframe_bindings_dirty.size()) {
+            throw std::runtime_error(
+                "Invalid per-frame dirty index: " + std::to_string(frame_index) +
+                " (frames in flight: " + std::to_string(m_perframe_bindings_dirty.size()) + ")."
+            );
+        }
+    }
+
     FrameContext build_frame_context(const FrameScheduler::FrameTicket& ticket) {
         return FrameContext(
             m_device.get(),
@@ -340,7 +309,7 @@ private:
             &m_resource_registries,
             m_frame_scheduler->swapchain().image_views()[ticket.image_index],
             m_frame_scheduler->swapchain().images()[ticket.image_index],
-            m_frame_scheduler->per_frame_resources()[ticket.frame_index].depth_image,
+            m_frame_scheduler->render_extent(),
             ticket.frame_index
         );
     }

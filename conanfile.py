@@ -31,7 +31,7 @@ class RTRDeps(ConanFile):
     def requirements(self):
         self.requires("glfw/3.4")
         self.requires("assimp/5.4.3")
-        self.requires("imgui/1.92.2b")
+        self.requires("imgui/1.92.2b-docking")
         self.requires("stb/cci.20230920")
         self.requires("vulkan-loader/[>=1.3]")
         self.requires("glm/cci.20230113")

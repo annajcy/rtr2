@@ -10,7 +10,6 @@
 #include "rhi/command.hpp"
 #include "rhi/device.hpp"
 #include "rhi/swap_chain.hpp"
-#include "rhi/texture.hpp"
 
 namespace rtr::render {
 
@@ -24,7 +23,6 @@ class FrameScheduler {
 public:
     struct PerFrameResources {
         rhi::CommandBuffer command_buffer;
-        rhi::Image depth_image;
 
         vk::raii::Semaphore image_available_semaphore{nullptr};
         vk::raii::Fence in_flight_fence{nullptr};
@@ -40,6 +38,14 @@ public:
         rhi::CommandBuffer* command_buffer{nullptr};
     };
 
+    struct SwapchainState {
+        uint64_t generation{0};
+        vk::Extent2D extent{};
+        uint32_t image_count{0};
+        vk::Format color_format{vk::Format::eUndefined};
+        vk::Format depth_format{vk::Format::eUndefined};
+    };
+
 private:
     rhi::Window* m_window{};
     rhi::Context* m_context{};
@@ -52,6 +58,7 @@ private:
     uint32_t m_current_frame_index{0};
     uint32_t m_current_image_index{0};
     bool m_framebuffer_resized{false};
+    uint64_t m_swapchain_generation{1};
 
     std::vector<PerImageResources> m_per_image_resources;
     std::vector<PerFrameResources> m_per_frame_resources;
@@ -103,9 +110,7 @@ public:
         );
         if (result == vk::Result::eErrorOutOfDateKHR) {
             m_device->device().waitIdle();
-            init_swapchain();
-            init_per_image_resource();
-            init_per_frame_resources();
+            recreate_swapchain_resources();
             return std::nullopt;
         }
         if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
@@ -150,9 +155,7 @@ public:
         if (needs_recreation || m_framebuffer_resized) {
             m_framebuffer_resized = false;
             m_device->device().waitIdle();
-            init_swapchain();
-            init_per_image_resource();
-            init_per_frame_resources();
+            recreate_swapchain_resources();
         }
 
         m_current_frame_index = (m_current_frame_index + 1) % m_max_frames_in_flight;
@@ -170,12 +173,29 @@ public:
     uint32_t current_frame_index() const { return m_current_frame_index; }
     uint32_t current_image_index() const { return m_current_image_index; }
     const vk::Format& depth_format() const { return m_depth_format; }
+    SwapchainState swapchain_state() const {
+        return SwapchainState{
+            .generation = m_swapchain_generation,
+            .extent = m_swapchain->extent(),
+            .image_count = static_cast<uint32_t>(m_swapchain->images().size()),
+            .color_format = m_swapchain->image_format(),
+            .depth_format = m_depth_format
+        };
+    }
 
     const std::vector<PerImageResources>& per_image_resources() const { return m_per_image_resources; }
+    std::vector<PerImageResources>& per_image_resources() { return m_per_image_resources; }
     const std::vector<PerFrameResources>& per_frame_resources() const { return m_per_frame_resources; }
     const rhi::SwapChain& swapchain() const { return *m_swapchain; }
 
 private:
+    void recreate_swapchain_resources() {
+        init_swapchain();
+        init_per_image_resource();
+        init_per_frame_resources();
+        ++m_swapchain_generation;
+    }
+
     void init_swapchain() {
         m_swapchain.reset();
         m_swapchain = std::make_unique<rhi::SwapChain>(m_window, m_context, m_device);
@@ -206,12 +226,6 @@ private:
         for (uint32_t i = 0; i < m_max_frames_in_flight; ++i) {
             PerFrameResources resources{
                 .command_buffer = std::move(command_buffers[i]),
-                .depth_image = rhi::Image::create_depth_image(
-                    m_device,
-                    m_swapchain->extent().width,
-                    m_swapchain->extent().height,
-                    m_depth_format
-                ),
                 .image_available_semaphore = vk::raii::Semaphore(
                     m_device->device(),
                     semaphore_info

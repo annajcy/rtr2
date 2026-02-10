@@ -11,6 +11,7 @@
 #include <glm/glm.hpp>
 
 #include "rhi/buffer.hpp"
+#include "rhi/command.hpp"
 #include "rhi/device.hpp"
 #include "utils/obj_loader.hpp"
 #include "vulkan/vulkan_enums.hpp"

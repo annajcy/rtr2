@@ -36,6 +36,17 @@ endif()
 
 set(IMGUI_INC_DIR      "${_IMGUI_PKG_ROOT}/include")
 set(IMGUI_BACKENDS_DIR "${_IMGUI_PKG_ROOT}/res/bindings")  
+set(IMGUI_HEADER_PATH  "${IMGUI_INC_DIR}/imgui.h")
+
+if (NOT EXISTS "${IMGUI_HEADER_PATH}")
+  message(FATAL_ERROR "ImGui header not found at ${IMGUI_HEADER_PATH}")
+endif()
+
+file(READ "${IMGUI_HEADER_PATH}" _IMGUI_HEADER_CONTENT)
+string(FIND "${_IMGUI_HEADER_CONTENT}" "ImGuiConfigFlags_DockingEnable" _IMGUI_DOCKING_SYMBOL_POS)
+if (_IMGUI_DOCKING_SYMBOL_POS EQUAL -1)
+  message(FATAL_ERROR "ImGui package does not expose docking symbols. Require imgui/*-docking package.")
+endif()
 
 message(STATUS "ImGui include dir  : ${IMGUI_INC_DIR}")
 message(STATUS "ImGui backends dir : ${IMGUI_BACKENDS_DIR}")

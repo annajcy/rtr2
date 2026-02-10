@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -7,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "render/renderer.hpp"
+#include "render/frame_context.hpp"
 
 namespace rtr::render {
 
@@ -21,8 +22,6 @@ struct ResourceDependency {
     std::string resource_name;
     ResourceAccess access{ResourceAccess::eRead};
 };
-
-class RenderGraph;
 
 class IPassResources {
 public:
