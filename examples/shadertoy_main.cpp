@@ -3,43 +3,45 @@
 #include <memory>
 
 #include "imgui.h"
+
 #include "input/input_system.hpp"
 #include "input/input_types.hpp"
-#include "render/forward_pipeline.hpp"
 #include "render/renderer.hpp"
+#include "render/shadertoy_pipeline.hpp"
 
 int main() {
-    try {
-        constexpr uint32_t kWidth = 800;
-        constexpr uint32_t kHeight = 600;
-        constexpr uint32_t kMaxFramesInFlight = 2;
+    constexpr uint32_t kWidth = 800;
+    constexpr uint32_t kHeight = 600;
+    constexpr uint32_t kMaxFramesInFlight = 2;
 
+    try {
         auto renderer = std::make_unique<rtr::render::Renderer>(
             static_cast<int>(kWidth),
             static_cast<int>(kHeight),
-            "RTR Application",
+            "RTR ShaderToy",
             kMaxFramesInFlight
         );
 
-        auto pipeline = std::make_unique<rtr::render::ForwardPipeline>(
+        auto pipeline = std::make_unique<rtr::render::ShaderToyPipeline>(
             renderer->build_pipeline_runtime(),
-            rtr::render::ForwardPipelineConfig{}
+            rtr::render::ShaderToyPipelineConfig{}
         );
-        auto* forward_pipeline = pipeline.get();
+        auto* shadertoy_pipeline = pipeline.get();
 
-        forward_pipeline->imgui_pass().set_ui_callback([]() {
-            ImGui::Begin("RTR2");
-            ImGui::Text("ImGui overlay active");
+        shadertoy_pipeline->imgui_pass().set_ui_callback([]() {
+            ImGui::Begin("ShaderToyPipeline");
+            ImGui::Text("Compute -> Present pipeline active");
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+            ImGui::Text("Press Q to quit");
             ImGui::End();
         });
 
         auto input_system = std::make_unique<rtr::input::InputSystem>(&renderer->window());
-        input_system->set_is_intercept_capture([forward_pipeline](bool is_mouse) {
+        input_system->set_is_intercept_capture([shadertoy_pipeline](bool is_mouse) {
             if (is_mouse) {
-                return forward_pipeline->imgui_pass().wants_capture_mouse();
+                return shadertoy_pipeline->imgui_pass().wants_capture_mouse();
             }
-            return forward_pipeline->imgui_pass().wants_capture_keyboard();
+            return shadertoy_pipeline->imgui_pass().wants_capture_keyboard();
         });
 
         renderer->set_pipeline(std::move(pipeline));

@@ -280,6 +280,28 @@ public:
         return *this;
     }
 
+    DescriptorWriter& write_storage_image(
+        uint32_t binding,
+        vk::ImageView image_view,
+        vk::ImageLayout layout,
+        uint32_t array_element = 0
+    ) {
+        vk::DescriptorImageInfo image_info{};
+        image_info.imageView = image_view;
+        image_info.imageLayout = layout;
+        m_image_infos.push_back(image_info);
+
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding;
+        write.dstArrayElement = array_element;
+        write.descriptorType = vk::DescriptorType::eStorageImage;
+        write.descriptorCount = 1;
+        write.pImageInfo = &m_image_infos.back();
+        m_writes.push_back(write);
+
+        return *this;
+    }
+
     DescriptorWriter& write_sampler(
         uint32_t binding,
         vk::Sampler sampler,
@@ -381,6 +403,32 @@ public:
         write.dstBinding = binding;
         write.dstArrayElement = first_array_element;
         write.descriptorType = vk::DescriptorType::eSampledImage;
+        write.descriptorCount = static_cast<uint32_t>(image_views.size());
+        write.pImageInfo = &m_image_infos[start_index];
+        m_writes.push_back(write);
+
+        return *this;
+    }
+
+    DescriptorWriter& write_storage_image_array(
+        uint32_t binding,
+        const std::vector<vk::ImageView>& image_views,
+        vk::ImageLayout layout,
+        uint32_t first_array_element = 0
+    ) {
+        size_t start_index = m_image_infos.size();
+
+        for (const auto& image_view : image_views) {
+            vk::DescriptorImageInfo image_info{};
+            image_info.imageView = image_view;
+            image_info.imageLayout = layout;
+            m_image_infos.push_back(image_info);
+        }
+
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding;
+        write.dstArrayElement = first_array_element;
+        write.descriptorType = vk::DescriptorType::eStorageImage;
         write.descriptorCount = static_cast<uint32_t>(image_views.size());
         write.pImageInfo = &m_image_infos[start_index];
         m_writes.push_back(write);

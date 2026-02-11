@@ -23,6 +23,8 @@ namespace detail {
     struct FeatureChecker<vk::PhysicalDeviceFeatures> {
         static bool check(const vk::PhysicalDeviceFeatures& required, const vk::PhysicalDeviceFeatures& supported) {
             if (required.samplerAnisotropy && !supported.samplerAnisotropy) return false;
+            if (required.shaderStorageImageReadWithoutFormat && !supported.shaderStorageImageReadWithoutFormat) return false;
+            if (required.shaderStorageImageWriteWithoutFormat && !supported.shaderStorageImageWriteWithoutFormat) return false;
             return true;
         }
     };
@@ -248,6 +250,8 @@ private:
     std::function<DeviceFeatureChainType()> m_device_feature_chain_generator = []() {
         vk::PhysicalDeviceFeatures2 physical_device_features2{};
         physical_device_features2.features.samplerAnisotropy = true;
+        physical_device_features2.features.shaderStorageImageReadWithoutFormat = true;
+        physical_device_features2.features.shaderStorageImageWriteWithoutFormat = true;
 
         vk::PhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features{};
         dynamic_rendering_features.dynamicRendering = true;
@@ -285,6 +289,8 @@ private:
 
         vk::PhysicalDeviceFeatures2 physical_device_features2{};
         physical_device_features2.features.samplerAnisotropy = true;
+        physical_device_features2.features.shaderStorageImageReadWithoutFormat = true;
+        physical_device_features2.features.shaderStorageImageWriteWithoutFormat = true;
 
         vk::PhysicalDeviceVulkan13Features vulkan13_features{};
         vulkan13_features.dynamicRendering = true;

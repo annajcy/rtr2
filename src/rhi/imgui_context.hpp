@@ -12,45 +12,50 @@
 #include "rhi/device.hpp"
 #include "rhi/window.hpp"
 
-namespace rtr::render {
+namespace rtr::rhi {
 
-class ImGuiLayer {
+class ImGuiContext {
 private:
-    rhi::Device* m_device{};
-    rhi::Context* m_context{};
-    rhi::Window* m_window{};
+    Device* m_device{};
+    Context* m_context{};
+    Window* m_window{};
+
     uint32_t m_image_count{};
     vk::Format m_color_format{vk::Format::eUndefined};
     vk::Format m_depth_format{vk::Format::eUndefined};
     vk::raii::DescriptorPool m_descriptor_pool{nullptr};
-    bool m_docking_enabled{true};
-    ImGuiDockNodeFlags m_dockspace_flags{ImGuiDockNodeFlags_PassthruCentralNode};
+
     bool m_context_initialized{false};
     bool m_glfw_backend_initialized{false};
     bool m_vulkan_backend_initialized{false};
     bool m_initialized{false};
 
 public:
-    explicit ImGuiLayer(rhi::Device* device, rhi::Context* context, rhi::Window* window,
-        uint32_t image_count, vk::Format color_format, vk::Format depth_format) {
-        m_device = device;
-        m_context = context;
-        m_window = window;
-        m_image_count = image_count;
-        m_color_format = color_format;
-        m_depth_format = depth_format;
-
+    ImGuiContext(
+        Device* device,
+        Context* context,
+        Window* window,
+        uint32_t image_count,
+        vk::Format color_format,
+        vk::Format depth_format
+    )
+        : m_device(device),
+          m_context(context),
+          m_window(window),
+          m_image_count(image_count),
+          m_color_format(color_format),
+          m_depth_format(depth_format) {
         if (!m_device || !m_context || !m_window) {
-            throw std::runtime_error("ImGuiLayer requires valid runtime context.");
+            throw std::runtime_error("ImGuiContext requires valid runtime context.");
         }
-
-        if (!m_image_count) {
-            throw std::runtime_error("ImGuiLayer requires valid image_count provider.");
+        if (m_image_count < 2) {
+            throw std::runtime_error("ImGuiContext requires image_count >= 2.");
         }
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         m_context_initialized = true;
+
         ImGuiIO& io = ImGui::GetIO();
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
@@ -68,7 +73,7 @@ public:
         m_initialized = true;
     }
 
-    ~ImGuiLayer() {
+    ~ImGuiContext() {
         if (!m_initialized) {
             return;
         }
@@ -90,6 +95,9 @@ public:
         m_initialized = false;
     }
 
+    ImGuiContext(const ImGuiContext&) = delete;
+    ImGuiContext& operator=(const ImGuiContext&) = delete;
+
     void begin_frame() {
         if (!m_initialized) {
             return;
@@ -108,19 +116,6 @@ public:
         return ImGui::GetDrawData();
     }
 
-    void build_dockspace() {
-        if (!m_initialized || !m_docking_enabled) {
-            return;
-        }
-
-        ImGuiIO& io = ImGui::GetIO();
-        if ((io.ConfigFlags & ImGuiConfigFlags_DockingEnable) == 0) {
-            return;
-        }
-
-        ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), m_dockspace_flags);
-    }
-
     void render_draw_data(const vk::raii::CommandBuffer& command_buffer, ImDrawData* draw_data) {
         if (!m_initialized || draw_data == nullptr) {
             return;
@@ -133,7 +128,7 @@ public:
             return;
         }
         if (image_count < 2) {
-            throw std::runtime_error("ImGuiLayer requires image_count >= 2.");
+            throw std::runtime_error("ImGuiContext requires image_count >= 2.");
         }
 
         const bool image_count_changed = m_image_count != image_count;
@@ -189,6 +184,7 @@ private:
         init_info.ImageCount = m_image_count;
         init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
         init_info.UseDynamicRendering = true;
+
         vk::PipelineRenderingCreateInfo pipeline_rendering{};
         pipeline_rendering.colorAttachmentCount = 1;
         pipeline_rendering.pColorAttachmentFormats = &m_color_format;
@@ -240,4 +236,4 @@ private:
     }
 };
 
-} // namespace rtr::render
+} // namespace rtr::rhi

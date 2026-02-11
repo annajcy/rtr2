@@ -3,3 +3,6 @@ target_link_libraries(main PRIVATE rtr)
 
 add_executable(third_party third_party.cpp)
 target_link_libraries(third_party PRIVATE rtr)
+
+add_executable(shadertoy_main shadertoy_main.cpp)
+target_link_libraries(shadertoy_main PRIVATE rtr)
