@@ -19,6 +19,7 @@ private:
     GameObjectId m_id{core::kInvalidGameObjectId};
     std::string m_name{"GameObject"};
     bool m_enabled{true};
+    bool m_components_destroyed{false};
     std::vector<std::unique_ptr<component::Component>> m_components{};
 
 public:
@@ -29,10 +30,10 @@ public:
         : m_id(id), m_name(std::move(name)) {}
 
     ~GameObject() {
-        for (const auto& component : m_components) {
-            if (component) {
-                component->on_destroy();
-            }
+        try {
+            destroy_components();
+        } catch (...) {
+            // Destructor must not throw.
         }
     }
 
@@ -63,6 +64,20 @@ public:
 
     std::size_t component_count() const {
         return m_components.size();
+    }
+
+    void destroy_components() {
+        if (m_components_destroyed) {
+            return;
+        }
+        for (auto& component : m_components) {
+            if (component) {
+                component->on_destroy();
+                component.reset();
+            }
+        }
+        m_components.clear();
+        m_components_destroyed = true;
     }
 
     template <typename TComponent, typename... TArgs>

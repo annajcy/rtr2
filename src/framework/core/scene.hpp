@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -7,6 +8,7 @@
 #include <vector>
 
 #include "framework/core/game_object.hpp"
+#include "framework/core/scene_graph.hpp"
 #include "framework/core/tick_context.hpp"
 #include "framework/core/types.hpp"
 
@@ -20,6 +22,16 @@ private:
 
     GameObjectId m_next_game_object_id{1};
     std::vector<std::unique_ptr<GameObject>> m_game_objects{};
+    SceneGraph m_scene_graph{};
+
+    void sync_scene_graph_enabled_state() {
+        for (const auto& game_object : m_game_objects) {
+            if (!game_object) {
+                continue;
+            }
+            m_scene_graph.set_self_enabled(game_object->id(), game_object->enabled());
+        }
+    }
 
 public:
     explicit Scene(
@@ -56,6 +68,7 @@ public:
     GameObject& create_game_object(std::string name = "GameObject") {
         auto game_object = std::make_unique<GameObject>(m_next_game_object_id++, std::move(name));
         GameObject* ptr = game_object.get();
+        m_scene_graph.register_node(ptr->id());
         m_game_objects.emplace_back(std::move(game_object));
         return *ptr;
     }
@@ -83,13 +96,37 @@ public:
     }
 
     bool destroy_game_object(GameObjectId id) {
-        for (auto it = m_game_objects.begin(); it != m_game_objects.end(); ++it) {
-            if (*it && (*it)->id() == id) {
-                m_game_objects.erase(it);
-                return true;
+        if (!m_scene_graph.has_node(id)) {
+            return false;
+        }
+        const auto subtree_ids = m_scene_graph.collect_subtree_postorder(id);
+        if (subtree_ids.empty()) {
+            return false;
+        }
+
+        // First run destroy lifecycle hooks in subtree postorder. Any exception
+        // is propagated to caller without rollback.
+        for (const auto victim_id : subtree_ids) {
+            GameObject* game_object = find_game_object(victim_id);
+            if (game_object != nullptr) {
+                game_object->destroy_components();
             }
         }
-        return false;
+
+        for (const auto victim_id : subtree_ids) {
+            const auto it = std::find_if(
+                m_game_objects.begin(),
+                m_game_objects.end(),
+                [victim_id](const std::unique_ptr<GameObject>& game_object) {
+                    return game_object && game_object->id() == victim_id;
+                }
+            );
+            if (it != m_game_objects.end()) {
+                m_game_objects.erase(it); // May throw; propagate by design.
+            }
+        }
+
+        return m_scene_graph.unregister_subtree(id);
     }
 
     std::size_t game_object_count() const {
@@ -98,6 +135,14 @@ public:
 
     const std::vector<std::unique_ptr<GameObject>>& game_objects() const {
         return m_game_objects;
+    }
+
+    SceneGraph& scene_graph() {
+        return m_scene_graph;
+    }
+
+    const SceneGraph& scene_graph() const {
+        return m_scene_graph;
     }
 
     void fixed_tick(const FixedTickContext& ctx) {
@@ -115,6 +160,9 @@ public:
         if (!m_enabled) {
             return;
         }
+        sync_scene_graph_enabled_state();
+        m_scene_graph.rebuild_active_set(m_enabled);
+        m_scene_graph.update_world_transforms();
         for (const auto& game_object : m_game_objects) {
             if (game_object) {
                 game_object->tick(ctx);
