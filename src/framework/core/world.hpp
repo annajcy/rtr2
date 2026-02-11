@@ -13,32 +13,17 @@ namespace rtr::framework::core {
 
 class World {
 private:
-    WorldId m_id{core::kInvalidWorldId};
-    bool m_enabled{true};
     SceneId m_next_scene_id{1};
     SceneId m_active_scene_id{core::kInvalidSceneId};
     std::vector<std::unique_ptr<Scene>> m_scenes{};
 
 public:
-    explicit World(WorldId id = core::kInvalidWorldId)
-        : m_id(id) {}
+    World() = default;
 
     World(const World&) = delete;
     World& operator=(const World&) = delete;
     World(World&&) noexcept = default;
     World& operator=(World&&) noexcept = default;
-
-    WorldId id() const {
-        return m_id;
-    }
-
-    bool enabled() const {
-        return m_enabled;
-    }
-
-    void set_enabled(bool enabled) {
-        m_enabled = enabled;
-    }
 
     Scene& create_scene(std::string name = "Scene") {
         auto scene = std::make_unique<Scene>(m_next_scene_id++, std::move(name));
@@ -89,9 +74,6 @@ public:
     }
 
     void fixed_tick(const FixedTickContext& ctx) {
-        if (!m_enabled) {
-            return;
-        }
         Scene* scene = active_scene();
         if (scene != nullptr) {
             scene->fixed_tick(ctx);
@@ -99,9 +81,6 @@ public:
     }
 
     void tick(const FrameTickContext& ctx) {
-        if (!m_enabled) {
-            return;
-        }
         Scene* scene = active_scene();
         if (scene != nullptr) {
             scene->tick(ctx);
@@ -109,9 +88,6 @@ public:
     }
 
     void late_tick(const FrameTickContext& ctx) {
-        if (!m_enabled) {
-            return;
-        }
         Scene* scene = active_scene();
         if (scene != nullptr) {
             scene->late_tick(ctx);

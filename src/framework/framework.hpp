@@ -2,7 +2,6 @@
 
 #include "framework/component/component.hpp"
 #include "framework/core/engine.hpp"
-#include "framework/core/engine_config.hpp"
 #include "framework/core/game_object.hpp"
 #include "framework/core/scene.hpp"
 #include "framework/core/tick_context.hpp"
