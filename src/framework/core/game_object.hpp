@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -59,9 +61,16 @@ public:
         m_enabled = enabled;
     }
 
+    std::size_t component_count() const {
+        return m_components.size();
+    }
+
     template <typename TComponent, typename... TArgs>
     TComponent& add_component(TArgs&&... args) {
         static_assert(std::is_base_of_v<component::Component, TComponent>);
+        if (has_component<TComponent>()) {
+            throw std::runtime_error("GameObject already has this component type.");
+        }
         auto component = std::make_unique<TComponent>(std::forward<TArgs>(args)...);
         component->bind_owner(this);
         component->on_awake();
@@ -90,6 +99,11 @@ public:
             }
         }
         return nullptr;
+    }
+
+    template <typename TComponent>
+    bool has_component() const {
+        return get_component<TComponent>() != nullptr;
     }
 
     void fixed_tick(const FixedTickContext& ctx) {

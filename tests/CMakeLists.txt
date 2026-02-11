@@ -21,3 +21,10 @@ add_executable(framework_engine_test
 target_include_directories(framework_engine_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(framework_engine_test PRIVATE gtest::gtest)
 gtest_discover_tests(framework_engine_test)
+
+add_executable(framework_world_scene_test
+    framework_world_scene_test.cpp
+)
+target_include_directories(framework_world_scene_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(framework_world_scene_test PRIVATE gtest::gtest)
+gtest_discover_tests(framework_world_scene_test)

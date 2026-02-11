@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
@@ -66,6 +67,33 @@ public:
             }
         }
         return nullptr;
+    }
+
+    const GameObject* find_game_object(GameObjectId id) const {
+        for (const auto& game_object : m_game_objects) {
+            if (game_object && game_object->id() == id) {
+                return game_object.get();
+            }
+        }
+        return nullptr;
+    }
+
+    bool has_game_object(GameObjectId id) const {
+        return find_game_object(id) != nullptr;
+    }
+
+    bool destroy_game_object(GameObjectId id) {
+        for (auto it = m_game_objects.begin(); it != m_game_objects.end(); ++it) {
+            if (*it && (*it)->id() == id) {
+                m_game_objects.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::size_t game_object_count() const {
+        return m_game_objects.size();
     }
 
     const std::vector<std::unique_ptr<GameObject>>& game_objects() const {

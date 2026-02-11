@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
@@ -44,12 +45,38 @@ public:
         return nullptr;
     }
 
+    const Scene* find_scene(SceneId id) const {
+        for (const auto& scene : m_scenes) {
+            if (scene && scene->id() == id) {
+                return scene.get();
+            }
+        }
+        return nullptr;
+    }
+
+    bool has_scene(SceneId id) const {
+        return find_scene(id) != nullptr;
+    }
+
     bool set_active_scene(SceneId id) {
         if (find_scene(id) == nullptr) {
             return false;
         }
         m_active_scene_id = id;
         return true;
+    }
+
+    bool destroy_scene(SceneId id) {
+        for (auto it = m_scenes.begin(); it != m_scenes.end(); ++it) {
+            if (*it && (*it)->id() == id) {
+                m_scenes.erase(it);
+                if (m_active_scene_id == id) {
+                    m_active_scene_id = m_scenes.empty() ? core::kInvalidSceneId : m_scenes.front()->id();
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     SceneId active_scene_id() const {
@@ -61,16 +88,15 @@ public:
     }
 
     const Scene* active_scene() const {
-        for (const auto& scene : m_scenes) {
-            if (scene && scene->id() == m_active_scene_id) {
-                return scene.get();
-            }
-        }
-        return nullptr;
+        return find_scene(m_active_scene_id);
     }
 
     const std::vector<std::unique_ptr<Scene>>& scenes() const {
         return m_scenes;
+    }
+
+    std::size_t scene_count() const {
+        return m_scenes.size();
     }
 
     void fixed_tick(const FixedTickContext& ctx) {
