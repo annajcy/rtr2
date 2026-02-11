@@ -3,11 +3,11 @@
 #include <functional>
 #include <utility>
 
-#include "input/input_state.hpp"
+#include "system/input/input_state.hpp"
 #include "rhi/window.hpp"
 #include "utils/event_center.hpp"
 
-namespace rtr::input {
+namespace rtr::system::input {
 
 class InputSystem {
 public:
@@ -199,4 +199,4 @@ private:
     }
 };
 
-} // namespace rtr::input
+} // namespace rtr::system::input

@@ -7,7 +7,7 @@
 #endif
 #include "GLFW/glfw3.h"
 
-namespace rtr::input {
+namespace rtr::system::input {
 
 enum class KeyCode : int {
     UNKNOWN = GLFW_KEY_UNKNOWN,
@@ -355,4 +355,4 @@ constexpr KeyMod from_glfw_mods(int mods) {
     return static_cast<KeyMod>(static_cast<uint32_t>(mods) & key_mod_mask());
 }
 
-} // namespace rtr::input
+} // namespace rtr::system::input

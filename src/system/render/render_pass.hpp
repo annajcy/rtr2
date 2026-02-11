@@ -4,11 +4,11 @@
 #include <string_view>
 #include <vector>
 
-#include "render/frame_context.hpp"
+#include "system/render/frame_context.hpp"
 #include "rhi/imgui_context.hpp"
 #include "rhi/texture.hpp"
 
-namespace rtr::render {
+namespace rtr::system::render {
 
 enum class ResourceAccess {
     eRead,
@@ -144,4 +144,4 @@ public:
 
 
 
-} // namespace rtr::render
+} // namespace rtr::system::render

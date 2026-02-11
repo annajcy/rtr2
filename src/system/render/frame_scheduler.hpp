@@ -11,7 +11,7 @@
 #include "rhi/device.hpp"
 #include "rhi/swap_chain.hpp"
 
-namespace rtr::render {
+namespace rtr::system::render {
 
 /**
  * @brief Vulkan frame orchestration utility.
@@ -256,4 +256,4 @@ private:
     }
 };
 
-} // namespace rtr::render
+} // namespace rtr::system::render

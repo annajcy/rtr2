@@ -3,9 +3,9 @@
 #include <cstddef>
 #include <unordered_map>
 
-#include "input/input_types.hpp"
+#include "system/input/input_types.hpp"
 
-namespace rtr::input {
+namespace rtr::system::input {
 
 struct EnumClassHash {
     template <typename T>
@@ -111,4 +111,4 @@ public:
     }
 };
 
-} // namespace rtr::input
+} // namespace rtr::system::input

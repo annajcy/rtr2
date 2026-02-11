@@ -5,7 +5,7 @@
 #include "rhi/command.hpp"
 #include "rhi/device.hpp"
 
-namespace rtr::render {
+namespace rtr::system::render {
 
 class FrameContext {
 private:
@@ -43,4 +43,4 @@ public:
     rhi::Device& device() { return *m_device; }
 };
 
-} // namespace rtr::render
+} // namespace rtr::system::render

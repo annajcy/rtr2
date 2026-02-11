@@ -11,11 +11,11 @@
 #include "rhi/context.hpp"
 #include "rhi/device.hpp"
 #include "rhi/window.hpp"
-#include "render/frame_context.hpp"
-#include "render/frame_scheduler.hpp"
-#include "render/pipeline.hpp"
+#include "system/render/frame_context.hpp"
+#include "system/render/frame_scheduler.hpp"
+#include "system/render/pipeline.hpp"
 
-namespace rtr::render {
+namespace rtr::system::render {
 
 class Renderer {
 public:
@@ -306,4 +306,4 @@ private:
     }
 };
 
-} // namespace rtr::render
+} // namespace rtr::system::render

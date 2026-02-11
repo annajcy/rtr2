@@ -13,16 +13,16 @@
 #include "rhi/descriptor.hpp"
 #include "rhi/shader_module.hpp"
 #include "rhi/texture.hpp"
-#include "render/mesh.hpp"
-#include "render/pipeline.hpp"
-#include "render/render_pass.hpp"
+#include "system/render/mesh.hpp"
+#include "system/render/pipeline.hpp"
+#include "system/render/render_pass.hpp"
 #include "vulkan/vulkan.hpp"
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace rtr::render {
+namespace rtr::system::render {
 
 struct ForwardPipelineConfig {
     std::string shader_output_dir{"/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/"};
@@ -521,4 +521,4 @@ private:
     }
 };
 
-} // namespace rtr::render
+} // namespace rtr::system::render

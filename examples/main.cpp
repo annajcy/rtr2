@@ -3,10 +3,10 @@
 #include <memory>
 
 #include "imgui.h"
-#include "input/input_system.hpp"
-#include "input/input_types.hpp"
-#include "render/forward_pipeline.hpp"
-#include "render/renderer.hpp"
+#include "system/input/input_system.hpp"
+#include "system/input/input_types.hpp"
+#include "system/render/forward_pipeline.hpp"
+#include "system/render/renderer.hpp"
 
 int main() {
     try {
@@ -14,16 +14,16 @@ int main() {
         constexpr uint32_t kHeight = 600;
         constexpr uint32_t kMaxFramesInFlight = 2;
 
-        auto renderer = std::make_unique<rtr::render::Renderer>(
+        auto renderer = std::make_unique<rtr::system::render::Renderer>(
             static_cast<int>(kWidth),
             static_cast<int>(kHeight),
             "RTR Application",
             kMaxFramesInFlight
         );
 
-        auto pipeline = std::make_unique<rtr::render::ForwardPipeline>(
+        auto pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
             renderer->build_pipeline_runtime(),
-            rtr::render::ForwardPipelineConfig{}
+            rtr::system::render::ForwardPipelineConfig{}
         );
         auto* forward_pipeline = pipeline.get();
 
@@ -34,7 +34,7 @@ int main() {
             ImGui::End();
         });
 
-        auto input_system = std::make_unique<rtr::input::InputSystem>(&renderer->window());
+        auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
         input_system->set_is_intercept_capture([forward_pipeline](bool is_mouse) {
             if (is_mouse) {
                 return forward_pipeline->imgui_pass().wants_capture_mouse();
@@ -48,7 +48,7 @@ int main() {
             input_system->begin_frame();
             renderer->window().poll_events();
             renderer->draw_frame();
-            if (input_system->state().key_down(rtr::input::KeyCode::Q)) {
+            if (input_system->state().key_down(rtr::system::input::KeyCode::Q)) {
                 renderer->window().close();
             }
             input_system->end_frame();

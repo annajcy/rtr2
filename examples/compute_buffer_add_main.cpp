@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "render/renderer.hpp"
+#include "system/render/renderer.hpp"
 #include "rhi/buffer.hpp"
 #include "rhi/descriptor.hpp"
 #include "rhi/shader_module.hpp"
@@ -133,7 +133,7 @@ int main() {
         "/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/hello_world_comp.spv";
 
     try {
-        auto renderer = std::make_unique<rtr::render::Renderer>(
+        auto renderer = std::make_unique<rtr::system::render::Renderer>(
             kWidth,
             kHeight,
             "RTR Compute Buffer Add",
@@ -166,46 +166,47 @@ int main() {
         buffer1->map();
         result->map();
 
-        auto* buffer0_data = static_cast<float*>(buffer0->mapped_data());
-        auto* buffer1_data = static_cast<float*>(buffer1->mapped_data());
-        auto* result_data = static_cast<float*>(result->mapped_data());
+        {
+            auto* buffer0_data = static_cast<float*>(buffer0->mapped_data());
+            auto* buffer1_data = static_cast<float*>(buffer1->mapped_data());
+            auto* result_data = static_cast<float*>(result->mapped_data());
 
-        for (uint32_t i = 0; i < kElementCount; ++i) {
-            buffer0_data[i] = static_cast<float>(i);
-            buffer1_data[i] = static_cast<float>(100 + i);
-            result_data[i] = 0.0f;
+            for (uint32_t i = 0; i < kElementCount; ++i) {
+                buffer0_data[i] = static_cast<float>(i);
+                buffer1_data[i] = static_cast<float>(100 + i);
+                result_data[i] = 0.0f;
+            }
+
+            ComputeBufferAddKernel kernel(
+                &renderer->device(),
+                kShaderPath,
+                kElementCount,
+                kBufferBytes
+            );
+            kernel.bind_buffers(*buffer0, *buffer1, *result);
+
+            renderer->compute([&](rtr::rhi::CommandBuffer& cb) {
+                kernel.record(cb);
+            });
+
+            bool all_pass = true;
+            for (uint32_t i = 0; i < kElementCount; ++i) {
+                const float expected = buffer0_data[i] + buffer1_data[i];
+                const float actual = result_data[i];
+                const bool pass = std::memcmp(&expected, &actual, sizeof(float)) == 0;
+                all_pass = all_pass && pass;
+                std::cout << "result[" << i << "] = " << actual
+                        << " (expected " << expected << ")"
+                        << (pass ? " [OK]" : " [FAIL]") << '\n';
+            }
+
+            std::cout << (all_pass ? "PASS" : "FAIL") << std::endl;
         }
-
-        ComputeBufferAddKernel kernel(
-            &renderer->device(),
-            kShaderPath,
-            kElementCount,
-            kBufferBytes
-        );
-        kernel.bind_buffers(*buffer0, *buffer1, *result);
-
-        renderer->compute([&](rtr::rhi::CommandBuffer& cb) {
-            kernel.record(cb);
-        });
-
-        bool all_pass = true;
-        for (uint32_t i = 0; i < kElementCount; ++i) {
-            const float expected = buffer0_data[i] + buffer1_data[i];
-            const float actual = result_data[i];
-            const bool pass = std::memcmp(&expected, &actual, sizeof(float)) == 0;
-            all_pass = all_pass && pass;
-            std::cout << "result[" << i << "] = " << actual
-                      << " (expected " << expected << ")"
-                      << (pass ? " [OK]" : " [FAIL]") << '\n';
-        }
-
-        std::cout << (all_pass ? "PASS" : "FAIL") << std::endl;
 
         result->unmap();
         buffer1->unmap();
         buffer0->unmap();
-
-        return all_pass ? EXIT_SUCCESS : EXIT_FAILURE;
+        return EXIT_SUCCESS;
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;

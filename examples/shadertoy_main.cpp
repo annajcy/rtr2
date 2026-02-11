@@ -4,10 +4,10 @@
 
 #include "imgui.h"
 
-#include "input/input_system.hpp"
-#include "input/input_types.hpp"
-#include "render/renderer.hpp"
-#include "render/shadertoy_pipeline.hpp"
+#include "system/input/input_system.hpp"
+#include "system/input/input_types.hpp"
+#include "system/render/renderer.hpp"
+#include "system/render/shadertoy_pipeline.hpp"
 
 int main() {
     constexpr uint32_t kWidth = 800;
@@ -15,16 +15,16 @@ int main() {
     constexpr uint32_t kMaxFramesInFlight = 2;
 
     try {
-        auto renderer = std::make_unique<rtr::render::Renderer>(
+        auto renderer = std::make_unique<rtr::system::render::Renderer>(
             static_cast<int>(kWidth),
             static_cast<int>(kHeight),
             "RTR ShaderToy",
             kMaxFramesInFlight
         );
 
-        auto pipeline = std::make_unique<rtr::render::ShaderToyPipeline>(
+        auto pipeline = std::make_unique<rtr::system::render::ShaderToyPipeline>(
             renderer->build_pipeline_runtime(),
-            rtr::render::ShaderToyPipelineConfig{}
+            rtr::system::render::ShaderToyPipelineConfig{}
         );
         auto* shadertoy_pipeline = pipeline.get();
 
@@ -36,7 +36,7 @@ int main() {
             ImGui::End();
         });
 
-        auto input_system = std::make_unique<rtr::input::InputSystem>(&renderer->window());
+        auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
         input_system->set_is_intercept_capture([shadertoy_pipeline](bool is_mouse) {
             if (is_mouse) {
                 return shadertoy_pipeline->imgui_pass().wants_capture_mouse();
@@ -50,7 +50,7 @@ int main() {
             input_system->begin_frame();
             renderer->window().poll_events();
             renderer->draw_frame();
-            if (input_system->state().key_down(rtr::input::KeyCode::Q)) {
+            if (input_system->state().key_down(rtr::system::input::KeyCode::Q)) {
                 renderer->window().close();
             }
             input_system->end_frame();

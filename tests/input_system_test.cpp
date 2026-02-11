@@ -2,9 +2,9 @@
 
 #include "gtest/gtest.h"
 
-#include "input/input_system.hpp"
+#include "system/input/input_system.hpp"
 
-namespace rtr::input::test {
+namespace rtr::system::input::test {
 
 TEST(InputTypesTest, MapsFromGlfwValuesAndUnknown) {
     EXPECT_EQ(from_glfw_key(GLFW_KEY_A), KeyCode::A);
@@ -165,7 +165,7 @@ TEST(InputSystemTest, DetachesFromRawSourcesOnDestroy) {
     EXPECT_EQ(mouse_scroll_source.size(), 0u);
 }
 
-} // namespace rtr::input::test
+} // namespace rtr::system::input::test
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

@@ -4,8 +4,8 @@
 #include <stdexcept>
 #include <vector>
 
-#include "render/frame_context.hpp"
-#include "render/frame_scheduler.hpp"
+#include "system/render/frame_context.hpp"
+#include "system/render/frame_scheduler.hpp"
 #include "rhi/buffer.hpp"
 #include "rhi/context.hpp"
 #include "rhi/device.hpp"
@@ -14,7 +14,7 @@
 #include "vulkan/vulkan_enums.hpp"
 #include <cstdint>
 
-namespace rtr::render {
+namespace rtr::system::render {
 
 struct PipelineRuntime {
     rhi::Device* device{};
@@ -149,4 +149,4 @@ protected:
     }
 };
 
-} // namespace rtr::render
+} // namespace rtr::system::render

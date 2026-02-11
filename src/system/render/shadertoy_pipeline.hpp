@@ -9,15 +9,15 @@
 #include <string>
 #include <vector>
 
-#include "render/pipeline.hpp"
-#include "render/render_pass.hpp"
+#include "system/render/pipeline.hpp"
+#include "system/render/render_pass.hpp"
 #include "rhi/buffer.hpp"
 #include "rhi/descriptor.hpp"
 #include "rhi/shader_module.hpp"
 #include "rhi/texture.hpp"
 #include "vulkan/vulkan.hpp"
 
-namespace rtr::render {
+namespace rtr::system::render {
 
 struct ShaderToyPipelineConfig {
     std::string shader_output_dir{"/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/"};
@@ -696,4 +696,4 @@ private:
     }
 };
 
-} // namespace rtr::render
+} // namespace rtr::system::render

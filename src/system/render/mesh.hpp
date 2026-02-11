@@ -17,7 +17,7 @@
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
 
-namespace rtr::render {
+namespace rtr::system::render {
 
 class Mesh {
 public:
@@ -177,4 +177,4 @@ public:
     uint32_t vertex_count() const { return m_vertex_count; }
 };
 
-} // namespace rtr::render
+} // namespace rtr::system::render
