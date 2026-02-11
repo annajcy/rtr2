@@ -46,11 +46,9 @@ TEST(FrameworkEngineTest, RunFrameDrivesTickPhasesWithFixedAccumulator) {
     EXPECT_NEAR(engine.fixed_accumulator(), 0.001, 1e-9);
 }
 
-TEST(FrameworkEngineTest, RunFrameCapsFixedStepsPerFrameFromConfig) {
+TEST(FrameworkEngineTest, RunFrameCapsFixedStepsPerFrame) {
     Engine engine(EngineConfig{
         .fixed_delta_seconds = 0.01,
-        .max_fixed_steps_per_frame = 2,
-        .max_frame_delta_seconds = 1.0,
     });
 
     auto& scene = engine.world().create_scene("main");
@@ -59,25 +57,7 @@ TEST(FrameworkEngineTest, RunFrameCapsFixedStepsPerFrameFromConfig) {
 
     engine.run_frame(1.0);
 
-    EXPECT_EQ(comp.fixed_count, 2u);
-    EXPECT_EQ(comp.update_count, 1u);
-    EXPECT_EQ(comp.late_count, 1u);
-}
-
-TEST(FrameworkEngineTest, RunFrameClampsByMaxFrameDeltaSeconds) {
-    Engine engine(EngineConfig{
-        .fixed_delta_seconds = 0.01,
-        .max_fixed_steps_per_frame = 32,
-        .max_frame_delta_seconds = 0.031,
-    });
-
-    auto& scene = engine.world().create_scene("main");
-    auto& go = scene.create_game_object("player");
-    auto& comp = go.add_component<CountingComponent>();
-
-    engine.run_frame(1.0);
-
-    EXPECT_EQ(comp.fixed_count, 3u);
+    EXPECT_EQ(comp.fixed_count, 4u);
     EXPECT_EQ(comp.update_count, 1u);
     EXPECT_EQ(comp.late_count, 1u);
 }

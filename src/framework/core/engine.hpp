@@ -4,7 +4,6 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <utility>
 
 #include "framework/core/tick_context.hpp"
@@ -13,19 +12,13 @@
 namespace rtr::framework::core {
 
 struct EngineConfig {
-    std::uint32_t window_width{800};
-    std::uint32_t window_height{600};
-    std::string window_title{"RTR2 Framework"};
-    std::uint32_t max_frames_in_flight{2};
-
     double fixed_delta_seconds{1.0 / 60.0};
-    std::uint32_t max_fixed_steps_per_frame{4};
-    double max_frame_delta_seconds{0.1};
-    bool start_paused{false};
 };
 
 class Engine {
 private:
+    static constexpr std::uint32_t kMaxFixedStepsPerFrame = 4;
+
     EngineConfig m_config{};
     std::unique_ptr<World> m_world{};
     bool m_stop_requested{false};
@@ -87,18 +80,13 @@ public:
     }
 
     void run_frame(double frame_delta_seconds) {
-        constexpr double kFixedTickEpsilon = 1e-12;
-        double frame_delta = std::max(0.0, frame_delta_seconds);
-        if (m_config.max_frame_delta_seconds > 0.0) {
-            frame_delta = std::min(frame_delta, m_config.max_frame_delta_seconds);
-        }
+        const double frame_delta = std::max(0.0, frame_delta_seconds);
         const double fixed_dt = m_config.fixed_delta_seconds;
 
         if (fixed_dt > 0.0) {
             m_fixed_accumulator += frame_delta;
             std::uint32_t fixed_steps = 0;
-            while ((m_fixed_accumulator + kFixedTickEpsilon) >= fixed_dt &&
-                   fixed_steps < m_config.max_fixed_steps_per_frame) {
+            while (m_fixed_accumulator >= fixed_dt && fixed_steps < kMaxFixedStepsPerFrame) {
                 fixed_tick(FixedTickContext{
                     .fixed_delta_seconds = fixed_dt,
                     .fixed_tick_index = m_fixed_tick_index++,
