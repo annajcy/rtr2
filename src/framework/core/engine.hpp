@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include "framework/core/tick_context.hpp"
@@ -12,24 +14,42 @@
 namespace rtr::framework::core {
 
 struct EngineConfig {
+    std::uint32_t window_width{800};
+    std::uint32_t window_height{600};
+    std::string window_title{"RTR2 Framework"};
+    std::uint32_t max_frames_in_flight{2};
+
     double fixed_delta_seconds{1.0 / 60.0};
+    std::uint32_t max_fixed_steps_per_frame{4};
+    double max_frame_delta_seconds{0.1};
+    bool start_paused{false};
 };
 
 class Engine {
-private:
-    static constexpr std::uint32_t kMaxFixedStepsPerFrame = 4;
+public:
+    struct LoopHooks {
+        std::function<void()> input_begin{};
+        std::function<void()> input_poll{};
+        std::function<void()> input_end{};
+        std::function<void()> render{};
+        std::function<bool()> should_close{};
+        std::function<double()> now_seconds{};
+    };
 
+private:
     EngineConfig m_config{};
     std::unique_ptr<World> m_world{};
+    LoopHooks m_hooks{};
     bool m_stop_requested{false};
-    double m_fixed_accumulator{0.0};
+    bool m_paused{false};
     std::uint64_t m_fixed_tick_index{0};
     std::uint64_t m_frame_index{0};
 
 public:
     explicit Engine(EngineConfig config = {})
         : m_config(std::move(config)),
-          m_world(std::make_unique<World>()) {}
+          m_world(std::make_unique<World>()),
+          m_paused(m_config.start_paused) {}
 
     const EngineConfig& config() const {
         return m_config;
@@ -55,6 +75,14 @@ public:
         m_world->late_tick(ctx);
     }
 
+    void set_loop_hooks(LoopHooks hooks) {
+        m_hooks = std::move(hooks);
+    }
+
+    const LoopHooks& loop_hooks() const {
+        return m_hooks;
+    }
+
     void request_stop() {
         m_stop_requested = true;
     }
@@ -67,6 +95,14 @@ public:
         return m_stop_requested;
     }
 
+    void set_paused(bool paused) {
+        m_paused = paused;
+    }
+
+    bool paused() const {
+        return m_paused;
+    }
+
     std::uint64_t fixed_tick_index() const {
         return m_fixed_tick_index;
     }
@@ -75,55 +111,69 @@ public:
         return m_frame_index;
     }
 
-    double fixed_accumulator() const {
-        return m_fixed_accumulator;
-    }
-
-    void run_frame(double frame_delta_seconds) {
-        const double frame_delta = std::max(0.0, frame_delta_seconds);
-        const double fixed_dt = m_config.fixed_delta_seconds;
-
-        if (fixed_dt > 0.0) {
-            m_fixed_accumulator += frame_delta;
-            std::uint32_t fixed_steps = 0;
-            while (m_fixed_accumulator >= fixed_dt && fixed_steps < kMaxFixedStepsPerFrame) {
-                fixed_tick(FixedTickContext{
-                    .fixed_delta_seconds = fixed_dt,
-                    .fixed_tick_index = m_fixed_tick_index++,
-                });
-                m_fixed_accumulator -= fixed_dt;
-                ++fixed_steps;
-            }
-        }
-
-        FrameTickContext frame_ctx{
-            .delta_seconds = frame_delta,
-            .unscaled_delta_seconds = frame_delta,
-            .frame_index = m_frame_index++,
+    void run() {
+        const auto default_now = []() -> double {
+            using Clock = std::chrono::steady_clock;
+            const auto now = Clock::now().time_since_epoch();
+            return std::chrono::duration<double>(now).count();
         };
-        tick(frame_ctx);
-        late_tick(frame_ctx);
-    }
+        const auto now_fn = m_hooks.now_seconds ? m_hooks.now_seconds : default_now;
+        double previous_time = now_fn();
+        double accumulator = 0.0;
 
-    void run_for_frames(std::uint64_t frame_count, double frame_delta_seconds = -1.0) {
-        const double delta = frame_delta_seconds >= 0.0 ? frame_delta_seconds : m_config.fixed_delta_seconds;
-        for (std::uint64_t i = 0; i < frame_count; ++i) {
-            if (m_stop_requested) {
+        while (!m_stop_requested) {
+            if (m_hooks.should_close && m_hooks.should_close()) {
                 break;
             }
-            run_frame(delta);
-        }
-    }
 
-    void run() {
-        using Clock = std::chrono::steady_clock;
-        auto previous_time = Clock::now();
-        while (!m_stop_requested) {
-            const auto current_time = Clock::now();
-            double frame_delta =
-                std::chrono::duration<double>(current_time - previous_time).count();
+            if (m_hooks.input_begin) {
+                m_hooks.input_begin();
+            }
+            if (m_hooks.input_poll) {
+                m_hooks.input_poll();
+            }
+
+            const double current_time = now_fn();
+            double frame_delta = current_time - previous_time;
             previous_time = current_time;
-            run_frame(frame_delta);
+            if (frame_delta < 0.0) {
+                frame_delta = 0.0;
+            }
+            if (m_config.max_frame_delta_seconds > 0.0) {
+                frame_delta = std::min(frame_delta, m_config.max_frame_delta_seconds);
+            }
+
+            if (!m_paused) {
+                const double fixed_dt = m_config.fixed_delta_seconds;
+                if (fixed_dt > 0.0) {
+                    accumulator += frame_delta;
+                    std::uint32_t fixed_steps = 0;
+                    while (accumulator >= fixed_dt && fixed_steps < m_config.max_fixed_steps_per_frame) {
+                        fixed_tick(FixedTickContext{
+                            .fixed_delta_seconds = fixed_dt,
+                            .fixed_tick_index = m_fixed_tick_index++,
+                        });
+                        accumulator -= fixed_dt;
+                        ++fixed_steps;
+                    }
+                }
+
+                FrameTickContext frame_ctx{
+                    .delta_seconds = frame_delta,
+                    .unscaled_delta_seconds = frame_delta,
+                    .frame_index = m_frame_index++,
+                };
+                tick(frame_ctx);
+                late_tick(frame_ctx);
+            }
+
+            if (m_hooks.render) {
+                m_hooks.render();
+            }
+
+            if (m_hooks.input_end) {
+                m_hooks.input_end();
+            }
         }
     }
 };
