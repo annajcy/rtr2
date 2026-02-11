@@ -13,7 +13,6 @@
 #include "rhi/descriptor.hpp"
 #include "rhi/shader_module.hpp"
 #include "rhi/texture.hpp"
-#include "render/imgui_pass.hpp"
 #include "render/mesh.hpp"
 #include "render/pipeline.hpp"
 #include "render/render_pass.hpp"

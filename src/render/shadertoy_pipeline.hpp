@@ -9,7 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "render/imgui_pass.hpp"
 #include "render/pipeline.hpp"
 #include "render/render_pass.hpp"
 #include "rhi/buffer.hpp"
@@ -32,7 +31,7 @@ struct ShaderToyUniformBufferObject {
     alignas(16) std::array<float, 4> i_time{};
 };
 
-class ShaderToyComputePass final : public IRenderPass {
+class ComputePass final : public IRenderPass {
 public:
     struct FrameResources {
         rhi::Buffer* uniform_buffer{};
@@ -53,7 +52,7 @@ private:
     };
 
 public:
-    ShaderToyComputePass(
+    ComputePass(
         vk::raii::PipelineLayout* pipeline_layout,
         vk::raii::Pipeline* compute_pipeline
     )
@@ -152,7 +151,7 @@ private:
     }
 };
 
-class ShaderToyPresentPass final : public IRenderPass {
+class PresentImagePass final : public IRenderPass {
 public:
     struct FrameResources {
         rhi::Image* offscreen_image{};
@@ -173,7 +172,7 @@ private:
     };
 
 public:
-    ShaderToyPresentPass(
+    PresentImagePass(
         vk::raii::PipelineLayout* pipeline_layout,
         vk::raii::Pipeline* present_pipeline
     )
@@ -189,7 +188,7 @@ public:
             resources.offscreen_layout == nullptr ||
             resources.depth_image == nullptr ||
             resources.present_set == nullptr) {
-            throw std::runtime_error("ShaderToyPresentPass frame resources are incomplete.");
+            throw std::runtime_error("PresentImagePass frame resources are incomplete.");
         }
         m_frame_resources = resources;
     }
@@ -199,7 +198,7 @@ public:
             m_frame_resources.offscreen_layout == nullptr ||
             m_frame_resources.depth_image == nullptr ||
             m_frame_resources.present_set == nullptr) {
-            throw std::runtime_error("ShaderToyPresentPass frame resources are not bound.");
+            throw std::runtime_error("PresentImagePass frame resources are not bound.");
         }
 
         auto& cmd = ctx.cmd().command_buffer();
@@ -337,8 +336,8 @@ private:
     std::vector<std::unique_ptr<rhi::Image>> m_depth_images{};
     std::unique_ptr<rhi::Sampler> m_offscreen_sampler{nullptr};
 
-    std::unique_ptr<ShaderToyComputePass> m_compute_pass{nullptr};
-    std::unique_ptr<ShaderToyPresentPass> m_present_pass{nullptr};
+    std::unique_ptr<ComputePass> m_compute_pass{nullptr};
+    std::unique_ptr<PresentImagePass> m_present_pass{nullptr};
     std::unique_ptr<ImGUIPass> m_imgui_pass{nullptr};
 
 public:
@@ -393,11 +392,11 @@ public:
         build_compute_pipeline();
         rebuild_present_graphics_pipeline();
 
-        m_compute_pass = std::make_unique<ShaderToyComputePass>(
+        m_compute_pass = std::make_unique<ComputePass>(
             &m_pipeline_layout,
             &m_compute_pipeline
         );
-        m_present_pass = std::make_unique<ShaderToyPresentPass>(
+        m_present_pass = std::make_unique<PresentImagePass>(
             &m_pipeline_layout,
             &m_present_pipeline
         );
@@ -469,7 +468,7 @@ public:
 
         auto& offscreen_frame = m_offscreen_frame_resources[frame_index];
 
-        m_compute_pass->bind_frame_resources(ShaderToyComputePass::FrameResources{
+        m_compute_pass->bind_frame_resources(ComputePass::FrameResources{
             .uniform_buffer = m_uniform_buffers[frame_index].get(),
             .offscreen_image = offscreen_frame.image.get(),
             .offscreen_layout = &offscreen_frame.layout,
@@ -477,7 +476,7 @@ public:
         });
         m_compute_pass->execute(ctx);
 
-        m_present_pass->bind_frame_resources(ShaderToyPresentPass::FrameResources{
+        m_present_pass->bind_frame_resources(PresentImagePass::FrameResources{
             .offscreen_image = offscreen_frame.image.get(),
             .offscreen_layout = &offscreen_frame.layout,
             .depth_image = m_depth_images[frame_index].get(),
