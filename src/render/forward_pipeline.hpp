@@ -41,12 +41,18 @@ struct UniformBufferObject {
 };
 
 class ForwardPass final : public render::IRenderPass {
+public:
+    struct FrameResources {
+        rhi::Buffer* uniform_buffer{};
+        rhi::Image* depth_image{};
+        vk::raii::DescriptorSet* per_frame_set{};
+    };
+
 private:
     render::Mesh* m_mesh{};
     vk::raii::PipelineLayout* m_pipeline_layout{};
     vk::raii::Pipeline* m_pipeline{};
-    std::vector<std::unique_ptr<rhi::Buffer>>* m_uniform_buffers{};
-    std::vector<std::unique_ptr<rhi::Image>>* m_depth_images{};
+    FrameResources m_frame_resources{};
     rhi::DescriptorSystem* m_descriptor_system{};
 
     std::vector<render::ResourceDependency> m_dependencies{
@@ -62,15 +68,11 @@ public:
         render::Mesh* mesh,
         vk::raii::PipelineLayout* pipeline_layout,
         vk::raii::Pipeline* pipeline,
-        std::vector<std::unique_ptr<rhi::Buffer>>* uniform_buffers,
-        std::vector<std::unique_ptr<rhi::Image>>* depth_images,
         rhi::DescriptorSystem* descriptor_system
     )
         : m_mesh(mesh),
           m_pipeline_layout(pipeline_layout),
           m_pipeline(pipeline),
-          m_uniform_buffers(uniform_buffers),
-          m_depth_images(depth_images),
           m_descriptor_system(descriptor_system) {}
 
     std::string_view name() const override { return "forward_main"; }
@@ -79,16 +81,26 @@ public:
         return m_dependencies;
     }
 
+    void bind_frame_resources(const FrameResources& resources) {
+        if (resources.uniform_buffer == nullptr ||
+            resources.depth_image == nullptr ||
+            resources.per_frame_set == nullptr) {
+            throw std::runtime_error("ForwardPass frame resources are incomplete.");
+        }
+        m_frame_resources = resources;
+    }
+
     void execute(render::FrameContext& ctx) override {
-        const uint32_t frame_index = ctx.frame_index();
-        if (frame_index >= m_uniform_buffers->size() || frame_index >= m_depth_images->size()) {
-            throw std::runtime_error("ForwardPass frame resources are not ready.");
+        if (m_frame_resources.uniform_buffer == nullptr ||
+            m_frame_resources.depth_image == nullptr ||
+            m_frame_resources.per_frame_set == nullptr) {
+            throw std::runtime_error("ForwardPass frame resources are not bound.");
         }
 
-        update_uniform_buffer(frame_index, ctx.render_extent());
+        update_uniform_buffer(*m_frame_resources.uniform_buffer, ctx.render_extent());
 
         auto& cmd = ctx.cmd().command_buffer();
-        rhi::Image& depth_image = *m_depth_images->at(frame_index);
+        rhi::Image& depth_image = *m_frame_resources.depth_image;
 
         vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}};
         vk::RenderingAttachmentInfo color_attachment_info{};
@@ -160,7 +172,7 @@ public:
             vk::PipelineBindPoint::eGraphics,
             **m_pipeline_layout,
             0,
-            *m_descriptor_system->get_set("per_frame", frame_index),
+            **m_frame_resources.per_frame_set,
             {}
         );
         cmd.bindDescriptorSets(
@@ -190,7 +202,7 @@ public:
     }
 
 private:
-    void update_uniform_buffer(uint32_t frame_index, const vk::Extent2D& extent) {
+    void update_uniform_buffer(rhi::Buffer& uniform_buffer, const vk::Extent2D& extent) {
         static const auto start_time = std::chrono::high_resolution_clock::now();
         const auto current_time = std::chrono::high_resolution_clock::now();
         const float time = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
@@ -212,7 +224,7 @@ private:
         ubo.proj[1][1] *= -1;
         ubo.normal = glm::transpose(glm::inverse(ubo.model));
 
-        std::memcpy(m_uniform_buffers->at(frame_index)->mapped_data(), &ubo, sizeof(ubo));
+        std::memcpy(uniform_buffer.mapped_data(), &ubo, sizeof(ubo));
     }
 };
 
@@ -303,8 +315,6 @@ public:
             m_mesh.get(),
             &m_pipeline_layout,
             &m_pipeline,
-            &m_uniform_buffers,
-            &m_depth_images,
             m_descriptor_system.get()
         );
 
@@ -314,8 +324,7 @@ public:
             m_window,
             m_image_count,
             m_color_format,
-            m_depth_format,
-            &m_depth_images
+            m_depth_format
         );
     }
 
@@ -358,11 +367,24 @@ public:
         if (extent.width == 0 || extent.height == 0) {
             return;
         }
+        const uint32_t frame_index = ctx.frame_index();
+        if (frame_index >= m_uniform_buffers.size() || frame_index >= m_depth_images.size()) {
+            throw std::runtime_error("ForwardPipeline frame resources are not ready.");
+        }
         if (!m_forward_pass || !m_imgui_pass) {
             throw std::runtime_error("Forward pipeline passes are not initialized.");
         }
 
+        m_forward_pass->bind_frame_resources(ForwardPass::FrameResources{
+            .uniform_buffer = m_uniform_buffers[frame_index].get(),
+            .depth_image = m_depth_images[frame_index].get(),
+            .per_frame_set = &m_descriptor_system->get_set("per_frame", frame_index)
+        });
         m_forward_pass->execute(ctx);
+
+        m_imgui_pass->bind_frame_resources(ImGUIPass::FrameResources{
+            .depth_image = m_depth_images[frame_index].get()
+        });
         m_imgui_pass->execute(ctx);
     }
 

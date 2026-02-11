@@ -18,10 +18,13 @@ namespace rtr::render {
 class ImGUIPass final : public IRenderPass {
 public:
     using UiCallback = std::function<void()>;
+    struct FrameResources {
+        rhi::Image* depth_image{};
+    };
 
 private:
     std::unique_ptr<rhi::ImGuiContext> m_imgui_context{};
-    std::vector<std::unique_ptr<rhi::Image>>* m_depth_images{};
+    FrameResources m_frame_resources{};
     UiCallback m_ui_callback{};
     ImGuiDockNodeFlags m_dockspace_flags{ImGuiDockNodeFlags_PassthruCentralNode};
     std::vector<ResourceDependency> m_dependencies{
@@ -36,8 +39,7 @@ public:
         rhi::Window* window,
         uint32_t image_count,
         vk::Format color_format,
-        vk::Format depth_format,
-        std::vector<std::unique_ptr<rhi::Image>>* depth_images
+        vk::Format depth_format
     )
         : m_imgui_context(std::make_unique<rhi::ImGuiContext>(
               device,
@@ -46,12 +48,7 @@ public:
               image_count,
               color_format,
               depth_format
-          )),
-          m_depth_images(depth_images) {
-        if (m_depth_images == nullptr) {
-            throw std::runtime_error("ImGUIPass requires depth image array.");
-        }
-    }
+          )) {}
 
     std::string_view name() const override { return "imgui.overlay"; }
 
@@ -79,9 +76,16 @@ public:
         m_imgui_context->on_swapchain_recreated(image_count, color_format, depth_format);
     }
 
+    void bind_frame_resources(const FrameResources& resources) {
+        if (resources.depth_image == nullptr) {
+            throw std::runtime_error("ImGUIPass frame resources are incomplete.");
+        }
+        m_frame_resources = resources;
+    }
+
     void execute(render::FrameContext& ctx) override {
-        if (ctx.frame_index() >= m_depth_images->size()) {
-            throw std::runtime_error("ImGUIPass frame depth image is not ready.");
+        if (m_frame_resources.depth_image == nullptr) {
+            throw std::runtime_error("ImGUIPass frame resources are not bound.");
         }
 
         m_imgui_context->begin_frame();
@@ -95,7 +99,7 @@ public:
             return;
         }
 
-        const rhi::Image& depth_image = *m_depth_images->at(ctx.frame_index());
+        const rhi::Image& depth_image = *m_frame_resources.depth_image;
 
         vk::RenderingAttachmentInfo color_attachment_info{};
         color_attachment_info.imageView = *ctx.swapchain_image_view();

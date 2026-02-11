@@ -23,7 +23,6 @@ class FrameScheduler {
 public:
     struct PerFrameResources {
         rhi::CommandBuffer command_buffer;
-
         vk::raii::Semaphore image_available_semaphore{nullptr};
         vk::raii::Fence in_flight_fence{nullptr};
     };

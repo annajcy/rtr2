@@ -33,12 +33,19 @@ struct ShaderToyUniformBufferObject {
 };
 
 class ShaderToyComputePass final : public IRenderPass {
+public:
+    struct FrameResources {
+        rhi::Buffer* uniform_buffer{};
+        rhi::Image* offscreen_image{};
+        vk::ImageLayout* offscreen_layout{};
+        vk::raii::DescriptorSet* compute_set{};
+    };
+
 private:
     vk::raii::PipelineLayout* m_pipeline_layout{};
     vk::raii::Pipeline* m_compute_pipeline{};
-    rhi::DescriptorSystem* m_descriptor_system{};
-    std::vector<std::unique_ptr<rhi::Image>>* m_offscreen_images{};
-    std::vector<vk::ImageLayout>* m_offscreen_layouts{};
+    FrameResources m_frame_resources{};
+    std::chrono::steady_clock::time_point m_start_time = std::chrono::steady_clock::now();
     std::vector<ResourceDependency> m_dependencies{
         {"shadertoy.uniform", ResourceAccess::eRead},
         {"shadertoy.compute", ResourceAccess::eRead},
@@ -48,30 +55,38 @@ private:
 public:
     ShaderToyComputePass(
         vk::raii::PipelineLayout* pipeline_layout,
-        vk::raii::Pipeline* compute_pipeline,
-        rhi::DescriptorSystem* descriptor_system,
-        std::vector<std::unique_ptr<rhi::Image>>* offscreen_images,
-        std::vector<vk::ImageLayout>* offscreen_layouts
+        vk::raii::Pipeline* compute_pipeline
     )
         : m_pipeline_layout(pipeline_layout),
-          m_compute_pipeline(compute_pipeline),
-          m_descriptor_system(descriptor_system),
-          m_offscreen_images(offscreen_images),
-          m_offscreen_layouts(offscreen_layouts) {}
+          m_compute_pipeline(compute_pipeline) {}
 
     std::string_view name() const override { return "shadertoy.compute"; }
 
     const std::vector<ResourceDependency>& dependencies() const override { return m_dependencies; }
 
+    void bind_frame_resources(const FrameResources& resources) {
+        if (resources.uniform_buffer == nullptr ||
+            resources.offscreen_image == nullptr ||
+            resources.offscreen_layout == nullptr ||
+            resources.compute_set == nullptr) {
+            throw std::runtime_error("ShaderToyComputePass frame resources are incomplete.");
+        }
+        m_frame_resources = resources;
+    }
+
     void execute(render::FrameContext& ctx) override {
-        const uint32_t frame_index = ctx.frame_index();
-        if (frame_index >= m_offscreen_images->size() || frame_index >= m_offscreen_layouts->size()) {
-            throw std::runtime_error("ShaderToyComputePass frame resources are not ready.");
+        if (m_frame_resources.uniform_buffer == nullptr ||
+            m_frame_resources.offscreen_image == nullptr ||
+            m_frame_resources.offscreen_layout == nullptr ||
+            m_frame_resources.compute_set == nullptr) {
+            throw std::runtime_error("ShaderToyComputePass frame resources are not bound.");
         }
 
+        update_uniform_buffer(*m_frame_resources.uniform_buffer, ctx.render_extent());
+
         auto& cmd = ctx.cmd().command_buffer();
-        rhi::Image& offscreen = *m_offscreen_images->at(frame_index);
-        const vk::ImageLayout old_layout = m_offscreen_layouts->at(frame_index);
+        rhi::Image& offscreen = *m_frame_resources.offscreen_image;
+        const vk::ImageLayout old_layout = *m_frame_resources.offscreen_layout;
 
         vk::PipelineStageFlags2 src_stage = vk::PipelineStageFlagBits2::eTopOfPipe;
         vk::AccessFlags2 src_access = vk::AccessFlagBits2::eNone;
@@ -102,14 +117,14 @@ public:
         to_general_dep.pImageMemoryBarriers = &to_general;
         cmd.pipelineBarrier2(to_general_dep);
 
-        m_offscreen_layouts->at(frame_index) = vk::ImageLayout::eGeneral;
+        *m_frame_resources.offscreen_layout = vk::ImageLayout::eGeneral;
 
         cmd.bindPipeline(vk::PipelineBindPoint::eCompute, **m_compute_pipeline);
         cmd.bindDescriptorSets(
             vk::PipelineBindPoint::eCompute,
             **m_pipeline_layout,
             0,
-            *m_descriptor_system->get_set("compute", frame_index),
+            **m_frame_resources.compute_set,
             {}
         );
 
@@ -118,16 +133,38 @@ public:
         const uint32_t group_count_y = (extent.height + 7) / 8;
         cmd.dispatch(group_count_x, group_count_y, 1);
     }
+
+private:
+    void update_uniform_buffer(rhi::Buffer& uniform_buffer, const vk::Extent2D& extent) {
+        const auto now = std::chrono::steady_clock::now();
+        const float seconds = std::chrono::duration<float>(now - m_start_time).count();
+
+        ShaderToyUniformBufferObject ubo{};
+        ubo.i_resolution = {
+            static_cast<float>(extent.width),
+            static_cast<float>(extent.height),
+            1.0f,
+            0.0f
+        };
+        ubo.i_time = {seconds, 0.0f, 0.0f, 0.0f};
+
+        std::memcpy(uniform_buffer.mapped_data(), &ubo, sizeof(ubo));
+    }
 };
 
 class ShaderToyPresentPass final : public IRenderPass {
+public:
+    struct FrameResources {
+        rhi::Image* offscreen_image{};
+        vk::ImageLayout* offscreen_layout{};
+        rhi::Image* depth_image{};
+        vk::raii::DescriptorSet* present_set{};
+    };
+
 private:
     vk::raii::PipelineLayout* m_pipeline_layout{};
     vk::raii::Pipeline* m_present_pipeline{};
-    rhi::DescriptorSystem* m_descriptor_system{};
-    std::vector<std::unique_ptr<rhi::Image>>* m_offscreen_images{};
-    std::vector<vk::ImageLayout>* m_offscreen_layouts{};
-    std::vector<std::unique_ptr<rhi::Image>>* m_depth_images{};
+    FrameResources m_frame_resources{};
     std::vector<ResourceDependency> m_dependencies{
         {"shadertoy.present", ResourceAccess::eRead},
         {"shadertoy.offscreen", ResourceAccess::eRead},
@@ -138,34 +175,36 @@ private:
 public:
     ShaderToyPresentPass(
         vk::raii::PipelineLayout* pipeline_layout,
-        vk::raii::Pipeline* present_pipeline,
-        rhi::DescriptorSystem* descriptor_system,
-        std::vector<std::unique_ptr<rhi::Image>>* offscreen_images,
-        std::vector<vk::ImageLayout>* offscreen_layouts,
-        std::vector<std::unique_ptr<rhi::Image>>* depth_images
+        vk::raii::Pipeline* present_pipeline
     )
         : m_pipeline_layout(pipeline_layout),
-          m_present_pipeline(present_pipeline),
-          m_descriptor_system(descriptor_system),
-          m_offscreen_images(offscreen_images),
-          m_offscreen_layouts(offscreen_layouts),
-          m_depth_images(depth_images) {}
+          m_present_pipeline(present_pipeline) {}
 
     std::string_view name() const override { return "shadertoy.present"; }
 
     const std::vector<ResourceDependency>& dependencies() const override { return m_dependencies; }
 
+    void bind_frame_resources(const FrameResources& resources) {
+        if (resources.offscreen_image == nullptr ||
+            resources.offscreen_layout == nullptr ||
+            resources.depth_image == nullptr ||
+            resources.present_set == nullptr) {
+            throw std::runtime_error("ShaderToyPresentPass frame resources are incomplete.");
+        }
+        m_frame_resources = resources;
+    }
+
     void execute(render::FrameContext& ctx) override {
-        const uint32_t frame_index = ctx.frame_index();
-        if (frame_index >= m_offscreen_images->size() ||
-            frame_index >= m_offscreen_layouts->size() ||
-            frame_index >= m_depth_images->size()) {
-            throw std::runtime_error("ShaderToyPresentPass frame resources are not ready.");
+        if (m_frame_resources.offscreen_image == nullptr ||
+            m_frame_resources.offscreen_layout == nullptr ||
+            m_frame_resources.depth_image == nullptr ||
+            m_frame_resources.present_set == nullptr) {
+            throw std::runtime_error("ShaderToyPresentPass frame resources are not bound.");
         }
 
         auto& cmd = ctx.cmd().command_buffer();
-        rhi::Image& offscreen = *m_offscreen_images->at(frame_index);
-        rhi::Image& depth = *m_depth_images->at(frame_index);
+        rhi::Image& offscreen = *m_frame_resources.offscreen_image;
+        rhi::Image& depth = *m_frame_resources.depth_image;
 
         vk::ImageMemoryBarrier2 to_sampled{};
         to_sampled.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader;
@@ -185,7 +224,7 @@ public:
         to_sampled_dep.imageMemoryBarrierCount = 1;
         to_sampled_dep.pImageMemoryBarriers = &to_sampled;
         cmd.pipelineBarrier2(to_sampled_dep);
-        m_offscreen_layouts->at(frame_index) = vk::ImageLayout::eShaderReadOnlyOptimal;
+        *m_frame_resources.offscreen_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
         vk::ImageMemoryBarrier2 to_color{};
         to_color.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe;
@@ -251,7 +290,7 @@ public:
             vk::PipelineBindPoint::eGraphics,
             **m_pipeline_layout,
             1,
-            *m_descriptor_system->get_set("present", frame_index),
+            **m_frame_resources.present_set,
             {}
         );
 
@@ -276,6 +315,11 @@ public:
 
 class ShaderToyPipeline final : public RenderPipelineBase {
 private:
+    struct OffscreenFrameResources {
+        std::unique_ptr<rhi::Image> image{};
+        vk::ImageLayout layout{vk::ImageLayout::eUndefined};
+    };
+
     vk::Format m_offscreen_format{vk::Format::eUndefined};
 
     std::unique_ptr<rhi::ShaderModule> m_compute_shader_module{nullptr};
@@ -289,16 +333,13 @@ private:
 
     vk::DeviceSize m_uniform_buffer_size{0};
     std::vector<std::unique_ptr<rhi::Buffer>> m_uniform_buffers{};
-    std::vector<std::unique_ptr<rhi::Image>> m_offscreen_images{};
-    std::vector<vk::ImageLayout> m_offscreen_layouts{};
+    std::vector<OffscreenFrameResources> m_offscreen_frame_resources{};
     std::vector<std::unique_ptr<rhi::Image>> m_depth_images{};
     std::unique_ptr<rhi::Sampler> m_offscreen_sampler{nullptr};
 
     std::unique_ptr<ShaderToyComputePass> m_compute_pass{nullptr};
     std::unique_ptr<ShaderToyPresentPass> m_present_pass{nullptr};
     std::unique_ptr<ImGUIPass> m_imgui_pass{nullptr};
-
-    std::chrono::steady_clock::time_point m_start_time = std::chrono::steady_clock::now();
 
 public:
     ShaderToyPipeline(
@@ -354,18 +395,11 @@ public:
 
         m_compute_pass = std::make_unique<ShaderToyComputePass>(
             &m_pipeline_layout,
-            &m_compute_pipeline,
-            m_descriptor_system.get(),
-            &m_offscreen_images,
-            &m_offscreen_layouts
+            &m_compute_pipeline
         );
         m_present_pass = std::make_unique<ShaderToyPresentPass>(
             &m_pipeline_layout,
-            &m_present_pipeline,
-            m_descriptor_system.get(),
-            &m_offscreen_images,
-            &m_offscreen_layouts,
-            &m_depth_images
+            &m_present_pipeline
         );
         m_imgui_pass = std::make_unique<ImGUIPass>(
             m_device,
@@ -373,8 +407,7 @@ public:
             m_window,
             m_image_count,
             m_color_format,
-            m_depth_format,
-            &m_depth_images
+            m_depth_format
         );
     }
 
@@ -404,9 +437,9 @@ public:
             return;
         }
 
-        if (diff.extent_or_depth_changed() || m_offscreen_images.empty() || m_depth_images.empty()) {
-            recreate_offscreen_images();
-            recreate_depth_images();
+        if (diff.extent_or_depth_changed() || m_offscreen_frame_resources.empty() || m_depth_images.empty()) {
+            create_offscreen_images();
+            create_depth_images();
             refresh_descriptor_sets();
         }
 
@@ -424,16 +457,37 @@ public:
         if (extent.width == 0 || extent.height == 0) {
             return;
         }
-        if (ctx.frame_index() >= m_offscreen_images.size() || ctx.frame_index() >= m_depth_images.size()) {
+        const uint32_t frame_index = ctx.frame_index();
+        if (frame_index >= m_uniform_buffers.size() ||
+            frame_index >= m_offscreen_frame_resources.size() ||
+            frame_index >= m_depth_images.size()) {
             throw std::runtime_error("ShaderToyPipeline frame resources are not ready.");
         }
         if (!m_compute_pass || !m_present_pass || !m_imgui_pass) {
             throw std::runtime_error("ShaderToyPipeline passes are not initialized.");
         }
 
-        update_uniform_buffer(ctx.frame_index(), extent);
+        auto& offscreen_frame = m_offscreen_frame_resources[frame_index];
+
+        m_compute_pass->bind_frame_resources(ShaderToyComputePass::FrameResources{
+            .uniform_buffer = m_uniform_buffers[frame_index].get(),
+            .offscreen_image = offscreen_frame.image.get(),
+            .offscreen_layout = &offscreen_frame.layout,
+            .compute_set = &m_descriptor_system->get_set("compute", frame_index)
+        });
         m_compute_pass->execute(ctx);
+
+        m_present_pass->bind_frame_resources(ShaderToyPresentPass::FrameResources{
+            .offscreen_image = offscreen_frame.image.get(),
+            .offscreen_layout = &offscreen_frame.layout,
+            .depth_image = m_depth_images[frame_index].get(),
+            .present_set = &m_descriptor_system->get_set("present", frame_index)
+        });
         m_present_pass->execute(ctx);
+
+        m_imgui_pass->bind_frame_resources(ImGUIPass::FrameResources{
+            .depth_image = m_depth_images[frame_index].get()
+        });
         m_imgui_pass->execute(ctx);
     }
 
@@ -559,13 +613,14 @@ private:
         };
     }
 
-    void recreate_offscreen_images() {
-        m_offscreen_images.clear();
-        m_offscreen_images.reserve(m_frame_count);
+    void create_offscreen_images() {
+        m_offscreen_frame_resources.clear();
+        m_offscreen_frame_resources.reserve(m_frame_count);
 
         const vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled;
         for (uint32_t i = 0; i < m_frame_count; ++i) {
-            m_offscreen_images.emplace_back(std::make_unique<rhi::Image>(
+            OffscreenFrameResources resources{};
+            resources.image = std::make_unique<rhi::Image>(
                 rhi::Image(
                     m_device,
                     m_swapchain_extent.width,
@@ -577,18 +632,18 @@ private:
                     vk::ImageAspectFlagBits::eColor,
                     false
                 )
-            ));
+            );
+            resources.layout = vk::ImageLayout::eUndefined;
+            m_offscreen_frame_resources.emplace_back(std::move(resources));
         }
-
-        m_offscreen_layouts.assign(m_frame_count, vk::ImageLayout::eUndefined);
     }
 
-    void recreate_depth_images() {
+    void create_depth_images() {
         m_depth_images = make_per_frame_depth_images(m_swapchain_extent, m_depth_format);
     }
 
     void refresh_descriptor_sets() {
-        if (m_offscreen_images.size() != m_frame_count) {
+        if (m_offscreen_frame_resources.size() != m_frame_count) {
             throw std::runtime_error("Offscreen images are not ready for descriptor refresh.");
         }
 
@@ -598,7 +653,7 @@ private:
                 writer.write_buffer(0, *m_uniform_buffers[index]->buffer(), 0, m_uniform_buffer_size);
                 writer.write_storage_image(
                     1,
-                    *m_offscreen_images[index]->image_view(),
+                    *m_offscreen_frame_resources[index].image->image_view(),
                     vk::ImageLayout::eGeneral
                 );
             }
@@ -607,28 +662,12 @@ private:
             [this](rhi::DescriptorWriter& writer, uint32_t index) {
                 writer.write_combined_image(
                     0,
-                    *m_offscreen_images[index]->image_view(),
+                    *m_offscreen_frame_resources[index].image->image_view(),
                     *m_offscreen_sampler->sampler(),
                     vk::ImageLayout::eShaderReadOnlyOptimal
                 );
             }
         );
-    }
-
-    void update_uniform_buffer(uint32_t frame_index, const vk::Extent2D& extent) {
-        const auto now = std::chrono::steady_clock::now();
-        const float seconds = std::chrono::duration<float>(now - m_start_time).count();
-
-        ShaderToyUniformBufferObject ubo{};
-        ubo.i_resolution = {
-            static_cast<float>(extent.width),
-            static_cast<float>(extent.height),
-            1.0f,
-            0.0f
-        };
-        ubo.i_time = {seconds, 0.0f, 0.0f, 0.0f};
-
-        std::memcpy(m_uniform_buffers.at(frame_index)->mapped_data(), &ubo, sizeof(ubo));
     }
 };
 

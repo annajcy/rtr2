@@ -63,3 +63,4 @@ wheels/
 merged_sources.txt
 vkt.cpp
 
+.VSCodeCounter/
