@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
+#include "rhi/command.hpp"
 #include "rhi/context.hpp"
 #include "rhi/device.hpp"
 #include "rhi/window.hpp"
@@ -20,12 +22,92 @@ public:
     using PerFrameResources = FrameScheduler::PerFrameResources;
     using PerImageResources = FrameScheduler::PerImageResources;
     using RenderCallback = std::function<void(FrameContext&)>;
+    using ComputeRecordCallback = std::function<void(rhi::CommandBuffer&)>;
+
+    class ComputeJob {
+    private:
+        rhi::Device* m_device{};
+        std::unique_ptr<rhi::CommandBuffer> m_command_buffer{};
+        vk::raii::Fence m_fence{nullptr};
+
+        ComputeJob(
+            rhi::Device* device,
+            rhi::CommandBuffer&& command_buffer,
+            vk::raii::Fence&& fence
+        )
+            : m_device(device),
+              m_command_buffer(std::make_unique<rhi::CommandBuffer>(std::move(command_buffer))),
+              m_fence(std::move(fence)) {}
+
+        friend class Renderer;
+
+    public:
+        ComputeJob() = default;
+        ~ComputeJob() noexcept {
+            if (!valid()) {
+                return;
+            }
+            try {
+                wait();
+            } catch (...) {
+            }
+        }
+
+        ComputeJob(const ComputeJob&) = delete;
+        ComputeJob& operator=(const ComputeJob&) = delete;
+        ComputeJob(ComputeJob&&) noexcept = default;
+        ComputeJob& operator=(ComputeJob&&) noexcept = default;
+
+        bool valid() const {
+            return m_device != nullptr &&
+                   m_command_buffer != nullptr &&
+                   static_cast<vk::Fence>(m_fence) != vk::Fence{};
+        }
+
+        bool is_done() const {
+            if (!valid()) {
+                return false;
+            }
+            const vk::Result result = m_device->device().waitForFences(
+                *m_fence,
+                VK_TRUE,
+                0
+            );
+            if (result == vk::Result::eSuccess) {
+                return true;
+            }
+            if (result == vk::Result::eTimeout) {
+                return false;
+            }
+            throw std::runtime_error("ComputeJob status query failed.");
+        }
+
+        void wait(uint64_t timeout_ns = UINT64_MAX) const {
+            if (!valid()) {
+                throw std::runtime_error("ComputeJob is invalid.");
+            }
+
+            const vk::Result result = m_device->device().waitForFences(
+                *m_fence,
+                VK_TRUE,
+                timeout_ns
+            );
+            if (result == vk::Result::eSuccess) {
+                return;
+            }
+            if (result == vk::Result::eTimeout) {
+                throw std::runtime_error("ComputeJob wait timed out.");
+            }
+            throw std::runtime_error("ComputeJob wait failed.");
+        }
+    };
 
 private:
     std::unique_ptr<rhi::Window> m_window{};
     std::unique_ptr<rhi::Context> m_context{};
     std::unique_ptr<rhi::Device> m_device{};
 
+    std::unique_ptr<rhi::CommandPool> m_compute_command_pool{};
     std::unique_ptr<FrameScheduler> m_frame_scheduler{};
     std::unique_ptr<IRenderPipeline> m_active_pipeline{};
 
@@ -60,6 +142,10 @@ public:
             m_context.get(),
             m_device.get(),
             max_frames_in_flight
+        );
+        m_compute_command_pool = std::make_unique<rhi::CommandPool>(
+            m_device.get(),
+            vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer
         );
         m_last_swapchain_generation = m_frame_scheduler->swapchain_state().generation;
     }
@@ -99,6 +185,41 @@ public:
 
     IRenderPipeline* pipeline() { return m_active_pipeline.get(); }
     const IRenderPipeline* pipeline() const { return m_active_pipeline.get(); }
+
+    // Contract:
+    // 1) compute/compute_async do not require set_pipeline().
+    // 2) compute/compute_async do not acquire/present swapchain images.
+    // 3) Renderer is not thread-safe; draw_frame()/compute* must be called serially.
+    // 4) ComputeJob must be used while Renderer is alive.
+    void compute(const ComputeRecordCallback& record) {
+        auto job = compute_async(record);
+        job.wait();
+    }
+
+    ComputeJob compute_async(const ComputeRecordCallback& record) {
+        if (!record) {
+            throw std::runtime_error("compute_async received empty callback.");
+        }
+        if (!m_compute_command_pool) {
+            throw std::runtime_error("Compute command pool is not initialized.");
+        }
+
+        auto command_buffer = m_compute_command_pool->create_command_buffer();
+        command_buffer.record([&](rhi::CommandBuffer& cb) {
+            record(cb);
+        }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+        vk::raii::Fence fence(m_device->device(), vk::FenceCreateInfo{});
+        rhi::CommandBuffer::SubmitInfo submit_info{};
+        submit_info.fence = *fence;
+        command_buffer.submit(submit_info);
+
+        return ComputeJob(
+            m_device.get(),
+            std::move(command_buffer),
+            std::move(fence)
+        );
+    }
 
     void draw_frame() {
         if (!m_active_pipeline) {

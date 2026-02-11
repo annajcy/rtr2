@@ -32,13 +32,13 @@ public:
 class ImGUIPass final : public IRenderPass {
 public:
     using UiCallback = std::function<void()>;
-    struct FrameResources {
+    struct RenderPassResources {
         rhi::Image* depth_image{};
     };
 
 private:
     std::unique_ptr<rhi::ImGuiContext> m_imgui_context{};
-    FrameResources m_frame_resources{};
+    RenderPassResources m_render_pass_resources{};
     UiCallback m_ui_callback{};
     ImGuiDockNodeFlags m_dockspace_flags{ImGuiDockNodeFlags_PassthruCentralNode};
     std::vector<ResourceDependency> m_dependencies{
@@ -90,15 +90,15 @@ public:
         m_imgui_context->on_swapchain_recreated(image_count, color_format, depth_format);
     }
 
-    void bind_frame_resources(const FrameResources& resources) {
+    void bind_render_pass_resources(const RenderPassResources& resources) {
         if (resources.depth_image == nullptr) {
             throw std::runtime_error("ImGUIPass frame resources are incomplete.");
         }
-        m_frame_resources = resources;
+        m_render_pass_resources = resources;
     }
 
     void execute(render::FrameContext& ctx) override {
-        if (m_frame_resources.depth_image == nullptr) {
+        if (m_render_pass_resources.depth_image == nullptr) {
             throw std::runtime_error("ImGUIPass frame resources are not bound.");
         }
 
@@ -113,7 +113,7 @@ public:
             return;
         }
 
-        const rhi::Image& depth_image = *m_frame_resources.depth_image;
+        const rhi::Image& depth_image = *m_render_pass_resources.depth_image;
 
         vk::RenderingAttachmentInfo color_attachment_info{};
         color_attachment_info.imageView = *ctx.swapchain_image_view();

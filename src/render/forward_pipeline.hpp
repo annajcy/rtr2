@@ -41,18 +41,18 @@ struct UniformBufferObject {
 
 class ForwardPass final : public render::IRenderPass {
 public:
-    struct FrameResources {
+    struct RenderPassResources {
         rhi::Buffer* uniform_buffer{};
         rhi::Image* depth_image{};
         vk::raii::DescriptorSet* per_frame_set{};
+        vk::raii::DescriptorSet* texture_set{};
     };
 
 private:
     render::Mesh* m_mesh{};
     vk::raii::PipelineLayout* m_pipeline_layout{};
     vk::raii::Pipeline* m_pipeline{};
-    FrameResources m_frame_resources{};
-    rhi::DescriptorSystem* m_descriptor_system{};
+    RenderPassResources m_render_pass_resources{};
 
     std::vector<render::ResourceDependency> m_dependencies{
         {"uniform", render::ResourceAccess::eWrite},
@@ -66,13 +66,11 @@ public:
     ForwardPass(
         render::Mesh* mesh,
         vk::raii::PipelineLayout* pipeline_layout,
-        vk::raii::Pipeline* pipeline,
-        rhi::DescriptorSystem* descriptor_system
+        vk::raii::Pipeline* pipeline
     )
         : m_mesh(mesh),
           m_pipeline_layout(pipeline_layout),
-          m_pipeline(pipeline),
-          m_descriptor_system(descriptor_system) {}
+          m_pipeline(pipeline) {}
 
     std::string_view name() const override { return "forward_main"; }
 
@@ -80,26 +78,28 @@ public:
         return m_dependencies;
     }
 
-    void bind_frame_resources(const FrameResources& resources) {
+    void bind_render_pass_resources(const RenderPassResources& resources) {
         if (resources.uniform_buffer == nullptr ||
             resources.depth_image == nullptr ||
-            resources.per_frame_set == nullptr) {
+            resources.per_frame_set == nullptr ||
+            resources.texture_set == nullptr) {
             throw std::runtime_error("ForwardPass frame resources are incomplete.");
         }
-        m_frame_resources = resources;
+        m_render_pass_resources = resources;
     }
 
     void execute(render::FrameContext& ctx) override {
-        if (m_frame_resources.uniform_buffer == nullptr ||
-            m_frame_resources.depth_image == nullptr ||
-            m_frame_resources.per_frame_set == nullptr) {
+        if (m_render_pass_resources.uniform_buffer == nullptr ||
+            m_render_pass_resources.depth_image == nullptr ||
+            m_render_pass_resources.per_frame_set == nullptr ||
+            m_render_pass_resources.texture_set == nullptr) {
             throw std::runtime_error("ForwardPass frame resources are not bound.");
         }
 
-        update_uniform_buffer(*m_frame_resources.uniform_buffer, ctx.render_extent());
+        update_uniform_buffer(*m_render_pass_resources.uniform_buffer, ctx.render_extent());
 
         auto& cmd = ctx.cmd().command_buffer();
-        rhi::Image& depth_image = *m_frame_resources.depth_image;
+        rhi::Image& depth_image = *m_render_pass_resources.depth_image;
 
         vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}};
         vk::RenderingAttachmentInfo color_attachment_info{};
@@ -171,14 +171,14 @@ public:
             vk::PipelineBindPoint::eGraphics,
             **m_pipeline_layout,
             0,
-            **m_frame_resources.per_frame_set,
+            **m_render_pass_resources.per_frame_set,
             {}
         );
         cmd.bindDescriptorSets(
             vk::PipelineBindPoint::eGraphics,
             **m_pipeline_layout,
             1,
-            *m_descriptor_system->get_set("texture", 0),
+            **m_render_pass_resources.texture_set,
             {}
         );
 
@@ -240,7 +240,11 @@ private:
     std::vector<std::unique_ptr<rhi::Buffer>> m_uniform_buffers{};
     std::vector<std::unique_ptr<rhi::Image>> m_depth_images{};
 
-    std::unique_ptr<rhi::DescriptorSystem> m_descriptor_system{nullptr};
+    std::unique_ptr<rhi::DescriptorSetLayout> m_per_frame_layout{nullptr};
+    std::unique_ptr<rhi::DescriptorSetLayout> m_texture_layout{nullptr};
+    std::unique_ptr<rhi::DescriptorPool> m_descriptor_pool{nullptr};
+    std::vector<vk::raii::DescriptorSet> m_per_frame_sets{};
+    std::vector<vk::raii::DescriptorSet> m_texture_sets{};
     std::unique_ptr<rhi::Image> m_texture_image{nullptr};
     std::unique_ptr<rhi::Sampler> m_texture_sampler{nullptr};
 
@@ -278,43 +282,69 @@ public:
 
         m_uniform_buffers = make_per_frame_mapped_uniform_buffers(m_uniform_buffer_size);
 
-        m_descriptor_system = std::make_unique<rhi::DescriptorSystem>(
-            rhi::DescriptorSystem::Builder(m_device)
-                .add_set("per_frame", 0, m_frame_count, [](rhi::DescriptorSetLayout::Builder& builder) {
-                    builder.add_binding(0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex);
-                })
-                .add_set("texture", 1, 1, [](rhi::DescriptorSetLayout::Builder& builder) {
-                    builder.add_binding(0, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment);
-                })
-                .build()
+        rhi::DescriptorSetLayout::Builder per_frame_layout_builder;
+        per_frame_layout_builder.add_binding(
+            0,
+            vk::DescriptorType::eUniformBuffer,
+            vk::ShaderStageFlagBits::eVertex
+        );
+        m_per_frame_layout = std::make_unique<rhi::DescriptorSetLayout>(
+            per_frame_layout_builder.build(m_device)
         );
 
-        m_descriptor_system->update_set(
-            "per_frame",
-            [this](rhi::DescriptorWriter& writer, uint32_t index) {
-                writer.write_buffer(0, *m_uniform_buffers[index]->buffer(), 0, m_uniform_buffer_size);
-            }).update_set(
-            "texture",
-            [this](rhi::DescriptorWriter& writer, uint32_t /*index*/) {
-                writer.write_combined_image(
-                    0,
-                    *m_texture_image->image_view(),
-                    *m_texture_sampler->sampler(),
-                    vk::ImageLayout::eShaderReadOnlyOptimal
-                );
-            }
+        rhi::DescriptorSetLayout::Builder texture_layout_builder;
+        texture_layout_builder.add_binding(
+            0,
+            vk::DescriptorType::eCombinedImageSampler,
+            vk::ShaderStageFlagBits::eFragment
+        );
+        m_texture_layout = std::make_unique<rhi::DescriptorSetLayout>(
+            texture_layout_builder.build(m_device)
         );
 
-        auto layout_info = rhi::DescriptorSystem::make_pipeline_layout_info(*m_descriptor_system);
-        m_pipeline_layout = vk::raii::PipelineLayout{m_device->device(), layout_info.info};
+        rhi::DescriptorPool::Builder descriptor_pool_builder;
+        descriptor_pool_builder
+            .add_layout(*m_per_frame_layout, m_frame_count)
+            .add_layout(*m_texture_layout, 1)
+            .set_flags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
+        m_descriptor_pool = std::make_unique<rhi::DescriptorPool>(
+            descriptor_pool_builder.build(m_device)
+        );
+
+        m_per_frame_sets = m_descriptor_pool->allocate_multiple(*m_per_frame_layout, m_frame_count);
+        m_texture_sets = m_descriptor_pool->allocate_multiple(*m_texture_layout, 1);
+
+        for (uint32_t index = 0; index < m_frame_count; ++index) {
+            rhi::DescriptorWriter writer;
+            writer.write_buffer(0, *m_uniform_buffers[index]->buffer(), 0, m_uniform_buffer_size);
+            writer.update(m_device, *m_per_frame_sets[index]);
+        }
+        {
+            rhi::DescriptorWriter writer;
+            writer.write_combined_image(
+                0,
+                *m_texture_image->image_view(),
+                *m_texture_sampler->sampler(),
+                vk::ImageLayout::eShaderReadOnlyOptimal
+            );
+            writer.update(m_device, *m_texture_sets[0]);
+        }
+
+        std::array<vk::DescriptorSetLayout, 2> set_layouts{
+            *m_per_frame_layout->layout(),
+            *m_texture_layout->layout()
+        };
+        vk::PipelineLayoutCreateInfo pipeline_layout_info{};
+        pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(set_layouts.size());
+        pipeline_layout_info.pSetLayouts = set_layouts.data();
+        m_pipeline_layout = vk::raii::PipelineLayout{m_device->device(), pipeline_layout_info};
 
         create_graphics_pipeline();
 
         m_forward_pass = std::make_unique<render::ForwardPass>(
             m_mesh.get(),
             &m_pipeline_layout,
-            &m_pipeline,
-            m_descriptor_system.get()
+            &m_pipeline
         );
 
         m_imgui_pass = std::make_unique<render::ImGUIPass>(
@@ -374,14 +404,15 @@ public:
             throw std::runtime_error("Forward pipeline passes are not initialized.");
         }
 
-        m_forward_pass->bind_frame_resources(ForwardPass::FrameResources{
+        m_forward_pass->bind_render_pass_resources(ForwardPass::RenderPassResources{
             .uniform_buffer = m_uniform_buffers[frame_index].get(),
             .depth_image = m_depth_images[frame_index].get(),
-            .per_frame_set = &m_descriptor_system->get_set("per_frame", frame_index)
+            .per_frame_set = &m_per_frame_sets[frame_index],
+            .texture_set = &m_texture_sets[0]
         });
         m_forward_pass->execute(ctx);
 
-        m_imgui_pass->bind_frame_resources(ImGUIPass::FrameResources{
+        m_imgui_pass->bind_render_pass_resources(ImGUIPass::RenderPassResources{
             .depth_image = m_depth_images[frame_index].get()
         });
         m_imgui_pass->execute(ctx);
