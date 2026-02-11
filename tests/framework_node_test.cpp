@@ -4,87 +4,74 @@
 
 #include "framework/framework.hpp"
 
-namespace rtr::framework::core::test {
-
-static glm::vec3 translation_of(const glm::mat4& m) {
-    return {m[3][0], m[3][1], m[3][2]};
-}
+namespace rtr::framework::component::test {
 
 TEST(FrameworkNodeTest, ParentChildWorldTransformPropagation) {
-    Scene scene(1, "scene");
-    auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
+    auto parent = Node::create();
+    auto child = Node::create();
 
-    auto& parent_node = parent.add_component<component::NodeComponent>();
-    auto& child_node = child.add_component<component::NodeComponent>();
+    parent->set_position({1.0f, 2.0f, 3.0f});
+    child->set_position({0.0f, 1.0f, 0.0f});
 
-    parent_node.set_local_position({1.0f, 2.0f, 3.0f});
-    child_node.set_local_position({0.0f, 1.0f, 0.0f});
+    parent->add_child(child);
 
-    ASSERT_TRUE(scene.set_parent(child.id(), parent.id()));
-    scene.update_world_transforms();
-
-    EXPECT_EQ(translation_of(parent_node.world_matrix()), glm::vec3(1.0f, 2.0f, 3.0f));
-    EXPECT_EQ(translation_of(child_node.world_matrix()), glm::vec3(1.0f, 3.0f, 3.0f));
+    EXPECT_EQ(parent->world_position(), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(child->world_position(), glm::vec3(1.0f, 3.0f, 3.0f));
 }
 
 TEST(FrameworkNodeTest, DirtyPropagatesFromParentToChild) {
-    Scene scene(1, "scene");
-    auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
+    auto parent = Node::create();
+    auto child = Node::create();
 
-    auto& parent_node = parent.add_component<component::NodeComponent>();
-    auto& child_node = child.add_component<component::NodeComponent>();
+    parent->set_position({1.0f, 0.0f, 0.0f});
+    child->set_position({2.0f, 0.0f, 0.0f});
+    parent->add_child(child);
 
-    parent_node.set_local_position({1.0f, 0.0f, 0.0f});
-    child_node.set_local_position({2.0f, 0.0f, 0.0f});
-    ASSERT_TRUE(scene.set_parent(child.id(), parent.id()));
-    scene.update_world_transforms();
-    EXPECT_EQ(translation_of(child_node.world_matrix()), glm::vec3(3.0f, 0.0f, 0.0f));
+    EXPECT_EQ(child->world_position(), glm::vec3(3.0f, 0.0f, 0.0f));
+    EXPECT_FALSE(parent->is_dirty());
+    EXPECT_FALSE(child->is_dirty());
 
-    parent_node.set_local_position({10.0f, 0.0f, 0.0f});
-    scene.update_world_transforms();
-    EXPECT_EQ(translation_of(child_node.world_matrix()), glm::vec3(12.0f, 0.0f, 0.0f));
+    parent->set_position({10.0f, 0.0f, 0.0f});
+    EXPECT_TRUE(parent->is_dirty());
+    EXPECT_TRUE(child->is_dirty());
+
+    EXPECT_EQ(child->world_position(), glm::vec3(12.0f, 0.0f, 0.0f));
 }
 
-TEST(FrameworkNodeTest, DisabledGameObjectSkipsTransformUpdateUntilReenabled) {
-    Scene scene(1, "scene");
-    auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
+TEST(FrameworkNodeTest, AddChildWithWorldPositionStaysKeepsWorldTransform) {
+    auto parent = Node::create();
+    auto child = Node::create();
 
-    auto& parent_node = parent.add_component<component::NodeComponent>();
-    auto& child_node = child.add_component<component::NodeComponent>();
+    parent->set_position({10.0f, 0.0f, 0.0f});
+    child->set_position({5.0f, 0.0f, 0.0f});
+    const glm::vec3 before = child->world_position();
 
-    parent_node.set_local_position({2.0f, 0.0f, 0.0f});
-    child_node.set_local_position({1.0f, 0.0f, 0.0f});
-    ASSERT_TRUE(scene.set_parent(child.id(), parent.id()));
+    parent->add_child(child, true);
 
-    child.set_enabled(false);
-    scene.update_world_transforms();
-    EXPECT_EQ(translation_of(child_node.world_matrix()), glm::vec3(0.0f, 0.0f, 0.0f));
-
-    child.set_enabled(true);
-    scene.update_world_transforms();
-    EXPECT_EQ(translation_of(child_node.world_matrix()), glm::vec3(3.0f, 0.0f, 0.0f));
+    EXPECT_EQ(child->world_position(), before);
+    EXPECT_EQ(child->position(), glm::vec3(-5.0f, 0.0f, 0.0f));
 }
 
 TEST(FrameworkNodeTest, RejectsCycleInParenting) {
-    Scene scene(1, "scene");
-    auto& a = scene.create_game_object("a");
-    auto& b = scene.create_game_object("b");
-    auto& c = scene.create_game_object("c");
+    auto a = Node::create();
+    auto b = Node::create();
+    auto c = Node::create();
 
-    (void)a.add_component<component::NodeComponent>();
-    (void)b.add_component<component::NodeComponent>();
-    (void)c.add_component<component::NodeComponent>();
+    a->add_child(b);
+    b->add_child(c);
 
-    ASSERT_TRUE(scene.set_parent(b.id(), a.id()));
-    ASSERT_TRUE(scene.set_parent(c.id(), b.id()));
-
-    EXPECT_FALSE(scene.set_parent(a.id(), c.id()));
+    EXPECT_THROW(c->add_child(a), std::invalid_argument);
 }
 
-} // namespace rtr::framework::core::test
+TEST(FrameworkNodeTest, NodeComponentOwnsNodeInstanceOnAwake) {
+    rtr::framework::core::GameObject go(1, "go");
+    auto& node_component = go.add_component<NodeComponent>();
+
+    ASSERT_NE(node_component.node(), nullptr);
+    EXPECT_EQ(node_component.node()->children().size(), 0u);
+}
+
+} // namespace rtr::framework::component::test
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

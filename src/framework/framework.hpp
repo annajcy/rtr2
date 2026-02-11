@@ -1,6 +1,7 @@
 #pragma once
 
 #include "framework/component/component.hpp"
+#include "framework/component/node.hpp"
 #include "framework/component/node_component.hpp"
 #include "framework/core/engine.hpp"
 #include "framework/core/game_object.hpp"
