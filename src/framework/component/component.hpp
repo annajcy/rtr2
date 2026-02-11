@@ -2,7 +2,7 @@
 
 #include "framework/core/tick_context.hpp"
 
-namespace rtr::framework::world {
+namespace rtr::framework::core {
 class GameObject;
 }
 
@@ -11,14 +11,14 @@ namespace rtr::framework::component {
 class Component {
 private:
     bool m_enabled{true};
-    world::GameObject* m_owner{nullptr};
+    core::GameObject* m_owner{nullptr};
 
 protected:
-    void bind_owner(world::GameObject* owner) {
+    void bind_owner(core::GameObject* owner) {
         m_owner = owner;
     }
 
-    friend class rtr::framework::world::GameObject;
+    friend class rtr::framework::core::GameObject;
 
 public:
     virtual ~Component() = default;
@@ -31,11 +31,11 @@ public:
         m_enabled = enabled;
     }
 
-    world::GameObject* owner() {
+    core::GameObject* owner() {
         return m_owner;
     }
 
-    const world::GameObject* owner() const {
+    const core::GameObject* owner() const {
         return m_owner;
     }
 
