@@ -134,6 +134,17 @@ private:
         }
     }
 
+    void set_enabled_recursive(GameObjectId id, bool enabled) {
+        auto it = m_nodes.find(id);
+        if (it == m_nodes.end()) {
+            return;
+        }
+        it->second.is_enabled = enabled;
+        for (const auto child_id : it->second.children) {
+            set_enabled_recursive(child_id, enabled);
+        }
+    }
+
     void collect_subtree_postorder_recursive(GameObjectId id, std::vector<GameObjectId>& out) const {
         const auto it = m_nodes.find(id);
         if (it == m_nodes.end()) {
@@ -316,7 +327,7 @@ public:
         if (!has_node(id) || id == kVirtualRootId) {
             return;
         }
-        checked_record(id).is_enabled = enabled;
+        set_enabled_recursive(id, enabled);
     }
 
     void update_world_transforms() {

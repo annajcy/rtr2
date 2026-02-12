@@ -87,6 +87,25 @@ TEST(SceneGraphTest, ParentInactiveMakesChildInactive) {
     EXPECT_FALSE(std::find(active.begin(), active.end(), child.id()) != active.end());
 }
 
+TEST(SceneGraphTest, SetEnabledRecursivelyAffectsSubtree) {
+    Scene scene(1, "scene");
+    auto& parent = scene.create_game_object("parent");
+    auto& child = scene.create_game_object("child");
+    auto& grandchild = scene.create_game_object("grandchild");
+    ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id()));
+    ASSERT_TRUE(scene.scene_graph().set_parent(grandchild.id(), child.id()));
+
+    scene.scene_graph().set_enabled(parent.id(), false);
+    EXPECT_FALSE(scene.scene_graph().node(parent.id()).is_enabled());
+    EXPECT_FALSE(scene.scene_graph().node(child.id()).is_enabled());
+    EXPECT_FALSE(scene.scene_graph().node(grandchild.id()).is_enabled());
+
+    scene.scene_graph().set_enabled(parent.id(), true);
+    EXPECT_TRUE(scene.scene_graph().node(parent.id()).is_enabled());
+    EXPECT_TRUE(scene.scene_graph().node(child.id()).is_enabled());
+    EXPECT_TRUE(scene.scene_graph().node(grandchild.id()).is_enabled());
+}
+
 TEST(SceneGraphTest, DirtyFlagPropagatesToSubtree) {
     Scene scene(1, "scene");
     auto& parent = scene.create_game_object("parent");
