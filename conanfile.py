@@ -36,6 +36,7 @@ class RTRDeps(ConanFile):
         self.requires("vulkan-loader/[>=1.3]")
         self.requires("glm/cci.20230113")
         self.requires("tinyobjloader/2.0.0-rc10")
+        self.requires("pugixml/1.14")
 
         # 本地 recipe：conan create . --name=slang --version=2025.10.4
         ver = str(self.options.slang_version)

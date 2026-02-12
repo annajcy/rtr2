@@ -15,3 +15,6 @@ target_link_libraries(shadertoy_main PRIVATE rtr)
 
 add_executable(compute_buffer_add_main compute_buffer_add_main.cpp)
 target_link_libraries(compute_buffer_add_main PRIVATE rtr)
+
+add_executable(pbpt_cbox_roundtrip_main pbpt_cbox_roundtrip_main.cpp)
+target_link_libraries(pbpt_cbox_roundtrip_main PRIVATE rtr)

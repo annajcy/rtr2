@@ -78,6 +78,13 @@ target_include_directories(framework_pbpt_scene_export_builder_test PRIVATE ${CM
 target_link_libraries(framework_pbpt_scene_export_builder_test PRIVATE gtest::gtest glm::glm)
 gtest_discover_tests(framework_pbpt_scene_export_builder_test)
 
+add_executable(framework_pbpt_scene_importer_test
+    framework_pbpt_scene_importer_test.cpp
+)
+target_include_directories(framework_pbpt_scene_importer_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(framework_pbpt_scene_importer_test PRIVATE gtest::gtest rtr)
+gtest_discover_tests(framework_pbpt_scene_importer_test)
+
 add_executable(framework_free_look_camera_controller_test
     framework_free_look_camera_controller_test.cpp
 )

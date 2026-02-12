@@ -206,6 +206,36 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerUsesStableRowMajorMatrixOrde
     }
 }
 
+TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsSensorAndIntegratorWithMatrix) {
+    core::Scene scene(1, "scene");
+
+    auto& camera_go = scene.create_game_object("camera");
+    auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
+    camera.fov_degrees() = 39.3077f;
+    camera.near_bound() = 10.0f;
+    camera.far_bound() = 2800.0f;
+    camera_go.node().set_local_position({278.0f, 273.0f, -800.0f});
+    camera_go.node().look_at_direction({0.0f, 0.0f, 1.0f});
+    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+
+    auto& mesh_go = scene.create_game_object("mesh");
+    (void)mesh_go.add_component<component::MeshRenderer>("assets/models/spot.obj", "");
+    auto& pbpt_mesh = mesh_go.add_component<component::PbptMesh>();
+    pbpt_mesh.set_reflectance_spectrum(make_test_spectrum(0.2f));
+
+    scene.scene_graph().update_world_transforms();
+
+    const auto record = build_pbpt_scene_record(scene);
+    const std::string xml = serialize_pbpt_scene_xml(record);
+
+    EXPECT_NE(xml.find("<integrator type=\"path\">"), std::string::npos);
+    EXPECT_NE(xml.find("<integer name=\"maxDepth\" value=\"-1\"/>"), std::string::npos);
+    EXPECT_NE(xml.find("<sensor type=\"perspective\">"), std::string::npos);
+    EXPECT_NE(xml.find("<transform name=\"toWorld\">"), std::string::npos);
+    EXPECT_NE(xml.find("<matrix value=\""), std::string::npos);
+    EXPECT_NE(xml.find("<spectrum name=\"reflectance\""), std::string::npos);
+}
+
 TEST(FrameworkPbptSceneExportBuilderTest, SerializerThrowsWhenShapeMeshPathIsEmpty) {
     PbptSceneRecord record{};
     record.shapes.emplace_back(PbptShapeRecord{

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <iomanip>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -10,13 +11,32 @@
 #include <vector>
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 
 #include "framework/component/mesh_renderer.hpp"
 #include "framework/component/pbpt_light.hpp"
 #include "framework/component/pbpt_mesh.hpp"
+#include "framework/core/camera.hpp"
 #include "framework/core/scene.hpp"
 
 namespace rtr::framework::integration {
+
+struct PbptIntegratorRecord {
+    std::string type{"path"};
+    int max_depth{-1};
+};
+
+struct PbptSensorRecord {
+    glm::mat4 to_world{1.0f};
+    float fov_degrees{45.0f};
+    float near_clip{0.1f};
+    float far_clip{1000.0f};
+    float focus_distance{1000.0f};
+    int film_width{512};
+    int film_height{512};
+    int sample_count{4};
+    std::string fov_axis{"smaller"};
+};
 
 struct PbptShapeRecord {
     std::string object_name{};
@@ -31,6 +51,8 @@ struct PbptShapeRecord {
 };
 
 struct PbptSceneRecord {
+    std::optional<PbptIntegratorRecord> integrator{PbptIntegratorRecord{}};
+    std::optional<PbptSensorRecord> sensor{};
     std::vector<PbptShapeRecord> shapes{};
 };
 
@@ -76,6 +98,18 @@ inline std::string serialize_matrix_row_major(const glm::mat4& matrix) {
 
 inline PbptSceneRecord build_pbpt_scene_record(const core::Scene& scene) {
     PbptSceneRecord record{};
+    record.integrator = PbptIntegratorRecord{};
+
+    const auto* active_camera = scene.active_camera();
+    if (const auto* perspective_camera = dynamic_cast<const core::PerspectiveCamera*>(active_camera);
+        perspective_camera != nullptr) {
+        PbptSensorRecord sensor{};
+        sensor.to_world = perspective_camera->node().world_matrix();
+        sensor.fov_degrees = perspective_camera->fov_degrees();
+        sensor.near_clip = perspective_camera->near_bound();
+        sensor.far_clip = perspective_camera->far_bound();
+        record.sensor = sensor;
+    }
 
     std::unordered_map<std::string, std::string> material_ids{};
 
@@ -169,6 +203,48 @@ inline std::string serialize_pbpt_scene_xml(const PbptSceneRecord& record) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n\n";
     xml << "<scene version=\"0.4.0\">\n";
+
+    if (record.integrator.has_value()) {
+        const auto& integrator = record.integrator.value();
+        xml << "  <integrator type=\""
+            << detail::escape_xml(integrator.type)
+            << "\">\n";
+        xml << "    <integer name=\"maxDepth\" value=\"" << integrator.max_depth << "\"/>\n";
+        xml << "  </integrator>\n";
+    }
+
+    if (record.sensor.has_value()) {
+        const auto& sensor = record.sensor.value();
+        if (sensor.film_width <= 0 || sensor.film_height <= 0) {
+            throw std::runtime_error("Pbpt sensor film size must be positive.");
+        }
+        if (sensor.sample_count <= 0) {
+            throw std::runtime_error("Pbpt sensor sample_count must be positive.");
+        }
+
+        xml << "  <sensor type=\"perspective\">\n";
+        xml << "    <string name=\"fovAxis\" value=\""
+            << detail::escape_xml(sensor.fov_axis)
+            << "\"/>\n";
+        xml << "    <float name=\"nearClip\" value=\"" << sensor.near_clip << "\"/>\n";
+        xml << "    <float name=\"farClip\" value=\"" << sensor.far_clip << "\"/>\n";
+        xml << "    <float name=\"focusDistance\" value=\"" << sensor.focus_distance << "\"/>\n";
+        xml << "    <transform name=\"toWorld\">\n";
+        xml << "      <matrix value=\""
+            << detail::serialize_matrix_row_major(sensor.to_world)
+            << "\"/>\n";
+        xml << "    </transform>\n";
+        xml << "    <float name=\"fov\" value=\"" << sensor.fov_degrees << "\"/>\n";
+        xml << "    <sampler type=\"ldsampler\">\n";
+        xml << "      <integer name=\"sampleCount\" value=\"" << sensor.sample_count << "\"/>\n";
+        xml << "    </sampler>\n";
+        xml << "    <film type=\"hdrfilm\">\n";
+        xml << "      <integer name=\"width\" value=\"" << sensor.film_width << "\"/>\n";
+        xml << "      <integer name=\"height\" value=\"" << sensor.film_height << "\"/>\n";
+        xml << "      <rfilter type=\"gaussian\"/>\n";
+        xml << "    </film>\n";
+        xml << "  </sensor>\n";
+    }
 
     for (const auto& material : materials) {
         xml << "  <bsdf type=\"diffuse\" id=\"" << material.id << "\">\n";
