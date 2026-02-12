@@ -29,7 +29,7 @@ private:
             if (!game_object) {
                 continue;
             }
-            m_scene_graph.set_self_enabled(game_object->id(), game_object->enabled());
+            m_scene_graph.set_enabled(game_object->id(), game_object->enabled());
         }
     }
 
@@ -161,7 +161,6 @@ public:
             return;
         }
         sync_scene_graph_enabled_state();
-        m_scene_graph.rebuild_active_set(m_enabled);
         m_scene_graph.update_world_transforms();
         for (const auto& game_object : m_game_objects) {
             if (game_object) {

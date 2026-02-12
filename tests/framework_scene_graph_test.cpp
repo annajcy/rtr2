@@ -82,11 +82,9 @@ TEST(SceneGraphTest, ParentInactiveMakesChildInactive) {
     parent.set_enabled(false);
     scene.tick(FrameTickContext{.delta_seconds = 0.016, .unscaled_delta_seconds = 0.016, .frame_index = 0});
 
-    const auto& active = scene.scene_graph().active_nodes();
+    const auto active = scene.scene_graph().active_nodes();
     EXPECT_FALSE(std::find(active.begin(), active.end(), parent.id()) != active.end());
     EXPECT_FALSE(std::find(active.begin(), active.end(), child.id()) != active.end());
-    EXPECT_FALSE(scene.scene_graph().node(parent.id()).hierarchy_active());
-    EXPECT_FALSE(scene.scene_graph().node(child.id()).hierarchy_active());
 }
 
 TEST(SceneGraphTest, DirtyFlagPropagatesToSubtree) {
@@ -156,13 +154,14 @@ TEST(SceneGraphTest, SnapshotRoundTripPreservesHierarchyAndLocalTransform) {
     graph.node(1).set_local_position({10.0f, 0.0f, 0.0f});
     graph.node(2).set_local_position({1.0f, 0.0f, 0.0f});
     graph.node(3).set_local_position({2.0f, 0.0f, 0.0f});
-    graph.set_self_enabled(2, false);
+    graph.set_enabled(2, false);
     graph.update_world_transforms();
 
     const SceneGraphSnapshot snapshot = graph.to_snapshot();
 
-    SceneGraph restored;
-    ASSERT_TRUE(restored.from_snapshot(snapshot));
+    auto restored_opt = SceneGraph::from_snapshot(snapshot);
+    ASSERT_TRUE(restored_opt.has_value());
+    SceneGraph& restored = *restored_opt;
     EXPECT_TRUE(restored.has_node(1));
     EXPECT_TRUE(restored.has_node(2));
     EXPECT_TRUE(restored.has_node(3));
@@ -171,7 +170,7 @@ TEST(SceneGraphTest, SnapshotRoundTripPreservesHierarchyAndLocalTransform) {
     expect_vec3_near(restored.node(1).local_position(), {10.0f, 0.0f, 0.0f});
     expect_vec3_near(restored.node(2).local_position(), {1.0f, 0.0f, 0.0f});
     expect_vec3_near(restored.node(3).local_position(), {2.0f, 0.0f, 0.0f});
-    EXPECT_FALSE(restored.node(2).self_enabled());
+    EXPECT_FALSE(restored.node(2).is_enabled());
 }
 
 } // namespace rtr::framework::core::test

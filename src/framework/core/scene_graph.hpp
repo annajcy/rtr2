@@ -2,9 +2,9 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -22,7 +22,7 @@ struct SceneGraphNodeSnapshot {
     glm::vec3 local_position{0.0f, 0.0f, 0.0f};
     glm::quat local_rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 local_scale{1.0f, 1.0f, 1.0f};
-    bool self_enabled{true};
+    bool is_enabled{true};
     std::vector<GameObjectId> children{};
 };
 
@@ -46,15 +46,13 @@ public:
         glm::mat4 world_matrix{1.0f};
 
         bool dirty{true};
-        bool self_enabled{true};
-        bool hierarchy_active{true};
+        bool is_enabled{true};
     };
 
 private:
     static constexpr float kEpsilon = 1e-6f;
 
     std::unordered_map<GameObjectId, NodeRecord> m_nodes{};
-    std::vector<GameObjectId> m_active_nodes{};
 
     static glm::mat4 compose_local_matrix(const NodeRecord& node) {
         glm::mat4 transform = glm::translate(glm::mat4{1.0f}, node.local_position);
@@ -165,19 +163,22 @@ private:
         }
     }
 
-    void rebuild_active_recursive(GameObjectId id, bool parent_active) {
+    void collect_active_recursive(
+        GameObjectId id,
+        bool parent_active,
+        std::vector<GameObjectId>& out
+    ) const {
         auto it = m_nodes.find(id);
         if (it == m_nodes.end()) {
             return;
         }
-        NodeRecord& node = it->second;
-        const bool active = parent_active && node.self_enabled;
-        node.hierarchy_active = active;
+        const NodeRecord& node = it->second;
+        const bool active = parent_active && node.is_enabled;
         if (id != kVirtualRootId && active) {
-            m_active_nodes.emplace_back(id);
+            out.emplace_back(id);
         }
         for (const auto child_id : node.children) {
-            rebuild_active_recursive(child_id, active);
+            collect_active_recursive(child_id, active, out);
         }
     }
 
@@ -216,8 +217,7 @@ public:
         root.parent_id = kVirtualRootId;
         root.world_matrix = glm::mat4{1.0f};
         root.dirty = false;
-        root.self_enabled = true;
-        root.hierarchy_active = true;
+        root.is_enabled = true;
         m_nodes.emplace(kVirtualRootId, std::move(root));
     }
 
@@ -233,8 +233,7 @@ public:
         record.id = id;
         record.parent_id = kVirtualRootId;
         record.dirty = true;
-        record.self_enabled = true;
-        record.hierarchy_active = true;
+        record.is_enabled = true;
         m_nodes.emplace(id, std::move(record));
         checked_record(kVirtualRootId).children.emplace_back(id);
         return true;
@@ -259,7 +258,6 @@ public:
         }
 
         const auto subtree = collect_subtree_postorder(root_id);
-        std::unordered_set<GameObjectId> removed{subtree.begin(), subtree.end()};
 
         for (const auto id : subtree) {
             auto it = m_nodes.find(id);
@@ -269,13 +267,6 @@ public:
             remove_child_link(it->second.parent_id, id);
             m_nodes.erase(it);
         }
-
-        const auto active_it = std::remove_if(
-            m_active_nodes.begin(),
-            m_active_nodes.end(),
-            [&removed](GameObjectId id) { return removed.contains(id); }
-        );
-        m_active_nodes.erase(active_it, m_active_nodes.end());
         return true;
     }
 
@@ -321,20 +312,11 @@ public:
         return set_parent(child, kVirtualRootId, world_position_stays);
     }
 
-    void set_self_enabled(GameObjectId id, bool enabled) {
+    void set_enabled(GameObjectId id, bool enabled) {
         if (!has_node(id) || id == kVirtualRootId) {
             return;
         }
-        checked_record(id).self_enabled = enabled;
-    }
-
-    void rebuild_active_set(bool scene_enabled) {
-        m_active_nodes.clear();
-        NodeRecord& root = checked_record(kVirtualRootId);
-        root.hierarchy_active = scene_enabled;
-        for (const auto child_id : root.children) {
-            rebuild_active_recursive(child_id, scene_enabled);
-        }
+        checked_record(id).is_enabled = enabled;
     }
 
     void update_world_transforms() {
@@ -344,8 +326,14 @@ public:
         }
     }
 
-    const std::vector<GameObjectId>& active_nodes() const {
-        return m_active_nodes;
+    std::vector<GameObjectId> active_nodes() const {
+        std::vector<GameObjectId> result{};
+        result.reserve(m_nodes.size() > 0 ? m_nodes.size() - 1 : 0);
+        const NodeRecord& root = checked_record(kVirtualRootId);
+        for (const auto child_id : root.children) {
+            collect_active_recursive(child_id, true, result);
+        }
+        return result;
     }
 
     auto node(GameObjectId id);
@@ -373,29 +361,28 @@ public:
             node.local_position = record.local_position;
             node.local_rotation = record.local_rotation;
             node.local_scale = record.local_scale;
-            node.self_enabled = record.self_enabled;
+            node.is_enabled = record.is_enabled;
             node.children = record.children;
             snapshot.nodes.emplace_back(std::move(node));
         }
         return snapshot;
     }
 
-    bool from_snapshot(const SceneGraphSnapshot& snapshot) {
-        m_nodes.clear();
-        m_active_nodes.clear();
+    static std::optional<SceneGraph> from_snapshot(const SceneGraphSnapshot& snapshot) {
+        SceneGraph graph;
+        graph.m_nodes.clear();
 
         NodeRecord root{};
         root.id = kVirtualRootId;
         root.parent_id = kVirtualRootId;
         root.world_matrix = glm::mat4{1.0f};
         root.dirty = false;
-        root.self_enabled = true;
-        root.hierarchy_active = true;
-        m_nodes.emplace(kVirtualRootId, std::move(root));
+        root.is_enabled = true;
+        graph.m_nodes.emplace(kVirtualRootId, std::move(root));
 
         for (const auto& item : snapshot.nodes) {
-            if (item.id == kVirtualRootId || m_nodes.contains(item.id)) {
-                return false;
+            if (item.id == kVirtualRootId || graph.m_nodes.contains(item.id)) {
+                return std::nullopt;
             }
             NodeRecord record{};
             record.id = item.id;
@@ -403,43 +390,42 @@ public:
             record.local_position = item.local_position;
             record.local_rotation = item.local_rotation;
             record.local_scale = item.local_scale;
-            record.self_enabled = item.self_enabled;
+            record.is_enabled = item.is_enabled;
             record.children = item.children;
             record.dirty = true;
-            m_nodes.emplace(item.id, std::move(record));
+            graph.m_nodes.emplace(item.id, std::move(record));
         }
 
-        checked_record(kVirtualRootId).children = snapshot.root_children;
+        graph.checked_record(kVirtualRootId).children = snapshot.root_children;
 
         for (const auto& item : snapshot.nodes) {
-            if (!has_node(item.id)) {
-                return false;
+            if (!graph.has_node(item.id)) {
+                return std::nullopt;
             }
-            if (item.parent_id != kVirtualRootId && !has_node(item.parent_id)) {
-                return false;
+            if (item.parent_id != kVirtualRootId && !graph.has_node(item.parent_id)) {
+                return std::nullopt;
             }
             for (const auto child_id : item.children) {
-                if (!has_node(child_id)) {
-                    return false;
+                if (!graph.has_node(child_id)) {
+                    return std::nullopt;
                 }
-                if (checked_record(child_id).parent_id != item.id) {
-                    return false;
+                if (graph.checked_record(child_id).parent_id != item.id) {
+                    return std::nullopt;
                 }
             }
         }
 
         for (const auto child_id : snapshot.root_children) {
-            if (!has_node(child_id)) {
-                return false;
+            if (!graph.has_node(child_id)) {
+                return std::nullopt;
             }
-            if (checked_record(child_id).parent_id != kVirtualRootId) {
-                return false;
+            if (graph.checked_record(child_id).parent_id != kVirtualRootId) {
+                return std::nullopt;
             }
         }
 
-        rebuild_active_set(true);
-        update_world_transforms();
-        return true;
+        graph.update_world_transforms();
+        return graph;
     }
 
 private:

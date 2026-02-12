@@ -62,12 +62,8 @@ public:
         return m_graph->checked_record(m_id).dirty;
     }
 
-    bool self_enabled() const {
-        return m_graph->checked_record(m_id).self_enabled;
-    }
-
-    bool hierarchy_active() const {
-        return m_graph->checked_record(m_id).hierarchy_active;
+    bool is_enabled() const {
+        return m_graph->checked_record(m_id).is_enabled;
     }
 };
 
