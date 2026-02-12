@@ -57,6 +57,13 @@ target_include_directories(framework_pbpt_mesh_test PRIVATE ${CMAKE_SOURCE_DIR}/
 target_link_libraries(framework_pbpt_mesh_test PRIVATE gtest::gtest glm::glm)
 gtest_discover_tests(framework_pbpt_mesh_test)
 
+add_executable(framework_pbpt_light_test
+    framework_pbpt_light_test.cpp
+)
+target_include_directories(framework_pbpt_light_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(framework_pbpt_light_test PRIVATE gtest::gtest glm::glm)
+gtest_discover_tests(framework_pbpt_light_test)
+
 add_executable(framework_forward_scene_view_builder_test
     framework_forward_scene_view_builder_test.cpp
 )

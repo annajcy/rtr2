@@ -65,3 +65,27 @@ cmake --preset conan-debug
 cmake --build --preset conan-debug
 ```
 If the preset name differs, run `cmake --list-presets` to check the available names.
+
+# PBPT integration
+
+Initialize the PBPT submodule:
+```bash
+git submodule update --init --recursive
+```
+
+`PbptMesh` and `PbptLight` use spectrum points (`lambda_nm`, `value`) and
+serialize to Mitsuba-style XML:
+- BSDF reflectance: `<spectrum name="reflectance" value="..."/>`
+- Area light radiance: `<spectrum name="radiance" value="..."/>`
+
+Default spectrum points:
+- Reflectance: `400:0.7, 500:0.7, 600:0.7, 700:0.7`
+- Radiance: `400:1.0, 500:1.0, 600:1.0, 700:1.0`
+
+To manually validate Cornell Box rendering in PBPT:
+```bash
+cd external/pbpt
+# follow PBPT's own dependency/build steps
+# then run a cbox example that loads:
+# asset/scene/cbox/cbox.xml
+```

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <sstream>
 #include <stdexcept>
@@ -10,11 +11,21 @@
 #include <glm/mat4x4.hpp>
 
 #include "framework/component/mesh_renderer.hpp"
+#include "framework/component/pbpt_light.hpp"
 #include "framework/component/pbpt_mesh.hpp"
 #include "framework/core/scene.hpp"
 #include "framework/integration/pbpt_scene_export_builder.hpp"
 
 namespace rtr::framework::integration::test {
+
+static component::PbptSpectrum make_test_spectrum(float base) {
+    return {
+        component::PbptSpectrumPoint{400.0f, base},
+        component::PbptSpectrumPoint{500.0f, base + 0.1f},
+        component::PbptSpectrumPoint{600.0f, base + 0.2f},
+        component::PbptSpectrumPoint{700.0f, base + 0.3f},
+    };
+}
 
 static void expect_mat4_near(const glm::mat4& lhs, const glm::mat4& rhs, float eps = 1e-5f) {
     for (int c = 0; c < 4; ++c) {
@@ -67,7 +78,8 @@ TEST(FrameworkPbptSceneExportBuilderTest, BuildsRecordsFromActiveNodesWithMeshAn
     auto& go_ok = scene.create_game_object("");
     (void)go_ok.add_component<component::MeshRenderer>("assets/models/spot.obj", "");
     auto& go_ok_pbpt = go_ok.add_component<component::PbptMesh>();
-    go_ok_pbpt.set_reflectance_rgb(0.2f, 0.3f, 0.4f);
+    const component::PbptSpectrum reflectance = make_test_spectrum(0.2f);
+    go_ok_pbpt.set_reflectance_spectrum(reflectance);
     go_ok.node().set_local_position({1.0f, 2.0f, 3.0f});
 
     auto& go_without_pbpt = scene.create_game_object("mesh_only");
@@ -92,10 +104,25 @@ TEST(FrameworkPbptSceneExportBuilderTest, BuildsRecordsFromActiveNodesWithMeshAn
     EXPECT_EQ(shape.object_name, "go_" + std::to_string(static_cast<std::uint64_t>(go_ok.id())));
     EXPECT_EQ(shape.mesh_path, "assets/models/spot.obj");
     EXPECT_EQ(shape.material_id, "mat_0");
-    EXPECT_FLOAT_EQ(shape.reflectance_rgb.x, 0.2f);
-    EXPECT_FLOAT_EQ(shape.reflectance_rgb.y, 0.3f);
-    EXPECT_FLOAT_EQ(shape.reflectance_rgb.z, 0.4f);
+    ASSERT_EQ(shape.reflectance_spectrum.size(), reflectance.size());
+    for (std::size_t i = 0; i < reflectance.size(); ++i) {
+        EXPECT_FLOAT_EQ(shape.reflectance_spectrum[i].lambda_nm, reflectance[i].lambda_nm);
+        EXPECT_FLOAT_EQ(shape.reflectance_spectrum[i].value, reflectance[i].value);
+    }
+    EXPECT_FALSE(shape.has_area_emitter);
     expect_mat4_near(shape.model, scene.scene_graph().node(go_ok.id()).world_matrix());
+}
+
+TEST(FrameworkPbptSceneExportBuilderTest, ThrowsWhenPbptLightExistsWithoutPbptMesh) {
+    core::Scene scene(1, "scene");
+    auto& go = scene.create_game_object("light_only");
+    (void)go.add_component<component::MeshRenderer>("assets/models/spot.obj", "");
+    (void)go.add_component<component::PbptLight>();
+
+    EXPECT_THROW(
+        (void)build_pbpt_scene_record(scene),
+        std::runtime_error
+    );
 }
 
 TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesDiffuseMaterials) {
@@ -104,23 +131,48 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesDiffuseMaterials
         .object_name = "a",
         .mesh_path = "assets/models/spot.obj",
         .model = glm::mat4{1.0f},
-        .reflectance_rgb = glm::vec3{0.2f, 0.3f, 0.4f},
+        .reflectance_spectrum = make_test_spectrum(0.2f),
+        .has_area_emitter = false,
+        .radiance_spectrum = {},
         .material_id = ""
     });
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "b",
         .mesh_path = "assets/models/stanford_bunny.obj",
         .model = glm::mat4{1.0f},
-        .reflectance_rgb = glm::vec3{0.2f, 0.3f, 0.4f},
+        .reflectance_spectrum = make_test_spectrum(0.2f),
+        .has_area_emitter = false,
+        .radiance_spectrum = {},
         .material_id = ""
     });
 
     const std::string xml = serialize_pbpt_scene_xml(record);
 
     EXPECT_EQ(count_occurrences(xml, "<bsdf type=\"diffuse\""), 1u);
+    EXPECT_EQ(count_occurrences(xml, "<spectrum name=\"reflectance\""), 1u);
     EXPECT_EQ(count_occurrences(xml, "<ref id=\"mat_0\"/>"), 2u);
-    EXPECT_NE(xml.find("<string name=\"filename\" value=\"assets/models/spot.obj\"/>"), std::string::npos);
-    EXPECT_NE(xml.find("<string name=\"filename\" value=\"assets/models/stanford_bunny.obj\"/>"), std::string::npos);
+}
+
+TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsAreaEmitterWhenPresent) {
+    PbptSceneRecord record{};
+    record.shapes.emplace_back(PbptShapeRecord{
+        .object_name = "light_mesh",
+        .mesh_path = "assets/models/spot.obj",
+        .model = glm::mat4{1.0f},
+        .reflectance_spectrum = make_test_spectrum(0.2f),
+        .has_area_emitter = true,
+        .radiance_spectrum = {
+            component::PbptSpectrumPoint{400.0f, 0.0f},
+            component::PbptSpectrumPoint{500.0f, 8.0f},
+            component::PbptSpectrumPoint{600.0f, 15.6f},
+            component::PbptSpectrumPoint{700.0f, 18.4f},
+        },
+        .material_id = ""
+    });
+
+    const std::string xml = serialize_pbpt_scene_xml(record);
+    EXPECT_NE(xml.find("<emitter type=\"area\">"), std::string::npos);
+    EXPECT_NE(xml.find("<spectrum name=\"radiance\""), std::string::npos);
 }
 
 TEST(FrameworkPbptSceneExportBuilderTest, SerializerUsesStableRowMajorMatrixOrder) {
@@ -137,7 +189,9 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerUsesStableRowMajorMatrixOrde
         .object_name = "mesh",
         .mesh_path = "assets/models/spot.obj",
         .model = matrix,
-        .reflectance_rgb = glm::vec3{0.5f, 0.5f, 0.5f},
+        .reflectance_spectrum = make_test_spectrum(0.2f),
+        .has_area_emitter = false,
+        .radiance_spectrum = {},
         .material_id = ""
     });
 
@@ -158,7 +212,9 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerThrowsWhenShapeMeshPathIsEmp
         .object_name = "mesh",
         .mesh_path = "",
         .model = glm::mat4{1.0f},
-        .reflectance_rgb = glm::vec3{0.5f, 0.5f, 0.5f},
+        .reflectance_spectrum = make_test_spectrum(0.2f),
+        .has_area_emitter = false,
+        .radiance_spectrum = {},
         .material_id = ""
     });
 

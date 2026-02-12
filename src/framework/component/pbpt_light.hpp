@@ -11,23 +11,23 @@
 
 namespace rtr::framework::component {
 
-struct PbptDiffuseBsdf {
-    PbptSpectrum reflectance_spectrum{make_constant_pbpt_spectrum(0.7f)};
+struct PbptAreaEmitter {
+    PbptSpectrum radiance_spectrum{make_constant_pbpt_spectrum(1.0f)};
 };
 
-class PbptMesh final : public Component {
+class PbptLight final : public Component {
 private:
-    PbptDiffuseBsdf m_diffuse_bsdf{};
+    PbptAreaEmitter m_area_emitter{};
 
     const MeshRenderer& require_mesh_renderer() const {
         const auto* go = owner();
         if (go == nullptr) {
-            throw std::runtime_error("PbptMesh owner is null.");
+            throw std::runtime_error("PbptLight owner is null.");
         }
 
         const auto* renderer = go->get_component<MeshRenderer>();
         if (renderer == nullptr) {
-            throw std::runtime_error("PbptMesh requires MeshRenderer on the same GameObject.");
+            throw std::runtime_error("PbptLight requires MeshRenderer on the same GameObject.");
         }
 
         return *renderer;
@@ -46,17 +46,13 @@ public:
         return require_mesh_renderer().mesh_path();
     }
 
-    const PbptDiffuseBsdf& diffuse_bsdf() const {
-        return m_diffuse_bsdf;
+    const PbptAreaEmitter& area_emitter() const {
+        return m_area_emitter;
     }
 
-    const PbptSpectrum& reflectance_spectrum() const {
-        return m_diffuse_bsdf.reflectance_spectrum;
-    }
-
-    void set_reflectance_spectrum(PbptSpectrum points) {
-        validate_pbpt_spectrum(points, "PbptMesh.reflectance_spectrum");
-        m_diffuse_bsdf.reflectance_spectrum = std::move(points);
+    void set_radiance_spectrum(PbptSpectrum points) {
+        validate_pbpt_spectrum(points, "PbptLight.radiance_spectrum");
+        m_area_emitter.radiance_spectrum = std::move(points);
     }
 };
 
