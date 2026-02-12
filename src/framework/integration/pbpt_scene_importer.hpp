@@ -18,23 +18,28 @@
 #include <pugixml.hpp>
 
 #include "framework/component/mesh_renderer.hpp"
+#include "framework/component/free_look_camera_controller.hpp"
 #include "framework/component/pbpt_light.hpp"
 #include "framework/component/pbpt_mesh.hpp"
 #include "framework/component/pbpt_spectrum.hpp"
 #include "framework/core/camera.hpp"
 #include "framework/core/scene.hpp"
 #include "framework/integration/pbpt_scene_export_builder.hpp"
+#include "system/input/input_state.hpp"
 
 namespace rtr::framework::integration {
 
 struct PbptImportOptions {
     bool resolve_mesh_to_absolute{true};
     bool require_supported_cbox_subset{true};
+    // When set, importer attaches FreeLookCameraController to the imported active camera.
+    const system::input::InputState* free_look_input_state{nullptr};
 };
 
 struct PbptImportResult {
     std::size_t imported_shape_count{0};
     std::size_t imported_light_shape_count{0};
+    std::unordered_map<std::string, core::GameObjectId> imported_game_object_id_by_name{};
     std::optional<PbptIntegratorRecord> integrator{};
     std::optional<PbptSensorRecord> sensor{};
 };
@@ -249,7 +254,29 @@ inline glm::mat4 parse_sensor_to_world(
             const glm::vec3 origin = parse_vec3_csv(origin_text, "sensor.lookAt.origin");
             const glm::vec3 target = parse_vec3_csv(target_text, "sensor.lookAt.target");
             const glm::vec3 up = parse_vec3_csv(up_text, "sensor.lookAt.up");
-            to_world = glm::inverse(glm::lookAt(origin, target, up));
+            const glm::vec3 forward = glm::normalize(target - origin);
+            if (glm::length(forward) < 1e-6f) {
+                throw std::runtime_error("sensor.lookAt origin and target must be different.");
+            }
+
+            glm::vec3 up_dir = glm::normalize(up);
+            if (glm::length(up_dir) < 1e-6f) {
+                throw std::runtime_error("sensor.lookAt up vector must be non-zero.");
+            }
+
+            // RTR camera convention: local -Z is front, +Y is up.
+            const glm::vec3 right = glm::normalize(glm::cross(forward, up_dir));
+            if (glm::length(right) < 1e-6f) {
+                throw std::runtime_error("sensor.lookAt up vector must not be parallel to view direction.");
+            }
+
+            up_dir = glm::normalize(glm::cross(right, forward));
+            to_world = glm::mat4{1.0f};
+            to_world[0] = glm::vec4(right, 0.0f);
+            to_world[1] = glm::vec4(up_dir, 0.0f);
+            // Local +Z points backwards when local -Z is camera forward.
+            to_world[2] = glm::vec4(-forward, 0.0f);
+            to_world[3] = glm::vec4(origin, 1.0f);
             has_look_at = true;
             continue;
         }
@@ -292,6 +319,17 @@ inline std::string default_object_name(
     }
 
     return "shape_" + std::to_string(fallback_index);
+}
+
+inline void register_imported_game_object(
+    PbptImportResult& result,
+    const std::string& name,
+    core::GameObjectId id
+) {
+    auto [_, inserted] = result.imported_game_object_id_by_name.emplace(name, id);
+    if (!inserted) {
+        throw std::runtime_error("Duplicate imported game object name: " + name);
+    }
 }
 
 } // namespace detail
@@ -423,6 +461,13 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
                                 static_cast<float>(std::max(1, sensor.film_height)));
         camera_go.node().set_local_model_matrix(sensor.to_world);
         (void)scene.set_active_camera(camera_go.id());
+        detail::register_imported_game_object(result, camera_go.name(), camera_go.id());
+        if (options.free_look_input_state != nullptr) {
+            (void)camera_go.add_component<component::FreeLookCameraController>(
+                options.free_look_input_state,
+                &scene.camera_manager()
+            );
+        }
 
         result.sensor = sensor;
     }
@@ -468,6 +513,7 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
         auto& go = scene.create_game_object(
             detail::default_object_name(shape_node, mesh_path, shape_index)
         );
+        detail::register_imported_game_object(result, go.name(), go.id());
         (void)go.add_component<component::MeshRenderer>(mesh_path.string(), "");
         auto& pbpt_mesh = go.add_component<component::PbptMesh>();
         pbpt_mesh.set_reflectance_spectrum(reflectance_by_bsdf_id.at(bsdf_id));

@@ -133,7 +133,7 @@ TEST(FrameworkCameraTest, CameraFrontMatchesGameObjectWorldFront) {
     );
     scene.scene_graph().update_world_transforms();
 
-    expect_vec3_near(camera.front(), scene.scene_graph().node(camera_go.id()).world_front());
+    expect_vec3_near(camera.front(), scene.scene_graph().node(camera_go.id()).world_back());
 }
 
 TEST(FrameworkCameraTest, CameraViewMatrixUsesNodeWorldTransform) {
@@ -146,7 +146,7 @@ TEST(FrameworkCameraTest, CameraViewMatrixUsesNodeWorldTransform) {
 
     const glm::mat4 expected = glm::lookAt(
         glm::vec3(1.0f, 2.0f, 3.0f),
-        glm::vec3(1.0f, 2.0f, 4.0f),
+        glm::vec3(1.0f, 2.0f, 2.0f),
         glm::vec3(0.0f, 1.0f, 0.0f)
     );
     expect_mat4_near(camera.view_matrix(), expected);

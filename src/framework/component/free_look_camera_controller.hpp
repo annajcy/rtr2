@@ -28,6 +28,8 @@ struct FreeLookCameraControllerConfig {
 
 class FreeLookCameraController final : public Component {
 private:
+    static constexpr float kEpsilon = 1e-5f;
+
     const system::input::InputState* m_input_state{nullptr};
     core::CameraManager* m_camera_manager{nullptr};
     FreeLookCameraControllerConfig m_config{};
@@ -70,8 +72,14 @@ private:
     }
 
     void initialize_angles_from_front() {
-        const auto node = owner()->node();
-        const glm::vec3 front = glm::normalize(node.world_front());
+        auto* camera = m_camera_manager->camera(owner()->id());
+        if (camera == nullptr) {
+            throw std::runtime_error(
+                "FreeLookCameraController owner does not have a bound camera."
+            );
+        }
+
+        const glm::vec3 front = glm::normalize(camera->front());
         m_yaw_degrees = glm::degrees(std::atan2(front.x, front.z));
         m_pitch_degrees = glm::degrees(std::asin(glm::clamp(front.y, -1.0f, 1.0f)));
         m_pitch_degrees = glm::clamp(
@@ -80,6 +88,24 @@ private:
             m_config.pitch_max_degrees
         );
         m_angles_initialized = true;
+    }
+
+    glm::quat world_rotation_looking_to(const glm::vec3& forward_dir) const {
+        const glm::vec3 forward = glm::normalize(forward_dir);
+        glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+        if (glm::length(glm::cross(up, forward)) <= kEpsilon) {
+            up = glm::vec3(0.0f, 0.0f, 1.0f);
+            if (glm::length(glm::cross(up, forward)) <= kEpsilon) {
+                up = glm::vec3(1.0f, 0.0f, 0.0f);
+            }
+        }
+
+        const glm::vec3 right = glm::normalize(glm::cross(forward, up));
+        const glm::vec3 corrected_up = glm::normalize(glm::cross(right, forward));
+
+        // Camera convention: local -Z is front.
+        const glm::mat3 basis(right, corrected_up, -forward);
+        return glm::normalize(glm::quat_cast(basis));
     }
 
 public:
@@ -142,15 +168,15 @@ public:
                 m_config.pitch_max_degrees
             );
 
-            const glm::quat yaw_q = glm::angleAxis(
-                glm::radians(m_yaw_degrees),
-                glm::vec3(0.0f, 1.0f, 0.0f)
-            );
-            const glm::quat pitch_q = glm::angleAxis(
-                glm::radians(m_pitch_degrees),
-                glm::vec3(1.0f, 0.0f, 0.0f)
-            );
-            node.set_local_rotation(glm::normalize(yaw_q * pitch_q));
+            const float yaw_rad = glm::radians(m_yaw_degrees);
+            const float pitch_rad = glm::radians(m_pitch_degrees);
+            const float cos_pitch = std::cos(pitch_rad);
+            const glm::vec3 desired_front = glm::normalize(glm::vec3{
+                std::sin(yaw_rad) * cos_pitch,
+                std::sin(pitch_rad),
+                std::cos(yaw_rad) * cos_pitch
+            });
+            node.set_world_rotation(world_rotation_looking_to(desired_front));
         }
 
         float speed = m_config.move_speed;
@@ -159,7 +185,13 @@ public:
         }
 
         glm::vec3 move_direction(0.0f);
-        const glm::vec3 world_front = node.world_front();
+        auto* camera = m_camera_manager->camera(go->id());
+        if (camera == nullptr) {
+            throw std::runtime_error(
+                "FreeLookCameraController owner does not have a bound camera."
+            );
+        }
+        const glm::vec3 world_front = camera->front();
         const glm::vec3 world_right = node.world_right();
         const glm::vec3 world_up = node.world_up();
 
@@ -190,12 +222,6 @@ public:
 
         const float scroll_y = static_cast<float>(m_input_state->mouse_scroll_dy());
         if (scroll_y != 0.0f) {
-            auto* camera = m_camera_manager->camera(go->id());
-            if (camera == nullptr) {
-                throw std::runtime_error(
-                    "FreeLookCameraController owner does not have a bound camera."
-                );
-            }
             camera->adjust_zoom(scroll_y * m_config.zoom_speed);
         }
     }

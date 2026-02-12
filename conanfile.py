@@ -20,7 +20,8 @@ class RTRDeps(ConanFile):
         "build_tests": True,
         "build_examples": True,
         "compile_shaders": True,
-        "slang_version": "2025.10.4"
+        "slang_version": "2025.10.4",
+        "embree/*:shared": True
     }
 
     generators = "CMakeDeps", "VirtualBuildEnv", "VirtualRunEnv"
@@ -37,6 +38,9 @@ class RTRDeps(ConanFile):
         self.requires("glm/cci.20230113")
         self.requires("tinyobjloader/2.0.0-rc10")
         self.requires("pugixml/1.14")
+        self.requires("openexr/3.2.4")
+        self.requires("embree/4.4.0")
+        self.requires("onetbb/2021.12.0")
 
         # 本地 recipe：conan create . --name=slang --version=2025.10.4
         ver = str(self.options.slang_version)

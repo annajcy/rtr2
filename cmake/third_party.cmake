@@ -15,6 +15,9 @@ find_package(slang          CONFIG REQUIRED)
 find_package(glm            CONFIG REQUIRED)
 find_package(tinyobjloader  CONFIG REQUIRED)
 find_package(pugixml        CONFIG REQUIRED)
+find_package(OpenEXR        CONFIG REQUIRED)
+find_package(embree         CONFIG REQUIRED)
+find_package(TBB            CONFIG REQUIRED)
 
 # build imgui with Vulkan and GLFW backends
 add_library(imgui_vk STATIC)

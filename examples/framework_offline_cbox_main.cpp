@@ -1,0 +1,344 @@
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+
+#include "imgui.h"
+#include "pugixml.hpp"
+
+#include "framework/core/camera.hpp"
+#include "framework/core/engine.hpp"
+#include "framework/integration/forward_scene_view_builder.hpp"
+#include "framework/integration/pbpt_offline_render_service.hpp"
+#include "framework/integration/pbpt_scene_importer.hpp"
+#include "system/input/input_system.hpp"
+#include "system/input/input_types.hpp"
+#include "system/render/forward_pipeline.hpp"
+#include "system/render/renderer.hpp"
+
+namespace {
+
+constexpr uint32_t kMaxFramesInFlight = 2;
+
+constexpr const char* kCboxScenePath =
+    "/Users/jinceyang/Desktop/codebase/graphics/rtr2/external/pbpt/asset/scene/cbox/cbox.xml";
+constexpr const char* kDefaultSceneXmlPath =
+    "/Users/jinceyang/Desktop/codebase/graphics/rtr2/external/pbpt/asset/scene/cbox/cbox_rtr_runtime.xml";
+constexpr const char* kDefaultOutputExrPath =
+    "/Users/jinceyang/Desktop/codebase/graphics/rtr2/external/pbpt/output/offline_ui.exr";
+
+constexpr std::size_t kPathBufferSize = 1024;
+
+const char* to_state_label(rtr::framework::integration::OfflineRenderState state) {
+    using rtr::framework::integration::OfflineRenderState;
+    switch (state) {
+        case OfflineRenderState::Idle:
+            return "Idle";
+        case OfflineRenderState::Running:
+            return "Running";
+        case OfflineRenderState::Succeeded:
+            return "Succeeded";
+        case OfflineRenderState::Failed:
+            return "Failed";
+        case OfflineRenderState::Canceled:
+            return "Canceled";
+    }
+    return "Unknown";
+}
+
+void set_path_buffer(std::array<char, kPathBufferSize>& buffer, const std::string& value) {
+    std::fill(buffer.begin(), buffer.end(), '\0');
+    if (value.empty()) {
+        return;
+    }
+    std::strncpy(buffer.data(), value.c_str(), buffer.size() - 1);
+}
+
+bool is_render_start_allowed(rtr::framework::integration::OfflineRenderState state) {
+    using rtr::framework::integration::OfflineRenderState;
+    return state == OfflineRenderState::Idle ||
+        state == OfflineRenderState::Succeeded ||
+        state == OfflineRenderState::Failed ||
+        state == OfflineRenderState::Canceled;
+}
+
+struct ExportResolutionInfo {
+    int window_w{0};
+    int window_h{0};
+    float scale_x{1.0f};
+    float scale_y{1.0f};
+    int framebuffer_w{0};
+    int framebuffer_h{0};
+    int export_w{0};
+    int export_h{0};
+};
+
+ExportResolutionInfo resolve_export_resolution(
+    const rtr::rhi::Window& window,
+    uint32_t fallback_w,
+    uint32_t fallback_h
+) {
+    ExportResolutionInfo info{};
+
+    const auto [fb_w, fb_h] = window.framebuffer_size();
+    info.framebuffer_w = fb_w;
+    info.framebuffer_h = fb_h;
+
+    GLFWwindow* glfw_window = window.window();
+    if (glfw_window != nullptr) {
+        glfwGetWindowSize(glfw_window, &info.window_w, &info.window_h);
+        glfwGetWindowContentScale(glfw_window, &info.scale_x, &info.scale_y);
+    }
+
+    if (info.window_w > 0 && info.window_h > 0) {
+        info.export_w = info.window_w;
+        info.export_h = info.window_h;
+    } else if (fb_w > 0 && fb_h > 0) {
+        info.export_w = fb_w;
+        info.export_h = fb_h;
+    } else {
+        info.export_w = static_cast<int>(fallback_w);
+        info.export_h = static_cast<int>(fallback_h);
+    }
+
+    return info;
+}
+
+std::pair<uint32_t, uint32_t> resolve_resolution_from_pbpt_scene_xml(const char* xml_path) {
+    pugi::xml_document doc;
+    const auto parse_result = doc.load_file(xml_path);
+    if (!parse_result) {
+        throw std::runtime_error(
+            std::string("Failed to load scene XML for resolution: ") + parse_result.description()
+        );
+    }
+
+    const auto scene_node = doc.child("scene");
+    const auto sensor_node = scene_node.child("sensor");
+    const auto film_node = sensor_node.child("film");
+    if (!scene_node || !sensor_node || !film_node) {
+        throw std::runtime_error("scene/sensor/film node is missing in input cbox.xml.");
+    }
+
+    int width = -1;
+    int height = -1;
+    for (const auto& integer_node : film_node.children("integer")) {
+        const std::string name = integer_node.attribute("name").value();
+        if (name == "width") {
+            width = integer_node.attribute("value").as_int(-1);
+        } else if (name == "height") {
+            height = integer_node.attribute("value").as_int(-1);
+        }
+    }
+
+    if (width <= 0 || height <= 0) {
+        throw std::runtime_error("Input cbox.xml film width/height must be positive.");
+    }
+    return {
+        static_cast<uint32_t>(width),
+        static_cast<uint32_t>(height)
+    };
+}
+
+} // namespace
+
+int main() {
+    try {
+        const auto [scene_width, scene_height] = resolve_resolution_from_pbpt_scene_xml(kCboxScenePath);
+
+        auto renderer = std::make_unique<rtr::system::render::Renderer>(
+            static_cast<int>(scene_width),
+            static_cast<int>(scene_height),
+            "RTR Framework Offline CBox",
+            kMaxFramesInFlight
+        );
+
+        auto pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
+            renderer->build_pipeline_runtime(),
+            rtr::system::render::ForwardPipelineConfig{}
+        );
+        auto* forward_pipeline = pipeline.get();
+
+        auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
+        input_system->set_is_intercept_capture([forward_pipeline](bool is_mouse) {
+            if (is_mouse) {
+                return forward_pipeline->imgui_pass().wants_capture_mouse();
+            }
+            return forward_pipeline->imgui_pass().wants_capture_keyboard();
+        });
+
+        renderer->set_pipeline(std::move(pipeline));
+
+        rtr::framework::core::Engine engine(rtr::framework::core::EngineConfig{
+            .window_width = scene_width,
+            .window_height = scene_height,
+            .window_title = "RTR Framework Offline CBox",
+            .max_frames_in_flight = kMaxFramesInFlight
+        });
+
+        auto& scene = engine.world().create_scene("cbox_scene");
+        rtr::framework::integration::PbptImportOptions import_options{};
+        import_options.free_look_input_state = &input_system->state();
+        const auto import_result = rtr::framework::integration::import_pbpt_scene_xml_to_scene(
+            kCboxScenePath,
+            scene,
+            import_options
+        );
+
+        const auto remove_required_imported_game_object = [&](const char* name) {
+            const auto it = import_result.imported_game_object_id_by_name.find(name);
+            if (it == import_result.imported_game_object_id_by_name.end()) {
+                throw std::runtime_error(std::string("Imported cbox scene does not contain ") + name + ".");
+            }
+            if (!scene.destroy_game_object(it->second)) {
+                throw std::runtime_error(std::string("Failed to destroy imported ") + name + " game object.");
+            }
+        };
+
+        // Remove selected cbox primitives from the imported scene.
+        remove_required_imported_game_object("cbox_floor");
+        remove_required_imported_game_object("cbox_redwall");
+
+        if (scene.active_camera() == nullptr) {
+            throw std::runtime_error("Imported cbox scene has no active camera.");
+        }
+
+        struct OfflineRenderUiState {
+            std::array<char, kPathBufferSize> output_exr_path{};
+            std::array<char, kPathBufferSize> scene_xml_path{};
+            int spp{16};
+        } ui_state{};
+
+        set_path_buffer(ui_state.output_exr_path, kDefaultOutputExrPath);
+        set_path_buffer(ui_state.scene_xml_path, kDefaultSceneXmlPath);
+
+        rtr::framework::integration::PbptOfflineRenderService offline_render_service{};
+
+        forward_pipeline->imgui_pass().set_ui_callback([&]() {
+            const auto state = offline_render_service.state();
+
+            ImGui::Begin("Offline Render");
+            ImGui::Text("Imported shapes: %zu", import_result.imported_shape_count);
+            ImGui::Text("Imported lights: %zu", import_result.imported_light_shape_count);
+            ImGui::Text("Scene film: %u x %u", scene_width, scene_height);
+
+            ImGui::InputText(
+                "Output EXR",
+                ui_state.output_exr_path.data(),
+                ui_state.output_exr_path.size()
+            );
+            ImGui::InputText(
+                "Scene XML",
+                ui_state.scene_xml_path.data(),
+                ui_state.scene_xml_path.size()
+            );
+            ImGui::InputInt("SPP", &ui_state.spp);
+            ui_state.spp = std::clamp(ui_state.spp, 1, 4096);
+            const auto export_resolution = resolve_export_resolution(
+                renderer->window(),
+                scene_width,
+                scene_height
+            );
+            ImGui::Text("Window: %d x %d", export_resolution.window_w, export_resolution.window_h);
+            ImGui::Text("Scale: %.2f x %.2f", export_resolution.scale_x, export_resolution.scale_y);
+            ImGui::Text(
+                "Framebuffer: %d x %d",
+                export_resolution.framebuffer_w,
+                export_resolution.framebuffer_h
+            );
+            ImGui::Text("Export Film: %d x %d", export_resolution.export_w, export_resolution.export_h);
+
+            const bool can_render = is_render_start_allowed(state);
+            const bool can_cancel = state == rtr::framework::integration::OfflineRenderState::Running;
+
+            if (!can_render) {
+                ImGui::BeginDisabled();
+            }
+            if (ImGui::Button("Render")) {
+                auto* active_scene = engine.world().active_scene();
+                if (active_scene == nullptr) {
+                    throw std::runtime_error("No active scene to export for offline render.");
+                }
+
+                const rtr::framework::integration::OfflineRenderConfig config{
+                    .scene_xml_path = std::string(ui_state.scene_xml_path.data()),
+                    .output_exr_path = std::string(ui_state.output_exr_path.data()),
+                    .spp = ui_state.spp,
+                    .film_width = export_resolution.export_w,
+                    .film_height = export_resolution.export_h
+                };
+                (void)offline_render_service.start(*active_scene, config);
+            }
+            if (!can_render) {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::SameLine();
+            if (!can_cancel) {
+                ImGui::BeginDisabled();
+            }
+            if (ImGui::Button("Cancel")) {
+                offline_render_service.request_cancel();
+            }
+            if (!can_cancel) {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::ProgressBar(
+                std::clamp(offline_render_service.progress_01(), 0.0f, 1.0f),
+                ImVec2(-1.0f, 0.0f)
+            );
+            ImGui::Text("State: %s", to_state_label(state));
+            ImGui::TextWrapped("Message: %s", offline_render_service.last_message().c_str());
+            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+            ImGui::End();
+        });
+
+        engine.set_loop_hooks(rtr::framework::core::Engine::LoopHooks{
+            .input_begin = [&]() { input_system->begin_frame(); },
+            .input_poll = [&]() { renderer->window().poll_events(); },
+            .input_end = [&]() { input_system->end_frame(); },
+            .render = [&]() {
+                auto* active_scene = engine.world().active_scene();
+                if (active_scene == nullptr) {
+                    throw std::runtime_error("No active scene.");
+                }
+
+                auto* active_camera = active_scene->active_camera();
+                if (active_camera == nullptr) {
+                    throw std::runtime_error("Active scene has no active camera.");
+                }
+
+                const auto [fb_w, fb_h] = renderer->window().framebuffer_size();
+                if (fb_w > 0 && fb_h > 0) {
+                    active_camera->set_aspect_ratio(
+                        static_cast<float>(fb_w) / static_cast<float>(fb_h)
+                    );
+                }
+
+                forward_pipeline->set_scene_view(
+                    rtr::framework::integration::build_forward_scene_view(*active_scene)
+                );
+                renderer->draw_frame();
+
+                if (input_system->state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
+                    renderer->window().close();
+                }
+            },
+            .should_close = [&]() { return renderer->window().is_should_close(); }
+        });
+
+        engine.run();
+        renderer->device().wait_idle();
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}

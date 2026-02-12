@@ -82,14 +82,14 @@ public:
     }
 
     glm::vec3 front() const {
-        return node().world_front();
+        // Camera convention: local -Z is forward.
+        return node().world_back();
     }
 
     glm::mat4 view_matrix() const {
-        const auto node_view = node();
-        const glm::vec3 eye = node_view.world_position();
-        const glm::vec3 center = eye + node_view.world_front();
-        return glm::lookAt(eye, center, node_view.world_up());
+        // Keep RTR view transform strictly consistent with exported PBPT
+        // sensor.toWorld: view = inverse(camera_to_world).
+        return glm::inverse(node().world_matrix());
     }
 
     virtual glm::mat4 projection_matrix() const = 0;
@@ -137,7 +137,7 @@ public:
     void adjust_zoom(float delta_zoom) override {
         auto node_view = node();
         node_view.set_world_position(
-            node_view.world_position() + node_view.world_front() * delta_zoom
+            node_view.world_position() + front() * delta_zoom
         );
     }
 

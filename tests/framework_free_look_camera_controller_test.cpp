@@ -81,8 +81,8 @@ TEST(FrameworkFreeLookCameraControllerTest, ShiftAppliesSprintMultiplier) {
     scene.tick(ctx);
     const float sprint_distance = scene.scene_graph().node(go.id()).world_position().z;
 
-    EXPECT_NEAR(normal_distance, 5.0f, 1e-4f);
-    EXPECT_NEAR(sprint_distance, 15.0f, 1e-4f);
+    EXPECT_NEAR(normal_distance, -5.0f, 1e-4f);
+    EXPECT_NEAR(sprint_distance, -15.0f, 1e-4f);
     EXPECT_NEAR(sprint_distance / normal_distance, 3.0f, 1e-4f);
 }
 
@@ -133,7 +133,9 @@ TEST(FrameworkFreeLookCameraControllerTest, PitchIsClamped) {
     input.update_mouse_position(0.0, -2000.0);
     scene.tick(ctx);
 
-    const glm::vec3 front = scene.scene_graph().node(go.id()).world_front();
+    const auto* camera = dynamic_cast<const core::PerspectiveCamera*>(scene.active_camera());
+    ASSERT_NE(camera, nullptr);
+    const glm::vec3 front = camera->front();
     const float pitch_deg = glm::degrees(std::asin(glm::clamp(front.y, -1.0f, 1.0f)));
     EXPECT_LE(pitch_deg, 89.0f + 1e-3f);
     EXPECT_GE(pitch_deg, -89.0f - 1e-3f);
@@ -152,7 +154,7 @@ TEST(FrameworkFreeLookCameraControllerTest, ScrollCallsAdjustZoom) {
     scene.tick(ctx);
 
     const glm::vec3 pos = scene.scene_graph().node(go.id()).world_position();
-    EXPECT_NEAR(pos.z, 0.8f, 1e-4f);
+    EXPECT_NEAR(pos.z, -0.8f, 1e-4f);
 }
 
 TEST(FrameworkFreeLookCameraControllerTest, OnlyActiveCameraResponds) {
@@ -170,13 +172,13 @@ TEST(FrameworkFreeLookCameraControllerTest, OnlyActiveCameraResponds) {
     input.update_key(system::input::KeyCode::W, system::input::KeyAction::PRESS, system::input::KeyMod::NONE);
 
     scene.tick(ctx);
-    EXPECT_NEAR(scene.scene_graph().node(go_a.id()).world_position().z, 5.0f, 1e-4f);
+    EXPECT_NEAR(scene.scene_graph().node(go_a.id()).world_position().z, -5.0f, 1e-4f);
     EXPECT_NEAR(scene.scene_graph().node(go_b.id()).world_position().z, 0.0f, 1e-4f);
 
     ASSERT_TRUE(scene.set_active_camera(go_b.id()));
     scene.tick(ctx);
-    EXPECT_NEAR(scene.scene_graph().node(go_a.id()).world_position().z, 5.0f, 1e-4f);
-    EXPECT_NEAR(scene.scene_graph().node(go_b.id()).world_position().z, 5.0f, 1e-4f);
+    EXPECT_NEAR(scene.scene_graph().node(go_a.id()).world_position().z, -5.0f, 1e-4f);
+    EXPECT_NEAR(scene.scene_graph().node(go_b.id()).world_position().z, -5.0f, 1e-4f);
 }
 
 TEST(FrameworkFreeLookCameraControllerTest, ThrowsWhenOwnerHasNoCamera) {

@@ -8,10 +8,12 @@
 #include <glm/vec3.hpp>
 
 #include "framework/component/mesh_renderer.hpp"
+#include "framework/component/free_look_camera_controller.hpp"
 #include "framework/component/pbpt_light.hpp"
 #include "framework/component/pbpt_mesh.hpp"
 #include "framework/core/scene.hpp"
 #include "framework/integration/pbpt_scene_importer.hpp"
+#include "system/input/input_state.hpp"
 
 namespace rtr::framework::integration::test {
 
@@ -115,6 +117,12 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
 
     const auto* mesh_go = find_mesh_object(scene);
     ASSERT_NE(mesh_go, nullptr);
+    ASSERT_TRUE(result.imported_game_object_id_by_name.contains("mesh_a"));
+    EXPECT_EQ(result.imported_game_object_id_by_name.at("mesh_a"), mesh_go->id());
+    ASSERT_TRUE(result.imported_game_object_id_by_name.contains("pbpt_camera"));
+    const auto* camera_go = scene.find_game_object(scene.camera_manager().active_camera_owner_id());
+    ASSERT_NE(camera_go, nullptr);
+    EXPECT_EQ(result.imported_game_object_id_by_name.at("pbpt_camera"), camera_go->id());
 
     const auto* renderer = mesh_go->get_component<component::MeshRenderer>();
     const auto* pbpt_mesh = mesh_go->get_component<component::PbptMesh>();
@@ -172,6 +180,143 @@ TEST(FrameworkPbptSceneImporterTest, ThrowsForInvalidMatrixElementCount) {
     EXPECT_THROW(
         (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene),
         std::runtime_error
+    );
+}
+
+TEST(FrameworkPbptSceneImporterTest, ThrowsForDuplicateImportedNameBetweenCameraAndShape) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_duplicate_name_test");
+
+    const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
+    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+
+    const auto xml_path = temp_dir.path / "scene_duplicate_name.xml";
+    write_text_file(
+        xml_path,
+        R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <sensor type="perspective">
+    <float name="fov" value="45"/>
+    <film type="hdrfilm">
+      <integer name="width" value="64"/>
+      <integer name="height" value="64"/>
+    </film>
+  </sensor>
+  <bsdf type="diffuse" id="mat_white">
+    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
+  </bsdf>
+  <shape type="obj" id="pbpt_camera">
+    <string name="filename" value="meshes/tri.obj"/>
+    <ref id="mat_white"/>
+  </shape>
+</scene>)XML"
+    );
+
+    core::Scene scene(1, "scene");
+    EXPECT_THROW(
+        (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene),
+        std::runtime_error
+    );
+}
+
+TEST(FrameworkPbptSceneImporterTest, RecordsDefaultShapeNameWhenShapeIdMissing) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_default_name_test");
+
+    const auto mesh_path = temp_dir.path / "meshes" / "tri_default.obj";
+    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+
+    const auto xml_path = temp_dir.path / "scene_default_name.xml";
+    write_text_file(
+        xml_path,
+        R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <bsdf type="diffuse" id="mat_white">
+    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
+  </bsdf>
+  <shape type="obj">
+    <string name="filename" value="meshes/tri_default.obj"/>
+    <ref id="mat_white"/>
+  </shape>
+</scene>)XML"
+    );
+
+    core::Scene scene(1, "scene");
+    const auto result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene);
+
+    EXPECT_EQ(result.imported_shape_count, 1u);
+    ASSERT_TRUE(result.imported_game_object_id_by_name.contains("tri_default"));
+    const auto imported_id = result.imported_game_object_id_by_name.at("tri_default");
+    const auto* imported_go = scene.find_game_object(imported_id);
+    ASSERT_NE(imported_go, nullptr);
+    EXPECT_EQ(imported_go->name(), "tri_default");
+}
+
+TEST(FrameworkPbptSceneImporterTest, LookAtSensorAlignsWithRtrCameraFrontConvention) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_lookat_camera_test");
+
+    const auto xml_path = temp_dir.path / "scene_lookat.xml";
+    write_text_file(
+        xml_path,
+        R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <sensor type="perspective">
+    <transform name="toWorld">
+      <lookAt origin="0, 0, 0" target="0, 0, 1" up="0, 1, 0"/>
+    </transform>
+    <float name="fov" value="45"/>
+    <film type="hdrfilm">
+      <integer name="width" value="64"/>
+      <integer name="height" value="64"/>
+    </film>
+  </sensor>
+</scene>)XML"
+    );
+
+    core::Scene scene(1, "scene");
+    (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene);
+
+    const auto* camera = dynamic_cast<const core::PerspectiveCamera*>(scene.active_camera());
+    ASSERT_NE(camera, nullptr);
+
+    const glm::vec3 front = camera->front();
+    EXPECT_NEAR(front.x, 0.0f, 1e-5f);
+    EXPECT_NEAR(front.y, 0.0f, 1e-5f);
+    EXPECT_NEAR(front.z, 1.0f, 1e-5f);
+}
+
+TEST(FrameworkPbptSceneImporterTest, AttachesFreeLookControllerWhenInputStateProvided) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_freelook_test");
+
+    const auto xml_path = temp_dir.path / "scene_with_sensor.xml";
+    write_text_file(
+        xml_path,
+        R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <sensor type="perspective">
+    <transform name="toWorld">
+      <lookAt origin="0, 0, 0" target="0, 0, 1" up="0, 1, 0"/>
+    </transform>
+    <float name="fov" value="45"/>
+    <film type="hdrfilm">
+      <integer name="width" value="64"/>
+      <integer name="height" value="64"/>
+    </film>
+  </sensor>
+</scene>)XML"
+    );
+
+    core::Scene scene(1, "scene");
+    system::input::InputState input_state{};
+    PbptImportOptions options{};
+    options.free_look_input_state = &input_state;
+    (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, options);
+
+    const auto active_camera_owner = scene.camera_manager().active_camera_owner_id();
+    ASSERT_NE(active_camera_owner, core::kInvalidGameObjectId);
+    const auto* active_camera_go = scene.find_game_object(active_camera_owner);
+    ASSERT_NE(active_camera_go, nullptr);
+    EXPECT_NE(
+        active_camera_go->get_component<component::FreeLookCameraController>(),
+        nullptr
     );
 }
 

@@ -130,11 +130,11 @@ private:
             }
         }
 
-        const glm::vec3 right = glm::normalize(glm::cross(up, forward));
-        const glm::vec3 corrected_up = glm::normalize(glm::cross(forward, right));
+        const glm::vec3 right = glm::normalize(glm::cross(forward, up));
+        const glm::vec3 corrected_up = glm::normalize(glm::cross(right, forward));
 
-        // SceneGraph convention uses +Z as front.
-        const glm::mat3 basis(right, corrected_up, forward);
+        // Camera convention uses local -Z as front.
+        const glm::mat3 basis(right, corrected_up, -forward);
         return glm::normalize(glm::quat_cast(basis));
     }
 

@@ -94,7 +94,7 @@ TEST(FrameworkTrackballCameraControllerTest, ScrollCallsAdjustZoomPerspective) {
     scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
     const glm::vec3 after = go.node().world_position();
 
-    EXPECT_NEAR(after.z - before.z, 0.35f, 1e-4f);
+    EXPECT_NEAR(after.z - before.z, -0.35f, 1e-4f);
 }
 
 TEST(FrameworkTrackballCameraControllerTest, OnlyActiveCameraResponds) {
@@ -247,7 +247,7 @@ TEST(FrameworkTrackballCameraControllerTest, InitializesLookingAtTargetBeforeMou
 
     const glm::vec3 pos = go.node().world_position();
     const glm::vec3 expect_front = glm::normalize(controller.target() - pos);
-    const glm::vec3 actual_front = glm::normalize(go.node().world_front());
+    const glm::vec3 actual_front = glm::normalize(go.node().world_back());
     EXPECT_GT(glm::dot(expect_front, actual_front), 0.999f);
 }
 
