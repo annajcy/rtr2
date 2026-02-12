@@ -16,8 +16,6 @@
 
 namespace rtr::framework::core {
 
-class NodeView;
-
 struct SceneGraphNodeSnapshot {
     GameObjectId id{core::kInvalidGameObjectId};
     GameObjectId parent_id{core::kInvalidGameObjectId};
@@ -51,10 +49,293 @@ public:
         bool is_enabled{true};
     };
 
-private:
-    static constexpr float kEpsilon = 1e-6f;
+    class NodeView {
+    private:
+        const SceneGraph* m_graph{};
+        SceneGraph* m_mut_graph{};
+        GameObjectId m_id{core::kInvalidGameObjectId};
 
-    std::unordered_map<GameObjectId, NodeRecord> m_nodes{};
+        SceneGraph& mutable_graph() {
+            if (m_mut_graph == nullptr) {
+                throw std::runtime_error("NodeView is read-only.");
+            }
+            return *m_mut_graph;
+        }
+
+    public:
+        NodeView() = default;
+        NodeView(SceneGraph* graph, GameObjectId id)
+            : m_graph(graph), m_mut_graph(graph), m_id(id) {}
+        NodeView(const SceneGraph* graph, GameObjectId id)
+            : m_graph(graph), m_mut_graph(nullptr), m_id(id) {}
+
+        bool valid() const {
+            return m_graph != nullptr && m_graph->has_node(m_id);
+        }
+
+        GameObjectId id() const {
+            return m_id;
+        }
+
+        GameObjectId parent_id() const {
+            return m_graph->checked_record(m_id).parent_id;
+        }
+
+        const std::vector<GameObjectId>& children() const {
+            return m_graph->checked_record(m_id).children;
+        }
+
+        const glm::vec3& local_position() const {
+            return m_graph->checked_record(m_id).local_position;
+        }
+
+        const glm::quat& local_rotation() const {
+            return m_graph->checked_record(m_id).local_rotation;
+        }
+
+        const glm::vec3& local_scale() const {
+            return m_graph->checked_record(m_id).local_scale;
+        }
+
+        const glm::mat4& world_matrix() const {
+            return m_graph->checked_record(m_id).world_matrix;
+        }
+
+        glm::vec3 world_position() const {
+            return SceneGraph::extract_world_position(world_matrix());
+        }
+
+        glm::quat world_rotation() const {
+            return SceneGraph::extract_world_rotation(world_matrix());
+        }
+
+        glm::vec3 world_scale() const {
+            return SceneGraph::extract_world_scale(world_matrix());
+        }
+
+        bool dirty() const {
+            return m_graph->checked_record(m_id).dirty;
+        }
+
+        bool is_enabled() const {
+            return m_graph->checked_record(m_id).is_enabled;
+        }
+
+        void set_local_position(const glm::vec3& value) {
+            auto& graph = mutable_graph();
+            auto& record = graph.checked_record(m_id);
+            record.local_position = value;
+            graph.mark_subtree_dirty(m_id);
+        }
+
+        void set_local_rotation(const glm::quat& value) {
+            auto& graph = mutable_graph();
+            auto& record = graph.checked_record(m_id);
+            record.local_rotation = value;
+            graph.mark_subtree_dirty(m_id);
+        }
+
+        void set_local_scale(const glm::vec3& value) {
+            auto& graph = mutable_graph();
+            auto& record = graph.checked_record(m_id);
+            record.local_scale = value;
+            graph.mark_subtree_dirty(m_id);
+        }
+
+        void set_local_model_matrix(const glm::mat4& local_model_matrix) {
+            glm::vec3 scale = {
+                glm::length(glm::vec3(local_model_matrix[0])),
+                glm::length(glm::vec3(local_model_matrix[1])),
+                glm::length(glm::vec3(local_model_matrix[2]))
+            };
+
+            glm::mat3 rotation_matrix = glm::mat3(local_model_matrix);
+            rotation_matrix[0] /= scale.x;
+            rotation_matrix[1] /= scale.y;
+            rotation_matrix[2] /= scale.z;
+            glm::quat rotation = glm::quat_cast(rotation_matrix);
+            glm::vec3 position = glm::vec3(local_model_matrix[3]);
+
+            set_local_position(position);
+            set_local_rotation(rotation);
+            set_local_scale(scale);
+        }
+
+        void set_world_position(const glm::vec3& value) {
+            mutable_graph().set_world_position_internal(m_id, value);
+        }
+
+        void set_world_rotation(const glm::quat& value) {
+            mutable_graph().set_world_rotation_internal(m_id, value);
+        }
+
+        void set_world_scale(const glm::vec3& value) {
+            mutable_graph().set_world_scale_internal(m_id, value);
+        }
+
+        glm::vec3 position() const {
+            return local_position();
+        }
+
+        glm::quat rotation() const {
+            return local_rotation();
+        }
+
+        glm::vec3 scale() const {
+            return local_scale();
+        }
+
+        glm::vec3 rotation_euler() const {
+            return glm::degrees(glm::eulerAngles(local_rotation()));
+        }
+
+        glm::vec3 up() const {
+            return local_rotation() * glm::vec3(0.0f, 1.0f, 0.0f);
+        }
+
+        glm::vec3 down() const {
+            return local_rotation() * glm::vec3(0.0f, -1.0f, 0.0f);
+        }
+
+        glm::vec3 right() const {
+            return local_rotation() * glm::vec3(1.0f, 0.0f, 0.0f);
+        }
+
+        glm::vec3 left() const {
+            return local_rotation() * glm::vec3(-1.0f, 0.0f, 0.0f);
+        }
+
+        glm::vec3 front() const {
+            return local_rotation() * glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+
+        glm::vec3 back() const {
+            return local_rotation() * glm::vec3(0.0f, 0.0f, -1.0f);
+        }
+
+        glm::vec3 world_up() const {
+            return world_rotation() * glm::vec3(0.0f, 1.0f, 0.0f);
+        }
+
+        glm::vec3 world_down() const {
+            return world_rotation() * glm::vec3(0.0f, -1.0f, 0.0f);
+        }
+
+        glm::vec3 world_right() const {
+            return world_rotation() * glm::vec3(1.0f, 0.0f, 0.0f);
+        }
+
+        glm::vec3 world_left() const {
+            return world_rotation() * glm::vec3(-1.0f, 0.0f, 0.0f);
+        }
+
+        glm::vec3 world_front() const {
+            return world_rotation() * glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+
+        glm::vec3 world_back() const {
+            return world_rotation() * glm::vec3(0.0f, 0.0f, -1.0f);
+        }
+
+        glm::mat4 normal_matrix() const {
+            return glm::transpose(glm::inverse(world_matrix()));
+        }
+
+        void look_at_direction(const glm::vec3& target_direction) {
+            if (glm::length(target_direction) < SceneGraph::kEpsilon) {
+                return;
+            }
+
+            const glm::vec3 direction = glm::normalize(target_direction);
+            const glm::vec3 current_front = front();
+            const float cross_len = glm::length(glm::cross(current_front, direction));
+            glm::quat rotation = local_rotation();
+
+            if (cross_len < SceneGraph::kEpsilon) {
+                if (glm::dot(current_front, direction) < 0.0f) {
+                    rotation = glm::rotate(rotation, glm::radians(180.0f), up());
+                    set_local_rotation(rotation);
+                }
+                return;
+            }
+
+            const glm::quat delta = glm::rotation(current_front, direction);
+            set_local_rotation(glm::normalize(delta * rotation));
+        }
+
+        void look_at_point(const glm::vec3& target_point) {
+            look_at_direction(target_point - position());
+        }
+
+        void translate(const glm::vec3& direction, float distance) {
+            set_local_position(position() + direction * distance);
+        }
+
+        void rotate(float angle, const glm::vec3& axis) {
+            const glm::quat q = glm::angleAxis(glm::radians(angle), axis);
+            set_local_rotation(q * local_rotation());
+        }
+    };
+
+    static std::optional<SceneGraph> from_snapshot(const SceneGraphSnapshot& snapshot) {
+        SceneGraph graph;
+        graph.m_nodes.clear();
+
+        NodeRecord root{};
+        root.id = kVirtualRootId;
+        root.parent_id = kVirtualRootId;
+        root.world_matrix = glm::mat4{1.0f};
+        root.dirty = false;
+        root.is_enabled = true;
+        graph.m_nodes.emplace(kVirtualRootId, std::move(root));
+
+        for (const auto& item : snapshot.nodes) {
+            if (item.id == kVirtualRootId || graph.m_nodes.contains(item.id)) {
+                return std::nullopt;
+            }
+            NodeRecord record{};
+            record.id = item.id;
+            record.parent_id = item.parent_id;
+            record.local_position = item.local_position;
+            record.local_rotation = item.local_rotation;
+            record.local_scale = item.local_scale;
+            record.is_enabled = item.is_enabled;
+            record.children = item.children;
+            record.dirty = true;
+            graph.m_nodes.emplace(item.id, std::move(record));
+        }
+
+        graph.checked_record(kVirtualRootId).children = snapshot.root_children;
+
+        for (const auto& item : snapshot.nodes) {
+            if (!graph.has_node(item.id)) {
+                return std::nullopt;
+            }
+            if (item.parent_id != kVirtualRootId && !graph.has_node(item.parent_id)) {
+                return std::nullopt;
+            }
+            for (const auto child_id : item.children) {
+                if (!graph.has_node(child_id)) {
+                    return std::nullopt;
+                }
+                if (graph.checked_record(child_id).parent_id != item.id) {
+                    return std::nullopt;
+                }
+            }
+        }
+
+        for (const auto child_id : snapshot.root_children) {
+            if (!graph.has_node(child_id)) {
+                return std::nullopt;
+            }
+            if (graph.checked_record(child_id).parent_id != kVirtualRootId) {
+                return std::nullopt;
+            }
+        }
+
+        graph.update_world_transforms();
+        return graph;
+    }
 
     static glm::mat4 compose_local_matrix(const NodeRecord& node) {
         glm::mat4 transform = glm::translate(glm::mat4{1.0f}, node.local_position);
@@ -84,21 +365,9 @@ private:
         return glm::quat_cast(rotation_matrix);
     }
 
-    const NodeRecord& checked_record(GameObjectId id) const {
-        const auto it = m_nodes.find(id);
-        if (it == m_nodes.end()) {
-            throw std::runtime_error("SceneGraph node id is invalid.");
-        }
-        return it->second;
-    }
-
-    NodeRecord& checked_record(GameObjectId id) {
-        auto it = m_nodes.find(id);
-        if (it == m_nodes.end()) {
-            throw std::runtime_error("SceneGraph node id is invalid.");
-        }
-        return it->second;
-    }
+private:
+    static constexpr float kEpsilon = 1e-6f;
+    std::unordered_map<GameObjectId, NodeRecord> m_nodes{};
 
     void remove_child_link(GameObjectId parent_id, GameObjectId child_id) {
         auto parent_it = m_nodes.find(parent_id);
@@ -195,6 +464,19 @@ private:
         }
     }
 
+    
+
+public:
+    SceneGraph() {
+        NodeRecord root{};
+        root.id = kVirtualRootId;
+        root.parent_id = kVirtualRootId;
+        root.world_matrix = glm::mat4{1.0f};
+        root.dirty = false;
+        root.is_enabled = true;
+        m_nodes.emplace(kVirtualRootId, std::move(root));
+    }
+
     void set_world_position_internal(GameObjectId id, const glm::vec3& world_pos) {
         NodeRecord& node = checked_record(id);
         const glm::mat4 parent_world = (node.parent_id == kVirtualRootId)
@@ -223,15 +505,24 @@ private:
         mark_subtree_dirty_recursive(id);
     }
 
-public:
-    SceneGraph() {
-        NodeRecord root{};
-        root.id = kVirtualRootId;
-        root.parent_id = kVirtualRootId;
-        root.world_matrix = glm::mat4{1.0f};
-        root.dirty = false;
-        root.is_enabled = true;
-        m_nodes.emplace(kVirtualRootId, std::move(root));
+    const NodeRecord& checked_record(GameObjectId id) const {
+        const auto it = m_nodes.find(id);
+        if (it == m_nodes.end()) {
+            throw std::runtime_error("SceneGraph node id is invalid.");
+        }
+        return it->second;
+    }
+
+    NodeRecord& checked_record(GameObjectId id) {
+        auto it = m_nodes.find(id);
+        if (it == m_nodes.end()) {
+            throw std::runtime_error("SceneGraph node id is invalid.");
+        }
+        return it->second;
+    }
+
+    void mark_subtree_dirty(GameObjectId id) {
+        mark_subtree_dirty_recursive(id);
     }
 
     bool register_node(GameObjectId id) {
@@ -349,8 +640,13 @@ public:
         return result;
     }
 
-    auto node(GameObjectId id);
-    auto node(GameObjectId id) const;
+    NodeView node(GameObjectId id) {
+        return NodeView(this, id);
+    }
+
+    NodeView node(GameObjectId id) const {
+        return NodeView(this, id);
+    }
 
     SceneGraphSnapshot to_snapshot() const {
         SceneGraphSnapshot snapshot{};
@@ -380,71 +676,6 @@ public:
         }
         return snapshot;
     }
-
-    static std::optional<SceneGraph> from_snapshot(const SceneGraphSnapshot& snapshot) {
-        SceneGraph graph;
-        graph.m_nodes.clear();
-
-        NodeRecord root{};
-        root.id = kVirtualRootId;
-        root.parent_id = kVirtualRootId;
-        root.world_matrix = glm::mat4{1.0f};
-        root.dirty = false;
-        root.is_enabled = true;
-        graph.m_nodes.emplace(kVirtualRootId, std::move(root));
-
-        for (const auto& item : snapshot.nodes) {
-            if (item.id == kVirtualRootId || graph.m_nodes.contains(item.id)) {
-                return std::nullopt;
-            }
-            NodeRecord record{};
-            record.id = item.id;
-            record.parent_id = item.parent_id;
-            record.local_position = item.local_position;
-            record.local_rotation = item.local_rotation;
-            record.local_scale = item.local_scale;
-            record.is_enabled = item.is_enabled;
-            record.children = item.children;
-            record.dirty = true;
-            graph.m_nodes.emplace(item.id, std::move(record));
-        }
-
-        graph.checked_record(kVirtualRootId).children = snapshot.root_children;
-
-        for (const auto& item : snapshot.nodes) {
-            if (!graph.has_node(item.id)) {
-                return std::nullopt;
-            }
-            if (item.parent_id != kVirtualRootId && !graph.has_node(item.parent_id)) {
-                return std::nullopt;
-            }
-            for (const auto child_id : item.children) {
-                if (!graph.has_node(child_id)) {
-                    return std::nullopt;
-                }
-                if (graph.checked_record(child_id).parent_id != item.id) {
-                    return std::nullopt;
-                }
-            }
-        }
-
-        for (const auto child_id : snapshot.root_children) {
-            if (!graph.has_node(child_id)) {
-                return std::nullopt;
-            }
-            if (graph.checked_record(child_id).parent_id != kVirtualRootId) {
-                return std::nullopt;
-            }
-        }
-
-        graph.update_world_transforms();
-        return graph;
-    }
-
-private:
-    friend class NodeView;
 };
 
 } // namespace rtr::framework::core
-
-#include "framework/core/scene_graph_view.hpp"
