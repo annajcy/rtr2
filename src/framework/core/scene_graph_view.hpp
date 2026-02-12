@@ -4,15 +4,25 @@
 
 namespace rtr::framework::core {
 
-class ConstNodeView {
-protected:
+class NodeView final {
+private:
     const SceneGraph* m_graph{};
+    SceneGraph* m_mut_graph{};
     GameObjectId m_id{core::kInvalidGameObjectId};
 
+    SceneGraph& mutable_graph() {
+        if (m_mut_graph == nullptr) {
+            throw std::runtime_error("NodeView is read-only.");
+        }
+        return *m_mut_graph;
+    }
+
 public:
-    ConstNodeView() = default;
-    ConstNodeView(const SceneGraph* graph, GameObjectId id)
-        : m_graph(graph), m_id(id) {}
+    NodeView() = default;
+    NodeView(SceneGraph* graph, GameObjectId id)
+        : m_graph(graph), m_mut_graph(graph), m_id(id) {}
+    NodeView(const SceneGraph* graph, GameObjectId id)
+        : m_graph(graph), m_mut_graph(nullptr), m_id(id) {}
 
     bool valid() const {
         return m_graph != nullptr && m_graph->has_node(m_id);
@@ -65,30 +75,26 @@ public:
     bool is_enabled() const {
         return m_graph->checked_record(m_id).is_enabled;
     }
-};
-
-class NodeView final : public ConstNodeView {
-public:
-    NodeView() = default;
-    NodeView(SceneGraph* graph, GameObjectId id)
-        : ConstNodeView(graph, id) {}
 
     void set_local_position(const glm::vec3& value) {
-        auto& record = const_cast<SceneGraph*>(m_graph)->checked_record(m_id);
+        auto& graph = mutable_graph();
+        auto& record = graph.checked_record(m_id);
         record.local_position = value;
-        const_cast<SceneGraph*>(m_graph)->mark_subtree_dirty_recursive(m_id);
+        graph.mark_subtree_dirty_recursive(m_id);
     }
 
     void set_local_rotation(const glm::quat& value) {
-        auto& record = const_cast<SceneGraph*>(m_graph)->checked_record(m_id);
+        auto& graph = mutable_graph();
+        auto& record = graph.checked_record(m_id);
         record.local_rotation = value;
-        const_cast<SceneGraph*>(m_graph)->mark_subtree_dirty_recursive(m_id);
+        graph.mark_subtree_dirty_recursive(m_id);
     }
 
     void set_local_scale(const glm::vec3& value) {
-        auto& record = const_cast<SceneGraph*>(m_graph)->checked_record(m_id);
+        auto& graph = mutable_graph();
+        auto& record = graph.checked_record(m_id);
         record.local_scale = value;
-        const_cast<SceneGraph*>(m_graph)->mark_subtree_dirty_recursive(m_id);
+        graph.mark_subtree_dirty_recursive(m_id);
     }
 
     void set_local_model_matrix(const glm::mat4& local_model_matrix) {
@@ -111,15 +117,15 @@ public:
     }
 
     void set_world_position(const glm::vec3& value) {
-        const_cast<SceneGraph*>(m_graph)->set_world_position_internal(m_id, value);
+        mutable_graph().set_world_position_internal(m_id, value);
     }
 
     void set_world_rotation(const glm::quat& value) {
-        const_cast<SceneGraph*>(m_graph)->set_world_rotation_internal(m_id, value);
+        mutable_graph().set_world_rotation_internal(m_id, value);
     }
 
     void set_world_scale(const glm::vec3& value) {
-        const_cast<SceneGraph*>(m_graph)->set_world_scale_internal(m_id, value);
+        mutable_graph().set_world_scale_internal(m_id, value);
     }
 
     glm::vec3 position() const {
@@ -231,7 +237,7 @@ inline auto SceneGraph::node(GameObjectId id) {
 }
 
 inline auto SceneGraph::node(GameObjectId id) const {
-    return ConstNodeView(this, id);
+    return NodeView(this, id);
 }
 
 } // namespace rtr::framework::core

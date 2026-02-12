@@ -16,6 +16,8 @@
 
 namespace rtr::framework::core {
 
+class NodeView;
+
 struct SceneGraphNodeSnapshot {
     GameObjectId id{core::kInvalidGameObjectId};
     GameObjectId parent_id{core::kInvalidGameObjectId};
@@ -440,7 +442,6 @@ public:
     }
 
 private:
-    friend class ConstNodeView;
     friend class NodeView;
 };
 
