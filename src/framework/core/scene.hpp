@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "framework/core/camera_manager.hpp"
 #include "framework/core/game_object.hpp"
 #include "framework/core/scene_graph.hpp"
 #include "framework/core/tick_context.hpp"
@@ -23,27 +24,19 @@ private:
     GameObjectId m_next_game_object_id{1};
     std::vector<std::unique_ptr<GameObject>> m_game_objects{};
     SceneGraph m_scene_graph{};
-
-    void sync_scene_graph_enabled_state() {
-        for (const auto& game_object : m_game_objects) {
-            if (!game_object) {
-                continue;
-            }
-            m_scene_graph.set_enabled(game_object->id(), game_object->enabled());
-        }
-    }
+    CameraManager m_camera_manager{};
 
 public:
     explicit Scene(
         SceneId id = core::kInvalidSceneId,
         std::string name = "Scene"
     )
-        : m_id(id), m_name(std::move(name)) {}
+        : m_id(id), m_name(std::move(name)), m_camera_manager(&m_scene_graph) {}
 
     Scene(const Scene&) = delete;
     Scene& operator=(const Scene&) = delete;
-    Scene(Scene&&) noexcept = default;
-    Scene& operator=(Scene&&) noexcept = default;
+    Scene(Scene&&) noexcept = delete;
+    Scene& operator=(Scene&&) noexcept = delete;
 
     SceneId id() const {
         return m_id;
@@ -68,6 +61,7 @@ public:
     GameObject& create_game_object(std::string name = "GameObject") {
         auto game_object = std::make_unique<GameObject>(m_next_game_object_id++, std::move(name));
         GameObject* ptr = game_object.get();
+        ptr->bind_scene_graph(&m_scene_graph);
         m_scene_graph.register_node(ptr->id());
         m_game_objects.emplace_back(std::move(game_object));
         return *ptr;
@@ -113,6 +107,8 @@ public:
             }
         }
 
+        m_camera_manager.on_game_objects_destroyed(subtree_ids);
+
         for (const auto victim_id : subtree_ids) {
             const auto it = std::find_if(
                 m_game_objects.begin(),
@@ -131,6 +127,26 @@ public:
 
     std::size_t game_object_count() const {
         return m_game_objects.size();
+    }
+
+    CameraManager& camera_manager() {
+        return m_camera_manager;
+    }
+
+    const CameraManager& camera_manager() const {
+        return m_camera_manager;
+    }
+
+    const CameraBase* active_camera() const {
+        return m_camera_manager.active_camera();
+    }
+
+    CameraBase* active_camera() {
+        return m_camera_manager.active_camera();
+    }
+
+    bool set_active_camera(GameObjectId camera_owner_id) {
+        return m_camera_manager.set_active_camera(camera_owner_id);
     }
 
     const std::vector<std::unique_ptr<GameObject>>& game_objects() const {
@@ -160,13 +176,13 @@ public:
         if (!m_enabled) {
             return;
         }
-        sync_scene_graph_enabled_state();
         m_scene_graph.update_world_transforms();
         for (const auto& game_object : m_game_objects) {
             if (game_object) {
                 game_object->tick(ctx);
             }
         }
+        m_scene_graph.update_world_transforms();
     }
 
     void late_tick(const FrameTickContext& ctx) {

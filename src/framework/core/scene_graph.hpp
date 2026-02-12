@@ -15,7 +15,6 @@
 
 namespace rtr::framework::core {
 
-
 class SceneGraph {
 public:
     static constexpr GameObjectId kVirtualRootId = 0;

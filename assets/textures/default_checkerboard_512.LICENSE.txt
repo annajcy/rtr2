@@ -1,0 +1,12 @@
+Default checkerboard texture license
+
+File: assets/textures/default_checkerboard_512.png
+Downloaded from: https://opengameart.org/sites/default/files/normal_1.png
+Source page: https://opengameart.org/content/high-res-normal-map-texture-pack
+License: CC0 1.0 Universal (Public Domain Dedication)
+License text: https://creativecommons.org/publicdomain/zero/1.0/
+Downloaded on: 2026-02-12
+
+Note:
+This file is used as the engine default albedo fallback texture when
+MeshRenderer albedo_texture_path is empty.

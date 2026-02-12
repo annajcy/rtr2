@@ -1,18 +1,21 @@
 #pragma once
 
 #include <array>
-#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "rhi/buffer.hpp"
 #include "rhi/descriptor.hpp"
 #include "rhi/shader_module.hpp"
 #include "rhi/texture.hpp"
+#include "system/render/forward_scene_view.hpp"
 #include "system/render/mesh.hpp"
 #include "system/render/pipeline.hpp"
 #include "system/render/render_pass.hpp"
@@ -20,7 +23,6 @@
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 namespace rtr::system::render {
 
@@ -28,8 +30,6 @@ struct ForwardPipelineConfig {
     std::string shader_output_dir{"/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/"};
     std::string vertex_shader_filename{"vert_buffer_vert.spv"};
     std::string fragment_shader_filename{"vert_buffer_frag.spv"};
-    std::string model_path{"/Users/jinceyang/Desktop/codebase/graphics/rtr2/assets/models/spot.obj"};
-    std::string texture_path{"/Users/jinceyang/Desktop/codebase/graphics/rtr2/assets/textures/spot_texture.png"};
 };
 
 struct UniformBufferObject {
@@ -41,35 +41,35 @@ struct UniformBufferObject {
 
 class ForwardPass final : public render::IRenderPass {
 public:
-    struct RenderPassResources {
-        rhi::Buffer* uniform_buffer{};
-        rhi::Image* depth_image{};
-        vk::raii::DescriptorSet* per_frame_set{};
+    struct DrawItem {
+        render::Mesh* mesh{};
+        vk::raii::DescriptorSet* per_object_set{};
         vk::raii::DescriptorSet* texture_set{};
     };
 
+    struct RenderPassResources {
+        rhi::Image* depth_image{};
+        std::vector<DrawItem> draw_items{};
+    };
+
 private:
-    render::Mesh* m_mesh{};
     vk::raii::PipelineLayout* m_pipeline_layout{};
     vk::raii::Pipeline* m_pipeline{};
     RenderPassResources m_render_pass_resources{};
 
     std::vector<render::ResourceDependency> m_dependencies{
-        {"uniform", render::ResourceAccess::eWrite},
-        {"per_frame", render::ResourceAccess::eRead},
-        {"texture", render::ResourceAccess::eRead},
+        {"forward.per_object", render::ResourceAccess::eRead},
+        {"forward.texture", render::ResourceAccess::eRead},
         {"swapchain_color", render::ResourceAccess::eReadWrite},
         {"depth", render::ResourceAccess::eReadWrite}
     };
 
 public:
     ForwardPass(
-        render::Mesh* mesh,
         vk::raii::PipelineLayout* pipeline_layout,
         vk::raii::Pipeline* pipeline
     )
-        : m_mesh(mesh),
-          m_pipeline_layout(pipeline_layout),
+        : m_pipeline_layout(pipeline_layout),
           m_pipeline(pipeline) {}
 
     std::string_view name() const override { return "forward_main"; }
@@ -78,25 +78,24 @@ public:
         return m_dependencies;
     }
 
-    void bind_render_pass_resources(const RenderPassResources& resources) {
-        if (resources.uniform_buffer == nullptr ||
-            resources.depth_image == nullptr ||
-            resources.per_frame_set == nullptr ||
-            resources.texture_set == nullptr) {
+    void bind_render_pass_resources(RenderPassResources resources) {
+        if (resources.depth_image == nullptr) {
             throw std::runtime_error("ForwardPass frame resources are incomplete.");
         }
-        m_render_pass_resources = resources;
+        for (const auto& item : resources.draw_items) {
+            if (item.mesh == nullptr ||
+                item.per_object_set == nullptr ||
+                item.texture_set == nullptr) {
+                throw std::runtime_error("ForwardPass draw item resources are incomplete.");
+            }
+        }
+        m_render_pass_resources = std::move(resources);
     }
 
     void execute(render::FrameContext& ctx) override {
-        if (m_render_pass_resources.uniform_buffer == nullptr ||
-            m_render_pass_resources.depth_image == nullptr ||
-            m_render_pass_resources.per_frame_set == nullptr ||
-            m_render_pass_resources.texture_set == nullptr) {
+        if (m_render_pass_resources.depth_image == nullptr) {
             throw std::runtime_error("ForwardPass frame resources are not bound.");
         }
-
-        update_uniform_buffer(*m_render_pass_resources.uniform_buffer, ctx.render_extent());
 
         auto& cmd = ctx.cmd().command_buffer();
         rhi::Image& depth_image = *m_render_pass_resources.depth_image;
@@ -162,26 +161,6 @@ public:
         cmd.beginRendering(rendering_info);
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
 
-        std::vector<vk::Buffer> vertex_buffers = {m_mesh->vertex_buffer()};
-        std::vector<vk::DeviceSize> offsets = {0};
-        cmd.bindVertexBuffers(0, vertex_buffers, offsets);
-        cmd.bindIndexBuffer(m_mesh->index_buffer(), 0, vk::IndexType::eUint32);
-
-        cmd.bindDescriptorSets(
-            vk::PipelineBindPoint::eGraphics,
-            **m_pipeline_layout,
-            0,
-            **m_render_pass_resources.per_frame_set,
-            {}
-        );
-        cmd.bindDescriptorSets(
-            vk::PipelineBindPoint::eGraphics,
-            **m_pipeline_layout,
-            1,
-            **m_render_pass_resources.texture_set,
-            {}
-        );
-
         vk::Viewport viewport{};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
@@ -196,56 +175,59 @@ public:
         scissor.extent = ctx.render_extent();
         cmd.setScissor(0, scissor);
 
-        cmd.drawIndexed(m_mesh->index_count(), 1, 0, 0, 0);
+        for (const auto& item : m_render_pass_resources.draw_items) {
+            std::vector<vk::Buffer> vertex_buffers = {item.mesh->vertex_buffer()};
+            std::vector<vk::DeviceSize> offsets = {0};
+            cmd.bindVertexBuffers(0, vertex_buffers, offsets);
+            cmd.bindIndexBuffer(item.mesh->index_buffer(), 0, vk::IndexType::eUint32);
+
+            cmd.bindDescriptorSets(
+                vk::PipelineBindPoint::eGraphics,
+                **m_pipeline_layout,
+                0,
+                **item.per_object_set,
+                {}
+            );
+            cmd.bindDescriptorSets(
+                vk::PipelineBindPoint::eGraphics,
+                **m_pipeline_layout,
+                1,
+                **item.texture_set,
+                {}
+            );
+
+            cmd.drawIndexed(item.mesh->index_count(), 1, 0, 0, 0);
+        }
+
         cmd.endRendering();
-    }
-
-private:
-    void update_uniform_buffer(rhi::Buffer& uniform_buffer, const vk::Extent2D& extent) {
-        static const auto start_time = std::chrono::high_resolution_clock::now();
-        const auto current_time = std::chrono::high_resolution_clock::now();
-        const float time = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
-
-        UniformBufferObject ubo{};
-        glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));
-        ubo.model = glm::rotate(model, time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.view = glm::lookAt(
-            glm::vec3(0.0f, 0.0f, -3.0f),
-            glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f)
-        );
-        ubo.proj = glm::perspective(
-            glm::radians(45.0f),
-            static_cast<float>(extent.width) / static_cast<float>(extent.height),
-            0.1f,
-            10.0f
-        );
-        ubo.proj[1][1] *= -1;
-        ubo.normal = glm::transpose(glm::inverse(ubo.model));
-
-        std::memcpy(uniform_buffer.mapped_data(), &ubo, sizeof(ubo));
     }
 };
 
 class ForwardPipeline : public RenderPipelineBase {
 private:
+    static constexpr uint32_t kMaxRenderables = 256;
+    static constexpr uint32_t kMaxTextures = 256;
+
     vk::raii::PipelineLayout m_pipeline_layout{nullptr};
     vk::raii::Pipeline m_pipeline{nullptr};
 
     std::unique_ptr<rhi::ShaderModule> m_vertex_shader_module{nullptr};
     std::unique_ptr<rhi::ShaderModule> m_fragment_shader_module{nullptr};
-    std::unique_ptr<render::Mesh> m_mesh{nullptr};
+
+    std::optional<ForwardSceneView> m_scene_view{};
 
     vk::DeviceSize m_uniform_buffer_size{0};
-    std::vector<std::unique_ptr<rhi::Buffer>> m_uniform_buffers{};
+    std::vector<std::vector<std::unique_ptr<rhi::Buffer>>> m_object_uniform_buffers{};
+    std::vector<std::vector<vk::raii::DescriptorSet>> m_object_sets{};
     std::vector<std::unique_ptr<rhi::Image>> m_depth_images{};
 
-    std::unique_ptr<rhi::DescriptorSetLayout> m_per_frame_layout{nullptr};
+    std::unique_ptr<rhi::DescriptorSetLayout> m_per_object_layout{nullptr};
     std::unique_ptr<rhi::DescriptorSetLayout> m_texture_layout{nullptr};
     std::unique_ptr<rhi::DescriptorPool> m_descriptor_pool{nullptr};
-    std::vector<vk::raii::DescriptorSet> m_per_frame_sets{};
-    std::vector<vk::raii::DescriptorSet> m_texture_sets{};
-    std::unique_ptr<rhi::Image> m_texture_image{nullptr};
+
+    std::unordered_map<std::string, std::unique_ptr<render::Mesh>> m_mesh_cache{};
+    std::unordered_map<std::string, std::unique_ptr<rhi::Image>> m_texture_cache{};
+    std::unordered_map<std::string, vk::raii::DescriptorSet> m_texture_sets{};
     std::unique_ptr<rhi::Sampler> m_texture_sampler{nullptr};
 
     std::unique_ptr<render::ForwardPass> m_forward_pass{nullptr};
@@ -274,22 +256,16 @@ public:
             )
         );
 
-        m_mesh = std::make_unique<render::Mesh>(render::Mesh::from_obj(m_device, config.model_path));
-        m_texture_image = std::make_unique<rhi::Image>(
-            rhi::Image::create_image_from_file(m_device, config.texture_path, true)
-        );
         m_texture_sampler = std::make_unique<rhi::Sampler>(rhi::Sampler::create_default(m_device));
 
-        m_uniform_buffers = make_per_frame_mapped_uniform_buffers(m_uniform_buffer_size);
-
-        rhi::DescriptorSetLayout::Builder per_frame_layout_builder;
-        per_frame_layout_builder.add_binding(
+        rhi::DescriptorSetLayout::Builder per_object_layout_builder;
+        per_object_layout_builder.add_binding(
             0,
             vk::DescriptorType::eUniformBuffer,
             vk::ShaderStageFlagBits::eVertex
         );
-        m_per_frame_layout = std::make_unique<rhi::DescriptorSetLayout>(
-            per_frame_layout_builder.build(m_device)
+        m_per_object_layout = std::make_unique<rhi::DescriptorSetLayout>(
+            per_object_layout_builder.build(m_device)
         );
 
         rhi::DescriptorSetLayout::Builder texture_layout_builder;
@@ -304,34 +280,17 @@ public:
 
         rhi::DescriptorPool::Builder descriptor_pool_builder;
         descriptor_pool_builder
-            .add_layout(*m_per_frame_layout, m_frame_count)
-            .add_layout(*m_texture_layout, 1)
+            .add_layout(*m_per_object_layout, kMaxRenderables * m_frame_count)
+            .add_layout(*m_texture_layout, kMaxTextures)
             .set_flags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
         m_descriptor_pool = std::make_unique<rhi::DescriptorPool>(
             descriptor_pool_builder.build(m_device)
         );
 
-        m_per_frame_sets = m_descriptor_pool->allocate_multiple(*m_per_frame_layout, m_frame_count);
-        m_texture_sets = m_descriptor_pool->allocate_multiple(*m_texture_layout, 1);
-
-        for (uint32_t index = 0; index < m_frame_count; ++index) {
-            rhi::DescriptorWriter writer;
-            writer.write_buffer(0, *m_uniform_buffers[index]->buffer(), 0, m_uniform_buffer_size);
-            writer.update(m_device, *m_per_frame_sets[index]);
-        }
-        {
-            rhi::DescriptorWriter writer;
-            writer.write_combined_image(
-                0,
-                *m_texture_image->image_view(),
-                *m_texture_sampler->sampler(),
-                vk::ImageLayout::eShaderReadOnlyOptimal
-            );
-            writer.update(m_device, *m_texture_sets[0]);
-        }
+        create_per_object_resources();
 
         std::array<vk::DescriptorSetLayout, 2> set_layouts{
-            *m_per_frame_layout->layout(),
+            *m_per_object_layout->layout(),
             *m_texture_layout->layout()
         };
         vk::PipelineLayoutCreateInfo pipeline_layout_info{};
@@ -342,7 +301,6 @@ public:
         create_graphics_pipeline();
 
         m_forward_pass = std::make_unique<render::ForwardPass>(
-            m_mesh.get(),
             &m_pipeline_layout,
             &m_pipeline
         );
@@ -357,7 +315,18 @@ public:
         );
     }
 
-    ~ForwardPipeline() override = default;
+    ~ForwardPipeline() override {
+        // Descriptor sets must be destroyed before the descriptor pool.
+        m_forward_pass.reset();
+        m_imgui_pass.reset();
+        m_object_sets.clear();
+        m_texture_sets.clear();
+        m_descriptor_pool.reset();
+    }
+
+    void set_scene_view(ForwardSceneView scene_view) {
+        m_scene_view = std::move(scene_view);
+    }
 
     ImGUIPass& imgui_pass() {
         if (!m_imgui_pass) {
@@ -396,19 +365,58 @@ public:
         if (extent.width == 0 || extent.height == 0) {
             return;
         }
+        if (!m_scene_view.has_value()) {
+            throw std::runtime_error("ForwardPipeline requires scene view before render().");
+        }
+
         const uint32_t frame_index = ctx.frame_index();
-        if (frame_index >= m_uniform_buffers.size() || frame_index >= m_depth_images.size()) {
+        if (frame_index >= m_object_uniform_buffers.size() ||
+            frame_index >= m_object_sets.size() ||
+            frame_index >= m_depth_images.size()) {
             throw std::runtime_error("ForwardPipeline frame resources are not ready.");
         }
+
         if (!m_forward_pass || !m_imgui_pass) {
             throw std::runtime_error("Forward pipeline passes are not initialized.");
         }
 
+        const auto& scene_view = m_scene_view.value();
+        if (scene_view.renderables.size() > kMaxRenderables) {
+            throw std::runtime_error("Renderable count exceeds preallocated ForwardPipeline capacity.");
+        }
+
+        glm::mat4 proj = scene_view.camera.proj;
+        proj[1][1] *= -1;
+
+        auto& frame_uniform_buffers = m_object_uniform_buffers[frame_index];
+        auto& frame_sets = m_object_sets[frame_index];
+
+        std::vector<ForwardPass::DrawItem> draw_items{};
+        draw_items.reserve(scene_view.renderables.size());
+
+        for (std::size_t i = 0; i < scene_view.renderables.size(); ++i) {
+            const auto& renderable = scene_view.renderables[i];
+            auto& mesh = require_mesh(renderable.mesh_path);
+            auto& texture_set = require_texture_set(renderable.albedo_texture_path);
+
+            UniformBufferObject ubo{};
+            ubo.model = renderable.model;
+            ubo.view = scene_view.camera.view;
+            ubo.proj = proj;
+            ubo.normal = renderable.normal;
+
+            std::memcpy(frame_uniform_buffers[i]->mapped_data(), &ubo, sizeof(ubo));
+
+            draw_items.emplace_back(ForwardPass::DrawItem{
+                .mesh = &mesh,
+                .per_object_set = &frame_sets[i],
+                .texture_set = &texture_set
+            });
+        }
+
         m_forward_pass->bind_render_pass_resources(ForwardPass::RenderPassResources{
-            .uniform_buffer = m_uniform_buffers[frame_index].get(),
             .depth_image = m_depth_images[frame_index].get(),
-            .per_frame_set = &m_per_frame_sets[frame_index],
-            .texture_set = &m_texture_sets[0]
+            .draw_items = std::move(draw_items)
         });
         m_forward_pass->execute(ctx);
 
@@ -419,6 +427,91 @@ public:
     }
 
 private:
+    render::Mesh& require_mesh(const std::string& mesh_path) {
+        if (mesh_path.empty()) {
+            throw std::runtime_error("Renderable mesh_path is empty.");
+        }
+
+        if (auto it = m_mesh_cache.find(mesh_path); it != m_mesh_cache.end()) {
+            return *it->second;
+        }
+
+        auto mesh = std::make_unique<render::Mesh>(render::Mesh::from_obj(m_device, mesh_path));
+        render::Mesh* ptr = mesh.get();
+        m_mesh_cache.emplace(mesh_path, std::move(mesh));
+        return *ptr;
+    }
+
+    vk::raii::DescriptorSet& require_texture_set(const std::string& texture_path) {
+        if (texture_path.empty()) {
+            throw std::runtime_error("Renderable albedo_texture_path is empty.");
+        }
+
+        if (auto it = m_texture_sets.find(texture_path); it != m_texture_sets.end()) {
+            return it->second;
+        }
+
+        if (m_texture_sets.size() >= kMaxTextures) {
+            throw std::runtime_error("Texture count exceeds preallocated ForwardPipeline capacity.");
+        }
+
+        auto image = std::make_unique<rhi::Image>(
+            rhi::Image::create_image_from_file(m_device, texture_path, true)
+        );
+        rhi::Image* image_ptr = image.get();
+
+        auto descriptor_set = m_descriptor_pool->allocate(*m_texture_layout);
+        {
+            rhi::DescriptorWriter writer;
+            writer.write_combined_image(
+                0,
+                *image_ptr->image_view(),
+                *m_texture_sampler->sampler(),
+                vk::ImageLayout::eShaderReadOnlyOptimal
+            );
+            writer.update(m_device, *descriptor_set);
+        }
+
+        m_texture_cache.emplace(texture_path, std::move(image));
+        auto [inserted_it, _] = m_texture_sets.emplace(texture_path, std::move(descriptor_set));
+        return inserted_it->second;
+    }
+
+    void create_per_object_resources() {
+        m_object_uniform_buffers.clear();
+        m_object_sets.clear();
+        m_object_uniform_buffers.resize(m_frame_count);
+        m_object_sets.resize(m_frame_count);
+
+        for (uint32_t frame = 0; frame < m_frame_count; ++frame) {
+            auto& frame_buffers = m_object_uniform_buffers[frame];
+            frame_buffers.reserve(kMaxRenderables);
+            for (uint32_t slot = 0; slot < kMaxRenderables; ++slot) {
+                auto buffer = std::make_unique<rhi::Buffer>(
+                    rhi::Buffer::create_host_visible_buffer(
+                        m_device,
+                        m_uniform_buffer_size,
+                        vk::BufferUsageFlagBits::eUniformBuffer
+                    )
+                );
+                buffer->map();
+                frame_buffers.emplace_back(std::move(buffer));
+            }
+
+            m_object_sets[frame] = m_descriptor_pool->allocate_multiple(*m_per_object_layout, kMaxRenderables);
+            for (uint32_t slot = 0; slot < kMaxRenderables; ++slot) {
+                rhi::DescriptorWriter writer;
+                writer.write_buffer(
+                    0,
+                    *frame_buffers[slot]->buffer(),
+                    0,
+                    m_uniform_buffer_size
+                );
+                writer.update(m_device, *m_object_sets[frame][slot]);
+            }
+        }
+    }
+
     void create_depth_images() {
         if (!has_valid_extent()) {
             return;

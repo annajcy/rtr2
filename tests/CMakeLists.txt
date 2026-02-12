@@ -35,3 +35,66 @@ add_executable(framework_scene_graph_test
 target_include_directories(framework_scene_graph_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(framework_scene_graph_test PRIVATE gtest::gtest glm::glm)
 gtest_discover_tests(framework_scene_graph_test)
+
+add_executable(framework_camera_test
+    framework_camera_test.cpp
+)
+target_include_directories(framework_camera_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(framework_camera_test PRIVATE gtest::gtest glm::glm)
+gtest_discover_tests(framework_camera_test)
+
+add_executable(framework_mesh_renderer_test
+    framework_mesh_renderer_test.cpp
+)
+target_include_directories(framework_mesh_renderer_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(framework_mesh_renderer_test PRIVATE gtest::gtest glm::glm)
+gtest_discover_tests(framework_mesh_renderer_test)
+
+add_executable(framework_pbpt_mesh_test
+    framework_pbpt_mesh_test.cpp
+)
+target_include_directories(framework_pbpt_mesh_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(framework_pbpt_mesh_test PRIVATE gtest::gtest glm::glm)
+gtest_discover_tests(framework_pbpt_mesh_test)
+
+add_executable(framework_forward_scene_view_builder_test
+    framework_forward_scene_view_builder_test.cpp
+)
+target_include_directories(framework_forward_scene_view_builder_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(framework_forward_scene_view_builder_test PRIVATE gtest::gtest glm::glm)
+gtest_discover_tests(framework_forward_scene_view_builder_test)
+
+add_executable(framework_pbpt_scene_export_builder_test
+    framework_pbpt_scene_export_builder_test.cpp
+)
+target_include_directories(framework_pbpt_scene_export_builder_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(framework_pbpt_scene_export_builder_test PRIVATE gtest::gtest glm::glm)
+gtest_discover_tests(framework_pbpt_scene_export_builder_test)
+
+add_executable(framework_free_look_camera_controller_test
+    framework_free_look_camera_controller_test.cpp
+)
+target_include_directories(framework_free_look_camera_controller_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(
+    framework_free_look_camera_controller_test
+    PRIVATE
+        gtest::gtest
+        glm::glm
+        glfw
+        Vulkan::Loader
+)
+gtest_discover_tests(framework_free_look_camera_controller_test)
+
+add_executable(framework_trackball_camera_controller_test
+    framework_trackball_camera_controller_test.cpp
+)
+target_include_directories(framework_trackball_camera_controller_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(
+    framework_trackball_camera_controller_test
+    PRIVATE
+        gtest::gtest
+        glm::glm
+        glfw
+        Vulkan::Loader
+)
+gtest_discover_tests(framework_trackball_camera_controller_test)

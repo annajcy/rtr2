@@ -1,6 +1,12 @@
 add_executable(main main.cpp)
 target_link_libraries(main PRIVATE rtr)
 
+add_executable(framework_scene_main framework_scene_main.cpp)
+target_link_libraries(framework_scene_main PRIVATE rtr)
+
+add_executable(framework_trackball_scene_main framework_trackball_scene_main.cpp)
+target_link_libraries(framework_trackball_scene_main PRIVATE rtr)
+
 add_executable(third_party third_party.cpp)
 target_link_libraries(third_party PRIVATE rtr)
 

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "framework/component/component.hpp"
+#include "framework/core/scene_graph.hpp"
 #include "framework/core/tick_context.hpp"
 #include "framework/core/types.hpp"
 
@@ -18,9 +19,15 @@ class GameObject {
 private:
     GameObjectId m_id{core::kInvalidGameObjectId};
     std::string m_name{"GameObject"};
-    bool m_enabled{true};
     bool m_components_destroyed{false};
+    SceneGraph* m_scene_graph{nullptr};
     std::vector<std::unique_ptr<component::Component>> m_components{};
+
+    void bind_scene_graph(SceneGraph* scene_graph) {
+        m_scene_graph = scene_graph;
+    }
+
+    friend class Scene;
 
 public:
     explicit GameObject(
@@ -55,11 +62,32 @@ public:
     }
 
     bool enabled() const {
-        return m_enabled;
+        return node().is_enabled();
     }
 
     void set_enabled(bool enabled) {
-        m_enabled = enabled;
+        if (m_scene_graph == nullptr) {
+            throw std::runtime_error("GameObject is not attached to a SceneGraph.");
+        }
+        m_scene_graph->set_enabled(m_id, enabled);
+    }
+
+    bool has_scene_graph() const {
+        return m_scene_graph != nullptr;
+    }
+
+    SceneGraph::NodeView node() {
+        if (m_scene_graph == nullptr) {
+            throw std::runtime_error("GameObject is not attached to a SceneGraph.");
+        }
+        return m_scene_graph->node(m_id);
+    }
+
+    SceneGraph::ConstNodeView node() const {
+        if (m_scene_graph == nullptr) {
+            throw std::runtime_error("GameObject is not attached to a SceneGraph.");
+        }
+        return m_scene_graph->node(m_id);
     }
 
     std::size_t component_count() const {
@@ -122,7 +150,7 @@ public:
     }
 
     void fixed_tick(const FixedTickContext& ctx) {
-        if (!m_enabled) {
+        if (!enabled()) {
             return;
         }
         for (const auto& component : m_components) {
@@ -133,7 +161,7 @@ public:
     }
 
     void tick(const FrameTickContext& ctx) {
-        if (!m_enabled) {
+        if (!enabled()) {
             return;
         }
         for (const auto& component : m_components) {
@@ -144,7 +172,7 @@ public:
     }
 
     void late_tick(const FrameTickContext& ctx) {
-        if (!m_enabled) {
+        if (!enabled()) {
             return;
         }
         for (const auto& component : m_components) {
