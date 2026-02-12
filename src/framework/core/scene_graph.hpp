@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <unordered_map>
@@ -16,24 +15,25 @@
 
 namespace rtr::framework::core {
 
-struct SceneGraphNodeSnapshot {
-    GameObjectId id{core::kInvalidGameObjectId};
-    GameObjectId parent_id{core::kInvalidGameObjectId};
-    glm::vec3 local_position{0.0f, 0.0f, 0.0f};
-    glm::quat local_rotation{1.0f, 0.0f, 0.0f, 0.0f};
-    glm::vec3 local_scale{1.0f, 1.0f, 1.0f};
-    bool is_enabled{true};
-    std::vector<GameObjectId> children{};
-};
-
-struct SceneGraphSnapshot {
-    std::vector<GameObjectId> root_children{};
-    std::vector<SceneGraphNodeSnapshot> nodes{};
-};
 
 class SceneGraph {
 public:
     static constexpr GameObjectId kVirtualRootId = 0;
+
+    struct NodeSnapshot {
+        GameObjectId id{core::kInvalidGameObjectId};
+        GameObjectId parent_id{core::kInvalidGameObjectId};
+        glm::vec3 local_position{0.0f, 0.0f, 0.0f};
+        glm::quat local_rotation{1.0f, 0.0f, 0.0f, 0.0f};
+        glm::vec3 local_scale{1.0f, 1.0f, 1.0f};
+        bool is_enabled{true};
+        std::vector<GameObjectId> children{};
+    };
+
+    struct Snapshot {
+        std::vector<GameObjectId> root_children{};
+        std::vector<NodeSnapshot> nodes{};
+    };
 
     struct NodeRecord {
         GameObjectId id{core::kInvalidGameObjectId};
@@ -49,28 +49,18 @@ public:
         bool is_enabled{true};
     };
 
-    class NodeView {
-    private:
-        SceneGraph& m_graph;
+    class ConstNodeView {
+    protected:
+        const SceneGraph& m_graph;
         GameObjectId m_id{core::kInvalidGameObjectId};
-        bool m_read_only{false};
 
         const SceneGraph& graph() const {
             return m_graph;
         }
 
-        SceneGraph& mutable_graph() {
-            if (m_read_only) {
-                throw std::runtime_error("NodeView is read-only.");
-            }
-            return m_graph;
-        }
-
     public:
-        NodeView(SceneGraph& graph, GameObjectId id)
-            : m_graph(graph), m_id(id), m_read_only(false) {}
-        NodeView(const SceneGraph& graph, GameObjectId id)
-            : m_graph(const_cast<SceneGraph&>(graph)), m_id(id), m_read_only(true) {}
+        ConstNodeView(const SceneGraph& graph, GameObjectId id)
+            : m_graph(graph), m_id(id) {}
 
         bool valid() const {
             return graph().has_node(m_id);
@@ -124,95 +114,31 @@ public:
             return graph().checked_record(m_id).is_enabled;
         }
 
-        void set_local_position(const glm::vec3& value) {
-            auto& graph = mutable_graph();
-            auto& record = graph.checked_record(m_id);
-            record.local_position = value;
-            graph.mark_subtree_dirty(m_id);
-        }
-
-        void set_local_rotation(const glm::quat& value) {
-            auto& graph = mutable_graph();
-            auto& record = graph.checked_record(m_id);
-            record.local_rotation = value;
-            graph.mark_subtree_dirty(m_id);
-        }
-
-        void set_local_scale(const glm::vec3& value) {
-            auto& graph = mutable_graph();
-            auto& record = graph.checked_record(m_id);
-            record.local_scale = value;
-            graph.mark_subtree_dirty(m_id);
-        }
-
-        void set_local_model_matrix(const glm::mat4& local_model_matrix) {
-            glm::vec3 scale = {
-                glm::length(glm::vec3(local_model_matrix[0])),
-                glm::length(glm::vec3(local_model_matrix[1])),
-                glm::length(glm::vec3(local_model_matrix[2]))
-            };
-
-            glm::mat3 rotation_matrix = glm::mat3(local_model_matrix);
-            rotation_matrix[0] /= scale.x;
-            rotation_matrix[1] /= scale.y;
-            rotation_matrix[2] /= scale.z;
-            glm::quat rotation = glm::quat_cast(rotation_matrix);
-            glm::vec3 position = glm::vec3(local_model_matrix[3]);
-
-            set_local_position(position);
-            set_local_rotation(rotation);
-            set_local_scale(scale);
-        }
-
-        void set_world_position(const glm::vec3& value) {
-            mutable_graph().set_world_position_internal(m_id, value);
-        }
-
-        void set_world_rotation(const glm::quat& value) {
-            mutable_graph().set_world_rotation_internal(m_id, value);
-        }
-
-        void set_world_scale(const glm::vec3& value) {
-            mutable_graph().set_world_scale_internal(m_id, value);
-        }
-
-        glm::vec3 position() const {
-            return local_position();
-        }
-
-        glm::quat rotation() const {
-            return local_rotation();
-        }
-
-        glm::vec3 scale() const {
-            return local_scale();
-        }
-
         glm::vec3 rotation_euler() const {
             return glm::degrees(glm::eulerAngles(local_rotation()));
         }
 
-        glm::vec3 up() const {
+        glm::vec3 local_up() const {
             return local_rotation() * glm::vec3(0.0f, 1.0f, 0.0f);
         }
 
-        glm::vec3 down() const {
+        glm::vec3 local_down() const {
             return local_rotation() * glm::vec3(0.0f, -1.0f, 0.0f);
         }
 
-        glm::vec3 right() const {
+        glm::vec3 local_right() const {
             return local_rotation() * glm::vec3(1.0f, 0.0f, 0.0f);
         }
 
-        glm::vec3 left() const {
+        glm::vec3 local_left() const {
             return local_rotation() * glm::vec3(-1.0f, 0.0f, 0.0f);
         }
 
-        glm::vec3 front() const {
+        glm::vec3 local_front() const {
             return local_rotation() * glm::vec3(0.0f, 0.0f, 1.0f);
         }
 
-        glm::vec3 back() const {
+        glm::vec3 local_back() const {
             return local_rotation() * glm::vec3(0.0f, 0.0f, -1.0f);
         }
 
@@ -243,6 +169,71 @@ public:
         glm::mat4 normal_matrix() const {
             return glm::transpose(glm::inverse(world_matrix()));
         }
+    };
+
+    class NodeView : public ConstNodeView {
+    private:
+        SceneGraph& m_mutable_graph;
+
+        SceneGraph& graph() {
+            return m_mutable_graph;
+        }
+
+    public:
+        NodeView(SceneGraph& graph, GameObjectId id)
+            : ConstNodeView(graph, id), m_mutable_graph(graph) {}
+
+        void set_local_position(const glm::vec3& value) {
+            auto& scene_graph = graph();
+            auto& record = scene_graph.checked_record(m_id);
+            record.local_position = value;
+            scene_graph.mark_subtree_dirty(m_id);
+        }
+
+        void set_local_rotation(const glm::quat& value) {
+            auto& scene_graph = graph();
+            auto& record = scene_graph.checked_record(m_id);
+            record.local_rotation = value;
+            scene_graph.mark_subtree_dirty(m_id);
+        }
+
+        void set_local_scale(const glm::vec3& value) {
+            auto& scene_graph = graph();
+            auto& record = scene_graph.checked_record(m_id);
+            record.local_scale = value;
+            scene_graph.mark_subtree_dirty(m_id);
+        }
+
+        void set_local_model_matrix(const glm::mat4& local_model_matrix) {
+            glm::vec3 scale = {
+                glm::length(glm::vec3(local_model_matrix[0])),
+                glm::length(glm::vec3(local_model_matrix[1])),
+                glm::length(glm::vec3(local_model_matrix[2]))
+            };
+
+            glm::mat3 rotation_matrix = glm::mat3(local_model_matrix);
+            rotation_matrix[0] /= scale.x;
+            rotation_matrix[1] /= scale.y;
+            rotation_matrix[2] /= scale.z;
+            glm::quat rotation = glm::quat_cast(rotation_matrix);
+            glm::vec3 position = glm::vec3(local_model_matrix[3]);
+
+            set_local_position(position);
+            set_local_rotation(rotation);
+            set_local_scale(scale);
+        }
+
+        void set_world_position(const glm::vec3& value) {
+            graph().set_world_position_internal(m_id, value);
+        }
+
+        void set_world_rotation(const glm::quat& value) {
+            graph().set_world_rotation_internal(m_id, value);
+        }
+
+        void set_world_scale(const glm::vec3& value) {
+            graph().set_world_scale_internal(m_id, value);
+        }
 
         void look_at_direction(const glm::vec3& target_direction) {
             if (glm::length(target_direction) < SceneGraph::kEpsilon) {
@@ -250,13 +241,13 @@ public:
             }
 
             const glm::vec3 direction = glm::normalize(target_direction);
-            const glm::vec3 current_front = front();
+            const glm::vec3 current_front = local_front();
             const float cross_len = glm::length(glm::cross(current_front, direction));
             glm::quat rotation = local_rotation();
 
             if (cross_len < SceneGraph::kEpsilon) {
                 if (glm::dot(current_front, direction) < 0.0f) {
-                    rotation = glm::rotate(rotation, glm::radians(180.0f), up());
+                    rotation = glm::rotate(rotation, glm::radians(180.0f), local_up());
                     set_local_rotation(rotation);
                 }
                 return;
@@ -267,11 +258,11 @@ public:
         }
 
         void look_at_point(const glm::vec3& target_point) {
-            look_at_direction(target_point - position());
+            look_at_direction(target_point - local_position());
         }
 
         void translate(const glm::vec3& direction, float distance) {
-            set_local_position(position() + direction * distance);
+            set_local_position(local_position() + direction * distance);
         }
 
         void rotate(float angle, const glm::vec3& axis) {
@@ -280,7 +271,7 @@ public:
         }
     };
 
-    static std::optional<SceneGraph> from_snapshot(const SceneGraphSnapshot& snapshot) {
+    static std::optional<SceneGraph> from_snapshot(const Snapshot& snapshot) {
         SceneGraph graph;
         graph.m_nodes.clear();
 
@@ -647,12 +638,12 @@ public:
         return NodeView(*this, id);
     }
 
-    NodeView node(GameObjectId id) const {
-        return NodeView(*this, id);
+    ConstNodeView node(GameObjectId id) const {
+        return ConstNodeView(*this, id);
     }
 
-    SceneGraphSnapshot to_snapshot() const {
-        SceneGraphSnapshot snapshot{};
+    Snapshot to_snapshot() const {
+        Snapshot snapshot{};
         snapshot.root_children = checked_record(kVirtualRootId).children;
 
         std::vector<GameObjectId> ids;
@@ -667,7 +658,7 @@ public:
         snapshot.nodes.reserve(ids.size());
         for (const auto id : ids) {
             const NodeRecord& record = checked_record(id);
-            SceneGraphNodeSnapshot node{};
+            NodeSnapshot node{};
             node.id = id;
             node.parent_id = record.parent_id;
             node.local_position = record.local_position;

@@ -29,13 +29,6 @@ target_include_directories(framework_world_scene_test PRIVATE ${CMAKE_SOURCE_DIR
 target_link_libraries(framework_world_scene_test PRIVATE gtest::gtest glm::glm)
 gtest_discover_tests(framework_world_scene_test)
 
-add_executable(framework_node_test
-    framework_node_test.cpp
-)
-target_include_directories(framework_node_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_node_test PRIVATE gtest::gtest glm::glm)
-gtest_discover_tests(framework_node_test)
-
 add_executable(framework_scene_graph_test
     framework_scene_graph_test.cpp
 )

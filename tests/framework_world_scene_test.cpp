@@ -2,7 +2,10 @@
 
 #include "gtest/gtest.h"
 
-#include "framework/framework.hpp"
+#include "framework/component/component.hpp"
+#include "framework/core/scene.hpp"
+#include "framework/core/scene_graph.hpp"
+#include "framework/core/world.hpp"
 
 namespace rtr::framework::core::test {
 

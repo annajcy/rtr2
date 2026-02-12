@@ -4,7 +4,9 @@
 
 #include "gtest/gtest.h"
 
-#include "framework/framework.hpp"
+#include "framework/component/component.hpp"
+#include "framework/core/scene.hpp"
+#include "framework/core/scene_graph.hpp"
 
 namespace rtr::framework::core::test {
 
@@ -176,7 +178,7 @@ TEST(SceneGraphTest, SnapshotRoundTripPreservesHierarchyAndLocalTransform) {
     graph.set_enabled(2, false);
     graph.update_world_transforms();
 
-    const SceneGraphSnapshot snapshot = graph.to_snapshot();
+    const SceneGraph::Snapshot snapshot = graph.to_snapshot();
 
     auto restored_opt = SceneGraph::from_snapshot(snapshot);
     ASSERT_TRUE(restored_opt.has_value());

@@ -5,7 +5,10 @@
 
 #include "gtest/gtest.h"
 
-#include "framework/framework.hpp"
+#include "framework/component/component.hpp"
+#include "framework/core/engine.hpp"
+#include "framework/core/scene.hpp"
+#include "framework/core/scene_graph.hpp"
 
 namespace rtr::framework::core::test {
 
