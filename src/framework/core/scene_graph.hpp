@@ -51,26 +51,29 @@ public:
 
     class NodeView {
     private:
-        const SceneGraph* m_graph{};
-        SceneGraph* m_mut_graph{};
+        SceneGraph& m_graph;
         GameObjectId m_id{core::kInvalidGameObjectId};
+        bool m_read_only{false};
+
+        const SceneGraph& graph() const {
+            return m_graph;
+        }
 
         SceneGraph& mutable_graph() {
-            if (m_mut_graph == nullptr) {
+            if (m_read_only) {
                 throw std::runtime_error("NodeView is read-only.");
             }
-            return *m_mut_graph;
+            return m_graph;
         }
 
     public:
-        NodeView() = default;
-        NodeView(SceneGraph* graph, GameObjectId id)
-            : m_graph(graph), m_mut_graph(graph), m_id(id) {}
-        NodeView(const SceneGraph* graph, GameObjectId id)
-            : m_graph(graph), m_mut_graph(nullptr), m_id(id) {}
+        NodeView(SceneGraph& graph, GameObjectId id)
+            : m_graph(graph), m_id(id), m_read_only(false) {}
+        NodeView(const SceneGraph& graph, GameObjectId id)
+            : m_graph(const_cast<SceneGraph&>(graph)), m_id(id), m_read_only(true) {}
 
         bool valid() const {
-            return m_graph != nullptr && m_graph->has_node(m_id);
+            return graph().has_node(m_id);
         }
 
         GameObjectId id() const {
@@ -78,27 +81,27 @@ public:
         }
 
         GameObjectId parent_id() const {
-            return m_graph->checked_record(m_id).parent_id;
+            return graph().checked_record(m_id).parent_id;
         }
 
         const std::vector<GameObjectId>& children() const {
-            return m_graph->checked_record(m_id).children;
+            return graph().checked_record(m_id).children;
         }
 
         const glm::vec3& local_position() const {
-            return m_graph->checked_record(m_id).local_position;
+            return graph().checked_record(m_id).local_position;
         }
 
         const glm::quat& local_rotation() const {
-            return m_graph->checked_record(m_id).local_rotation;
+            return graph().checked_record(m_id).local_rotation;
         }
 
         const glm::vec3& local_scale() const {
-            return m_graph->checked_record(m_id).local_scale;
+            return graph().checked_record(m_id).local_scale;
         }
 
         const glm::mat4& world_matrix() const {
-            return m_graph->checked_record(m_id).world_matrix;
+            return graph().checked_record(m_id).world_matrix;
         }
 
         glm::vec3 world_position() const {
@@ -114,11 +117,11 @@ public:
         }
 
         bool dirty() const {
-            return m_graph->checked_record(m_id).dirty;
+            return graph().checked_record(m_id).dirty;
         }
 
         bool is_enabled() const {
-            return m_graph->checked_record(m_id).is_enabled;
+            return graph().checked_record(m_id).is_enabled;
         }
 
         void set_local_position(const glm::vec3& value) {
@@ -641,11 +644,11 @@ public:
     }
 
     NodeView node(GameObjectId id) {
-        return NodeView(this, id);
+        return NodeView(*this, id);
     }
 
     NodeView node(GameObjectId id) const {
-        return NodeView(this, id);
+        return NodeView(*this, id);
     }
 
     SceneGraphSnapshot to_snapshot() const {
