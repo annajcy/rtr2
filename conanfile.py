@@ -27,7 +27,10 @@ class RTRConan(ConanFile):
         "compile_shaders": True,
         "with_pbpt": True,
         "slang_version": "2025.10.4",
-        "pbpt_version": "0.1.0"
+        "pbpt_version": "0.1.0",
+        "pbpt/*:with_tests": False,
+        "pbpt/*:with_examples": False,
+        "pbpt/*:with_docs": False,
     }
 
     generators = "CMakeDeps", "VirtualBuildEnv", "VirtualRunEnv"

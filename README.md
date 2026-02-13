@@ -39,6 +39,12 @@ PBPT_VER="0.1.0-dev.${SHA}"
 uv run conan install . -pr=profiles/rtr2 -s build_type=Debug -s compiler.cppstd=23 -o "&:with_pbpt=True" -o "&:pbpt_version=${PBPT_VER}" --build=missing
 ```
 
+By default, when `rtr` consumes `pbpt` via Conan, `pbpt` is built without tests/examples/docs (`pbpt/*:with_tests=False`, `pbpt/*:with_examples=False`, `pbpt/*:with_docs=False`).
+Override per-install if needed:
+```bash
+uv run conan install . -pr=profiles/rtr2 -s build_type=Debug -s compiler.cppstd=23 -o '&:with_pbpt=True' -o '&:pbpt_version=0.1.0-dev.local' -o 'pbpt/*:with_tests=True' -o 'pbpt/*:with_examples=True' -o 'pbpt/*:with_docs=True' --build=missing
+```
+
 ```bash
 # quick local example
 uv run conan install . -pr=profiles/rtr2 -s build_type=Debug -s compiler.cppstd=23 -o '&:with_pbpt=True' -o '&:pbpt_version=0.1.0-dev.local' --build=missing

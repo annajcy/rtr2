@@ -32,8 +32,11 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-option(RTR_BUILD_TESTS "Build the project's tests" ON)
-option(RTR_BUILD_EXAMPLES "Build the project's examples" ON)
+set(RTR_DEFAULT_BUILD_TESTS ${PROJECT_IS_TOP_LEVEL})
+set(RTR_DEFAULT_BUILD_EXAMPLES ${PROJECT_IS_TOP_LEVEL})
+
+option(RTR_BUILD_TESTS "Build the project's tests" ${RTR_DEFAULT_BUILD_TESTS})
+option(RTR_BUILD_EXAMPLES "Build the project's examples" ${RTR_DEFAULT_BUILD_EXAMPLES})
 option(RTR_COMPILE_SHADERS "Build the project's shaders" ON)
 option(RTR_ENABLE_PBPT_RUNTIME "Enable PBPT offline runtime implementation" ON)
 
