@@ -100,7 +100,7 @@ endif()
 
 if(RTR_BUILD_TESTS)
   enable_testing()
-  add_subdirectory(tests)
+  add_subdirectory(test)
   message(STATUS "RTR_BUILD_TESTS is ON; tests will be built.")
 else()
   message(STATUS "RTR_BUILD_TESTS is OFF; tests will NOT be built.")
