@@ -111,6 +111,9 @@ jobs:
             -pr:h=external/pbpt/profiles/pbpt \
             -pr:b=external/pbpt/profiles/pbpt \
             -s build_type=${{ matrix.build_type }} \
+            -o with_tests=False \
+            -o with_examples=False \
+            -o with_docs=False \
             --build=missing
           uv run conan list "pbpt/${PBPT_VER}"
           uv run conan install . \
@@ -143,6 +146,9 @@ jobs:
             -pr:h=external/pbpt/profiles/pbpt `
             -pr:b=external/pbpt/profiles/pbpt `
             -s build_type=${{ matrix.build_type }} `
+            -o with_tests=False `
+            -o with_examples=False `
+            -o with_docs=False `
             --build=missing
           uv run conan list "pbpt/$pbptVer"
           uv run conan install . `

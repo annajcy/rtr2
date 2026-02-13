@@ -5,7 +5,6 @@ from conan.tools.files import copy
 
 required_conan_version = ">=2.0"
 
-
 class RTRConan(ConanFile):
     name = "rtr"
     package_type = "static-library"
@@ -27,10 +26,7 @@ class RTRConan(ConanFile):
         "compile_shaders": True,
         "with_pbpt": True,
         "slang_version": "2025.10.4",
-        "pbpt_version": "0.1.0",
-        "pbpt/*:with_tests": False,
-        "pbpt/*:with_examples": False,
-        "pbpt/*:with_docs": False,
+        "pbpt_version": "0.1.0"
     }
 
     generators = "CMakeDeps", "VirtualBuildEnv", "VirtualRunEnv"
@@ -70,9 +66,9 @@ class RTRConan(ConanFile):
 
     def requirements(self):
         self.requires("glfw/3.4")
-        self.requires("assimp/5.4.3")
+        self.requires("tinygltf/[>=2.8 <3]")
         self.requires("imgui/1.92.2b-docking")
-        self.requires("stb/cci.20230920")
+        self.requires("stb/cci.20240531")
         self.requires("vulkan-loader/[>=1.3]")
         self.requires("glm/cci.20230113")
         self.requires("tinyobjloader/2.0.0-rc10")
@@ -131,7 +127,7 @@ class RTRConan(ConanFile):
         core_component.requires = [
             "imgui_vk",
             "stb_impl",
-            "assimp::assimp",
+            "TinyGLTF::TinyGLTF",
             "slang::slang",
             "glm::glm",
             "tinyobjloader::tinyobjloader",

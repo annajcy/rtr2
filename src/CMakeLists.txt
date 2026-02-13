@@ -10,7 +10,7 @@ target_link_libraries(rtr INTERFACE
     stb_impl 
     glfw 
     Vulkan::Loader 
-    assimp::assimp 
+  TinyGLTF::TinyGLTF
     slang::slang
     glm::glm
     tinyobjloader::tinyobjloader

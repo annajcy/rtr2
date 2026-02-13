@@ -9,9 +9,9 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
 
-#include "assimp/Importer.hpp"
 #include "imgui.h"
 #include "slang.h"
+#include "tiny_gltf.h"
 #include "vulkan/vulkan.h"
 #include "vulkan/vulkan.hpp"
 #include "stb_image.h"
@@ -113,16 +113,17 @@ void test_stb_image() {
     }
 }
 
-void test_assimp() {
-    std::cout << "\n=== Testing Assimp ===" << std::endl;
-    Assimp::Importer importer;
-    std::vector<std::string> formats = {"obj", "fbx", "dae", "gltf", "glb", "stl", "ply", "3ds"};
-    for (const auto& fmt : formats) {
-        std::cout << "  " << fmt << ": " << (importer.IsExtensionSupported(fmt) ? "✓ Supported" : "✗ Not supported") << std::endl;
-    }
-    std::string extensions;
-    importer.GetExtensionList(extensions);
-    std::cout << "\nAll extensions: " << extensions << std::endl;
+void test_tinygltf() {
+    std::cout << "\n=== Testing tinygltf ===" << std::endl;
+    tinygltf::Model model;
+    tinygltf::Material material;
+    tinygltf::Mesh mesh;
+
+    model.materials.push_back(material);
+    model.meshes.push_back(mesh);
+
+    std::cout << "✓ tinygltf headers accessible" << std::endl;
+    std::cout << "materials: " << model.materials.size() << ", meshes: " << model.meshes.size() << std::endl;
 }
 
 void test_glm() {
@@ -183,7 +184,7 @@ int main() {
     test_imgui();
     test_vulkan();
     test_stb_image();
-    test_assimp();
+    test_tinygltf();
     test_glm();
     std::cout << "\n========================================" << std::endl;
     std::cout << "All tests completed!" << std::endl;
