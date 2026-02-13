@@ -148,7 +148,7 @@ jobs:
             -pr:b=profiles/rtr2 `
             -s build_type=${{ matrix.build_type }} `
             -s compiler.cppstd=23 `
-            -o &:with_pbpt=True `
+            -o '&:with_pbpt=True' `
             -o "&:pbpt_version=$pbptVer" `
             --build=missing
 
