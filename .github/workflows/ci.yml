@@ -116,6 +116,13 @@ jobs:
             -o with_docs=False \
             --build=missing
           uv run conan list "pbpt/${PBPT_VER}"
+          uv run conan graph info . \
+            -pr:h=profiles/rtr2 \
+            -pr:b=profiles/rtr2 \
+            -s build_type=${{ matrix.build_type }} \
+            -s compiler.cppstd=23 \
+            -o '&:with_pbpt=True' \
+            -o '&:pbpt_version='"${PBPT_VER}"
           uv run conan install . \
             -pr:h=profiles/rtr2 \
             -pr:b=profiles/rtr2 \
@@ -151,6 +158,13 @@ jobs:
             -o with_docs=False `
             --build=missing
           uv run conan list "pbpt/$pbptVer"
+          uv run conan graph info . `
+            -pr:h=profiles/rtr2 `
+            -pr:b=profiles/rtr2 `
+            -s build_type=${{ matrix.build_type }} `
+            -s compiler.cppstd=23 `
+            -o '&:with_pbpt=True' `
+            -o "&:pbpt_version=$pbptVer"
           uv run conan install . `
             -pr:h=profiles/rtr2 `
             -pr:b=profiles/rtr2 `

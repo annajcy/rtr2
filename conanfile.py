@@ -68,7 +68,7 @@ class RTRConan(ConanFile):
         self.requires("glfw/3.4")
         self.requires("tinygltf/[>=2.8 <3]")
         self.requires("imgui/1.92.2b-docking")
-        self.requires("stb/cci.20240531")
+        self.requires("stb/cci.20240531", override=True)
         self.requires("vulkan-loader/[>=1.3]")
         self.requires("glm/cci.20230113")
         self.requires("tinyobjloader/2.0.0-rc10")
