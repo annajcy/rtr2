@@ -13,6 +13,7 @@ class Scene;
 }
 
 namespace rtr::framework::integration {
+using OfflineRenderWorkerThread = std::thread;
 
 enum class OfflineRenderState {
     Idle,
@@ -71,7 +72,7 @@ private:
     std::shared_ptr<const std::string> m_last_message{};
 
     mutable std::mutex m_lifecycle_mutex{};
-    std::jthread m_worker{};
+    OfflineRenderWorkerThread m_worker{};
 
     RenderBackend m_backend{};
 };

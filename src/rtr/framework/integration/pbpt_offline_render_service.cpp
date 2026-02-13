@@ -139,7 +139,7 @@ bool PbptOfflineRenderService::start(const core::Scene& scene, const OfflineRend
     set_message("Scene snapshot saved to XML: " + config.scene_xml_path);
 
     const OfflineRenderConfig worker_config = config;
-    m_worker = std::jthread([this, worker_config](std::stop_token) {
+    m_worker = std::thread([this, worker_config]() {
         run_worker(worker_config);
     });
 
