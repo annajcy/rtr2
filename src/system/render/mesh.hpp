@@ -13,7 +13,7 @@
 #include "rhi/buffer.hpp"
 #include "rhi/command.hpp"
 #include "rhi/device.hpp"
-#include "utils/obj_loader.hpp"
+#include "utils/rtr_obj_loader.hpp"
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
 

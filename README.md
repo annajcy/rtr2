@@ -39,7 +39,35 @@ cd ..
 
 Use the project profile (cross-platform, Ninja):
 ```bash
-conan install . -pr=profiles/rtr2 -s build_type=Debug --build=missing
+SHA=$(git rev-parse --short HEAD)
+PBPT_VER="0.1.0-dev.${SHA}"
+
+conan install . -pr=profiles/rtr2 -s build_type=Debug -s compiler.cppstd=23 -o "&:with_pbpt=True" -o "&:pbpt_version=${PBPT_VER}" --build=missing
+```
+
+```bash
+# quick local example
+conan install . -pr=profiles/rtr2 -s build_type=Debug -s compiler.cppstd=23 -o '&:with_pbpt=True' -o '&:pbpt_version=0.1.0-dev.local' --build=missing
+```
+
+Create a local consumable package:
+```bash
+# Use a real suffix. Example below uses git short SHA.
+SHA=$(git rev-parse --short HEAD)
+PBPT_VER="0.1.0-dev.${SHA}"
+RTR_VER="0.1.0-dev.${SHA}"
+
+# 1) create pbpt package in local cache
+conan create external/pbpt --version ${PBPT_VER} -s build_type=Debug -s compiler.cppstd=23 --build=missing
+
+# 2) create rtr package in local cache (Conan 2 scoped option syntax)
+conan create . --name=rtr --version ${RTR_VER} -pr=profiles/rtr2 -s build_type=Debug -s compiler.cppstd=23 -o "&:with_pbpt=True" -o "&:pbpt_version=${PBPT_VER}" --build=missing
+```
+
+Quick local example:
+```bash
+conan create external/pbpt --version 0.1.0-dev.local -s build_type=Debug -s compiler.cppstd=23 --build=missing
+conan install . -pr=profiles/rtr2 -s build_type=Debug -s compiler.cppstd=23 -o '&:with_pbpt=True' -o '&:pbpt_version=0.1.0-dev.local' --build=missing
 ```
 
 Windows note: if Conan cannot find your Visual Studio installation, set a
@@ -55,8 +83,41 @@ pwsh -ExecutionPolicy Bypass -File script\setup_conan_profile.ps1 -VsPath "C:\Pr
 
 Then run:
 ```bash
-conan install . -pr=profiles/rtr2 -pr=rtr2-local -s build_type=Debug --build=missing
+conan install . -pr=profiles/rtr2 -pr=rtr2-local -s build_type=Debug -s compiler.cppstd=23 -o '&:with_pbpt=True' -o '&:pbpt_version=0.1.0-dev.<sha>' --build=missing
 ```
+
+### Troubleshooting dependency conflicts
+
+If Conan resolves an older cached `pbpt` (for example `pbpt/0.1.0`) and reports conflicts like `imgui` vs `imgui-docking`, remove the old cache entry and retry with scoped `pbpt_version`:
+
+```bash
+conan remove 'pbpt/0.1.0*' -c
+conan install . -pr=profiles/rtr2 -s build_type=Debug -s compiler.cppstd=23 -o '&:with_pbpt=True' -o '&:pbpt_version=0.1.0-dev.<sha>' --build=missing
+```
+
+Do not run `<sha>` literally in shell variable assignments; it will be parsed as redirection in `zsh`.
+
+### Downstream consumption
+
+```python
+# conanfile.py
+def requirements(self):
+    self.requires("rtr/0.1.0-dev.<sha>")
+```
+
+```cmake
+find_package(rtr CONFIG REQUIRED)
+target_link_libraries(your_app PRIVATE rtr::rtr rtr::framework_integration)
+```
+
+PBPT runtime can be disabled while still exporting the same targets:
+```bash
+conan install . -pr=profiles/rtr2 -s build_type=Debug -s compiler.cppstd=23 -o '&:with_pbpt=False' --build=missing
+```
+When `with_pbpt=False`, `rtr::framework_integration` links a stub implementation:
+- target name remains `rtr::framework_integration`
+- `PbptOfflineRenderService::start(...)` returns `false`
+- no `pbpt`/`OpenEXR`/`embree`/`TBB` package resolution is required
 
 Configure and build with CMake presets:
 ```bash

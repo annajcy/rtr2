@@ -21,8 +21,8 @@ PbptOfflineRenderService::PbptOfflineRenderService(RenderBackend backend)
         m_backend = [](const OfflineRenderConfig& config,
                        const ProgressCallback& on_progress,
                        const CancelQuery& is_cancel_requested) {
-            auto pbpt_scene = pbpt::loader::load_scene<double>(config.scene_xml_path);
-            pbpt::integrator::PathIntegrator<double, 4> integrator(-1, 0.9);
+            auto pbpt_scene = pbpt::loader::load_scene<float>(config.scene_xml_path);
+            pbpt::integrator::PathIntegrator<float, 4> integrator(-1, 0.9f);
 
             pbpt::integrator::RenderObserver observer{};
             observer.on_progress = on_progress;

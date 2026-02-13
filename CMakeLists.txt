@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.27)
-project(rtr LANGUAGES CXX)
+project(rtr VERSION 0.1.0 LANGUAGES CXX)
 
 message(STATUS "CMake version: ${CMAKE_VERSION}")
 
@@ -29,13 +29,60 @@ if(APPLE)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 option(RTR_BUILD_TESTS "Build the project's tests" ON)
 option(RTR_BUILD_EXAMPLES "Build the project's examples" ON)
 option(RTR_COMPILE_SHADERS "Build the project's shaders" ON)
+option(RTR_ENABLE_PBPT_RUNTIME "Enable PBPT offline runtime implementation" ON)
 
 include(third_party) 
 add_subdirectory(src)
+
+set(RTR_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/rtr")
+
+install(
+  TARGETS rtr rtr_framework_integration imgui_vk stb_impl
+  EXPORT rtrTargets
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  FILES_MATCHING
+  PATTERN "*.hpp"
+  PATTERN "*.h"
+)
+
+configure_package_config_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/rtrConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/rtrConfig.cmake
+  INSTALL_DESTINATION ${RTR_CONFIG_INSTALL_DIR}
+)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/rtrConfigVersion.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/rtrConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/rtrConfigVersion.cmake
+  DESTINATION ${RTR_CONFIG_INSTALL_DIR}
+)
+
+install(
+  EXPORT rtrTargets
+  NAMESPACE rtr::
+  DESTINATION ${RTR_CONFIG_INSTALL_DIR}
+)
 
 if (RTR_COMPILE_SHADERS)
   add_subdirectory(shaders)

@@ -1,7 +1,7 @@
 include(default)
 
 [settings]
-compiler.cppstd=17
+compiler.cppstd=23
 
 [conf]
 tools.cmake.cmaketoolchain:generator=Ninja
