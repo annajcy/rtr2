@@ -6,8 +6,8 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-#include "framework/core/camera.hpp"
-#include "framework/core/scene.hpp"
+#include "rtr/framework/core/camera.hpp"
+#include "rtr/framework/core/scene.hpp"
 
 namespace rtr::framework::core::test {
 

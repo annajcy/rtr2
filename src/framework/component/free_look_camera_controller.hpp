@@ -9,11 +9,11 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/trigonometric.hpp>
 
-#include "framework/component/component.hpp"
-#include "framework/core/camera_manager.hpp"
-#include "framework/core/game_object.hpp"
-#include "system/input/input_state.hpp"
-#include "system/input/input_types.hpp"
+#include "rtr/framework/component/component.hpp"
+#include "rtr/framework/core/camera_manager.hpp"
+#include "rtr/framework/core/game_object.hpp"
+#include "rtr/system/input/input_state.hpp"
+#include "rtr/system/input/input_types.hpp"
 
 namespace rtr::framework::component {
 

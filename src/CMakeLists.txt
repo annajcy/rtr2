@@ -30,6 +30,8 @@ target_include_directories(rtr_framework_integration
     PUBLIC
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    PRIVATE
+      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/pbpt/src>
 )
 target_link_libraries(rtr_framework_integration PUBLIC rtr)
 if(RTR_ENABLE_PBPT_RUNTIME)

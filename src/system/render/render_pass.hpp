@@ -4,9 +4,9 @@
 #include <string_view>
 #include <vector>
 
-#include "system/render/frame_context.hpp"
-#include "rhi/imgui_context.hpp"
-#include "rhi/texture.hpp"
+#include "rtr/system/render/frame_context.hpp"
+#include "rtr/rhi/imgui_context.hpp"
+#include "rtr/rhi/texture.hpp"
 
 namespace rtr::system::render {
 

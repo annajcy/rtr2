@@ -6,12 +6,12 @@
 #include <glm/geometric.hpp>
 #include <glm/trigonometric.hpp>
 
-#include "framework/component/component.hpp"
-#include "framework/component/free_look_camera_controller.hpp"
-#include "framework/core/scene.hpp"
-#include "framework/core/scene_graph.hpp"
-#include "system/input/input_state.hpp"
-#include "system/input/input_types.hpp"
+#include "rtr/framework/component/component.hpp"
+#include "rtr/framework/component/free_look_camera_controller.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/core/scene_graph.hpp"
+#include "rtr/system/input/input_state.hpp"
+#include "rtr/system/input/input_types.hpp"
 
 namespace rtr::framework::component::test {
 

@@ -4,9 +4,9 @@
 #include <stdexcept>
 #include <string>
 
-#include "framework/core/scene.hpp"
-#include "framework/integration/pbpt_scene_export_builder.hpp"
-#include "framework/integration/pbpt_scene_importer.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/integration/pbpt_scene_export_builder.hpp"
+#include "rtr/framework/integration/pbpt_scene_importer.hpp"
 
 int main(int argc, char** argv) {
     std::filesystem::path input_path =

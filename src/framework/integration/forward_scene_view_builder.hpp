@@ -5,9 +5,9 @@
 
 #include <glm/gtc/matrix_inverse.hpp>
 
-#include "framework/component/mesh_renderer.hpp"
-#include "framework/core/scene.hpp"
-#include "system/render/forward_scene_view.hpp"
+#include "rtr/framework/component/mesh_renderer.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/system/render/forward_scene_view.hpp"
 
 namespace rtr::framework::integration {
 

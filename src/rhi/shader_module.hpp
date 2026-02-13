@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "rhi/device.hpp"
-#include "utils/file_loder.hpp"
+#include "rtr/rhi/device.hpp"
+#include "rtr/utils/file_loder.hpp"
 #include "vulkan/vulkan_raii.hpp"
 
 namespace rtr::rhi {

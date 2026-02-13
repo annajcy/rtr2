@@ -13,7 +13,7 @@
 #include <cmath>
 #include "device.hpp"
 #include "buffer.hpp"
-#include "utils/image_loader.hpp"
+#include "rtr/utils/image_loader.hpp"
 
 namespace rtr::rhi {
 

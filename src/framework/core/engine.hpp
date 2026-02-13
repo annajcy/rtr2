@@ -8,8 +8,8 @@
 #include <string>
 #include <utility>
 
-#include "framework/core/tick_context.hpp"
-#include "framework/core/world.hpp"
+#include "rtr/framework/core/tick_context.hpp"
+#include "rtr/framework/core/world.hpp"
 
 namespace rtr::framework::core {
 

@@ -5,10 +5,10 @@
 #include <stdexcept>
 #include <string>
 
-#include "system/render/renderer.hpp"
-#include "rhi/buffer.hpp"
-#include "rhi/descriptor.hpp"
-#include "rhi/shader_module.hpp"
+#include "rtr/system/render/renderer.hpp"
+#include "rtr/rhi/buffer.hpp"
+#include "rtr/rhi/descriptor.hpp"
+#include "rtr/rhi/shader_module.hpp"
 
 namespace {
 

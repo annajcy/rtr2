@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "rhi/common.hpp"
+#include "rtr/rhi/common.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_handles.hpp"
 #include "vulkan/vulkan_raii.hpp"

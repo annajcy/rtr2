@@ -8,9 +8,9 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 
-#include "rhi/context.hpp"
-#include "rhi/device.hpp"
-#include "rhi/window.hpp"
+#include "rtr/rhi/context.hpp"
+#include "rtr/rhi/device.hpp"
+#include "rtr/rhi/window.hpp"
 
 namespace rtr::rhi {
 

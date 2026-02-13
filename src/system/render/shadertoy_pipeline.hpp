@@ -9,12 +9,12 @@
 #include <string>
 #include <vector>
 
-#include "system/render/pipeline.hpp"
-#include "system/render/render_pass.hpp"
-#include "rhi/buffer.hpp"
-#include "rhi/descriptor.hpp"
-#include "rhi/shader_module.hpp"
-#include "rhi/texture.hpp"
+#include "rtr/system/render/pipeline.hpp"
+#include "rtr/system/render/render_pass.hpp"
+#include "rtr/rhi/buffer.hpp"
+#include "rtr/rhi/descriptor.hpp"
+#include "rtr/rhi/shader_module.hpp"
+#include "rtr/rhi/texture.hpp"
 #include "vulkan/vulkan.hpp"
 
 namespace rtr::system::render {

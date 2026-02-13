@@ -7,13 +7,13 @@
 
 #include <glm/vec3.hpp>
 
-#include "framework/component/mesh_renderer.hpp"
-#include "framework/component/free_look_camera_controller.hpp"
-#include "framework/component/pbpt_light.hpp"
-#include "framework/component/pbpt_mesh.hpp"
-#include "framework/core/scene.hpp"
-#include "framework/integration/pbpt_scene_importer.hpp"
-#include "system/input/input_state.hpp"
+#include "rtr/framework/component/mesh_renderer.hpp"
+#include "rtr/framework/component/free_look_camera_controller.hpp"
+#include "rtr/framework/component/pbpt_light.hpp"
+#include "rtr/framework/component/pbpt_mesh.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/integration/pbpt_scene_importer.hpp"
+#include "rtr/system/input/input_state.hpp"
 
 namespace rtr::framework::integration::test {
 

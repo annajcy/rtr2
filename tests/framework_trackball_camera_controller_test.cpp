@@ -6,10 +6,10 @@
 #include <glm/geometric.hpp>
 #include <glm/trigonometric.hpp>
 
-#include "framework/component/trackball_camera_controller.hpp"
-#include "framework/core/scene.hpp"
-#include "system/input/input_state.hpp"
-#include "system/input/input_types.hpp"
+#include "rtr/framework/component/trackball_camera_controller.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/system/input/input_state.hpp"
+#include "rtr/system/input/input_types.hpp"
 
 namespace rtr::framework::component::test {
 

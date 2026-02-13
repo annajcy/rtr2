@@ -7,13 +7,13 @@
 #include <string>
 #include <utility>
 
-#include "rhi/command.hpp"
-#include "rhi/context.hpp"
-#include "rhi/device.hpp"
-#include "rhi/window.hpp"
-#include "system/render/frame_context.hpp"
-#include "system/render/frame_scheduler.hpp"
-#include "system/render/pipeline.hpp"
+#include "rtr/rhi/command.hpp"
+#include "rtr/rhi/context.hpp"
+#include "rtr/rhi/device.hpp"
+#include "rtr/rhi/window.hpp"
+#include "rtr/system/render/frame_context.hpp"
+#include "rtr/system/render/frame_scheduler.hpp"
+#include "rtr/system/render/pipeline.hpp"
 
 namespace rtr::system::render {
 

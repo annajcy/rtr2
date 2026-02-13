@@ -7,9 +7,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "framework/core/camera.hpp"
-#include "framework/core/scene_graph.hpp"
-#include "framework/core/types.hpp"
+#include "rtr/framework/core/camera.hpp"
+#include "rtr/framework/core/scene_graph.hpp"
+#include "rtr/framework/core/types.hpp"
 
 namespace rtr::framework::core {
 

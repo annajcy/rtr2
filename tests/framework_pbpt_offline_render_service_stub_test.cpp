@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "framework/core/scene.hpp"
-#include "framework/integration/pbpt_offline_render_service.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/integration/pbpt_offline_render_service.hpp"
 
 namespace rtr::framework::integration::testing {
 

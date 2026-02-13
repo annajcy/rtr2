@@ -6,9 +6,9 @@
 
 #include <glm/gtc/quaternion.hpp>
 
-#include "framework/component/mesh_renderer.hpp"
-#include "framework/core/scene.hpp"
-#include "framework/integration/forward_scene_view_builder.hpp"
+#include "rtr/framework/component/mesh_renderer.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/integration/forward_scene_view_builder.hpp"
 
 namespace rtr::framework::integration::test {
 

@@ -4,15 +4,15 @@
 
 #include "imgui.h"
 
-#include "framework/component/mesh_renderer.hpp"
-#include "framework/component/trackball_camera_controller.hpp"
-#include "framework/core/camera.hpp"
-#include "framework/core/engine.hpp"
-#include "framework/integration/forward_scene_view_builder.hpp"
-#include "system/input/input_system.hpp"
-#include "system/input/input_types.hpp"
-#include "system/render/forward_pipeline.hpp"
-#include "system/render/renderer.hpp"
+#include "rtr/framework/component/mesh_renderer.hpp"
+#include "rtr/framework/component/trackball_camera_controller.hpp"
+#include "rtr/framework/core/camera.hpp"
+#include "rtr/framework/core/engine.hpp"
+#include "rtr/framework/integration/forward_scene_view_builder.hpp"
+#include "rtr/system/input/input_system.hpp"
+#include "rtr/system/input/input_types.hpp"
+#include "rtr/system/render/forward_pipeline.hpp"
+#include "rtr/system/render/renderer.hpp"
 
 int main() {
     constexpr uint32_t kWidth = 1280;

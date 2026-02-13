@@ -2,10 +2,10 @@
 
 #include "gtest/gtest.h"
 
-#include "framework/component/component.hpp"
-#include "framework/core/scene.hpp"
-#include "framework/core/scene_graph.hpp"
-#include "framework/core/world.hpp"
+#include "rtr/framework/component/component.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/core/scene_graph.hpp"
+#include "rtr/framework/core/world.hpp"
 
 namespace rtr::framework::core::test {
 

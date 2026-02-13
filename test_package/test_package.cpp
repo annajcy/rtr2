@@ -1,4 +1,4 @@
-#include "framework/integration/pbpt_offline_render_service.hpp"
+#include "rtr/framework/integration/pbpt_offline_render_service.hpp"
 
 int main() {
     rtr::framework::integration::PbptOfflineRenderService service;

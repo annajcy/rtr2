@@ -4,10 +4,10 @@
 #include <string>
 #include <utility>
 
-#include "framework/component/component.hpp"
-#include "framework/component/mesh_renderer.hpp"
-#include "framework/component/pbpt_spectrum.hpp"
-#include "framework/core/game_object.hpp"
+#include "rtr/framework/component/component.hpp"
+#include "rtr/framework/component/mesh_renderer.hpp"
+#include "rtr/framework/component/pbpt_spectrum.hpp"
+#include "rtr/framework/core/game_object.hpp"
 
 namespace rtr::framework::component {
 

@@ -10,7 +10,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
-#include "utils/event_center.hpp"
+#include "rtr/utils/event_center.hpp"
 #include "vulkan/vulkan_raii.hpp"
 
 namespace rtr::rhi {

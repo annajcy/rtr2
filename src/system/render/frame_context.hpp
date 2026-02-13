@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "rhi/command.hpp"
-#include "rhi/device.hpp"
+#include "rtr/rhi/command.hpp"
+#include "rtr/rhi/device.hpp"
 
 namespace rtr::system::render {
 

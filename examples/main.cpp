@@ -3,10 +3,10 @@
 #include <memory>
 
 #include "imgui.h"
-#include "system/input/input_system.hpp"
-#include "system/input/input_types.hpp"
-#include "system/render/forward_pipeline.hpp"
-#include "system/render/renderer.hpp"
+#include "rtr/system/input/input_system.hpp"
+#include "rtr/system/input/input_types.hpp"
+#include "rtr/system/render/forward_pipeline.hpp"
+#include "rtr/system/render/renderer.hpp"
 
 int main() {
     try {

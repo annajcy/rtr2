@@ -13,11 +13,11 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
-#include "framework/component/mesh_renderer.hpp"
-#include "framework/component/pbpt_light.hpp"
-#include "framework/component/pbpt_mesh.hpp"
-#include "framework/core/camera.hpp"
-#include "framework/core/scene.hpp"
+#include "rtr/framework/component/mesh_renderer.hpp"
+#include "rtr/framework/component/pbpt_light.hpp"
+#include "rtr/framework/component/pbpt_mesh.hpp"
+#include "rtr/framework/core/camera.hpp"
+#include "rtr/framework/core/scene.hpp"
 
 namespace rtr::framework::integration {
 

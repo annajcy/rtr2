@@ -4,10 +4,10 @@
 
 #include "imgui.h"
 
-#include "system/input/input_system.hpp"
-#include "system/input/input_types.hpp"
-#include "system/render/renderer.hpp"
-#include "system/render/shadertoy_pipeline.hpp"
+#include "rtr/system/input/input_system.hpp"
+#include "rtr/system/input/input_types.hpp"
+#include "rtr/system/render/renderer.hpp"
+#include "rtr/system/render/shadertoy_pipeline.hpp"
 
 int main() {
     constexpr uint32_t kWidth = 800;

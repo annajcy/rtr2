@@ -10,10 +10,10 @@
 
 #include <glm/glm.hpp>
 
-#include "rhi/buffer.hpp"
-#include "rhi/command.hpp"
-#include "rhi/device.hpp"
-#include "utils/rtr_obj_loader.hpp"
+#include "rtr/rhi/buffer.hpp"
+#include "rtr/rhi/command.hpp"
+#include "rtr/rhi/device.hpp"
+#include "rtr/utils/obj_loader.hpp"
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
 

@@ -5,7 +5,7 @@
 #include <string_view>
 #include <utility>
 
-#include "framework/component/component.hpp"
+#include "rtr/framework/component/component.hpp"
 
 namespace rtr::framework::component {
 

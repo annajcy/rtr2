@@ -6,9 +6,9 @@
 #include <utility>
 #include <vector>
 
-#include "framework/core/scene.hpp"
-#include "framework/core/tick_context.hpp"
-#include "framework/core/types.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/core/tick_context.hpp"
+#include "rtr/framework/core/types.hpp"
 
 namespace rtr::framework::core {
 

@@ -3,9 +3,9 @@
 
 #include "gtest/gtest.h"
 
-#include "framework/component/mesh_renderer.hpp"
-#include "framework/component/pbpt_mesh.hpp"
-#include "framework/core/scene.hpp"
+#include "rtr/framework/component/mesh_renderer.hpp"
+#include "rtr/framework/component/pbpt_mesh.hpp"
+#include "rtr/framework/core/scene.hpp"
 
 namespace rtr::framework::component::test {
 

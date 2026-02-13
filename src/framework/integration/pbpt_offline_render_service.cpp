@@ -1,4 +1,4 @@
-#include "framework/integration/pbpt_offline_render_service.hpp"
+#include "rtr/framework/integration/pbpt_offline_render_service.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -6,12 +6,12 @@
 #include <stdexcept>
 #include <utility>
 
-#include "integrator/integrator.hpp"
-#include "integrator/plugin/integrator/path_integrator.hpp"
-#include "loader/scene_loader.hpp"
+#include "pbpt/integrator/integrator.hpp"
+#include "pbpt/integrator/plugin/integrator/path_integrator.hpp"
+#include "pbpt/loader/scene_loader.hpp"
 
-#include "framework/core/scene.hpp"
-#include "framework/integration/pbpt_scene_export_builder.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/integration/pbpt_scene_export_builder.hpp"
 
 namespace rtr::framework::integration {
 

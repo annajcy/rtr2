@@ -1,6 +1,6 @@
 #pragma once
 
-#include "framework/core/tick_context.hpp"
+#include "rtr/framework/core/tick_context.hpp"
 
 namespace rtr::framework::core {
 class GameObject;

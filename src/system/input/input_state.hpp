@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <unordered_map>
 
-#include "system/input/input_types.hpp"
+#include "rtr/system/input/input_types.hpp"
 
 namespace rtr::system::input {
 

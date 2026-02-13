@@ -6,8 +6,8 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
-#include "framework/core/scene_graph.hpp"
-#include "framework/core/types.hpp"
+#include "rtr/framework/core/scene_graph.hpp"
+#include "rtr/framework/core/types.hpp"
 
 namespace rtr::framework::core {
 

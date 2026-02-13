@@ -1,8 +1,8 @@
-#include "framework/integration/pbpt_offline_render_service.hpp"
+#include "rtr/framework/integration/pbpt_offline_render_service.hpp"
 
 #include <utility>
 
-#include "framework/core/scene.hpp"
+#include "rtr/framework/core/scene.hpp"
 
 namespace rtr::framework::integration {
 

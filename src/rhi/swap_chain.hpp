@@ -8,8 +8,8 @@
 #include <iostream>
 
 #include "device.hpp"
-#include "rhi/context.hpp"
-#include "rhi/window.hpp"
+#include "rtr/rhi/context.hpp"
+#include "rtr/rhi/window.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"

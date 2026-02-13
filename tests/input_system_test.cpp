@@ -2,7 +2,7 @@
 
 #include "gtest/gtest.h"
 
-#include "system/input/input_system.hpp"
+#include "rtr/system/input/input_system.hpp"
 
 namespace rtr::system::input::test {
 

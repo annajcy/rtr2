@@ -3,9 +3,9 @@
 #include <functional>
 #include <utility>
 
-#include "system/input/input_state.hpp"
-#include "rhi/window.hpp"
-#include "utils/event_center.hpp"
+#include "rtr/system/input/input_state.hpp"
+#include "rtr/rhi/window.hpp"
+#include "rtr/utils/event_center.hpp"
 
 namespace rtr::system::input {
 

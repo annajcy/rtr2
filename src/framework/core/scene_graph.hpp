@@ -11,7 +11,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include "framework/core/types.hpp"
+#include "rtr/framework/core/types.hpp"
 
 namespace rtr::framework::core {
 
