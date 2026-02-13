@@ -31,6 +31,7 @@ cd ..
 ```
 
 Use the project profile (cross-platform, Ninja):
+(`profiles/rtr2` keeps project code on C++23 and pins `embree/*:compiler.cppstd=20` for compatibility)
 ```bash
 SHA=$(git rev-parse --short HEAD)
 PBPT_VER="0.1.0-dev.${SHA}"
