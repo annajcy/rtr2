@@ -13,8 +13,8 @@ class RTRConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
 
     options = {
-        "build_tests": [True, False],
-        "build_examples": [True, False],
+        "with_tests": [True, False],
+        "with_examples": [True, False],
         "compile_shaders": [True, False],
         "with_pbpt": [True, False],
         "slang_version": ["ANY"],
@@ -22,8 +22,8 @@ class RTRConan(ConanFile):
     }
 
     default_options = {
-        "build_tests": True,
-        "build_examples": True,
+        "with_tests": True,
+        "with_examples": True,
         "compile_shaders": True,
         "with_pbpt": True,
         "slang_version": "2025.10.4",
@@ -83,7 +83,7 @@ class RTRConan(ConanFile):
         slang_ver = str(self.options.slang_version)
         self.requires(f"slang/{slang_ver}")
 
-        if self.options.build_tests:
+        if self.options.with_tests:
             self.test_requires("gtest/[>=1.14 <2]")
 
     def build_requirements(self):
@@ -94,8 +94,8 @@ class RTRConan(ConanFile):
         tc = CMakeToolchain(self)
         tc.generator = "Ninja"
         tc.cache_variables["CMAKE_EXPORT_COMPILE_COMMANDS"] = True
-        tc.cache_variables["RTR_BUILD_TESTS"] = "ON" if self.options.build_tests else "OFF"
-        tc.cache_variables["RTR_BUILD_EXAMPLES"] = "ON" if self.options.build_examples else "OFF"
+        tc.cache_variables["RTR_BUILD_TESTS"] = "ON" if self.options.with_tests else "OFF"
+        tc.cache_variables["RTR_BUILD_EXAMPLES"] = "ON" if self.options.with_examples else "OFF"
         tc.cache_variables["RTR_COMPILE_SHADERS"] = "ON" if self.options.compile_shaders else "OFF"
         tc.cache_variables["RTR_ENABLE_PBPT_RUNTIME"] = "ON" if self.options.with_pbpt else "OFF"
         tc.generate()

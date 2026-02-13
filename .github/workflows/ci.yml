@@ -94,18 +94,29 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source .venv/bin/activate
-          conan profile detect --force
+          uv run conan profile detect --force
           if [[ -d "conan_recipe" ]]; then
             cd conan_recipe
-            python build_conan_recipes.py -d . -v
+            uv run python build_conan_recipes.py -d . -b ${{ matrix.build_type }} -v
             cd ..
           else
             echo "No conan_recipe directory; skipping custom recipes."
           fi
-          conan install . \
-            -pr=profiles/rtr2 \
+          PBPT_VER="0.1.0-dev.${GITHUB_SHA::7}"
+          uv run conan create external/pbpt \
+            --name=pbpt \
+            --version=${PBPT_VER} \
+            -pr:h=external/pbpt/profiles/pbpt \
+            -pr:b=external/pbpt/profiles/pbpt \
             -s build_type=${{ matrix.build_type }} \
+            --build=missing
+          uv run conan install . \
+            -pr:h=profiles/rtr2 \
+            -pr:b=profiles/rtr2 \
+            -s build_type=${{ matrix.build_type }} \
+            -s compiler.cppstd=23 \
+            -o '&:with_pbpt=True' \
+            -o '&:pbpt_version='"${PBPT_VER}" \
             --build=missing
 
       - name: Conan Setup (README) on Windows
@@ -114,18 +125,29 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           Set-ExecutionPolicy -Scope Process Bypass -Force
-          .\.venv\Scripts\Activate.ps1
-          conan profile detect --force
+          uv run conan profile detect --force
           if (Test-Path "conan_recipe") {
             Push-Location conan_recipe
-            python build_conan_recipes.py -d . -v
+            uv run python build_conan_recipes.py -d . -b ${{ matrix.build_type }} -v
             Pop-Location
           } else {
             Write-Host "No conan_recipe directory; skipping custom recipes."
           }
-          conan install . `
-            -pr=profiles/rtr2 `
+          $pbptVer = "0.1.0-dev.$($env:GITHUB_SHA.Substring(0,7))"
+          uv run conan create external/pbpt `
+            --name=pbpt `
+            --version=$pbptVer `
+            -pr:h=external/pbpt/profiles/pbpt `
+            -pr:b=external/pbpt/profiles/pbpt `
             -s build_type=${{ matrix.build_type }} `
+            --build=missing
+          uv run conan install . `
+            -pr:h=profiles/rtr2 `
+            -pr:b=profiles/rtr2 `
+            -s build_type=${{ matrix.build_type }} `
+            -s compiler.cppstd=23 `
+            -o &:with_pbpt=True `
+            -o "&:pbpt_version=$pbptVer" `
             --build=missing
 
       - name: Configure and Build (CMake Presets) on Linux/macOS
