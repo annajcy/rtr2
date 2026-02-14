@@ -127,6 +127,64 @@ cmake --build --preset conan-debug
 ```
 If the preset name differs, run `cmake --list-presets` to check the available names.
 
+## Examples
+
+`build/Debug` below is an example output directory. Use the build directory produced by your active CMake preset.
+
+### `framework_quickstart_main`
+Purpose: Recommended first real-time example using `AppRuntime + ForwardPipeline`, scene setup, free-look camera, and ImGui controls.
+
+Build command:
+```bash
+cmake --build build/Debug --target framework_quickstart_main
+```
+
+Run command:
+```bash
+./build/Debug/examples/framework_quickstart_main
+```
+
+### `shadertoy_main`
+Purpose: Runs the compute-to-present ShaderToy-style pipeline with an ImGui overlay.
+
+Build command:
+```bash
+cmake --build build/Debug --target shadertoy_main
+```
+
+Run command:
+```bash
+./build/Debug/examples/shadertoy_main
+```
+
+### `pbpt_cbox_roundtrip_main`
+Purpose: Imports a PBPT scene XML into RTR structures and writes a roundtrip XML output.
+Prerequisite: PBPT scene resources under `assets/pbpt_scene/cbox` must exist.
+
+Build command:
+```bash
+cmake --build build/Debug --target pbpt_cbox_roundtrip_main
+```
+
+Run command:
+```bash
+./build/Debug/examples/pbpt_cbox_roundtrip_main pbpt_scene/cbox cbox.xml /tmp/cbox_rtr_roundtrip.xml
+```
+
+### `framework_offline_cbox_main`
+Purpose: Loads the cbox scene in RTR and exposes PBPT offline render controls via ImGui.
+Prerequisite: With `with_pbpt=True`, full offline rendering is available. With `with_pbpt=False`, the app still runs and offline render actions use the stub implementation.
+
+Build command:
+```bash
+cmake --build build/Debug --target framework_offline_cbox_main
+```
+
+Run command:
+```bash
+./build/Debug/examples/framework_offline_cbox_main
+```
+
 # PBPT integration
 
 Initialize the PBPT submodule:

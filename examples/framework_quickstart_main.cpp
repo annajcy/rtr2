@@ -23,7 +23,7 @@ int main() {
         rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
             .window_width = kWidth,
             .window_height = kHeight,
-            .window_title = "RTR Framework Scene",
+            .window_title = "RTR Framework Quickstart",
             .max_frames_in_flight = kMaxFramesInFlight
         });
 
@@ -34,7 +34,7 @@ int main() {
         auto* forward_pipeline = pipeline.get();
 
         forward_pipeline->imgui_pass().set_ui_callback([]() {
-            ImGui::Begin("Framework Scene");
+            ImGui::Begin("Quickstart controls");
             ImGui::Text("Right Mouse: Look");
             ImGui::Text("WASD + Q/E: Move");
             ImGui::Text("Shift: Sprint");

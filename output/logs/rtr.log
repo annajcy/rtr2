@@ -1,189 +1,63 @@
-[2026-02-15 01:06:50.738] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
-[2026-02-15 01:06:50.739] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-15 01:06:50.739] [info] [framework.integration.pbpt.offline_service] PbptOfflineRenderService initialized.
-[2026-02-15 01:06:50.985] [info] [rhi.context] Vulkan instance created (app='RTR Framework Offline CBox', validation_layers=true)
-[2026-02-15 01:06:50.987] [info] [rhi.context] Vulkan surface created.
-[2026-02-15 01:06:50.988] [info] [rhi.context] Vulkan debug messenger created.
-[2026-02-15 01:06:50.989] [info] [rhi.device] Physical device selected: 'Apple M1 Pro' (queue_family_index=0)
-[2026-02-15 01:06:50.997] [info] [rhi.device] Logical device created.
-[2026-02-15 01:06:50.997] [info] [rhi.device] Graphics queue created.
-[2026-02-15 01:06:50.997] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(1024,1024)
-[2026-02-15 01:06:50.998] [info] [rhi.swapchain] Swapchain created with 3 images.
-[2026-02-15 01:06:51.000] [info] [render.frame_scheduler] FrameScheduler initialized (max_frames_in_flight=2, image_count=3)
-[2026-02-15 01:06:51.022] [info] [framework.core.world] ResourceManager bound to World (bound=true).
-[2026-02-15 01:06:51.022] [info] [framework.core.world] Scene created (scene_id=1, name='cbox_scene', scene_count=1, active_scene_id=1)
-[2026-02-15 01:06:51.022] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from './assets/pbpt_scene/cbox/cbox.xml'.
-[2026-02-15 01:06:51.022] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='pbpt_camera', count=1)
-[2026-02-15 01:06:51.022] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
-[2026-02-15 01:06:51.022] [info] [framework.core.camera_manager] Active camera owner changed to 1.
-[2026-02-15 01:06:51.022] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
-[2026-02-15 01:06:51.023] [debug] [framework.core.game_object] Component added (game_object_id=1, name='pbpt_camera', component_type='N3rtr9framework9component24FreeLookCameraControllerE', component_count=1)
-[2026-02-15 01:06:51.023] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='cbox_luminaire', count=2)
-[2026-02-15 01:06:51.023] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_luminaire.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_luminaire.obj'
-[2026-02-15 01:06:51.023] [debug] [resource.manager] Mesh created (handle=1, vertices=4, indices=6)
-[2026-02-15 01:06:51.023] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:06:51.023] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:06:51.023] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:06:51.023] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component9PbptLightE', component_count=3)
-[2026-02-15 01:06:51.023] [debug] [framework.component.pbpt_light] PbptLight radiance_spectrum updated.
-[2026-02-15 01:06:51.023] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=3, name='cbox_floor', count=3)
-[2026-02-15 01:06:51.023] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_floor.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_floor.obj'
-[2026-02-15 01:06:51.024] [debug] [resource.manager] Mesh created (handle=2, vertices=4, indices=6)
-[2026-02-15 01:06:51.024] [debug] [framework.core.game_object] Component added (game_object_id=3, name='cbox_floor', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:06:51.024] [debug] [framework.core.game_object] Component added (game_object_id=3, name='cbox_floor', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:06:51.024] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:06:51.024] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=4, name='cbox_ceiling', count=4)
-[2026-02-15 01:06:51.024] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_ceiling.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_ceiling.obj'
-[2026-02-15 01:06:51.024] [debug] [resource.manager] Mesh created (handle=3, vertices=8, indices=12)
-[2026-02-15 01:06:51.024] [debug] [framework.core.game_object] Component added (game_object_id=4, name='cbox_ceiling', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:06:51.024] [debug] [framework.core.game_object] Component added (game_object_id=4, name='cbox_ceiling', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:06:51.024] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:06:51.024] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=5, name='cbox_back', count=5)
-[2026-02-15 01:06:51.024] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_back.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_back.obj'
-[2026-02-15 01:06:51.025] [debug] [resource.manager] Mesh created (handle=4, vertices=4, indices=6)
-[2026-02-15 01:06:51.025] [debug] [framework.core.game_object] Component added (game_object_id=5, name='cbox_back', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:06:51.025] [debug] [framework.core.game_object] Component added (game_object_id=5, name='cbox_back', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:06:51.025] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:06:51.025] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=6, name='cbox_greenwall', count=6)
-[2026-02-15 01:06:51.025] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_greenwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_greenwall.obj'
-[2026-02-15 01:06:51.025] [debug] [resource.manager] Mesh created (handle=5, vertices=4, indices=6)
-[2026-02-15 01:06:51.025] [debug] [framework.core.game_object] Component added (game_object_id=6, name='cbox_greenwall', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:06:51.025] [debug] [framework.core.game_object] Component added (game_object_id=6, name='cbox_greenwall', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:06:51.025] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:06:51.025] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=7, name='cbox_redwall', count=7)
-[2026-02-15 01:06:51.025] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_redwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_redwall.obj'
-[2026-02-15 01:06:51.025] [debug] [resource.manager] Mesh created (handle=6, vertices=4, indices=6)
-[2026-02-15 01:06:51.025] [debug] [framework.core.game_object] Component added (game_object_id=7, name='cbox_redwall', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:06:51.026] [debug] [framework.core.game_object] Component added (game_object_id=7, name='cbox_redwall', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:06:51.026] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:06:51.026] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=8, name='cbox_smallbox', count=8)
-[2026-02-15 01:06:51.026] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_smallbox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_smallbox.obj'
-[2026-02-15 01:06:51.026] [debug] [resource.manager] Mesh created (handle=7, vertices=24, indices=36)
-[2026-02-15 01:06:51.026] [debug] [framework.core.game_object] Component added (game_object_id=8, name='cbox_smallbox', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:06:51.026] [debug] [framework.core.game_object] Component added (game_object_id=8, name='cbox_smallbox', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:06:51.026] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:06:51.026] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=9, name='cbox_largebox', count=9)
-[2026-02-15 01:06:51.026] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_largebox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_largebox.obj'
-[2026-02-15 01:06:51.026] [debug] [resource.manager] Mesh created (handle=8, vertices=24, indices=36)
-[2026-02-15 01:06:51.027] [debug] [framework.core.game_object] Component added (game_object_id=9, name='cbox_largebox', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:06:51.027] [debug] [framework.core.game_object] Component added (game_object_id=9, name='cbox_largebox', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:06:51.027] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:06:51.027] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=8, lights=1, camera_imported=true).
-[2026-02-15 01:06:51.027] [warning] [framework.core.camera_manager] destroy_camera ignored: owner 3 has no camera.
-[2026-02-15 01:06:51.027] [info] [framework.core.scene] GameObject subtree destroyed (scene_id=1, root_game_object_id=3, removed_count=1, success=true, remaining=8)
-[2026-02-15 01:06:51.027] [warning] [framework.core.camera_manager] destroy_camera ignored: owner 7 has no camera.
-[2026-02-15 01:06:51.027] [info] [framework.core.scene] GameObject subtree destroyed (scene_id=1, root_game_object_id=7, removed_count=1, success=true, remaining=7)
-[2026-02-15 01:06:51.027] [info] [framework.core.engine] Engine run started (paused=false, fixed_dt=0.016666666666666666, max_fixed_steps_per_frame=4, max_frame_delta=0.1)
-[2026-02-15 01:06:51.129] [debug] [resource.manager] Mesh handle=1 triggering first GPU upload.
-[2026-02-15 01:06:51.129] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
-[2026-02-15 01:06:51.129] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
-[2026-02-15 01:06:51.131] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
-[2026-02-15 01:06:51.131] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
-[2026-02-15 01:06:51.132] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
-[2026-02-15 01:06:51.132] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-15 01:06:51.132] [debug] [resource.manager] Mesh handle=3 triggering first GPU upload.
-[2026-02-15 01:06:51.132] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=8, indices=12, vertex_bytes=256, index_bytes=48)
-[2026-02-15 01:06:51.132] [debug] [rhi.mesh] GPU buffer copy start (bytes=256)
-[2026-02-15 01:06:51.132] [debug] [rhi.mesh] GPU buffer copy finished (bytes=256)
-[2026-02-15 01:06:51.132] [debug] [rhi.mesh] GPU buffer copy start (bytes=48)
-[2026-02-15 01:06:51.132] [debug] [rhi.mesh] GPU buffer copy finished (bytes=48)
-[2026-02-15 01:06:51.133] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-15 01:06:51.133] [debug] [resource.manager] Mesh handle=4 triggering first GPU upload.
-[2026-02-15 01:06:51.133] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
-[2026-02-15 01:06:51.133] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
-[2026-02-15 01:06:51.133] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
-[2026-02-15 01:06:51.133] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
-[2026-02-15 01:06:51.133] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
-[2026-02-15 01:06:51.133] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-15 01:06:51.133] [debug] [resource.manager] Mesh handle=5 triggering first GPU upload.
-[2026-02-15 01:06:51.133] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
-[2026-02-15 01:06:51.133] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
-[2026-02-15 01:06:51.134] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
-[2026-02-15 01:06:51.134] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
-[2026-02-15 01:06:51.134] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
-[2026-02-15 01:06:51.134] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-15 01:06:51.134] [debug] [resource.manager] Mesh handle=7 triggering first GPU upload.
-[2026-02-15 01:06:51.134] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=24, indices=36, vertex_bytes=768, index_bytes=144)
-[2026-02-15 01:06:51.134] [debug] [rhi.mesh] GPU buffer copy start (bytes=768)
-[2026-02-15 01:06:51.135] [debug] [rhi.mesh] GPU buffer copy finished (bytes=768)
-[2026-02-15 01:06:51.135] [debug] [rhi.mesh] GPU buffer copy start (bytes=144)
-[2026-02-15 01:06:51.135] [debug] [rhi.mesh] GPU buffer copy finished (bytes=144)
-[2026-02-15 01:06:51.136] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-15 01:06:51.136] [debug] [resource.manager] Mesh handle=8 triggering first GPU upload.
-[2026-02-15 01:06:51.136] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=24, indices=36, vertex_bytes=768, index_bytes=144)
-[2026-02-15 01:06:51.136] [debug] [rhi.mesh] GPU buffer copy start (bytes=768)
-[2026-02-15 01:06:51.136] [debug] [rhi.mesh] GPU buffer copy finished (bytes=768)
-[2026-02-15 01:06:51.136] [debug] [rhi.mesh] GPU buffer copy start (bytes=144)
-[2026-02-15 01:06:51.136] [debug] [rhi.mesh] GPU buffer copy finished (bytes=144)
-[2026-02-15 01:06:51.136] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-15 01:06:58.016] [info] [framework.integration.pbpt.offline_service] Offline render start requested (scene_xml='./assets/pbpt_scene/cbox/output/cbox_output.xml', output_exr='./assets/pbpt_scene/cbox/output/cbox_offline.exr', spp=16, film_override=512x512).
-[2026-02-15 01:06:58.016] [debug] [framework.integration.pbpt.export] Building PBPT scene record from Scene 1 ('cbox_scene').
-[2026-02-15 01:06:58.017] [debug] [framework.integration.pbpt.export] PBPT scene record built (shape_count=6, has_sensor=true, active_material_count=3).
-[2026-02-15 01:06:58.017] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=6, scene_xml_path='./assets/pbpt_scene/cbox/output/cbox_output.xml').
-[2026-02-15 01:06:58.018] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/Users/jinceyang/Desktop/codebase/graphics/rtr2/./assets/pbpt_scene/cbox/output/meshes'.
-[2026-02-15 01:06:58.019] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=3, shapes=6).
-[2026-02-15 01:06:58.019] [info] [framework.integration.pbpt.offline_service] Scene snapshot exported to './assets/pbpt_scene/cbox/output/cbox_output.xml'.
-[2026-02-15 01:06:58.019] [info] [framework.integration.pbpt.offline_service] Offline render worker thread launched.
-[2026-02-15 01:07:03.950] [warning] [framework.integration.pbpt.offline_service] Offline render cancel requested.
-[2026-02-15 01:07:04.061] [warning] [framework.integration.pbpt.offline_service] Offline render canceled.
-[2026-02-15 01:07:11.875] [info] [render.frame_scheduler] Window resized to (1036, 1030), scheduling swapchain recreation.
-[2026-02-15 01:07:11.881] [info] [render.frame_scheduler] Window resized to (1040, 1032), scheduling swapchain recreation.
-[2026-02-15 01:07:11.890] [info] [render.frame_scheduler] Window resized to (1042, 1036), scheduling swapchain recreation.
-[2026-02-15 01:07:11.899] [info] [render.frame_scheduler] Window resized to (1046, 1038), scheduling swapchain recreation.
-[2026-02-15 01:07:11.915] [info] [render.frame_scheduler] Window resized to (1052, 1042), scheduling swapchain recreation.
-[2026-02-15 01:07:11.923] [info] [render.frame_scheduler] Window resized to (1056, 1046), scheduling swapchain recreation.
-[2026-02-15 01:07:11.931] [info] [render.frame_scheduler] Window resized to (1060, 1048), scheduling swapchain recreation.
-[2026-02-15 01:07:11.939] [info] [render.frame_scheduler] Window resized to (1062, 1050), scheduling swapchain recreation.
-[2026-02-15 01:07:11.948] [info] [render.frame_scheduler] Window resized to (1064, 1052), scheduling swapchain recreation.
-[2026-02-15 01:07:11.956] [info] [render.frame_scheduler] Window resized to (1066, 1054), scheduling swapchain recreation.
-[2026-02-15 01:07:11.964] [info] [render.frame_scheduler] Window resized to (1070, 1056), scheduling swapchain recreation.
-[2026-02-15 01:07:11.973] [info] [render.frame_scheduler] Window resized to (1072, 1058), scheduling swapchain recreation.
-[2026-02-15 01:07:11.981] [info] [render.frame_scheduler] Window resized to (1076, 1060), scheduling swapchain recreation.
-[2026-02-15 01:07:11.989] [info] [render.frame_scheduler] Window resized to (1078, 1062), scheduling swapchain recreation.
-[2026-02-15 01:07:11.998] [info] [render.frame_scheduler] Window resized to (1082, 1064), scheduling swapchain recreation.
-[2026-02-15 01:07:12.006] [info] [render.frame_scheduler] Window resized to (1084, 1066), scheduling swapchain recreation.
-[2026-02-15 01:07:12.014] [info] [render.frame_scheduler] Window resized to (1086, 1070), scheduling swapchain recreation.
-[2026-02-15 01:07:12.023] [info] [render.frame_scheduler] Window resized to (1088, 1070), scheduling swapchain recreation.
-[2026-02-15 01:07:12.031] [info] [render.frame_scheduler] Window resized to (1090, 1072), scheduling swapchain recreation.
-[2026-02-15 01:07:12.039] [info] [render.frame_scheduler] Window resized to (1090, 1074), scheduling swapchain recreation.
-[2026-02-15 01:07:12.048] [info] [render.frame_scheduler] Window resized to (1092, 1074), scheduling swapchain recreation.
-[2026-02-15 01:07:12.056] [info] [render.frame_scheduler] Window resized to (1094, 1076), scheduling swapchain recreation.
-[2026-02-15 01:07:12.181] [info] [render.frame_scheduler] Window resized to (1092, 1076), scheduling swapchain recreation.
-[2026-02-15 01:07:12.189] [info] [render.frame_scheduler] Window resized to (1090, 1076), scheduling swapchain recreation.
-[2026-02-15 01:07:12.197] [info] [render.frame_scheduler] Window resized to (1090, 1074), scheduling swapchain recreation.
-[2026-02-15 01:07:12.206] [info] [render.frame_scheduler] Window resized to (1088, 1074), scheduling swapchain recreation.
-[2026-02-15 01:07:12.215] [info] [render.frame_scheduler] Window resized to (1086, 1072), scheduling swapchain recreation.
-[2026-02-15 01:07:12.223] [info] [render.frame_scheduler] Window resized to (1084, 1070), scheduling swapchain recreation.
-[2026-02-15 01:07:12.232] [info] [render.frame_scheduler] Window resized to (1080, 1068), scheduling swapchain recreation.
-[2026-02-15 01:07:12.240] [info] [render.frame_scheduler] Window resized to (1076, 1066), scheduling swapchain recreation.
-[2026-02-15 01:07:12.248] [info] [render.frame_scheduler] Window resized to (1072, 1062), scheduling swapchain recreation.
-[2026-02-15 01:07:12.256] [info] [render.frame_scheduler] Window resized to (1066, 1058), scheduling swapchain recreation.
-[2026-02-15 01:07:12.265] [info] [render.frame_scheduler] Window resized to (1062, 1054), scheduling swapchain recreation.
-[2026-02-15 01:07:12.273] [info] [render.frame_scheduler] Window resized to (1056, 1050), scheduling swapchain recreation.
-[2026-02-15 01:07:12.281] [info] [render.frame_scheduler] Window resized to (1050, 1046), scheduling swapchain recreation.
-[2026-02-15 01:07:12.289] [info] [render.frame_scheduler] Window resized to (1044, 1042), scheduling swapchain recreation.
-[2026-02-15 01:07:12.298] [info] [render.frame_scheduler] Window resized to (1038, 1036), scheduling swapchain recreation.
-[2026-02-15 01:07:12.306] [info] [render.frame_scheduler] Window resized to (1032, 1032), scheduling swapchain recreation.
-[2026-02-15 01:07:12.315] [info] [render.frame_scheduler] Window resized to (1024, 1028), scheduling swapchain recreation.
-[2026-02-15 01:07:12.323] [info] [render.frame_scheduler] Window resized to (1018, 1022), scheduling swapchain recreation.
-[2026-02-15 01:07:12.331] [info] [render.frame_scheduler] Window resized to (1004, 1012), scheduling swapchain recreation.
-[2026-02-15 01:07:12.339] [info] [render.frame_scheduler] Window resized to (998, 1006), scheduling swapchain recreation.
-[2026-02-15 01:07:12.348] [info] [render.frame_scheduler] Window resized to (992, 1002), scheduling swapchain recreation.
-[2026-02-15 01:07:12.356] [info] [render.frame_scheduler] Window resized to (986, 998), scheduling swapchain recreation.
-[2026-02-15 01:07:12.364] [info] [render.frame_scheduler] Window resized to (982, 994), scheduling swapchain recreation.
-[2026-02-15 01:07:12.373] [info] [render.frame_scheduler] Window resized to (978, 992), scheduling swapchain recreation.
-[2026-02-15 01:07:12.381] [info] [render.frame_scheduler] Window resized to (974, 990), scheduling swapchain recreation.
-[2026-02-15 01:07:12.389] [info] [render.frame_scheduler] Window resized to (972, 988), scheduling swapchain recreation.
-[2026-02-15 01:07:12.398] [info] [render.frame_scheduler] Window resized to (970, 986), scheduling swapchain recreation.
-[2026-02-15 01:07:12.406] [info] [render.frame_scheduler] Window resized to (970, 984), scheduling swapchain recreation.
-[2026-02-15 01:07:12.414] [info] [render.frame_scheduler] Window resized to (968, 984), scheduling swapchain recreation.
-[2026-02-15 01:07:12.456] [info] [render.frame_scheduler] Window resized to (966, 982), scheduling swapchain recreation.
-[2026-02-15 01:07:12.540] [info] [render.frame_scheduler] Window resized to (964, 982), scheduling swapchain recreation.
-[2026-02-15 01:07:12.616] [warning] [render.frame_scheduler] Swapchain suboptimal during presentation; scheduling recreation.
-[2026-02-15 01:07:12.616] [info] [render.frame_scheduler] Recreating swapchain resources after present/resize event.
-[2026-02-15 01:07:12.617] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(964,982)
-[2026-02-15 01:07:12.617] [info] [rhi.swapchain] Swapchain created with 3 images.
-[2026-02-15 01:07:12.618] [info] [render.frame_scheduler] Swapchain resources recreated (generation 1 -> 2).
-[2026-02-15 01:07:17.064] [info] [framework.core.engine] Engine run finished (frames=2961, fixed_ticks=1498, stop_requested=false, should_close=true)
-[2026-02-15 01:07:17.065] [info] [resource.manager] Flushing GPU caches after wait_idle (live_meshes=8, live_textures=0, retired_meshes=0, retired_textures=0)
-[2026-02-15 01:07:17.102] [info] [framework.integration.pbpt.offline_service] Offline render cancel requested while not running.
+[2026-02-15 01:21:26.566] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
+[2026-02-15 01:21:26.567] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-15 01:21:26.567] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from './assets/pbpt_scene/cbox/cbox.xml'.
+[2026-02-15 01:21:26.568] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='pbpt_camera', count=1)
+[2026-02-15 01:21:26.568] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
+[2026-02-15 01:21:26.568] [info] [framework.core.camera_manager] Active camera owner changed to 1.
+[2026-02-15 01:21:26.568] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
+[2026-02-15 01:21:26.568] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='cbox_luminaire', count=2)
+[2026-02-15 01:21:26.568] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_luminaire.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_luminaire.obj'
+[2026-02-15 01:21:26.569] [debug] [resource.manager] Mesh created (handle=1, vertices=4, indices=6)
+[2026-02-15 01:21:26.569] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 01:21:26.569] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 01:21:26.569] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
+[2026-02-15 01:21:26.569] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component9PbptLightE', component_count=3)
+[2026-02-15 01:21:26.569] [debug] [framework.component.pbpt_light] PbptLight radiance_spectrum updated.
+[2026-02-15 01:21:26.569] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=3, name='cbox_floor', count=3)
+[2026-02-15 01:21:26.569] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_floor.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_floor.obj'
+[2026-02-15 01:21:26.570] [debug] [resource.manager] Mesh created (handle=2, vertices=4, indices=6)
+[2026-02-15 01:21:26.570] [debug] [framework.core.game_object] Component added (game_object_id=3, name='cbox_floor', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 01:21:26.570] [debug] [framework.core.game_object] Component added (game_object_id=3, name='cbox_floor', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 01:21:26.570] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
+[2026-02-15 01:21:26.570] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=4, name='cbox_ceiling', count=4)
+[2026-02-15 01:21:26.570] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_ceiling.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_ceiling.obj'
+[2026-02-15 01:21:26.570] [debug] [resource.manager] Mesh created (handle=3, vertices=8, indices=12)
+[2026-02-15 01:21:26.571] [debug] [framework.core.game_object] Component added (game_object_id=4, name='cbox_ceiling', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 01:21:26.571] [debug] [framework.core.game_object] Component added (game_object_id=4, name='cbox_ceiling', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 01:21:26.571] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
+[2026-02-15 01:21:26.571] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=5, name='cbox_back', count=5)
+[2026-02-15 01:21:26.571] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_back.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_back.obj'
+[2026-02-15 01:21:26.571] [debug] [resource.manager] Mesh created (handle=4, vertices=4, indices=6)
+[2026-02-15 01:21:26.572] [debug] [framework.core.game_object] Component added (game_object_id=5, name='cbox_back', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 01:21:26.572] [debug] [framework.core.game_object] Component added (game_object_id=5, name='cbox_back', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 01:21:26.572] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
+[2026-02-15 01:21:26.572] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=6, name='cbox_greenwall', count=6)
+[2026-02-15 01:21:26.572] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_greenwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_greenwall.obj'
+[2026-02-15 01:21:26.572] [debug] [resource.manager] Mesh created (handle=5, vertices=4, indices=6)
+[2026-02-15 01:21:26.572] [debug] [framework.core.game_object] Component added (game_object_id=6, name='cbox_greenwall', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 01:21:26.572] [debug] [framework.core.game_object] Component added (game_object_id=6, name='cbox_greenwall', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 01:21:26.572] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
+[2026-02-15 01:21:26.572] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=7, name='cbox_redwall', count=7)
+[2026-02-15 01:21:26.572] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_redwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_redwall.obj'
+[2026-02-15 01:21:26.573] [debug] [resource.manager] Mesh created (handle=6, vertices=4, indices=6)
+[2026-02-15 01:21:26.573] [debug] [framework.core.game_object] Component added (game_object_id=7, name='cbox_redwall', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 01:21:26.573] [debug] [framework.core.game_object] Component added (game_object_id=7, name='cbox_redwall', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 01:21:26.573] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
+[2026-02-15 01:21:26.573] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=8, name='cbox_smallbox', count=8)
+[2026-02-15 01:21:26.573] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_smallbox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_smallbox.obj'
+[2026-02-15 01:21:26.574] [debug] [resource.manager] Mesh created (handle=7, vertices=24, indices=36)
+[2026-02-15 01:21:26.574] [debug] [framework.core.game_object] Component added (game_object_id=8, name='cbox_smallbox', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 01:21:26.574] [debug] [framework.core.game_object] Component added (game_object_id=8, name='cbox_smallbox', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 01:21:26.574] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
+[2026-02-15 01:21:26.574] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=9, name='cbox_largebox', count=9)
+[2026-02-15 01:21:26.574] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_largebox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_largebox.obj'
+[2026-02-15 01:21:26.574] [debug] [resource.manager] Mesh created (handle=8, vertices=24, indices=36)
+[2026-02-15 01:21:26.575] [debug] [framework.core.game_object] Component added (game_object_id=9, name='cbox_largebox', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 01:21:26.575] [debug] [framework.core.game_object] Component added (game_object_id=9, name='cbox_largebox', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 01:21:26.575] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
+[2026-02-15 01:21:26.575] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=8, lights=1, camera_imported=true).
+[2026-02-15 01:21:26.575] [debug] [framework.integration.pbpt.export] Building PBPT scene record from Scene 1 ('pbpt_roundtrip').
+[2026-02-15 01:21:26.576] [debug] [framework.integration.pbpt.export] PBPT scene record built (shape_count=8, has_sensor=true, active_material_count=4).
+[2026-02-15 01:21:26.576] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=8, scene_xml_path='/tmp/cbox_rtr_roundtrip.xml').
+[2026-02-15 01:21:26.577] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/tmp/meshes'.
+[2026-02-15 01:21:26.580] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=4, shapes=8).
