@@ -1,0 +1,53 @@
+#pragma once
+
+#include <memory>
+#include <stdexcept>
+
+#include "rtr/editor/editor_host.hpp"
+#include "rtr/system/input/input_system.hpp"
+#include "rtr/system/render/pipeline.hpp"
+
+namespace rtr::editor {
+
+inline system::render::IImGuiOverlayPipeline& require_imgui_overlay_pipeline(
+    system::render::IRenderPipeline& pipeline
+) {
+    auto* overlay_pipeline = dynamic_cast<system::render::IImGuiOverlayPipeline*>(&pipeline);
+    if (overlay_pipeline == nullptr) {
+        throw std::runtime_error("Render pipeline does not implement IImGuiOverlayPipeline.");
+    }
+    return *overlay_pipeline;
+}
+
+inline void attach_editor_host(
+    system::render::IRenderPipeline& pipeline,
+    const std::shared_ptr<EditorHost>& editor_host
+) {
+    if (!editor_host) {
+        throw std::invalid_argument("attach_editor_host requires non-null editor_host.");
+    }
+    require_imgui_overlay_pipeline(pipeline).set_imgui_overlay(editor_host);
+}
+
+inline void detach_editor_host(system::render::IRenderPipeline& pipeline) {
+    require_imgui_overlay_pipeline(pipeline).clear_imgui_overlay();
+}
+
+inline void bind_input_capture_to_pipeline(
+    system::input::InputSystem& input,
+    system::render::IRenderPipeline& pipeline
+) {
+    input.set_is_intercept_capture([&pipeline](bool is_mouse) {
+        auto* overlay_pipeline = dynamic_cast<system::render::IImGuiOverlayPipeline*>(&pipeline);
+        if (overlay_pipeline == nullptr) {
+            return false;
+        }
+        if (is_mouse) {
+            return overlay_pipeline->wants_imgui_capture_mouse();
+        }
+        return overlay_pipeline->wants_imgui_capture_keyboard();
+    });
+}
+
+} // namespace rtr::editor
+

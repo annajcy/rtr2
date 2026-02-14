@@ -1,6 +1,9 @@
 #pragma once
 
-
+#include <functional>
+#include <memory>
+#include <stdexcept>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -29,9 +32,14 @@ public:
     virtual void execute(render::FrameContext& ctx) = 0;
 };
 
+class IImGuiOverlay {
+public:
+    virtual ~IImGuiOverlay() = default;
+    virtual void draw_imgui() = 0;
+};
+
 class ImGUIPass final : public IRenderPass {
 public:
-    using UiCallback = std::function<void()>;
     struct RenderPassResources {
         rhi::Image* depth_image{};
     };
@@ -39,7 +47,7 @@ public:
 private:
     std::unique_ptr<rhi::ImGuiContext> m_imgui_context{};
     RenderPassResources m_render_pass_resources{};
-    UiCallback m_ui_callback{};
+    std::shared_ptr<IImGuiOverlay> m_overlay{};
     ImGuiDockNodeFlags m_dockspace_flags{ImGuiDockNodeFlags_PassthruCentralNode};
     std::vector<ResourceDependency> m_dependencies{
         {"swapchain_color", ResourceAccess::eReadWrite},
@@ -70,12 +78,16 @@ public:
         return m_dependencies;
     }
 
-    void set_ui_callback(UiCallback cb) {
-        m_ui_callback = std::move(cb);
+    void set_overlay(std::shared_ptr<IImGuiOverlay> overlay) {
+        m_overlay = std::move(overlay);
     }
 
-    void clear_ui_callback() {
-        m_ui_callback = UiCallback{};
+    void clear_overlay() {
+        m_overlay.reset();
+    }
+
+    bool has_overlay() const {
+        return static_cast<bool>(m_overlay);
     }
 
     bool wants_capture_mouse() const {
@@ -104,8 +116,8 @@ public:
 
         m_imgui_context->begin_frame();
         ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), m_dockspace_flags);
-        if (m_ui_callback) {
-            m_ui_callback();
+        if (m_overlay) {
+            m_overlay->draw_imgui();
         }
 
         ImDrawData* draw_data = m_imgui_context->prepare_draw_data();

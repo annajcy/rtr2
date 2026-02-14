@@ -11,6 +11,11 @@
 #include "imgui.h"
 #include "pugixml.hpp"
 
+#include "rtr/editor/editor_attach.hpp"
+#include "rtr/editor/editor_host.hpp"
+#include "rtr/editor/hierarchy_panel.hpp"
+#include "rtr/editor/inspector_panel.hpp"
+#include "rtr/editor/stats_panel.hpp"
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/engine.hpp"
 #include "rtr/resource/resource_manager.hpp"
@@ -148,6 +153,156 @@ std::pair<uint32_t, uint32_t> resolve_resolution_from_pbpt_scene_xml(const char*
     };
 }
 
+class OfflineRenderPanel final : public rtr::editor::IEditorPanel {
+private:
+    struct UiState {
+        std::array<char, kPathBufferSize> scene_xml_path{};
+        std::array<char, kPathBufferSize> output_exr_path{};
+        std::array<char, kPathBufferSize> output_scene_xml_path{};
+        int spp{16};
+    };
+
+    rtr::framework::integration::PbptOfflineRenderService& m_offline_render_service;
+    rtr::framework::core::Engine& m_engine;
+    rtr::system::render::Renderer& m_renderer;
+    rtr::resource::ResourceManager& m_resource_manager;
+    const rtr::framework::integration::PbptImportResult& m_import_result;
+    uint32_t m_scene_width{0};
+    uint32_t m_scene_height{0};
+    bool m_visible{true};
+    UiState m_ui_state{};
+
+public:
+    OfflineRenderPanel(
+        rtr::framework::integration::PbptOfflineRenderService& offline_render_service,
+        rtr::framework::core::Engine& engine,
+        rtr::system::render::Renderer& renderer,
+        rtr::resource::ResourceManager& resource_manager,
+        const rtr::framework::integration::PbptImportResult& import_result,
+        uint32_t scene_width,
+        uint32_t scene_height,
+        const std::string& scene_xml_path,
+        const std::string& output_exr_path,
+        const std::string& output_scene_xml_path
+    )
+        : m_offline_render_service(offline_render_service),
+          m_engine(engine),
+          m_renderer(renderer),
+          m_resource_manager(resource_manager),
+          m_import_result(import_result),
+          m_scene_width(scene_width),
+          m_scene_height(scene_height) {
+        set_path_buffer(m_ui_state.scene_xml_path, scene_xml_path);
+        set_path_buffer(m_ui_state.output_exr_path, output_exr_path);
+        set_path_buffer(m_ui_state.output_scene_xml_path, output_scene_xml_path);
+    }
+
+    std::string_view id() const override {
+        return "offline_render";
+    }
+
+    int order() const override {
+        return 250;
+    }
+
+    bool visible() const override {
+        return m_visible;
+    }
+
+    void set_visible(bool visible) override {
+        m_visible = visible;
+    }
+
+    void on_imgui(rtr::editor::EditorContext& /*ctx*/) override {
+        if (!m_visible) {
+            return;
+        }
+
+        const auto state = m_offline_render_service.state();
+        ImGui::Begin("Offline Render", &m_visible);
+        ImGui::Text("Imported shapes: %zu", m_import_result.imported_shape_count);
+        ImGui::Text("Imported lights: %zu", m_import_result.imported_light_shape_count);
+        ImGui::Text("Scene film: %u x %u", m_scene_width, m_scene_height);
+
+        ImGui::InputText(
+            "Scene XML",
+            m_ui_state.scene_xml_path.data(),
+            m_ui_state.scene_xml_path.size()
+        );
+        ImGui::InputText(
+            "Output EXR",
+            m_ui_state.output_exr_path.data(),
+            m_ui_state.output_exr_path.size()
+        );
+        ImGui::InputText(
+            "Output Scene XML",
+            m_ui_state.output_scene_xml_path.data(),
+            m_ui_state.output_scene_xml_path.size()
+        );
+        ImGui::InputInt("SPP", &m_ui_state.spp);
+        m_ui_state.spp = std::clamp(m_ui_state.spp, 1, 4096);
+
+        const auto export_resolution = resolve_export_resolution(
+            m_renderer.window(),
+            m_scene_width,
+            m_scene_height
+        );
+        ImGui::Text("Window: %d x %d", export_resolution.window_w, export_resolution.window_h);
+        ImGui::Text("Scale: %.2f x %.2f", export_resolution.scale_x, export_resolution.scale_y);
+        ImGui::Text(
+            "Framebuffer: %d x %d",
+            export_resolution.framebuffer_w,
+            export_resolution.framebuffer_h
+        );
+        ImGui::Text("Export Film: %d x %d", export_resolution.export_w, export_resolution.export_h);
+
+        const bool can_render = is_render_start_allowed(state);
+        const bool can_cancel = state == rtr::framework::integration::OfflineRenderState::Running;
+
+        if (!can_render) {
+            ImGui::BeginDisabled();
+        }
+        if (ImGui::Button("Render")) {
+            auto* active_scene = m_engine.world().active_scene();
+            if (active_scene == nullptr) {
+                throw std::runtime_error("No active scene to export for offline render.");
+            }
+
+            const rtr::framework::integration::OfflineRenderConfig config{
+                .scene_xml_path = std::string(m_ui_state.output_scene_xml_path.data()),
+                .output_exr_path = std::string(m_ui_state.output_exr_path.data()),
+                .spp = m_ui_state.spp,
+                .film_width = export_resolution.export_w,
+                .film_height = export_resolution.export_h
+            };
+            (void)m_offline_render_service.start(*active_scene, m_resource_manager, config);
+        }
+        if (!can_render) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+        if (!can_cancel) {
+            ImGui::BeginDisabled();
+        }
+        if (ImGui::Button("Cancel")) {
+            m_offline_render_service.request_cancel();
+        }
+        if (!can_cancel) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::ProgressBar(
+            std::clamp(m_offline_render_service.progress_01(), 0.0f, 1.0f),
+            ImVec2(-1.0f, 0.0f)
+        );
+        ImGui::Text("State: %s", to_state_label(state));
+        ImGui::TextWrapped("Message: %s", m_offline_render_service.last_message().c_str());
+        ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+        ImGui::End();
+    }
+};
+
 } // namespace
 
 int main() {
@@ -180,12 +335,6 @@ int main() {
         forward_pipeline->set_resource_manager(&resource_manager);
 
         auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
-        input_system->set_is_intercept_capture([forward_pipeline](bool is_mouse) {
-            if (is_mouse) {
-                return forward_pipeline->imgui_pass().wants_capture_mouse();
-            }
-            return forward_pipeline->imgui_pass().wants_capture_keyboard();
-        });
 
         rtr::framework::integration::PbptImportOptions import_options{};
         import_options.free_look_input_state = &input_system->state();
@@ -226,107 +375,38 @@ int main() {
             throw std::runtime_error("Imported cbox scene has no active camera.");
         }
 
-        struct OfflineRenderUiState {
-            std::array<char, kPathBufferSize> scene_xml_path{};
-            std::array<char, kPathBufferSize> output_exr_path{};
-            std::array<char, kPathBufferSize> output_scene_xml_path{};
-            int spp{16};
-        } ui_state{};
-
-        set_path_buffer(ui_state.scene_xml_path, (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / import_location.xml_filename).string());
-        set_path_buffer(ui_state.output_scene_xml_path, (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputSceneXmlFilename).string());
-        set_path_buffer(ui_state.output_exr_path, (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputExrPath).string());
-        
-        forward_pipeline->imgui_pass().set_ui_callback([&]() {
-            const auto state = offline_render_service.state();
-
-            ImGui::Begin("Offline Render");
-            ImGui::Text("Imported shapes: %zu", import_result.imported_shape_count);
-            ImGui::Text("Imported lights: %zu", import_result.imported_light_shape_count);
-            ImGui::Text("Scene film: %u x %u", scene_width, scene_height);
-
-            ImGui::InputText(
-                "Scene XML",
-                ui_state.scene_xml_path.data(),
-                ui_state.scene_xml_path.size()
-            );
-            ImGui::InputText(
-                "Output EXR",
-                ui_state.output_exr_path.data(),
-                ui_state.output_exr_path.size()
-            );
-            ImGui::InputText(
-                "Output Scene XML",
-                ui_state.output_scene_xml_path.data(),
-                ui_state.output_scene_xml_path.size()
-            );
-            ImGui::InputInt("SPP", &ui_state.spp);
-            ui_state.spp = std::clamp(ui_state.spp, 1, 4096);
-            const auto export_resolution = resolve_export_resolution(
-                renderer->window(),
-                scene_width,
-                scene_height
-            );
-            ImGui::Text("Window: %d x %d", export_resolution.window_w, export_resolution.window_h);
-            ImGui::Text("Scale: %.2f x %.2f", export_resolution.scale_x, export_resolution.scale_y);
-            ImGui::Text(
-                "Framebuffer: %d x %d",
-                export_resolution.framebuffer_w,
-                export_resolution.framebuffer_h
-            );
-            ImGui::Text("Export Film: %d x %d", export_resolution.export_w, export_resolution.export_h);
-
-            const bool can_render = is_render_start_allowed(state);
-            const bool can_cancel = state == rtr::framework::integration::OfflineRenderState::Running;
-
-            if (!can_render) {
-                ImGui::BeginDisabled();
-            }
-            if (ImGui::Button("Render")) {
-                auto* active_scene = engine.world().active_scene();
-                if (active_scene == nullptr) {
-                    throw std::runtime_error("No active scene to export for offline render.");
-                }
-
-                const rtr::framework::integration::OfflineRenderConfig config{
-                    .scene_xml_path = std::string(ui_state.output_scene_xml_path.data()),
-                    .output_exr_path = std::string(ui_state.output_exr_path.data()),
-                    .spp = ui_state.spp,
-                    .film_width = export_resolution.export_w,
-                    .film_height = export_resolution.export_h
-                };
-                (void)offline_render_service.start(*active_scene, resource_manager, config);
-            }
-            if (!can_render) {
-                ImGui::EndDisabled();
-            }
-
-            ImGui::SameLine();
-            if (!can_cancel) {
-                ImGui::BeginDisabled();
-            }
-            if (ImGui::Button("Cancel")) {
-                offline_render_service.request_cancel();
-            }
-            if (!can_cancel) {
-                ImGui::EndDisabled();
-            }
-
-            ImGui::ProgressBar(
-                std::clamp(offline_render_service.progress_01(), 0.0f, 1.0f),
-                ImVec2(-1.0f, 0.0f)
-            );
-            ImGui::Text("State: %s", to_state_label(state));
-            ImGui::TextWrapped("Message: %s", offline_render_service.last_message().c_str());
-            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-            ImGui::End();
-        });
+        auto editor_host = std::make_shared<rtr::editor::EditorHost>();
+        editor_host->bind_runtime(
+            &engine.world(),
+            &resource_manager,
+            renderer.get(),
+            input_system.get()
+        );
+        editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
+        editor_host->register_panel(std::make_unique<OfflineRenderPanel>(
+            offline_render_service,
+            engine,
+            *renderer,
+            resource_manager,
+            import_result,
+            scene_width,
+            scene_height,
+            (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / import_location.xml_filename).string(),
+            (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputExrPath).string(),
+            (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputSceneXmlFilename).string()
+        ));
+        rtr::editor::attach_editor_host(*forward_pipeline, editor_host);
+        rtr::editor::bind_input_capture_to_pipeline(*input_system, *forward_pipeline);
 
         engine.set_loop_hooks(rtr::framework::core::Engine::LoopHooks{
             .input_begin = [&]() { input_system->begin_frame(); },
             .input_poll = [&]() { renderer->window().poll_events(); },
             .input_end = [&]() { input_system->end_frame(); },
             .render = [&]() {
+                static std::uint64_t frame_serial = 0;
+
                 auto* active_scene = engine.world().active_scene();
                 if (active_scene == nullptr) {
                     throw std::runtime_error("No active scene.");
@@ -344,6 +424,12 @@ int main() {
                     );
                 }
 
+                editor_host->begin_frame(rtr::editor::EditorFrameData{
+                    .frame_serial = frame_serial,
+                    .delta_seconds = 0.0,
+                    .paused = engine.paused(),
+                });
+
                 forward_pipeline->set_scene_view(
                     rtr::system::render::build_forward_scene_view(
                         *active_scene,
@@ -351,7 +437,6 @@ int main() {
                     )
                 );
                 renderer->draw_frame();
-                static std::uint64_t frame_serial = 0;
                 resource_manager.tick(frame_serial++);
 
                 if (input_system->state().key_down(rtr::system::input::KeyCode::ESCAPE)) {

@@ -312,7 +312,8 @@ public:
     }
 };
 
-class ShaderToyPipeline final : public RenderPipelineBase {
+class ShaderToyPipeline final : public RenderPipelineBase,
+                                public IImGuiOverlayPipeline {
 private:
     struct OffscreenFrameResources {
         std::unique_ptr<rhi::Image> image{};
@@ -452,6 +453,34 @@ public:
             throw std::runtime_error("ShaderToyPipeline imgui pass is not initialized.");
         }
         return *m_imgui_pass;
+    }
+
+    void set_imgui_overlay(std::shared_ptr<IImGuiOverlay> overlay) override {
+        if (!m_imgui_pass) {
+            throw std::runtime_error("ShaderToyPipeline imgui pass is not initialized.");
+        }
+        m_imgui_pass->set_overlay(std::move(overlay));
+    }
+
+    void clear_imgui_overlay() override {
+        if (!m_imgui_pass) {
+            return;
+        }
+        m_imgui_pass->clear_overlay();
+    }
+
+    bool wants_imgui_capture_mouse() const override {
+        if (!m_imgui_pass) {
+            return false;
+        }
+        return m_imgui_pass->wants_capture_mouse();
+    }
+
+    bool wants_imgui_capture_keyboard() const override {
+        if (!m_imgui_pass) {
+            return false;
+        }
+        return m_imgui_pass->wants_capture_keyboard();
     }
 
     void on_resize(int /*width*/, int /*height*/) override {}
