@@ -136,6 +136,25 @@ rtr_add_test(
     Vulkan::Loader
 )
 
+# editor
+rtr_add_test(
+    test_editor_host
+    editor/editor_host_test.cpp
+    rtr
+)
+rtr_add_test(
+    test_editor_selection
+    editor/editor_selection_test.cpp
+    rtr
+)
+rtr_add_test(
+    test_editor_pipeline_bridge
+    editor/editor_pipeline_bridge_test.cpp
+    rtr
+    glfw
+    Vulkan::Loader
+)
+
 # framework/integration
 rtr_add_test(
     test_framework_pbpt_scene_export_builder

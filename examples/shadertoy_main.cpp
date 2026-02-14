@@ -2,8 +2,13 @@
 #include <iostream>
 #include <memory>
 
-#include "imgui.h"
-
+#include "rtr/editor/editor_attach.hpp"
+#include "rtr/editor/editor_host.hpp"
+#include "rtr/editor/hierarchy_panel.hpp"
+#include "rtr/editor/inspector_panel.hpp"
+#include "rtr/editor/stats_panel.hpp"
+#include "rtr/framework/core/world.hpp"
+#include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/input/input_system.hpp"
 #include "rtr/system/input/input_types.hpp"
 #include "rtr/system/render/renderer.hpp"
@@ -28,32 +33,45 @@ int main() {
         );
         auto* shadertoy_pipeline = pipeline.get();
 
-        shadertoy_pipeline->imgui_pass().set_ui_callback([]() {
-            ImGui::Begin("ShaderToyPipeline");
-            ImGui::Text("Compute -> Present pipeline active");
-            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-            ImGui::Text("Press Q to quit");
-            ImGui::End();
-        });
-
         auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
-        input_system->set_is_intercept_capture([shadertoy_pipeline](bool is_mouse) {
-            if (is_mouse) {
-                return shadertoy_pipeline->imgui_pass().wants_capture_mouse();
-            }
-            return shadertoy_pipeline->imgui_pass().wants_capture_keyboard();
-        });
+
+        auto world = std::make_unique<rtr::framework::core::World>();
+        auto resources = std::make_unique<rtr::resource::ResourceManager>(kMaxFramesInFlight);
+        world->set_resource_manager(resources.get());
+        (void)world->create_scene("editor_scene");
+
+        auto editor_host = std::make_shared<rtr::editor::EditorHost>();
+        editor_host->bind_runtime(
+            world.get(),
+            resources.get(),
+            renderer.get(),
+            input_system.get()
+        );
+        editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
+        rtr::editor::attach_editor_host(*shadertoy_pipeline, editor_host);
+        rtr::editor::bind_input_capture_to_pipeline(*input_system, *shadertoy_pipeline);
 
         renderer->set_pipeline(std::move(pipeline));
 
+        std::uint64_t frame_serial = 0;
         while (!renderer->window().is_should_close()) {
             input_system->begin_frame();
             renderer->window().poll_events();
+
+            editor_host->begin_frame(rtr::editor::EditorFrameData{
+                .frame_serial = frame_serial,
+                .delta_seconds = 0.0,
+                .paused = false,
+            });
+
             renderer->draw_frame();
             if (input_system->state().key_down(rtr::system::input::KeyCode::Q)) {
                 renderer->window().close();
             }
             input_system->end_frame();
+            ++frame_serial;
         }
 
         renderer->device().wait_idle();

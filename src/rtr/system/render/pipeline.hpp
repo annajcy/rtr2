@@ -28,6 +28,8 @@ class InputSystem;
 
 namespace rtr::system::render {
 
+class IImGuiOverlay;
+
 struct PipelineRuntime {
     rhi::Device* device{};
     rhi::Context* context{};
@@ -51,6 +53,15 @@ public:
 
     // Renderer owns command buffer begin/end/reset/submit; pipeline only records draw commands.
     virtual void render(FrameContext& ctx) = 0;
+};
+
+class IImGuiOverlayPipeline {
+public:
+    virtual ~IImGuiOverlayPipeline() = default;
+    virtual void set_imgui_overlay(std::shared_ptr<IImGuiOverlay> overlay) = 0;
+    virtual void clear_imgui_overlay() = 0;
+    virtual bool wants_imgui_capture_mouse() const = 0;
+    virtual bool wants_imgui_capture_keyboard() const = 0;
 };
 
 struct FramePrepareContext {

@@ -4,10 +4,14 @@
 #include <stdexcept>
 #include <string>
 
-#include "imgui.h"
 #include <glm/vec4.hpp>
 
 #include "rtr/app/app_runtime.hpp"
+#include "rtr/editor/editor_attach.hpp"
+#include "rtr/editor/editor_host.hpp"
+#include "rtr/editor/hierarchy_panel.hpp"
+#include "rtr/editor/inspector_panel.hpp"
+#include "rtr/editor/stats_panel.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/camera.hpp"
@@ -33,23 +37,19 @@ int main() {
         );
         auto* forward_pipeline = pipeline.get();
 
-        forward_pipeline->imgui_pass().set_ui_callback([]() {
-            ImGui::Begin("Quickstart controls");
-            ImGui::Text("Right Mouse: Look");
-            ImGui::Text("WASD + Q/E: Move");
-            ImGui::Text("Shift: Sprint");
-            ImGui::Text("Mouse Wheel: Zoom");
-            ImGui::Text("ESC: Quit");
-            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-            ImGui::End();
-        });
+        auto editor_host = std::make_shared<rtr::editor::EditorHost>();
+        editor_host->bind_runtime(
+            &runtime.world(),
+            &runtime.resource_manager(),
+            &runtime.renderer(),
+            &runtime.input_system()
+        );
+        editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
+        rtr::editor::attach_editor_host(*forward_pipeline, editor_host);
 
-        runtime.input_system().set_is_intercept_capture([forward_pipeline](bool is_mouse) {
-            if (is_mouse) {
-                return forward_pipeline->imgui_pass().wants_capture_mouse();
-            }
-            return forward_pipeline->imgui_pass().wants_capture_keyboard();
-        });
+        rtr::editor::bind_input_capture_to_pipeline(runtime.input_system(), *forward_pipeline);
 
         runtime.set_pipeline(std::move(pipeline));
 
@@ -110,6 +110,13 @@ int main() {
                 if (ctx.input.state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
                     ctx.renderer.window().close();
                 }
+            },
+            .on_post_update = [editor_host](rtr::app::RuntimeContext& ctx) {
+                editor_host->begin_frame(rtr::editor::EditorFrameData{
+                    .frame_serial = ctx.frame_serial,
+                    .delta_seconds = ctx.delta_seconds,
+                    .paused = ctx.paused,
+                });
             }
         });
 
