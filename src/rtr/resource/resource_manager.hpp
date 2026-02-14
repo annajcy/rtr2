@@ -23,8 +23,6 @@ namespace rtr::resource {
 class ResourceManager {
 public:
     static constexpr std::string_view kDefaultResourceRootDir = "./assets/";
-    static constexpr std::string_view kDefaultCheckerboardTextureRelativePath =
-        "textures/default_checkerboard_512.png";
 
 private:
     struct MeshRecord {
@@ -57,8 +55,6 @@ private:
     std::unordered_map<MeshHandle, MeshRecord> m_mesh_records{};
     std::unordered_map<TextureHandle, TextureRecord> m_texture_records{};
 
-    TextureHandle m_default_checkerboard_texture{};
-
     std::vector<RetiredMeshGpu> m_retired_meshes{};
     std::vector<RetiredTextureGpu> m_retired_textures{};
 
@@ -80,7 +76,6 @@ public:
 
     void set_resource_root_dir(std::filesystem::path resource_root_dir) {
         m_resource_root_dir = std::move(resource_root_dir);
-        m_default_checkerboard_texture = {};
     }
 
     MeshHandle create_mesh(utils::ObjMeshData cpu) {
@@ -118,19 +113,6 @@ public:
     ) {
         const auto abs_path = resolve_resource_path(rel_path);
         return create_texture(utils::load_image_from_path(abs_path.string(), true, 4), use_srgb);
-    }
-
-    TextureHandle default_checkerboard_texture() {
-        if (m_default_checkerboard_texture.is_valid() &&
-            texture_alive(m_default_checkerboard_texture)) {
-            return m_default_checkerboard_texture;
-        }
-
-        m_default_checkerboard_texture = create_texture_from_relative_path(
-            std::string(kDefaultCheckerboardTextureRelativePath),
-            true
-        );
-        return m_default_checkerboard_texture;
     }
 
     void unload_mesh(MeshHandle handle) {

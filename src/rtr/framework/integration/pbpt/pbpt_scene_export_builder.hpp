@@ -7,9 +7,11 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <variant>
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
@@ -45,7 +47,7 @@ struct PbptShapeRecord {
     std::string object_name{};
     resource::MeshHandle mesh_handle{};
     glm::mat4 model{1.0f};
-    component::PbptSpectrum reflectance_spectrum{
+    component::PbptReflectance reflectance{
         component::make_constant_pbpt_spectrum(0.7f)
     };
     bool has_area_emitter{false};
@@ -80,6 +82,27 @@ inline std::string escape_xml(std::string value) {
 
 inline std::string spectrum_key(const component::PbptSpectrum& spectrum) {
     return component::serialize_pbpt_spectrum(spectrum);
+}
+
+inline std::string rgb_value_string(const component::PbptRgb& rgb) {
+    component::validate_pbpt_rgb(rgb, "PbptShapeRecord.reflectance_rgb");
+    std::ostringstream oss;
+    oss << std::setprecision(6) << rgb.r << " " << rgb.g << " " << rgb.b;
+    return oss.str();
+}
+
+inline std::string reflectance_key(const component::PbptReflectance& reflectance) {
+    return std::visit(
+        [](const auto& payload) -> std::string {
+            using PayloadT = std::decay_t<decltype(payload)>;
+            if constexpr (std::is_same_v<PayloadT, component::PbptSpectrum>) {
+                return "spectrum:" + spectrum_key(payload);
+            } else {
+                return "rgb:" + rgb_value_string(payload);
+            }
+        },
+        reflectance
+    );
 }
 
 inline std::string serialize_matrix_row_major(const glm::mat4& matrix) {
@@ -172,9 +195,13 @@ inline PbptSceneRecord build_pbpt_scene_record(
             throw std::runtime_error("Pbpt export requires valid and alive mesh handle.");
         }
 
-        const component::PbptSpectrum& reflectance = pbpt_mesh->reflectance_spectrum();
-        component::validate_pbpt_spectrum(reflectance, "PbptMesh.reflectance_spectrum");
-        const std::string reflectance_key = detail::spectrum_key(reflectance);
+        const component::PbptReflectance& reflectance = pbpt_mesh->reflectance();
+        if (const auto* spectrum = std::get_if<component::PbptSpectrum>(&reflectance)) {
+            component::validate_pbpt_spectrum(*spectrum, "PbptMesh.reflectance_spectrum");
+        } else {
+            component::validate_pbpt_rgb(std::get<component::PbptRgb>(reflectance), "PbptMesh.reflectance_rgb");
+        }
+        const std::string reflectance_key = detail::reflectance_key(reflectance);
         if (!material_ids.contains(reflectance_key)) {
             material_ids.emplace(
                 reflectance_key,
@@ -191,7 +218,7 @@ inline PbptSceneRecord build_pbpt_scene_record(
             .object_name = std::move(object_name),
             .mesh_handle = mesh_handle,
             .model = scene.scene_graph().node(id).world_matrix(),
-            .reflectance_spectrum = reflectance,
+            .reflectance = reflectance,
             .has_area_emitter = pbpt_light != nullptr && pbpt_light->enabled(),
             .radiance_spectrum =
                 (pbpt_light != nullptr && pbpt_light->enabled())
@@ -211,7 +238,7 @@ inline std::string serialize_pbpt_scene_xml(
 ) {
     struct MaterialEntry {
         std::string id{};
-        component::PbptSpectrum reflectance_spectrum{
+        component::PbptReflectance reflectance{
             component::make_constant_pbpt_spectrum(0.7f)
         };
     };
@@ -221,8 +248,12 @@ inline std::string serialize_pbpt_scene_xml(
     materials.reserve(record.shapes.size());
 
     for (const auto& shape : record.shapes) {
-        component::validate_pbpt_spectrum(shape.reflectance_spectrum, "shape.reflectance_spectrum");
-        const std::string key = detail::spectrum_key(shape.reflectance_spectrum);
+        if (const auto* spectrum = std::get_if<component::PbptSpectrum>(&shape.reflectance)) {
+            component::validate_pbpt_spectrum(*spectrum, "shape.reflectance_spectrum");
+        } else {
+            component::validate_pbpt_rgb(std::get<component::PbptRgb>(shape.reflectance), "shape.reflectance_rgb");
+        }
+        const std::string key = detail::reflectance_key(shape.reflectance);
         if (material_ids.contains(key)) {
             continue;
         }
@@ -231,7 +262,7 @@ inline std::string serialize_pbpt_scene_xml(
         material_ids.emplace(key, id);
         materials.emplace_back(MaterialEntry{
             .id = id,
-            .reflectance_spectrum = shape.reflectance_spectrum
+            .reflectance = shape.reflectance
         });
     }
 
@@ -304,9 +335,17 @@ inline std::string serialize_pbpt_scene_xml(
 
     for (const auto& material : materials) {
         xml << "  <bsdf type=\"diffuse\" id=\"" << material.id << "\">\n";
-        xml << "    <spectrum name=\"reflectance\" value=\""
-            << detail::escape_xml(component::serialize_pbpt_spectrum(material.reflectance_spectrum))
-            << "\"/>\n";
+        if (const auto* spectrum = std::get_if<component::PbptSpectrum>(&material.reflectance)) {
+            xml << "    <spectrum name=\"reflectance\" value=\""
+                << detail::escape_xml(component::serialize_pbpt_spectrum(*spectrum))
+                << "\"/>\n";
+        } else {
+            xml << "    <rgb name=\"reflectance\" value=\""
+                << detail::escape_xml(
+                       detail::rgb_value_string(std::get<component::PbptRgb>(material.reflectance))
+                   )
+                << "\"/>\n";
+        }
         xml << "  </bsdf>\n";
     }
 
@@ -315,7 +354,7 @@ inline std::string serialize_pbpt_scene_xml(
             throw std::runtime_error("Pbpt export requires valid mesh_handle.");
         }
 
-        const std::string key = detail::spectrum_key(shape.reflectance_spectrum);
+        const std::string key = detail::reflectance_key(shape.reflectance);
         const std::string& material_id = material_ids.at(key);
         const std::string& mesh_rel_path = mesh_relative_path_by_handle.at(shape.mesh_handle);
 

@@ -2,6 +2,7 @@ add_library(rtr INTERFACE)
 add_library(rtr::rtr ALIAS rtr)
 target_include_directories(rtr INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/pbpt/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 

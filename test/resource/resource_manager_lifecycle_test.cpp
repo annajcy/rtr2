@@ -26,14 +26,6 @@ struct TempDir {
     }
 };
 
-std::filesystem::path repo_assets_dir() {
-    return std::filesystem::path(__FILE__)
-               .parent_path()
-               .parent_path()
-               .parent_path() /
-           "assets";
-}
-
 void write_text_file(const std::filesystem::path& path, const std::string& content) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream out(path, std::ios::binary);
@@ -139,22 +131,6 @@ TEST(ResourceManagerLifecycleTest, CreateTextureThenUnloadIsIdempotent) {
     manager.unload_texture(handle);
     EXPECT_FALSE(manager.texture_alive(handle));
     EXPECT_NO_THROW(manager.unload_texture(handle));
-}
-
-TEST(ResourceManagerLifecycleTest, DefaultCheckerboardTextureReturnsAliveHandle) {
-    ResourceManager manager(2, repo_assets_dir());
-    const auto a = manager.default_checkerboard_texture();
-    const auto b = manager.default_checkerboard_texture();
-
-    EXPECT_TRUE(a.is_valid());
-    EXPECT_EQ(a, b);
-    EXPECT_TRUE(manager.texture_alive(a));
-}
-
-TEST(ResourceManagerLifecycleTest, DefaultCheckerboardTextureThrowsWhenMissingUnderRoot) {
-    TempDir temp_dir("rtr_resource_manager_missing_checkerboard_test");
-    ResourceManager manager(2, temp_dir.path);
-    EXPECT_THROW((void)manager.default_checkerboard_texture(), std::runtime_error);
 }
 
 TEST(ResourceManagerLifecycleTest, CreateMeshAndTextureFromRelativePathUsesResourceRoot) {

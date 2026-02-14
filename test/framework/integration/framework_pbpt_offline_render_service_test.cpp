@@ -70,8 +70,7 @@ void setup_scene_with_camera(core::Scene& scene) {
 void add_minimal_pbpt_emitter_shape(core::Scene& scene, resource::ResourceManager& resources) {
     auto& go = scene.create_game_object("pbpt_test_shape");
     (void)go.add_component<component::MeshRenderer>(
-        create_test_mesh(resources),
-        resources.default_checkerboard_texture()
+        create_test_mesh(resources)
     );
     (void)go.add_component<component::PbptMesh>();
     (void)go.add_component<component::PbptLight>();

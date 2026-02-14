@@ -22,17 +22,19 @@ TEST(FrameworkPbptMeshTest, ThrowsWhenMeshRendererIsMissing) {
 TEST(FrameworkPbptMeshTest, CanAttachWhenMeshRendererExists) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
+    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
     EXPECT_EQ(&pbpt_mesh.mesh_renderer(), &renderer);
     EXPECT_EQ(pbpt_mesh.mesh_handle(), resource::MeshHandle{10});
+    EXPECT_TRUE(pbpt_mesh.is_reflectance_spectrum());
+    EXPECT_FALSE(pbpt_mesh.is_reflectance_rgb());
 }
 
 TEST(FrameworkPbptMeshTest, MeshHandleTracksMeshRendererUpdates) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
+    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
     EXPECT_EQ(pbpt_mesh.mesh_handle(), resource::MeshHandle{10});
@@ -43,7 +45,7 @@ TEST(FrameworkPbptMeshTest, MeshHandleTracksMeshRendererUpdates) {
 TEST(FrameworkPbptMeshTest, ReflectanceSpectrumSetAndReadBack) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("mesh");
-    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
+    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
     const PbptSpectrum spectrum{
@@ -64,7 +66,7 @@ TEST(FrameworkPbptMeshTest, ReflectanceSpectrumSetAndReadBack) {
 TEST(FrameworkPbptMeshTest, ReflectanceSpectrumValidationThrowsForInvalidData) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("mesh");
-    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
+    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
     EXPECT_THROW(
@@ -87,6 +89,44 @@ TEST(FrameworkPbptMeshTest, ReflectanceSpectrumValidationThrowsForInvalidData) {
         }),
         std::invalid_argument
     );
+}
+
+TEST(FrameworkPbptMeshTest, ReflectanceRgbSetAndReadBack) {
+    core::Scene scene(1, "scene");
+    auto& go = scene.create_game_object("mesh");
+    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10});
+    auto& pbpt_mesh = go.add_component<PbptMesh>();
+
+    pbpt_mesh.set_reflectance_rgb(PbptRgb{0.1f, 0.2f, 0.3f});
+    EXPECT_TRUE(pbpt_mesh.is_reflectance_rgb());
+    EXPECT_FALSE(pbpt_mesh.is_reflectance_spectrum());
+
+    const auto& rgb = pbpt_mesh.reflectance_rgb();
+    EXPECT_FLOAT_EQ(rgb.r, 0.1f);
+    EXPECT_FLOAT_EQ(rgb.g, 0.2f);
+    EXPECT_FLOAT_EQ(rgb.b, 0.3f);
+}
+
+TEST(FrameworkPbptMeshTest, ReflectanceRgbValidationThrowsForInvalidData) {
+    core::Scene scene(1, "scene");
+    auto& go = scene.create_game_object("mesh");
+    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10});
+    auto& pbpt_mesh = go.add_component<PbptMesh>();
+
+    EXPECT_THROW((void)pbpt_mesh.set_reflectance_rgb(PbptRgb{-0.1f, 0.2f, 0.3f}), std::invalid_argument);
+    EXPECT_THROW((void)pbpt_mesh.set_reflectance_rgb(PbptRgb{0.1f, 1.2f, 0.3f}), std::invalid_argument);
+}
+
+TEST(FrameworkPbptMeshTest, WrongReflectanceAccessorThrows) {
+    core::Scene scene(1, "scene");
+    auto& go = scene.create_game_object("mesh");
+    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10});
+    auto& pbpt_mesh = go.add_component<PbptMesh>();
+
+    EXPECT_THROW((void)pbpt_mesh.reflectance_rgb(), std::logic_error);
+
+    pbpt_mesh.set_reflectance_rgb(PbptRgb{0.3f, 0.4f, 0.5f});
+    EXPECT_THROW((void)pbpt_mesh.reflectance_spectrum(), std::logic_error);
 }
 
 } // namespace rtr::framework::component::test

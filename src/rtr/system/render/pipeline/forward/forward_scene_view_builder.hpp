@@ -41,18 +41,14 @@ inline ForwardSceneView build_forward_scene_view(
         const glm::mat4 model = node.world_matrix();
         const glm::mat4 normal = glm::transpose(glm::inverse(model));
         const resource::MeshHandle mesh_handle = mesh_renderer->mesh_handle();
-        const resource::TextureHandle albedo_handle = mesh_renderer->albedo_texture_handle();
         if (!mesh_handle.is_valid() || !resources.mesh_alive(mesh_handle)) {
             throw std::runtime_error("MeshRenderer mesh handle is invalid or unloaded.");
-        }
-        if (!albedo_handle.is_valid() || !resources.texture_alive(albedo_handle)) {
-            throw std::runtime_error("MeshRenderer albedo texture handle is invalid or unloaded.");
         }
 
         view.renderables.emplace_back(ForwardSceneRenderable{
             .instance_id = static_cast<std::uint64_t>(id),
             .mesh = mesh_handle,
-            .albedo_texture = albedo_handle,
+            .base_color = mesh_renderer->base_color(),
             .model = model,
             .normal = normal
         });

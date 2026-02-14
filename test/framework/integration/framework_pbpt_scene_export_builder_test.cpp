@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <variant>
 
 #include "gtest/gtest.h"
 
@@ -46,15 +47,6 @@ resource::MeshHandle create_test_mesh(resource::ResourceManager& resources) {
     };
     mesh.indices = {0, 1, 2};
     return resources.create_mesh(std::move(mesh));
-}
-
-resource::TextureHandle create_test_texture(resource::ResourceManager& resources) {
-    utils::ImageData tex{};
-    tex.width = 1;
-    tex.height = 1;
-    tex.channels = 4;
-    tex.pixels = {255, 255, 255, 255};
-    return resources.create_texture(std::move(tex), true);
 }
 
 component::PbptSpectrum make_test_spectrum(float base) {
@@ -119,23 +111,22 @@ TEST(FrameworkPbptSceneExportBuilderTest, BuildsRecordsFromActiveNodesWithMeshAn
 
     auto& go_ok = scene.create_game_object("");
     const auto expected_handle = create_test_mesh(resources);
-    const auto tex_handle = create_test_texture(resources);
-    (void)go_ok.add_component<component::MeshRenderer>(expected_handle, tex_handle);
+    (void)go_ok.add_component<component::MeshRenderer>(expected_handle);
     auto& go_ok_pbpt = go_ok.add_component<component::PbptMesh>();
     const component::PbptSpectrum reflectance = make_test_spectrum(0.2f);
     go_ok_pbpt.set_reflectance_spectrum(reflectance);
     go_ok.node().set_local_position({1.0f, 2.0f, 3.0f});
 
     auto& go_without_pbpt = scene.create_game_object("mesh_only");
-    (void)go_without_pbpt.add_component<component::MeshRenderer>(create_test_mesh(resources), tex_handle);
+    (void)go_without_pbpt.add_component<component::MeshRenderer>(create_test_mesh(resources));
 
     auto& go_with_disabled_component = scene.create_game_object("disabled_component");
-    (void)go_with_disabled_component.add_component<component::MeshRenderer>(create_test_mesh(resources), tex_handle);
+    (void)go_with_disabled_component.add_component<component::MeshRenderer>(create_test_mesh(resources));
     auto& disabled_pbpt = go_with_disabled_component.add_component<component::PbptMesh>();
     disabled_pbpt.set_enabled(false);
 
     auto& go_disabled = scene.create_game_object("disabled_go");
-    (void)go_disabled.add_component<component::MeshRenderer>(create_test_mesh(resources), tex_handle);
+    (void)go_disabled.add_component<component::MeshRenderer>(create_test_mesh(resources));
     (void)go_disabled.add_component<component::PbptMesh>();
     go_disabled.set_enabled(false);
 
@@ -148,10 +139,12 @@ TEST(FrameworkPbptSceneExportBuilderTest, BuildsRecordsFromActiveNodesWithMeshAn
     EXPECT_EQ(shape.object_name, "go_" + std::to_string(static_cast<std::uint64_t>(go_ok.id())));
     EXPECT_EQ(shape.mesh_handle, expected_handle);
     EXPECT_EQ(shape.material_id, "mat_0");
-    ASSERT_EQ(shape.reflectance_spectrum.size(), reflectance.size());
+    ASSERT_TRUE(std::holds_alternative<component::PbptSpectrum>(shape.reflectance));
+    const auto& out_reflectance = std::get<component::PbptSpectrum>(shape.reflectance);
+    ASSERT_EQ(out_reflectance.size(), reflectance.size());
     for (std::size_t i = 0; i < reflectance.size(); ++i) {
-        EXPECT_FLOAT_EQ(shape.reflectance_spectrum[i].lambda_nm, reflectance[i].lambda_nm);
-        EXPECT_FLOAT_EQ(shape.reflectance_spectrum[i].value, reflectance[i].value);
+        EXPECT_FLOAT_EQ(out_reflectance[i].lambda_nm, reflectance[i].lambda_nm);
+        EXPECT_FLOAT_EQ(out_reflectance[i].value, reflectance[i].value);
     }
     EXPECT_FALSE(shape.has_area_emitter);
     expect_mat4_near(shape.model, scene.scene_graph().node(go_ok.id()).world_matrix());
@@ -161,7 +154,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, ThrowsWhenPbptLightExistsWithoutPbptMe
     core::Scene scene(1, "scene");
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("light_only");
-    (void)go.add_component<component::MeshRenderer>(create_test_mesh(resources), create_test_texture(resources));
+    (void)go.add_component<component::MeshRenderer>(create_test_mesh(resources));
     (void)go.add_component<component::PbptLight>();
 
     EXPECT_THROW(
@@ -182,7 +175,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesMaterialsAndMesh
         .object_name = "a",
         .mesh_handle = shared_mesh,
         .model = glm::mat4{1.0f},
-        .reflectance_spectrum = make_test_spectrum(0.2f),
+        .reflectance = make_test_spectrum(0.2f),
         .has_area_emitter = false,
         .radiance_spectrum = {},
         .material_id = ""
@@ -191,7 +184,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesMaterialsAndMesh
         .object_name = "b",
         .mesh_handle = shared_mesh,
         .model = glm::mat4{1.0f},
-        .reflectance_spectrum = make_test_spectrum(0.2f),
+        .reflectance = make_test_spectrum(0.2f),
         .has_area_emitter = false,
         .radiance_spectrum = {},
         .material_id = ""
@@ -217,6 +210,27 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesMaterialsAndMesh
     EXPECT_EQ(file_count, 1u);
 }
 
+TEST(FrameworkPbptSceneExportBuilderTest, SerializerWritesRgbReflectanceWhenVariantIsRgb) {
+    TempDir temp_dir("rtr_pbpt_scene_export_builder_rgb_reflectance");
+    const std::string out_xml = (temp_dir.path / "scene.xml").string();
+
+    resource::ResourceManager resources{};
+    PbptSceneRecord record{};
+    record.shapes.emplace_back(PbptShapeRecord{
+        .object_name = "rgb_mesh",
+        .mesh_handle = create_test_mesh(resources),
+        .model = glm::mat4{1.0f},
+        .reflectance = component::PbptRgb{0.25f, 0.5f, 0.75f},
+        .has_area_emitter = false,
+        .radiance_spectrum = {},
+        .material_id = ""
+    });
+
+    const std::string xml = serialize_pbpt_scene_xml(record, resources, out_xml);
+    EXPECT_NE(xml.find("<rgb name=\"reflectance\" value=\"0.25 0.5 0.75\"/>"), std::string::npos);
+    EXPECT_EQ(count_occurrences(xml, "<spectrum name=\"reflectance\""), 0u);
+}
+
 TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsAreaEmitterWhenPresent) {
     TempDir temp_dir("rtr_pbpt_scene_export_builder_emitter");
     const std::string out_xml = (temp_dir.path / "scene.xml").string();
@@ -227,7 +241,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsAreaEmitterWhenPresent)
         .object_name = "light_mesh",
         .mesh_handle = create_test_mesh(resources),
         .model = glm::mat4{1.0f},
-        .reflectance_spectrum = make_test_spectrum(0.2f),
+        .reflectance = make_test_spectrum(0.2f),
         .has_area_emitter = true,
         .radiance_spectrum = {
             component::PbptSpectrumPoint{400.0f, 0.0f},
@@ -261,7 +275,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerUsesStableRowMajorMatrixOrde
         .object_name = "mesh",
         .mesh_handle = create_test_mesh(resources),
         .model = matrix,
-        .reflectance_spectrum = make_test_spectrum(0.2f),
+        .reflectance = make_test_spectrum(0.2f),
         .has_area_emitter = false,
         .radiance_spectrum = {},
         .material_id = ""
@@ -295,7 +309,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsSensorAndIntegratorWith
     ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
 
     auto& mesh_go = scene.create_game_object("mesh");
-    (void)mesh_go.add_component<component::MeshRenderer>(create_test_mesh(resources), create_test_texture(resources));
+    (void)mesh_go.add_component<component::MeshRenderer>(create_test_mesh(resources));
     auto& pbpt_mesh = mesh_go.add_component<component::PbptMesh>();
     pbpt_mesh.set_reflectance_spectrum(make_test_spectrum(0.2f));
 
@@ -322,7 +336,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerThrowsWhenShapeMeshHandleIsI
         .object_name = "mesh",
         .mesh_handle = resource::MeshHandle{},
         .model = glm::mat4{1.0f},
-        .reflectance_spectrum = make_test_spectrum(0.2f),
+        .reflectance = make_test_spectrum(0.2f),
         .has_area_emitter = false,
         .radiance_spectrum = {},
         .material_id = ""

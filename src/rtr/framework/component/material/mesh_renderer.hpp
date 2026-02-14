@@ -1,5 +1,7 @@
 #pragma once
 
+#include <glm/vec4.hpp>
+
 #include <stdexcept>
 
 #include "rtr/framework/component/component.hpp"
@@ -10,20 +12,17 @@ namespace rtr::framework::component {
 class MeshRenderer final : public Component {
 private:
     resource::MeshHandle m_mesh{};
-    resource::TextureHandle m_albedo_texture{};
+    glm::vec4 m_base_color{1.0f, 1.0f, 1.0f, 1.0f};
 
 public:
     explicit MeshRenderer(
         resource::MeshHandle mesh,
-        resource::TextureHandle albedo_texture
+        glm::vec4 base_color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}
     )
         : m_mesh(mesh),
-          m_albedo_texture(albedo_texture) {
+          m_base_color(base_color) {
         if (!m_mesh.is_valid()) {
             throw std::invalid_argument("MeshRenderer mesh handle must be valid.");
-        }
-        if (!m_albedo_texture.is_valid()) {
-            throw std::invalid_argument("MeshRenderer albedo texture handle must be valid.");
         }
     }
 
@@ -38,15 +37,12 @@ public:
         m_mesh = mesh;
     }
 
-    resource::TextureHandle albedo_texture_handle() const {
-        return m_albedo_texture;
+    const glm::vec4& base_color() const {
+        return m_base_color;
     }
 
-    void set_albedo_texture_handle(resource::TextureHandle albedo_texture) {
-        if (!albedo_texture.is_valid()) {
-            throw std::invalid_argument("MeshRenderer albedo texture handle must be valid.");
-        }
-        m_albedo_texture = albedo_texture;
+    void set_base_color(const glm::vec4& base_color) {
+        m_base_color = base_color;
     }
 };
 

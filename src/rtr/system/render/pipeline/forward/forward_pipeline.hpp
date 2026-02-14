@@ -7,7 +7,6 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -16,7 +15,6 @@
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/descriptor.hpp"
 #include "rtr/rhi/shader_module.hpp"
-#include "rtr/rhi/texture.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 #include "rtr/system/render/mesh.hpp"
@@ -40,6 +38,7 @@ struct UniformBufferObject {
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
     alignas(16) glm::mat4 normal;
+    alignas(16) glm::vec4 base_color;
 };
 
 class ForwardPass final : public render::IRenderPass {
@@ -47,7 +46,6 @@ public:
     struct DrawItem {
         render::Mesh* mesh{};
         vk::raii::DescriptorSet* per_object_set{};
-        vk::raii::DescriptorSet* texture_set{};
     };
 
     struct RenderPassResources {
@@ -62,7 +60,6 @@ private:
 
     std::vector<render::ResourceDependency> m_dependencies{
         {"forward.per_object", render::ResourceAccess::eRead},
-        {"forward.texture", render::ResourceAccess::eRead},
         {"swapchain_color", render::ResourceAccess::eReadWrite},
         {"depth", render::ResourceAccess::eReadWrite}
     };
@@ -87,8 +84,7 @@ public:
         }
         for (const auto& item : resources.draw_items) {
             if (item.mesh == nullptr ||
-                item.per_object_set == nullptr ||
-                item.texture_set == nullptr) {
+                item.per_object_set == nullptr) {
                 throw std::runtime_error("ForwardPass draw item resources are incomplete.");
             }
         }
@@ -191,13 +187,6 @@ public:
                 **item.per_object_set,
                 {}
             );
-            cmd.bindDescriptorSets(
-                vk::PipelineBindPoint::eGraphics,
-                **m_pipeline_layout,
-                1,
-                **item.texture_set,
-                {}
-            );
 
             cmd.drawIndexed(item.mesh->index_count(), 1, 0, 0, 0);
         }
@@ -211,11 +200,6 @@ class ForwardPipeline : public RenderPipelineBase,
                         public IResourceAwarePipeline {
 private:
     static constexpr uint32_t kMaxRenderables = 256;
-    static constexpr uint32_t kMaxTextures = 256;
-
-    struct TextureSetCacheEntry {
-        vk::raii::DescriptorSet set{nullptr};
-    };
 
     vk::raii::PipelineLayout m_pipeline_layout{nullptr};
     vk::raii::Pipeline m_pipeline{nullptr};
@@ -231,12 +215,9 @@ private:
     std::vector<std::unique_ptr<rhi::Image>> m_depth_images{};
 
     std::unique_ptr<rhi::DescriptorSetLayout> m_per_object_layout{nullptr};
-    std::unique_ptr<rhi::DescriptorSetLayout> m_texture_layout{nullptr};
     std::unique_ptr<rhi::DescriptorPool> m_descriptor_pool{nullptr};
 
     resource::ResourceManager* m_resource_manager{};
-    std::unordered_map<resource::TextureHandle, TextureSetCacheEntry> m_texture_sets{};
-    std::unique_ptr<rhi::Sampler> m_texture_sampler{nullptr};
 
     std::unique_ptr<render::ForwardPass> m_forward_pass{nullptr};
     std::unique_ptr<render::ImGUIPass> m_imgui_pass{nullptr};
@@ -264,42 +245,27 @@ public:
             )
         );
 
-        m_texture_sampler = std::make_unique<rhi::Sampler>(rhi::Sampler::create_default(m_device));
-
         rhi::DescriptorSetLayout::Builder per_object_layout_builder;
         per_object_layout_builder.add_binding(
             0,
             vk::DescriptorType::eUniformBuffer,
-            vk::ShaderStageFlagBits::eVertex
+            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment
         );
         m_per_object_layout = std::make_unique<rhi::DescriptorSetLayout>(
             per_object_layout_builder.build(m_device)
         );
 
-        rhi::DescriptorSetLayout::Builder texture_layout_builder;
-        texture_layout_builder.add_binding(
-            0,
-            vk::DescriptorType::eCombinedImageSampler,
-            vk::ShaderStageFlagBits::eFragment
-        );
-        m_texture_layout = std::make_unique<rhi::DescriptorSetLayout>(
-            texture_layout_builder.build(m_device)
-        );
-
         rhi::DescriptorPool::Builder descriptor_pool_builder;
         descriptor_pool_builder
             .add_layout(*m_per_object_layout, kMaxRenderables * m_frame_count)
-            .add_layout(*m_texture_layout, kMaxTextures)
             .set_flags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
         m_descriptor_pool = std::make_unique<rhi::DescriptorPool>(
             descriptor_pool_builder.build(m_device)
         );
 
         create_per_object_resources();
-
-        std::array<vk::DescriptorSetLayout, 2> set_layouts{
-            *m_per_object_layout->layout(),
-            *m_texture_layout->layout()
+        std::array<vk::DescriptorSetLayout, 1> set_layouts{
+            *m_per_object_layout->layout()
         };
         vk::PipelineLayoutCreateInfo pipeline_layout_info{};
         pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(set_layouts.size());
@@ -328,13 +294,11 @@ public:
         m_forward_pass.reset();
         m_imgui_pass.reset();
         m_object_sets.clear();
-        m_texture_sets.clear();
         m_descriptor_pool.reset();
     }
 
     void set_resource_manager(resource::ResourceManager* manager) override {
         m_resource_manager = manager;
-        m_texture_sets.clear();
     }
 
     void prepare_frame(const FramePrepareContext& ctx) override {
@@ -414,7 +378,6 @@ public:
 
         auto& frame_uniform_buffers = m_object_uniform_buffers[frame_index];
         auto& frame_sets = m_object_sets[frame_index];
-        prune_dead_texture_sets();
 
         std::vector<ForwardPass::DrawItem> draw_items{};
         draw_items.reserve(scene_view.renderables.size());
@@ -422,20 +385,19 @@ public:
         for (std::size_t i = 0; i < scene_view.renderables.size(); ++i) {
             const auto& renderable = scene_view.renderables[i];
             auto& mesh = require_mesh(renderable.mesh);
-            auto& texture_set = require_texture_set(renderable.albedo_texture);
 
             UniformBufferObject ubo{};
             ubo.model = renderable.model;
             ubo.view = scene_view.camera.view;
             ubo.proj = proj;
             ubo.normal = renderable.normal;
+            ubo.base_color = renderable.base_color;
 
             std::memcpy(frame_uniform_buffers[i]->mapped_data(), &ubo, sizeof(ubo));
 
             draw_items.emplace_back(ForwardPass::DrawItem{
                 .mesh = &mesh,
-                .per_object_set = &frame_sets[i],
-                .texture_set = &texture_set
+                .per_object_set = &frame_sets[i]
             });
         }
 
@@ -452,15 +414,6 @@ public:
     }
 
 private:
-    void prune_dead_texture_sets() {
-        if (m_resource_manager == nullptr) {
-            return;
-        }
-        std::erase_if(m_texture_sets, [&](const auto& item) {
-            return !m_resource_manager->texture_alive(item.first);
-        });
-    }
-
     render::Mesh& require_mesh(resource::MeshHandle mesh_handle) {
         if (!mesh_handle.is_valid()) {
             throw std::runtime_error("Renderable mesh handle is invalid.");
@@ -469,42 +422,6 @@ private:
             throw std::runtime_error("ForwardPipeline missing resource manager.");
         }
         return m_resource_manager->require_mesh_rhi(mesh_handle, m_device);
-    }
-
-    vk::raii::DescriptorSet& require_texture_set(resource::TextureHandle texture_handle) {
-        if (!texture_handle.is_valid()) {
-            throw std::runtime_error("Renderable texture handle is invalid.");
-        }
-        if (m_resource_manager == nullptr) {
-            throw std::runtime_error("ForwardPipeline missing resource manager.");
-        }
-
-        if (auto it = m_texture_sets.find(texture_handle); it != m_texture_sets.end()) {
-            return it->second.set;
-        }
-
-        const bool is_new_handle = m_texture_sets.find(texture_handle) == m_texture_sets.end();
-        if (is_new_handle && m_texture_sets.size() >= kMaxTextures) {
-            throw std::runtime_error("Texture count exceeds preallocated ForwardPipeline capacity.");
-        }
-
-        rhi::Image& image = m_resource_manager->require_texture_rhi(texture_handle, m_device);
-
-        auto descriptor_set = m_descriptor_pool->allocate(*m_texture_layout);
-        {
-            rhi::DescriptorWriter writer;
-            writer.write_combined_image(
-                0,
-                *image.image_view(),
-                *m_texture_sampler->sampler(),
-                vk::ImageLayout::eShaderReadOnlyOptimal
-            );
-            writer.update(m_device, *descriptor_set);
-        }
-
-        auto& entry = m_texture_sets[texture_handle];
-        entry.set = std::move(descriptor_set);
-        return entry.set;
     }
 
     void create_per_object_resources() {
@@ -642,6 +559,7 @@ private:
             pipeline_info_chain.get<vk::GraphicsPipelineCreateInfo>()
         };
     }
+
 };
 
 } // namespace rtr::system::render

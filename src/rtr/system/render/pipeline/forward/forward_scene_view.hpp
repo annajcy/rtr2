@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
 
 #include "rtr/resource/resource_types.hpp"
 
@@ -17,7 +18,7 @@ struct ForwardSceneCameraData {
 struct ForwardSceneRenderable {
     std::uint64_t instance_id{0};
     resource::MeshHandle mesh{};
-    resource::TextureHandle albedo_texture{};
+    glm::vec4 base_color{1.0f, 1.0f, 1.0f, 1.0f};
     glm::mat4 model{1.0f};
     glm::mat4 normal{1.0f};
 };

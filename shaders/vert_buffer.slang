@@ -16,13 +16,11 @@ struct UniformBufferObject {
     float4x4 view;
     float4x4 proj;
     float4x4 normal; // inverse-transpose of model
+    float4 base_color;
 };
 
 [[vk_binding(0, 0)]]
 ConstantBuffer<UniformBufferObject> ubo;
-
-[[vk_binding(0, 1)]]
-Sampler2D<float4> texSampler;
 
 [shader("vertex")]
 PSInput vertMain(VSInput input) {
@@ -42,8 +40,5 @@ PSInput vertMain(VSInput input) {
 
 [shader("fragment")]
 float4 fragMain(PSInput input) : SV_Target {
-    float4 texColor = texSampler.Sample(input.uv);
-    return texColor;
-    // return float4(input.color, 1.0);
-    //return float4(input.uv, 0.0, 1.0);
+    return ubo.base_color;
 }

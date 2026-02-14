@@ -5,6 +5,7 @@
 #include <string>
 
 #include "imgui.h"
+#include <glm/vec4.hpp>
 
 #include "rtr/app/app_runtime.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
@@ -66,32 +67,25 @@ int main() {
 
         auto add_mesh_renderer = [&](rtr::framework::core::GameObject& go,
                                      const std::string& mesh_path,
-                                     const std::string& albedo_path) {
+                                     const glm::vec4& base_color) {
             const auto mesh_handle =
                 runtime.resource_manager().create_mesh_from_obj_relative_path(mesh_path);
-
-            rtr::resource::TextureHandle albedo_handle{};
-            if (albedo_path.empty()) {
-                albedo_handle = runtime.resource_manager().default_checkerboard_texture();
-            } else {
-                albedo_handle = runtime.resource_manager().create_texture_from_relative_path(
-                    albedo_path,
-                    true
-                );
-            }
-            (void)go.add_component<rtr::framework::component::MeshRenderer>(mesh_handle, albedo_handle);
+            (void)go.add_component<rtr::framework::component::MeshRenderer>(
+                mesh_handle,
+                base_color
+            );
         };
 
         auto& go_a = scene.create_game_object("mesh_a");
-        add_mesh_renderer(go_a, "models/spot.obj", "textures/spot_texture.png");
+        add_mesh_renderer(go_a, "models/spot.obj", glm::vec4{0.2f, 0.7f, 0.9f, 1.0f});
         go_a.node().set_local_position({-2.5f, 0.0f, 0.0f});
 
         auto& go_b = scene.create_game_object("mesh_b");
-        add_mesh_renderer(go_b, "models/stanford_bunny.obj", "textures/viking_room.png");
+        add_mesh_renderer(go_b, "models/stanford_bunny.obj", glm::vec4{0.9f, 0.85f, 0.75f, 1.0f});
         go_b.node().set_local_position({0.0f, 0.0f, 0.0f});
 
         auto& go_c = scene.create_game_object("mesh_c");
-        add_mesh_renderer(go_c, "models/colored_quad.obj", "");
+        add_mesh_renderer(go_c, "models/colored_quad.obj", glm::vec4{0.9f, 0.25f, 0.25f, 1.0f});
         go_c.node().set_local_position({2.5f, 0.0f, 0.0f});
 
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{

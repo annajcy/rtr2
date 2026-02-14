@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 
 #include <glm/gtc/quaternion.hpp>
+#include <glm/vec4.hpp>
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
@@ -26,22 +27,20 @@ resource::MeshHandle create_test_mesh(resource::ResourceManager& resources) {
     return resources.create_mesh(std::move(mesh));
 }
 
-resource::TextureHandle create_test_texture(resource::ResourceManager& resources) {
-    utils::ImageData tex{};
-    tex.width = 1;
-    tex.height = 1;
-    tex.channels = 4;
-    tex.pixels = {255, 255, 255, 255};
-    return resources.create_texture(std::move(tex), true);
+void add_renderer(
+    framework::core::GameObject& go,
+    resource::ResourceManager& resources
+) {
+    (void)go.add_component<component::MeshRenderer>(create_test_mesh(resources));
 }
 
-void add_renderer(
+void add_renderer_with_color(
     framework::core::GameObject& go,
     resource::ResourceManager& resources
 ) {
     (void)go.add_component<component::MeshRenderer>(
         create_test_mesh(resources),
-        create_test_texture(resources)
+        glm::vec4{0.3f, 0.4f, 0.5f, 1.0f}
     );
 }
 
@@ -130,6 +129,21 @@ TEST(FrameworkForwardSceneViewBuilderTest, ComputesModelAndNormalFromWorldTransf
     const glm::mat4 expected_normal = glm::transpose(glm::inverse(expected_model));
     expect_mat4_near(it->model, expected_model);
     expect_mat4_near(it->normal, expected_normal);
+}
+
+TEST(FrameworkForwardSceneViewBuilderTest, SupportsBaseColorPath) {
+    core::Scene scene(1, "scene");
+    resource::ResourceManager resources{};
+    auto& camera_go = scene.create_game_object("camera");
+    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
+    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+
+    auto& mesh_go = scene.create_game_object("mesh");
+    add_renderer_with_color(mesh_go, resources);
+
+    const auto view = system::render::build_forward_scene_view(scene, resources);
+    ASSERT_EQ(view.renderables.size(), 1u);
+    EXPECT_EQ(view.renderables[0].base_color, glm::vec4(0.3f, 0.4f, 0.5f, 1.0f));
 }
 
 } // namespace rtr::framework::integration::test
