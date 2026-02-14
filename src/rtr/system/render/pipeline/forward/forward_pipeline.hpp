@@ -14,10 +14,10 @@
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/descriptor.hpp"
+#include "rtr/rhi/mesh.hpp"
 #include "rtr/rhi/shader_module.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
-#include "rtr/system/render/mesh.hpp"
 #include "rtr/system/render/pipeline.hpp"
 #include "rtr/system/render/render_pass.hpp"
 #include "vulkan/vulkan.hpp"
@@ -44,7 +44,7 @@ struct UniformBufferObject {
 class ForwardPass final : public render::IRenderPass {
 public:
     struct DrawItem {
-        render::Mesh* mesh{};
+        rhi::Mesh* mesh{};
         vk::raii::DescriptorSet* per_object_set{};
     };
 
@@ -414,7 +414,7 @@ public:
     }
 
 private:
-    render::Mesh& require_mesh(resource::MeshHandle mesh_handle) {
+    rhi::Mesh& require_mesh(resource::MeshHandle mesh_handle) {
         if (!mesh_handle.is_valid()) {
             throw std::runtime_error("Renderable mesh handle is invalid.");
         }
@@ -472,7 +472,7 @@ private:
             m_fragment_shader_module->stage_create_info()
         };
 
-        auto vertex_input_state = render::Mesh::vertex_input_state();
+        auto vertex_input_state = rhi::Mesh::vertex_input_state();
         vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
         vertex_input_info.vertexBindingDescriptionCount = static_cast<uint32_t>(vertex_input_state.bindings.size());
         vertex_input_info.pVertexBindingDescriptions = vertex_input_state.bindings.data();

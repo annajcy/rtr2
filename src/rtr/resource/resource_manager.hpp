@@ -13,8 +13,8 @@
 
 #include "rtr/resource/resource_types.hpp"
 #include "rtr/rhi/device.hpp"
+#include "rtr/rhi/mesh.hpp"
 #include "rtr/rhi/texture.hpp"
-#include "rtr/system/render/mesh.hpp"
 #include "rtr/utils/image_io.hpp"
 #include "rtr/utils/obj_io.hpp"
 
@@ -27,7 +27,7 @@ public:
 private:
     struct MeshRecord {
         utils::ObjMeshData cpu{};
-        std::unique_ptr<system::render::Mesh> gpu{};
+        std::unique_ptr<rhi::Mesh> gpu{};
     };
 
     struct TextureRecord {
@@ -38,7 +38,7 @@ private:
 
     struct RetiredMeshGpu {
         std::uint64_t retire_after_frame{0};
-        std::unique_ptr<system::render::Mesh> mesh{};
+        std::unique_ptr<rhi::Mesh> mesh{};
     };
 
     struct RetiredTextureGpu {
@@ -159,7 +159,7 @@ public:
         return it != m_texture_records.end();
     }
 
-    system::render::Mesh& require_mesh_rhi(MeshHandle handle, rhi::Device* device) {
+    rhi::Mesh& require_mesh_rhi(MeshHandle handle, rhi::Device* device) {
         if (device == nullptr) {
             throw std::invalid_argument("ResourceManager require_mesh_rhi requires non-null device.");
         }
@@ -170,8 +170,8 @@ public:
         if (record.gpu) {
             return *record.gpu;
         }
-        record.gpu = std::make_unique<system::render::Mesh>(
-            system::render::Mesh::from_cpu_data(device, record.cpu)
+        record.gpu = std::make_unique<rhi::Mesh>(
+            rhi::Mesh::from_cpu_data(device, record.cpu)
         );
         return *record.gpu;
     }

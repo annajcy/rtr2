@@ -6,39 +6,32 @@
 #include <memory>
 #include <stdexcept>
 #include <utility>
-#include <vector>
 
 #include <glm/glm.hpp>
 
-#include "rtr/rhi/buffer.hpp"
-#include "rtr/rhi/command.hpp"
-#include "rtr/rhi/device.hpp"
+#include "buffer.hpp"
+#include "command.hpp"
+#include "device.hpp"
 #include "rtr/utils/obj_types.hpp"
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
 
-namespace rtr::resource {
-class ResourceManager;
-}
-
-namespace rtr::system::render {
+namespace rtr::rhi {
 
 class Mesh {
 public:
     using Vertex = rtr::utils::ObjVertex;
 
-    friend class rtr::resource::ResourceManager;
-
     static void copy_buffer(
-        rhi::Device* device,
+        Device* device,
         vk::Buffer src,
         vk::Buffer dst,
         vk::DeviceSize size
     ) {
-        rhi::CommandPool command_pool(device, vk::CommandPoolCreateFlagBits::eTransient);
+        CommandPool command_pool(device, vk::CommandPoolCreateFlagBits::eTransient);
         auto cmd = command_pool.create_command_buffer();
 
-        cmd.record_and_submit([&](rhi::CommandBuffer& cb) {
+        cmd.record_and_submit([&](CommandBuffer& cb) {
             vk::BufferCopy buffer_copy{};
             buffer_copy.srcOffset = 0;
             buffer_copy.dstOffset = 0;
@@ -49,19 +42,19 @@ public:
         device->queue().waitIdle();
     }
 
-    static rhi::Buffer create_device_local_with_data(
-        rhi::Device* device,
+    static Buffer create_device_local_with_data(
+        Device* device,
         const void* data,
         vk::DeviceSize size,
         vk::BufferUsageFlags usage = {}
     ) {
-        auto buffer = rhi::Buffer::create_device_local_buffer(
+        auto buffer = Buffer::create_device_local_buffer(
             device,
             size,
             usage | vk::BufferUsageFlagBits::eTransferDst
         );
 
-        auto staging_buffer = rhi::Buffer::create_host_visible_buffer(
+        auto staging_buffer = Buffer::create_host_visible_buffer(
             device,
             size,
             vk::BufferUsageFlagBits::eTransferSrc
@@ -76,13 +69,12 @@ public:
         return buffer;
     }
 
-private:
-    static Mesh from_cpu_data(rhi::Device* device, const utils::ObjMeshData& cpu_data) {
+    static Mesh from_cpu_data(Device* device, const utils::ObjMeshData& cpu_data) {
         if (cpu_data.vertices.empty() || cpu_data.indices.empty()) {
             throw std::runtime_error("Mesh CPU data is empty and cannot create GPU buffers.");
         }
 
-        auto vertex_buffer = std::make_unique<rhi::Buffer>(
+        auto vertex_buffer = std::make_unique<Buffer>(
             Mesh::create_device_local_with_data(
                 device,
                 cpu_data.vertices.data(),
@@ -91,7 +83,7 @@ private:
             )
         );
 
-        auto index_buffer = std::make_unique<rhi::Buffer>(
+        auto index_buffer = std::make_unique<Buffer>(
             Mesh::create_device_local_with_data(
                 device,
                 cpu_data.indices.data(),
@@ -108,8 +100,6 @@ private:
             std::move(index_buffer)
         );
     }
-
-public:
 
     static vk::VertexInputBindingDescription binding_description() {
         vk::VertexInputBindingDescription desc{};
@@ -153,19 +143,19 @@ public:
     }
 
 private:
-    rhi::Device* m_device{};
+    Device* m_device{};
     uint32_t m_vertex_count{0};
     uint32_t m_index_count{0};
-    std::unique_ptr<rhi::Buffer> m_vertex_buffer{};
-    std::unique_ptr<rhi::Buffer> m_index_buffer{};
+    std::unique_ptr<Buffer> m_vertex_buffer{};
+    std::unique_ptr<Buffer> m_index_buffer{};
 
 public:
     Mesh(
-        rhi::Device* device,
+        Device* device,
         uint32_t vertex_count,
         uint32_t index_count,
-        std::unique_ptr<rhi::Buffer> vertex_buffer,
-        std::unique_ptr<rhi::Buffer> index_buffer
+        std::unique_ptr<Buffer> vertex_buffer,
+        std::unique_ptr<Buffer> index_buffer
     )
         : m_device(device),
           m_vertex_count(vertex_count),
@@ -185,4 +175,4 @@ public:
     uint32_t vertex_count() const { return m_vertex_count; }
 };
 
-} // namespace rtr::system::render
+} // namespace rtr::rhi
