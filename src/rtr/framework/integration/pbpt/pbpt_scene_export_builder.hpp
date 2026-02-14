@@ -22,9 +22,14 @@
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
+#include "rtr/utils/log.hpp"
 #include "rtr/utils/obj_io.hpp"
 
 namespace rtr::framework::integration {
+
+inline std::shared_ptr<spdlog::logger> pbpt_export_logger() {
+    return utils::get_logger("framework.integration.pbpt.export");
+}
 
 struct PbptIntegratorRecord {
     std::string type{"path"};
@@ -122,12 +127,17 @@ inline std::string serialize_matrix_row_major(const glm::mat4& matrix) {
 
 inline std::filesystem::path resolve_meshes_output_dir(const std::string& scene_xml_path) {
     if (scene_xml_path.empty()) {
+        pbpt_export_logger()->error("resolve_meshes_output_dir failed: scene_xml_path is empty.");
         throw std::invalid_argument("scene_xml_path must not be empty.");
     }
 
     const auto abs_xml = std::filesystem::absolute(std::filesystem::path(scene_xml_path));
     const auto xml_parent = abs_xml.parent_path();
     if (xml_parent.empty()) {
+        pbpt_export_logger()->error(
+            "resolve_meshes_output_dir failed: scene_xml_path '{}' has no parent directory.",
+            scene_xml_path
+        );
         throw std::runtime_error("scene_xml_path must have a parent directory.");
     }
     return xml_parent / "meshes";
@@ -140,6 +150,10 @@ inline std::string mesh_file_name(resource::MeshHandle handle) {
 inline std::filesystem::path make_mesh_relative_xml_path(resource::MeshHandle handle) {
     const std::filesystem::path rel = std::filesystem::path("meshes") / mesh_file_name(handle);
     if (rel.parent_path() != std::filesystem::path("meshes") || rel.extension() != ".obj") {
+        pbpt_export_logger()->error(
+            "PBPT mesh XML path contract violation for mesh handle {}.",
+            handle.value
+        );
         throw std::runtime_error("PBPT mesh XML path contract violation.");
     }
     return rel;
@@ -151,6 +165,12 @@ inline PbptSceneRecord build_pbpt_scene_record(
     const core::Scene& scene,
     resource::ResourceManager& resources
 ) {
+    auto log = pbpt_export_logger();
+    log->debug(
+        "Building PBPT scene record from Scene {} ('{}').",
+        scene.id(),
+        scene.name()
+    );
     PbptSceneRecord record{};
     record.integrator = PbptIntegratorRecord{};
 
@@ -178,6 +198,10 @@ inline PbptSceneRecord build_pbpt_scene_record(
         const auto* pbpt_light = go->get_component<component::PbptLight>();
 
         if (pbpt_light != nullptr && pbpt_mesh == nullptr) {
+            log->error(
+                "PBPT export failed: GameObject '{}' has PbptLight without PbptMesh.",
+                go->name()
+            );
             throw std::runtime_error(
                 "PbptLight requires PbptMesh on the same GameObject for export."
             );
@@ -192,6 +216,11 @@ inline PbptSceneRecord build_pbpt_scene_record(
 
         const resource::MeshHandle mesh_handle = pbpt_mesh->mesh_handle();
         if (!mesh_handle.is_valid() || !resources.mesh_alive(mesh_handle)) {
+            log->error(
+                "PBPT export failed: GameObject '{}' has invalid/unloaded mesh handle {}.",
+                go->name(),
+                mesh_handle.value
+            );
             throw std::runtime_error("Pbpt export requires valid and alive mesh handle.");
         }
 
@@ -228,6 +257,12 @@ inline PbptSceneRecord build_pbpt_scene_record(
         });
     }
 
+    log->debug(
+        "PBPT scene record built (shape_count={}, has_sensor={}, active_material_count={}).",
+        record.shapes.size(),
+        record.sensor.has_value(),
+        material_ids.size()
+    );
     return record;
 }
 
@@ -236,6 +271,12 @@ inline std::string serialize_pbpt_scene_xml(
     resource::ResourceManager& resources,
     const std::string& scene_xml_path
 ) {
+    auto log = pbpt_export_logger();
+    log->debug(
+        "Serializing PBPT scene XML (shape_count={}, scene_xml_path='{}').",
+        record.shapes.size(),
+        scene_xml_path
+    );
     struct MaterialEntry {
         std::string id{};
         component::PbptReflectance reflectance{
@@ -268,10 +309,15 @@ inline std::string serialize_pbpt_scene_xml(
 
     const std::filesystem::path mesh_output_dir = detail::resolve_meshes_output_dir(scene_xml_path);
     std::filesystem::create_directories(mesh_output_dir);
+    log->debug("PBPT mesh output directory: '{}'.", mesh_output_dir.string());
 
     std::unordered_map<resource::MeshHandle, std::string> mesh_relative_path_by_handle{};
     for (const auto& shape : record.shapes) {
         if (!shape.mesh_handle.is_valid() || !resources.mesh_alive(shape.mesh_handle)) {
+            log->error(
+                "serialize_pbpt_scene_xml failed: invalid/unloaded mesh handle {}.",
+                shape.mesh_handle.value
+            );
             throw std::runtime_error("Pbpt export requires valid and alive mesh handle.");
         }
 
@@ -303,9 +349,15 @@ inline std::string serialize_pbpt_scene_xml(
     if (record.sensor.has_value()) {
         const auto& sensor = record.sensor.value();
         if (sensor.film_width <= 0 || sensor.film_height <= 0) {
+            log->error(
+                "serialize_pbpt_scene_xml failed: invalid film size {}x{}.",
+                sensor.film_width,
+                sensor.film_height
+            );
             throw std::runtime_error("Pbpt sensor film size must be positive.");
         }
         if (sensor.sample_count <= 0) {
+            log->error("serialize_pbpt_scene_xml failed: invalid sample_count {}.", sensor.sample_count);
             throw std::runtime_error("Pbpt sensor sample_count must be positive.");
         }
 
@@ -351,6 +403,7 @@ inline std::string serialize_pbpt_scene_xml(
 
     for (const auto& shape : record.shapes) {
         if (!shape.mesh_handle.is_valid()) {
+            log->error("serialize_pbpt_scene_xml failed: shape has invalid mesh handle.");
             throw std::runtime_error("Pbpt export requires valid mesh_handle.");
         }
 
@@ -382,6 +435,11 @@ inline std::string serialize_pbpt_scene_xml(
     }
 
     xml << "</scene>\n";
+    log->info(
+        "PBPT scene XML serialization completed (materials={}, shapes={}).",
+        materials.size(),
+        record.shapes.size()
+    );
     return xml.str();
 }
 

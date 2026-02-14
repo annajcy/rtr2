@@ -15,6 +15,7 @@
 #include "rtr/system/input/input_system.hpp"
 #include "rtr/system/render/pipeline.hpp"
 #include "rtr/system/render/renderer.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::app {
 
@@ -29,6 +30,8 @@ struct AppRuntimeConfig {
     std::uint32_t max_fixed_steps_per_frame{4};
     double max_frame_delta_seconds{0.1};
     bool start_paused{false};
+    bool auto_init_logging{true};
+    utils::LogConfig log_config{};
 };
 
 struct RuntimeResult {
@@ -62,6 +65,17 @@ struct RuntimeCallbacks {
 
 class AppRuntime {
 private:
+    static AppRuntimeConfig prepare_config(AppRuntimeConfig config) {
+        if (config.auto_init_logging) {
+            utils::init_logging(config.log_config);
+        }
+        return config;
+    }
+
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("app.runtime");
+    }
+
     AppRuntimeConfig m_config{};
     RuntimeCallbacks m_callbacks{};
 
@@ -77,7 +91,7 @@ private:
 
 public:
     explicit AppRuntime(AppRuntimeConfig config = {})
-        : m_config(std::move(config)),
+        : m_config(prepare_config(std::move(config))),
           m_world(std::make_unique<framework::core::World>()),
           m_resources(std::make_unique<resource::ResourceManager>(
               m_config.max_frames_in_flight,
@@ -92,6 +106,14 @@ public:
           m_input(std::make_unique<system::input::InputSystem>(&m_renderer->window())),
           m_paused(m_config.start_paused) {
         m_world->set_resource_manager(m_resources.get());
+        logger()->info(
+            "AppRuntime initialized (window={}x{}, title='{}', frames_in_flight={}, paused={})",
+            m_config.window_width,
+            m_config.window_height,
+            m_config.window_title,
+            m_config.max_frames_in_flight,
+            m_paused
+        );
     }
 
     const AppRuntimeConfig& config() const {
@@ -147,7 +169,9 @@ public:
     }
 
     void set_pipeline(std::unique_ptr<system::render::IRenderPipeline> pipeline) {
+        auto log = logger();
         if (!pipeline) {
+            log->error("set_pipeline received null pipeline.");
             throw std::runtime_error("AppRuntime set_pipeline received null pipeline.");
         }
 
@@ -157,6 +181,7 @@ public:
         }
 
         m_renderer->set_pipeline(std::move(pipeline));
+        log->info("Pipeline bound to runtime.");
     }
 
     void request_stop() {
@@ -176,12 +201,21 @@ public:
     }
 
     RuntimeResult run() {
+        auto log = logger();
         RuntimeResult result{};
         if (m_renderer->pipeline() == nullptr) {
             result.ok = false;
             result.error_message = "AppRuntime requires pipeline before run().";
+            log->error("run() aborted: pipeline is not bound.");
             return result;
         }
+        log->info(
+            "Run started (paused={}, fixed_dt={}, max_fixed_steps_per_frame={}, max_frame_delta={})",
+            m_paused,
+            m_config.fixed_delta_seconds,
+            m_config.max_fixed_steps_per_frame,
+            m_config.max_frame_delta_seconds
+        );
 
         const auto default_now = []() -> double {
             using Clock = std::chrono::steady_clock;
@@ -283,6 +317,7 @@ public:
         } catch (const std::exception& e) {
             result.ok = false;
             result.error_message = e.what();
+            log->error("Runtime main loop failed: {}", e.what());
         }
 
         result.fixed_ticks = m_fixed_tick_index;
@@ -293,6 +328,7 @@ public:
                 m_callbacks.on_shutdown(ctx);
             }
         } catch (const std::exception& e) {
+            log->error("Shutdown callback failed: {}", e.what());
             if (result.ok) {
                 result.ok = false;
                 result.error_message = e.what();
@@ -303,12 +339,19 @@ public:
             m_renderer->device().wait_idle();
             m_resources->flush_after_wait_idle();
         } catch (const std::exception& e) {
+            log->error("wait_idle/flush_after_wait_idle failed: {}", e.what());
             if (result.ok) {
                 result.ok = false;
                 result.error_message = e.what();
             }
         }
 
+        log->info(
+            "Run finished (ok={}, frames_rendered={}, fixed_ticks={})",
+            result.ok,
+            result.frames_rendered,
+            result.fixed_ticks
+        );
         return result;
     }
 

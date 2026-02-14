@@ -3,12 +3,20 @@
 #include <utility>
 
 #include "rtr/framework/core/scene.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::framework::integration {
+
+namespace {
+std::shared_ptr<spdlog::logger> logger() {
+    return rtr::utils::get_logger("framework.integration.pbpt.offline_service_stub");
+}
+} // namespace
 
 PbptOfflineRenderService::PbptOfflineRenderService(RenderBackend backend)
     : m_backend(std::move(backend)) {
     set_message("PBPT runtime is disabled in this package build.");
+    logger()->warn("PbptOfflineRenderService stub initialized: PBPT runtime is disabled.");
 }
 
 PbptOfflineRenderService::~PbptOfflineRenderService() {
@@ -25,6 +33,7 @@ bool PbptOfflineRenderService::start(
 ) {
     m_state.store(OfflineRenderState::Failed);
     set_message("PBPT runtime is disabled in this package build.");
+    logger()->warn("Offline render start rejected by stub: PBPT runtime is disabled.");
     return false;
 }
 
@@ -54,6 +63,7 @@ bool PbptOfflineRenderService::is_running() const {
 void PbptOfflineRenderService::run_worker(const OfflineRenderConfig&) {
     m_state.store(OfflineRenderState::Failed);
     set_message("PBPT runtime is disabled in this package build.");
+    logger()->warn("Offline render worker in stub failed: PBPT runtime is disabled.");
 }
 
 void PbptOfflineRenderService::set_message(std::string message) {

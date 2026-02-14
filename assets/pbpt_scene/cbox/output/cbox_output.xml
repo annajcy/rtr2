@@ -10,11 +10,11 @@
     <float name="farClip" value="2800"/>
     <float name="focusDistance" value="1000"/>
     <transform name="toWorld">
-      <matrix value="-1, 0, 0, 278, 0, 1, 0, 273, 0, 0, -1, -800, 0, 0, 0, 1"/>
+      <matrix value="-0.968725801, -0.00714886189, 0.248032257, 278, 0, 0.999584913, 0.0288103484, 273, -0.248135254, 0.0279093161, -0.968323588, -800, 0, 0, 0, 1"/>
     </transform>
     <float name="fov" value="39.3077"/>
     <sampler type="ldsampler">
-      <integer name="sampleCount" value="4"/>
+      <integer name="sampleCount" value="16"/>
     </sampler>
     <film type="hdrfilm">
       <integer name="width" value="512"/>

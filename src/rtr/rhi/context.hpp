@@ -49,6 +49,7 @@ private:
 
 private:
     void create_instance() {
+        auto logger = utils::get_logger("rhi.context");
         m_instance_extensions.insert(
             m_instance_extensions.end(),
             m_create_info.instance_extensions.begin(),
@@ -74,21 +75,31 @@ private:
         );
 
         if (!instance_result.has_value()) {
+            logger->error("Failed to create Vulkan instance.");
             throw std::runtime_error("Failed to create Vulkan instance.");
         }
 
         auto instance_handles = std::move(instance_result.value());
         m_context = std::move(instance_handles.first);
         m_instance = std::move(instance_handles.second);
+        logger->info(
+            "Vulkan instance created (app='{}', validation_layers={})",
+            m_create_info.app_name,
+            m_is_validation_layers_enabled
+        );
     }
 
     void create_surface() {
+        auto logger = utils::get_logger("rhi.context");
         if (!m_create_info.surface_creator) {
+            logger->error("Missing surface factory callback in ContextCreateInfo.");
             throw std::runtime_error("Missing surface factory callback in ContextCreateInfo.");
         }
         if (auto surface_handle = m_create_info.surface_creator(m_instance)) {
             m_surface = vk::raii::SurfaceKHR{m_instance, surface_handle.value()};
+            logger->info("Vulkan surface created.");
         } else {
+            logger->error("Failed to create Vulkan surface.");
             throw std::runtime_error("Failed to create Vulkan surface.");
         }
     }
@@ -96,6 +107,7 @@ private:
     void create_debug_messenger() {
         if (m_is_validation_layers_enabled) {
             m_debug_messenger = rtr::rhi::create_debug_messenger(m_instance);
+            utils::get_logger("rhi.context")->info("Vulkan debug messenger created.");
         }
     }
 

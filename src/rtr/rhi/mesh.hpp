@@ -12,6 +12,7 @@
 #include "buffer.hpp"
 #include "command.hpp"
 #include "device.hpp"
+#include "rtr/utils/log.hpp"
 #include "rtr/utils/obj_types.hpp"
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
@@ -28,6 +29,8 @@ public:
         vk::Buffer dst,
         vk::DeviceSize size
     ) {
+        auto logger = utils::get_logger("rhi.mesh");
+        logger->debug("GPU buffer copy start (bytes={})", static_cast<std::uint64_t>(size));
         CommandPool command_pool(device, vk::CommandPoolCreateFlagBits::eTransient);
         auto cmd = command_pool.create_command_buffer();
 
@@ -40,6 +43,7 @@ public:
         });
 
         device->queue().waitIdle();
+        logger->debug("GPU buffer copy finished (bytes={})", static_cast<std::uint64_t>(size));
     }
 
     static Buffer create_device_local_with_data(
@@ -70,9 +74,18 @@ public:
     }
 
     static Mesh from_cpu_data(Device* device, const utils::ObjMeshData& cpu_data) {
+        auto logger = utils::get_logger("rhi.mesh");
         if (cpu_data.vertices.empty() || cpu_data.indices.empty()) {
+            logger->error("Mesh upload failed: CPU mesh data is empty.");
             throw std::runtime_error("Mesh CPU data is empty and cannot create GPU buffers.");
         }
+        logger->debug(
+            "Uploading mesh to GPU (vertices={}, indices={}, vertex_bytes={}, index_bytes={})",
+            cpu_data.vertices.size(),
+            cpu_data.indices.size(),
+            sizeof(Vertex) * cpu_data.vertices.size(),
+            sizeof(uint32_t) * cpu_data.indices.size()
+        );
 
         auto vertex_buffer = std::make_unique<Buffer>(
             Mesh::create_device_local_with_data(
@@ -91,6 +104,8 @@ public:
                 vk::BufferUsageFlagBits::eIndexBuffer
             )
         );
+
+        logger->debug("Mesh GPU upload completed.");
 
         return Mesh(
             device,

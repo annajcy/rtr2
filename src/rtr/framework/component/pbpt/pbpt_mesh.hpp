@@ -11,6 +11,7 @@
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/pbpt/pbpt_spectrum.hpp"
 #include "rtr/framework/core/game_object.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::framework::component {
 
@@ -25,11 +26,19 @@ inline void validate_pbpt_rgb(
     std::string_view field_name = "rgb"
 ) {
     if (!std::isfinite(rgb.r) || !std::isfinite(rgb.g) || !std::isfinite(rgb.b)) {
+        utils::get_logger("framework.component.pbpt_mesh")->error(
+            "{} validation failed: rgb contains non-finite values.",
+            field_name
+        );
         throw std::invalid_argument(std::string(field_name) + " must be finite.");
     }
     if (rgb.r < 0.0f || rgb.r > 1.0f ||
         rgb.g < 0.0f || rgb.g > 1.0f ||
         rgb.b < 0.0f || rgb.b > 1.0f) {
+        utils::get_logger("framework.component.pbpt_mesh")->error(
+            "{} validation failed: rgb channels out of [0,1].",
+            field_name
+        );
         throw std::invalid_argument(std::string(field_name) + " channels must be in [0, 1].");
     }
 }
@@ -42,16 +51,25 @@ struct PbptDiffuseBsdf {
 
 class PbptMesh final : public Component {
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("framework.component.pbpt_mesh");
+    }
+
     PbptDiffuseBsdf m_diffuse_bsdf{};
 
     const MeshRenderer& require_mesh_renderer() const {
         const auto* go = owner();
         if (go == nullptr) {
+            logger()->error("PbptMesh require_mesh_renderer failed: owner is null.");
             throw std::runtime_error("PbptMesh owner is null.");
         }
 
         const auto* renderer = go->get_component<MeshRenderer>();
         if (renderer == nullptr) {
+            logger()->error(
+                "PbptMesh require_mesh_renderer failed: owner {} missing MeshRenderer.",
+                go->id()
+            );
             throw std::runtime_error("PbptMesh requires MeshRenderer on the same GameObject.");
         }
 
@@ -90,6 +108,7 @@ public:
     const PbptSpectrum& reflectance_spectrum() const {
         const auto* spectrum = std::get_if<PbptSpectrum>(&m_diffuse_bsdf.reflectance);
         if (spectrum == nullptr) {
+            logger()->error("reflectance_spectrum() failed: current reflectance is not spectrum.");
             throw std::logic_error("PbptMesh reflectance is not a spectrum.");
         }
         return *spectrum;
@@ -98,6 +117,7 @@ public:
     const PbptRgb& reflectance_rgb() const {
         const auto* rgb = std::get_if<PbptRgb>(&m_diffuse_bsdf.reflectance);
         if (rgb == nullptr) {
+            logger()->error("reflectance_rgb() failed: current reflectance is not rgb.");
             throw std::logic_error("PbptMesh reflectance is not rgb.");
         }
         return *rgb;
@@ -106,11 +126,13 @@ public:
     void set_reflectance_spectrum(PbptSpectrum points) {
         validate_pbpt_spectrum(points, "PbptMesh.reflectance_spectrum");
         m_diffuse_bsdf.reflectance = std::move(points);
+        logger()->debug("PbptMesh reflectance set to spectrum.");
     }
 
     void set_reflectance_rgb(PbptRgb rgb) {
         validate_pbpt_rgb(rgb, "PbptMesh.reflectance_rgb");
         m_diffuse_bsdf.reflectance = rgb;
+        logger()->debug("PbptMesh reflectance set to rgb.");
     }
 };
 

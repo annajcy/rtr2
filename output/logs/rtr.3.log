@@ -1,0 +1,70 @@
+[2026-02-15 00:48:02.909] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
+[2026-02-15 00:48:02.910] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-15 00:48:03.163] [info] [rhi.context] Vulkan instance created (app='RTR Framework Offline CBox', validation_layers=true)
+[2026-02-15 00:48:03.167] [info] [rhi.context] Vulkan surface created.
+[2026-02-15 00:48:03.167] [info] [rhi.context] Vulkan debug messenger created.
+[2026-02-15 00:48:03.169] [info] [rhi.device] Physical device selected: 'Apple M1 Pro' (queue_family_index=0)
+[2026-02-15 00:48:03.177] [info] [rhi.device] Logical device created.
+[2026-02-15 00:48:03.177] [info] [rhi.device] Graphics queue created.
+[2026-02-15 00:48:03.178] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(1024,1024)
+[2026-02-15 00:48:03.178] [info] [rhi.swapchain] Swapchain created with 3 images.
+[2026-02-15 00:48:03.180] [info] [render.frame_scheduler] FrameScheduler initialized (max_frames_in_flight=2, image_count=3)
+[2026-02-15 00:48:03.204] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_luminaire.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_luminaire.obj'
+[2026-02-15 00:48:03.204] [debug] [resource.manager] Mesh created (handle=1, vertices=4, indices=6)
+[2026-02-15 00:48:03.205] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_floor.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_floor.obj'
+[2026-02-15 00:48:03.205] [debug] [resource.manager] Mesh created (handle=2, vertices=4, indices=6)
+[2026-02-15 00:48:03.205] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_ceiling.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_ceiling.obj'
+[2026-02-15 00:48:03.205] [debug] [resource.manager] Mesh created (handle=3, vertices=8, indices=12)
+[2026-02-15 00:48:03.206] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_back.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_back.obj'
+[2026-02-15 00:48:03.206] [debug] [resource.manager] Mesh created (handle=4, vertices=4, indices=6)
+[2026-02-15 00:48:03.206] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_greenwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_greenwall.obj'
+[2026-02-15 00:48:03.206] [debug] [resource.manager] Mesh created (handle=5, vertices=4, indices=6)
+[2026-02-15 00:48:03.206] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_redwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_redwall.obj'
+[2026-02-15 00:48:03.206] [debug] [resource.manager] Mesh created (handle=6, vertices=4, indices=6)
+[2026-02-15 00:48:03.207] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_smallbox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_smallbox.obj'
+[2026-02-15 00:48:03.207] [debug] [resource.manager] Mesh created (handle=7, vertices=24, indices=36)
+[2026-02-15 00:48:03.207] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_largebox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_largebox.obj'
+[2026-02-15 00:48:03.207] [debug] [resource.manager] Mesh created (handle=8, vertices=24, indices=36)
+[2026-02-15 00:48:03.311] [debug] [resource.manager] Mesh handle=1 triggering first GPU upload.
+[2026-02-15 00:48:03.311] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
+[2026-02-15 00:48:03.311] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
+[2026-02-15 00:48:03.317] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
+[2026-02-15 00:48:03.317] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
+[2026-02-15 00:48:03.318] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
+[2026-02-15 00:48:03.318] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-15 00:48:03.318] [debug] [resource.manager] Mesh handle=3 triggering first GPU upload.
+[2026-02-15 00:48:03.318] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=8, indices=12, vertex_bytes=256, index_bytes=48)
+[2026-02-15 00:48:03.318] [debug] [rhi.mesh] GPU buffer copy start (bytes=256)
+[2026-02-15 00:48:03.318] [debug] [rhi.mesh] GPU buffer copy finished (bytes=256)
+[2026-02-15 00:48:03.319] [debug] [rhi.mesh] GPU buffer copy start (bytes=48)
+[2026-02-15 00:48:03.319] [debug] [rhi.mesh] GPU buffer copy finished (bytes=48)
+[2026-02-15 00:48:03.319] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-15 00:48:03.319] [debug] [resource.manager] Mesh handle=4 triggering first GPU upload.
+[2026-02-15 00:48:03.319] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
+[2026-02-15 00:48:03.319] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
+[2026-02-15 00:48:03.319] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
+[2026-02-15 00:48:03.319] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
+[2026-02-15 00:48:03.320] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
+[2026-02-15 00:48:03.320] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-15 00:48:03.320] [debug] [resource.manager] Mesh handle=5 triggering first GPU upload.
+[2026-02-15 00:48:03.320] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
+[2026-02-15 00:48:03.320] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
+[2026-02-15 00:48:03.320] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
+[2026-02-15 00:48:03.320] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
+[2026-02-15 00:48:03.320] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
+[2026-02-15 00:48:03.320] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-15 00:48:03.320] [debug] [resource.manager] Mesh handle=7 triggering first GPU upload.
+[2026-02-15 00:48:03.320] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=24, indices=36, vertex_bytes=768, index_bytes=144)
+[2026-02-15 00:48:03.320] [debug] [rhi.mesh] GPU buffer copy start (bytes=768)
+[2026-02-15 00:48:03.321] [debug] [rhi.mesh] GPU buffer copy finished (bytes=768)
+[2026-02-15 00:48:03.321] [debug] [rhi.mesh] GPU buffer copy start (bytes=144)
+[2026-02-15 00:48:03.321] [debug] [rhi.mesh] GPU buffer copy finished (bytes=144)
+[2026-02-15 00:48:03.321] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-15 00:48:03.321] [debug] [resource.manager] Mesh handle=8 triggering first GPU upload.
+[2026-02-15 00:48:03.321] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=24, indices=36, vertex_bytes=768, index_bytes=144)
+[2026-02-15 00:48:03.321] [debug] [rhi.mesh] GPU buffer copy start (bytes=768)
+[2026-02-15 00:48:03.322] [debug] [rhi.mesh] GPU buffer copy finished (bytes=768)
+[2026-02-15 00:48:03.322] [debug] [rhi.mesh] GPU buffer copy start (bytes=144)
+[2026-02-15 00:48:03.323] [debug] [rhi.mesh] GPU buffer copy finished (bytes=144)
+[2026-02-15 00:48:03.323] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-15 00:48:54.579] [info] [resource.manager] Flushing GPU caches after wait_idle (live_meshes=8, live_textures=0, retired_meshes=0, retired_textures=0)

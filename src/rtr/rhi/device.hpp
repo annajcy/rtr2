@@ -8,10 +8,11 @@
 #include "vulkan/vulkan_structs.hpp"
 
 #include <functional>
-#include <iostream>
 #include <optional>
 #include <vector>
 #include <algorithm>
+
+#include "rtr/utils/log.hpp"
 
 namespace rtr::rhi {
 
@@ -151,6 +152,7 @@ public:
     }
     
     std::optional<Selection> select() const {
+        auto logger = utils::get_logger("rhi.device");
         vk::raii::PhysicalDevices devices(m_instance);
         for (const auto& device : devices) {
             if (check_device(device)) {
@@ -158,6 +160,11 @@ public:
                 if (queue_idx) {
                     return Selection{ device, *queue_idx };
                 }
+                const std::string device_name = device.getProperties().deviceName.data();
+                logger->debug(
+                    "Device '{}' rejected: no compatible queue family for required flags.",
+                    device_name
+                );
             }
         }
         return std::nullopt;
@@ -165,16 +172,19 @@ public:
 
 private:
     bool check_device(const vk::raii::PhysicalDevice& device) const {
+        auto logger = utils::get_logger("rhi.device");
         auto properties = device.getProperties();
+        const std::string device_name = properties.deviceName.data();
         
         // Check api version
         if (properties.apiVersion < m_required_api_version) {
-            std::cout << "Device " << properties.deviceName << " API version too low." << std::endl;
+            logger->debug("Device '{}' rejected: API version too low.", device_name);
             return false;
         }
 
         // Check gpu type
         if (m_required_type && properties.deviceType != *m_required_type) {
+            logger->debug("Device '{}' rejected: GPU type does not match requirement.", device_name);
             return false;
         }
 
@@ -186,18 +196,24 @@ private:
                     return req == ext.extensionName;
                 });
                 if (!found) {
-                    std::cout << "Device " << properties.deviceName << " missing extension: " << req << std::endl;
+                    logger->debug("Device '{}' rejected: missing extension '{}'.", device_name, req);
                     return false;
                 }
             }
         }
 
         for (const auto& checker : m_feature_checkers) {
-            if (!checker(device)) return false;
+            if (!checker(device)) {
+                logger->debug("Device '{}' rejected: required feature chain not supported.", device_name);
+                return false;
+            }
         }
 
         for (const auto& checker : m_custom_checkers) {
-            if (!checker(device)) return false;
+            if (!checker(device)) {
+                logger->debug("Device '{}' rejected: custom checker failed.", device_name);
+                return false;
+            }
         }
 
         return true;
@@ -317,6 +333,7 @@ private:
 
 private:
     void select_physical_device(const vk::raii::Instance& instance, const vk::raii::SurfaceKHR& surface) {
+        auto logger = utils::get_logger("rhi.device");
         PhysicalDeviceSelector selector(instance);
         auto result = selector
             .set_surface(surface)
@@ -335,13 +352,20 @@ private:
         if (result) {
             m_physical_device = std::move(result->physical_device);
             m_queue_family_index = result->queue_family_index;
-            std::cout << "Physical device selected: " << m_physical_device.getProperties().deviceName << std::endl;
+            const std::string device_name = m_physical_device.getProperties().deviceName.data();
+            logger->info(
+                "Physical device selected: '{}' (queue_family_index={})",
+                device_name,
+                m_queue_family_index
+            );
         } else {
+            logger->error("Failed to find suitable physical device.");
             throw std::runtime_error("Failed to find suitable physical device");
         }
     }
 
     void create_logical_device() {
+        auto logger = utils::get_logger("rhi.device");
         auto device_result = make_device(
             m_physical_device,
             m_device_extensions,
@@ -350,10 +374,12 @@ private:
         );
 
         if (!device_result.has_value()) {
+            logger->error("Failed to create logical device.");
             throw std::runtime_error("Failed to create logical device.");
         }
 
         m_device = std::move(device_result.value());
+        logger->info("Logical device created.");
     }
 
     void create_queue() {
@@ -365,6 +391,7 @@ public:
         select_physical_device(context->instance(), context->surface());
         create_logical_device();
         create_queue();
+        utils::get_logger("rhi.device")->info("Graphics queue created.");
     }
 
     const vk::raii::PhysicalDevice& physical_device() const { return m_physical_device; }

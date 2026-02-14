@@ -12,8 +12,15 @@
 
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_scene_export_builder.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::framework::integration {
+
+namespace {
+std::shared_ptr<spdlog::logger> logger() {
+    return rtr::utils::get_logger("framework.integration.pbpt.offline_service");
+}
+} // namespace
 
 PbptOfflineRenderService::PbptOfflineRenderService(RenderBackend backend)
     : m_backend(std::move(backend)) {
@@ -36,6 +43,7 @@ PbptOfflineRenderService::PbptOfflineRenderService(RenderBackend backend)
     }
 
     set_message("Idle.");
+    logger()->info("PbptOfflineRenderService initialized.");
 }
 
 PbptOfflineRenderService::~PbptOfflineRenderService() {
@@ -50,32 +58,50 @@ bool PbptOfflineRenderService::start(
     resource::ResourceManager& resources,
     const OfflineRenderConfig& config
 ) {
+    auto log = logger();
     std::scoped_lock lifecycle_lock(m_lifecycle_mutex);
+    log->info(
+        "Offline render start requested (scene_xml='{}', output_exr='{}', spp={}, film_override={}x{}).",
+        config.scene_xml_path,
+        config.output_exr_path,
+        config.spp,
+        config.film_width,
+        config.film_height
+    );
 
     if (is_running()) {
         set_message("Render already running.");
+        log->warn("Offline render start rejected: render is already running.");
         return false;
     }
 
     if (config.scene_xml_path.empty()) {
         m_state.store(OfflineRenderState::Failed);
         set_message("scene_xml_path must not be empty.");
+        log->error("Offline render start failed: scene_xml_path is empty.");
         return false;
     }
     if (config.output_exr_path.empty()) {
         m_state.store(OfflineRenderState::Failed);
         set_message("output_exr_path must not be empty.");
+        log->error("Offline render start failed: output_exr_path is empty.");
         return false;
     }
     if (config.spp < 1) {
         m_state.store(OfflineRenderState::Failed);
         set_message("spp must be >= 1.");
+        log->error("Offline render start failed: spp={} is invalid.", config.spp);
         return false;
     }
     if ((config.film_width > 0 && config.film_height <= 0) ||
         (config.film_height > 0 && config.film_width <= 0)) {
         m_state.store(OfflineRenderState::Failed);
         set_message("film_width and film_height must both be > 0 when overriding film size.");
+        log->error(
+            "Offline render start failed: invalid film override width={} height={}.",
+            config.film_width,
+            config.film_height
+        );
         return false;
     }
 
@@ -127,17 +153,20 @@ bool PbptOfflineRenderService::start(
 
         std::ofstream out(scene_xml_path);
         if (!out) {
+            log->error("Failed to open scene XML path for writing: '{}'.", config.scene_xml_path);
             throw std::runtime_error(
                 "Failed to open scene XML path for writing: " + config.scene_xml_path
             );
         }
         out << scene_xml;
         if (!out.good()) {
+            log->error("Failed to write scene XML to '{}'.", config.scene_xml_path);
             throw std::runtime_error("Failed to write scene XML to: " + config.scene_xml_path);
         }
     } catch (const std::exception& e) {
         m_state.store(OfflineRenderState::Failed);
         set_message(e.what());
+        log->error("Offline render scene snapshot/export failed: {}", e.what());
         return false;
     }
 
@@ -145,11 +174,13 @@ bool PbptOfflineRenderService::start(
     m_progress_01.store(0.0f);
     m_state.store(OfflineRenderState::Running);
     set_message("Scene snapshot saved to XML: " + config.scene_xml_path);
+    log->info("Scene snapshot exported to '{}'.", config.scene_xml_path);
 
     const OfflineRenderConfig worker_config = config;
     m_worker = std::thread([this, worker_config]() {
         run_worker(worker_config);
     });
+    log->info("Offline render worker thread launched.");
 
     return true;
 }
@@ -158,6 +189,9 @@ void PbptOfflineRenderService::request_cancel() {
     m_cancel_requested.store(true);
     if (is_running()) {
         set_message("Cancel requested.");
+        logger()->warn("Offline render cancel requested.");
+    } else {
+        logger()->info("Offline render cancel requested while not running.");
     }
 }
 
@@ -181,6 +215,7 @@ bool PbptOfflineRenderService::is_running() const {
 }
 
 void PbptOfflineRenderService::run_worker(const OfflineRenderConfig& config) {
+    auto log = logger();
     try {
         m_backend(
             config,
@@ -195,12 +230,15 @@ void PbptOfflineRenderService::run_worker(const OfflineRenderConfig& config) {
         m_progress_01.store(1.0f);
         m_state.store(OfflineRenderState::Succeeded);
         set_message("Render succeeded: " + config.output_exr_path);
+        log->info("Offline render succeeded (output_exr='{}').", config.output_exr_path);
     } catch (const RenderCanceled&) {
         m_state.store(OfflineRenderState::Canceled);
         set_message("Render canceled.");
+        log->warn("Offline render canceled.");
     } catch (const std::exception& e) {
         m_state.store(OfflineRenderState::Failed);
         set_message(e.what());
+        log->error("Offline render worker failed: {}", e.what());
     }
 }
 

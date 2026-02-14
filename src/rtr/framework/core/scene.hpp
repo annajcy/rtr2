@@ -12,11 +12,16 @@
 #include "rtr/framework/core/scene_graph.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/types.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::framework::core {
 
 class Scene {
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("framework.core.scene");
+    }
+
     SceneId m_id{core::kInvalidSceneId};
     std::string m_name{"Scene"};
     bool m_enabled{true};
@@ -56,6 +61,7 @@ public:
 
     void set_enabled(bool enabled) {
         m_enabled = enabled;
+        logger()->info("Scene {} enabled set to {}.", m_id, m_enabled);
     }
 
     GameObject& create_game_object(std::string name = "GameObject") {
@@ -64,6 +70,13 @@ public:
         ptr->bind_scene_graph(&m_scene_graph);
         m_scene_graph.register_node(ptr->id());
         m_game_objects.emplace_back(std::move(game_object));
+        logger()->debug(
+            "GameObject created (scene_id={}, game_object_id={}, name='{}', count={})",
+            m_id,
+            ptr->id(),
+            ptr->name(),
+            m_game_objects.size()
+        );
         return *ptr;
     }
 
@@ -91,10 +104,12 @@ public:
 
     bool destroy_game_object(GameObjectId id) {
         if (!m_scene_graph.has_node(id)) {
+            logger()->warn("destroy_game_object ignored: node {} does not exist in Scene {}.", id, m_id);
             return false;
         }
         const auto subtree_ids = m_scene_graph.collect_subtree_postorder(id);
         if (subtree_ids.empty()) {
+            logger()->warn("destroy_game_object ignored: subtree for node {} is empty in Scene {}.", id, m_id);
             return false;
         }
 
@@ -122,7 +137,16 @@ public:
             }
         }
 
-        return m_scene_graph.unregister_subtree(id);
+        const bool unregistered = m_scene_graph.unregister_subtree(id);
+        logger()->info(
+            "GameObject subtree destroyed (scene_id={}, root_game_object_id={}, removed_count={}, success={}, remaining={})",
+            m_id,
+            id,
+            subtree_ids.size(),
+            unregistered,
+            m_game_objects.size()
+        );
+        return unregistered;
     }
 
     std::size_t game_object_count() const {
@@ -146,7 +170,17 @@ public:
     }
 
     bool set_active_camera(GameObjectId camera_owner_id) {
-        return m_camera_manager.set_active_camera(camera_owner_id);
+        const bool success = m_camera_manager.set_active_camera(camera_owner_id);
+        if (success) {
+            logger()->info("Scene {} active camera set to owner {}.", m_id, camera_owner_id);
+        } else {
+            logger()->warn(
+                "Scene {} failed to set active camera to owner {} (camera not found).",
+                m_id,
+                camera_owner_id
+            );
+        }
+        return success;
     }
 
     const std::vector<std::unique_ptr<GameObject>>& game_objects() const {

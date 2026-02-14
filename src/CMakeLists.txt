@@ -11,6 +11,7 @@ target_link_libraries(rtr INTERFACE
     stb_impl 
     glfw 
     Vulkan::Loader 
+    spdlog::spdlog
   TinyGLTF::TinyGLTF
     slang::slang
     glm::glm

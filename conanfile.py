@@ -69,6 +69,7 @@ class RTRConan(ConanFile):
         self.requires("tinygltf/[>=2.8 <3]")
         self.requires("imgui/1.92.2b-docking")
         self.requires("stb/cci.20240531", override=True)
+        self.requires("spdlog/[>=1.13 <2]")
         self.requires("vulkan-loader/[>=1.3]")
         self.requires("glm/cci.20230113")
         self.requires("tinyobjloader/2.0.0-rc10")
@@ -127,6 +128,7 @@ class RTRConan(ConanFile):
         core_component.requires = [
             "imgui_vk",
             "stb_impl",
+            "spdlog::spdlog",
             "TinyGLTF::TinyGLTF",
             "slang::slang",
             "glm::glm",
