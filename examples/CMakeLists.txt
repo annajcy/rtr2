@@ -1,20 +1,8 @@
-add_executable(main main.cpp)
-target_link_libraries(main PRIVATE rtr)
-
-add_executable(framework_scene_main framework_scene_main.cpp)
-target_link_libraries(framework_scene_main PRIVATE rtr)
-
-add_executable(framework_trackball_scene_main framework_trackball_scene_main.cpp)
-target_link_libraries(framework_trackball_scene_main PRIVATE rtr)
-
-add_executable(third_party third_party.cpp)
-target_link_libraries(third_party PRIVATE rtr)
+add_executable(framework_quickstart_main framework_quickstart_main.cpp)
+target_link_libraries(framework_quickstart_main PRIVATE rtr)
 
 add_executable(shadertoy_main shadertoy_main.cpp)
 target_link_libraries(shadertoy_main PRIVATE rtr)
-
-add_executable(compute_buffer_add_main compute_buffer_add_main.cpp)
-target_link_libraries(compute_buffer_add_main PRIVATE rtr)
 
 add_executable(pbpt_cbox_roundtrip_main pbpt_cbox_roundtrip_main.cpp)
 target_link_libraries(pbpt_cbox_roundtrip_main PRIVATE rtr)
