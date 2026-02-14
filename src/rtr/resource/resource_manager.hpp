@@ -28,15 +28,11 @@ public:
 
 private:
     struct MeshRecord {
-        bool alive{true};
-        bool cpu_loaded{true};
         utils::ObjMeshData cpu{};
         std::unique_ptr<system::render::Mesh> gpu{};
     };
 
     struct TextureRecord {
-        bool alive{true};
-        bool cpu_loaded{true};
         utils::ImageData cpu{};
         bool use_srgb{true};
         std::unique_ptr<rhi::Image> gpu{};
@@ -92,8 +88,6 @@ public:
 
         const MeshHandle handle{m_next_mesh_id++};
         m_mesh_records.emplace(handle, MeshRecord{
-            .alive = true,
-            .cpu_loaded = true,
             .cpu = std::move(cpu),
             .gpu = nullptr
         });
@@ -106,8 +100,6 @@ public:
 
         const TextureHandle handle{m_next_texture_id++};
         m_texture_records.emplace(handle, TextureRecord{
-            .alive = true,
-            .cpu_loaded = true,
             .cpu = std::move(cpu),
             .use_srgb = use_srgb,
             .gpu = nullptr
@@ -143,28 +135,24 @@ public:
 
     void unload_mesh(MeshHandle handle) {
         auto it = m_mesh_records.find(handle);
-        if (it == m_mesh_records.end() || !it->second.alive) {
+        if (it == m_mesh_records.end()) {
             return;
         }
 
         MeshRecord& record = it->second;
-        record.alive = false;
-        record.cpu_loaded = false;
-        record.cpu = {};
         retire_mesh_gpu(record);
+        m_mesh_records.erase(it);
     }
 
     void unload_texture(TextureHandle handle) {
         auto it = m_texture_records.find(handle);
-        if (it == m_texture_records.end() || !it->second.alive) {
+        if (it == m_texture_records.end()) {
             return;
         }
 
         TextureRecord& record = it->second;
-        record.alive = false;
-        record.cpu_loaded = false;
-        record.cpu = {};
         retire_texture_gpu(record);
+        m_texture_records.erase(it);
     }
 
     const utils::ObjMeshData& mesh_cpu(MeshHandle handle) {
@@ -181,12 +169,12 @@ public:
 
     bool mesh_alive(MeshHandle handle) const {
         const auto it = m_mesh_records.find(handle);
-        return it != m_mesh_records.end() && it->second.alive;
+        return it != m_mesh_records.end();
     }
 
     bool texture_alive(TextureHandle handle) const {
         const auto it = m_texture_records.find(handle);
-        return it != m_texture_records.end() && it->second.alive;
+        return it != m_texture_records.end();
     }
 
     system::render::Mesh& require_mesh_rhi(MeshHandle handle, rhi::Device* device) {
@@ -339,13 +327,13 @@ private:
     }
 
     void ensure_mesh_cpu_loaded(const MeshRecord& record) const {
-        if (!record.cpu_loaded || record.cpu.vertices.empty() || record.cpu.indices.empty()) {
+        if (record.cpu.vertices.empty() || record.cpu.indices.empty()) {
             throw std::runtime_error("Mesh CPU data is missing for live handle.");
         }
     }
 
     void ensure_texture_cpu_loaded(const TextureRecord& record) const {
-        if (!record.cpu_loaded || record.cpu.pixels.empty()) {
+        if (record.cpu.pixels.empty()) {
             throw std::runtime_error("Texture CPU data is missing for live handle.");
         }
     }
@@ -374,7 +362,7 @@ private:
 
     MeshRecord& require_mesh_record(MeshHandle handle) {
         const auto it = m_mesh_records.find(handle);
-        if (it == m_mesh_records.end() || !it->second.alive) {
+        if (it == m_mesh_records.end()) {
             throw std::runtime_error("Mesh handle is invalid or unloaded.");
         }
         return it->second;
@@ -382,7 +370,7 @@ private:
 
     TextureRecord& require_texture_record(TextureHandle handle) {
         const auto it = m_texture_records.find(handle);
-        if (it == m_texture_records.end() || !it->second.alive) {
+        if (it == m_texture_records.end()) {
             throw std::runtime_error("Texture handle is invalid or unloaded.");
         }
         return it->second;
