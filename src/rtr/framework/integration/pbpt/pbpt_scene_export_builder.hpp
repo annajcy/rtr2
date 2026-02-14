@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <iomanip>
 #include <optional>
 #include <sstream>
@@ -18,6 +19,8 @@
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
+#include "rtr/resource/resource_manager.hpp"
+#include "rtr/utils/obj_io.hpp"
 
 namespace rtr::framework::integration {
 
@@ -40,7 +43,7 @@ struct PbptSensorRecord {
 
 struct PbptShapeRecord {
     std::string object_name{};
-    std::string mesh_path{};
+    resource::MeshHandle mesh_handle{};
     glm::mat4 model{1.0f};
     component::PbptSpectrum reflectance_spectrum{
         component::make_constant_pbpt_spectrum(0.7f)
@@ -94,9 +97,37 @@ inline std::string serialize_matrix_row_major(const glm::mat4& matrix) {
     return oss.str();
 }
 
+inline std::filesystem::path resolve_meshes_output_dir(const std::string& scene_xml_path) {
+    if (scene_xml_path.empty()) {
+        throw std::invalid_argument("scene_xml_path must not be empty.");
+    }
+
+    const auto abs_xml = std::filesystem::absolute(std::filesystem::path(scene_xml_path));
+    const auto xml_parent = abs_xml.parent_path();
+    if (xml_parent.empty()) {
+        throw std::runtime_error("scene_xml_path must have a parent directory.");
+    }
+    return xml_parent / "meshes";
+}
+
+inline std::string mesh_file_name(resource::MeshHandle handle) {
+    return "mesh_" + std::to_string(handle.value) + ".obj";
+}
+
+inline std::filesystem::path make_mesh_relative_xml_path(resource::MeshHandle handle) {
+    const std::filesystem::path rel = std::filesystem::path("meshes") / mesh_file_name(handle);
+    if (rel.parent_path() != std::filesystem::path("meshes") || rel.extension() != ".obj") {
+        throw std::runtime_error("PBPT mesh XML path contract violation.");
+    }
+    return rel;
+}
+
 } // namespace detail
 
-inline PbptSceneRecord build_pbpt_scene_record(const core::Scene& scene) {
+inline PbptSceneRecord build_pbpt_scene_record(
+    const core::Scene& scene,
+    resource::ResourceManager& resources
+) {
     PbptSceneRecord record{};
     record.integrator = PbptIntegratorRecord{};
 
@@ -136,9 +167,9 @@ inline PbptSceneRecord build_pbpt_scene_record(const core::Scene& scene) {
             continue;
         }
 
-        const std::string& mesh_path = pbpt_mesh->mesh_path();
-        if (mesh_path.empty()) {
-            throw std::runtime_error("Pbpt export requires non-empty mesh_path.");
+        const resource::MeshHandle mesh_handle = pbpt_mesh->mesh_handle();
+        if (!mesh_handle.is_valid() || !resources.mesh_alive(mesh_handle)) {
+            throw std::runtime_error("Pbpt export requires valid and alive mesh handle.");
         }
 
         const component::PbptSpectrum& reflectance = pbpt_mesh->reflectance_spectrum();
@@ -158,7 +189,7 @@ inline PbptSceneRecord build_pbpt_scene_record(const core::Scene& scene) {
 
         record.shapes.emplace_back(PbptShapeRecord{
             .object_name = std::move(object_name),
-            .mesh_path = mesh_path,
+            .mesh_handle = mesh_handle,
             .model = scene.scene_graph().node(id).world_matrix(),
             .reflectance_spectrum = reflectance,
             .has_area_emitter = pbpt_light != nullptr && pbpt_light->enabled(),
@@ -173,7 +204,11 @@ inline PbptSceneRecord build_pbpt_scene_record(const core::Scene& scene) {
     return record;
 }
 
-inline std::string serialize_pbpt_scene_xml(const PbptSceneRecord& record) {
+inline std::string serialize_pbpt_scene_xml(
+    const PbptSceneRecord& record,
+    resource::ResourceManager& resources,
+    const std::string& scene_xml_path
+) {
     struct MaterialEntry {
         std::string id{};
         component::PbptSpectrum reflectance_spectrum{
@@ -198,6 +233,27 @@ inline std::string serialize_pbpt_scene_xml(const PbptSceneRecord& record) {
             .id = id,
             .reflectance_spectrum = shape.reflectance_spectrum
         });
+    }
+
+    const std::filesystem::path mesh_output_dir = detail::resolve_meshes_output_dir(scene_xml_path);
+    std::filesystem::create_directories(mesh_output_dir);
+
+    std::unordered_map<resource::MeshHandle, std::string> mesh_relative_path_by_handle{};
+    for (const auto& shape : record.shapes) {
+        if (!shape.mesh_handle.is_valid() || !resources.mesh_alive(shape.mesh_handle)) {
+            throw std::runtime_error("Pbpt export requires valid and alive mesh handle.");
+        }
+
+        if (mesh_relative_path_by_handle.contains(shape.mesh_handle)) {
+            continue;
+        }
+
+        const std::string filename = detail::mesh_file_name(shape.mesh_handle);
+        const std::filesystem::path abs_mesh_path = mesh_output_dir / filename;
+        const std::filesystem::path rel_mesh_path = detail::make_mesh_relative_xml_path(shape.mesh_handle);
+
+        utils::write_obj_to_path(resources.mesh_cpu(shape.mesh_handle), abs_mesh_path.string());
+        mesh_relative_path_by_handle.emplace(shape.mesh_handle, rel_mesh_path.generic_string());
     }
 
     std::ostringstream xml;
@@ -255,18 +311,19 @@ inline std::string serialize_pbpt_scene_xml(const PbptSceneRecord& record) {
     }
 
     for (const auto& shape : record.shapes) {
-        if (shape.mesh_path.empty()) {
-            throw std::runtime_error("Pbpt export requires non-empty mesh_path.");
+        if (!shape.mesh_handle.is_valid()) {
+            throw std::runtime_error("Pbpt export requires valid mesh_handle.");
         }
 
         const std::string key = detail::spectrum_key(shape.reflectance_spectrum);
         const std::string& material_id = material_ids.at(key);
+        const std::string& mesh_rel_path = mesh_relative_path_by_handle.at(shape.mesh_handle);
 
         xml << "  <shape type=\"obj\" id=\""
             << detail::escape_xml(shape.object_name)
             << "\">\n";
         xml << "    <string name=\"filename\" value=\""
-            << detail::escape_xml(shape.mesh_path)
+            << detail::escape_xml(mesh_rel_path)
             << "\"/>\n";
         xml << "    <transform name=\"toWorld\">\n";
         xml << "      <matrix value=\""

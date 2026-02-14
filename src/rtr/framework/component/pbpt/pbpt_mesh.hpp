@@ -42,8 +42,8 @@ public:
         return require_mesh_renderer();
     }
 
-    const std::string& mesh_path() const {
-        return require_mesh_renderer().mesh_path();
+    resource::MeshHandle mesh_handle() const {
+        return require_mesh_renderer().mesh_handle();
     }
 
     const PbptDiffuseBsdf& diffuse_bsdf() const {

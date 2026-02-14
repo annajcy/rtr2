@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <glm/ext/matrix_transform.hpp>
@@ -25,12 +26,12 @@
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_scene_export_builder.hpp"
+#include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/input/input_state.hpp"
 
 namespace rtr::framework::integration {
 
 struct PbptImportOptions {
-    bool resolve_mesh_to_absolute{true};
     bool require_supported_cbox_subset{true};
     // When set, importer attaches FreeLookCameraController to the imported active camera.
     const system::input::InputState* free_look_input_state{nullptr};
@@ -43,6 +44,21 @@ struct PbptImportResult {
     std::optional<PbptIntegratorRecord> integrator{};
     std::optional<PbptSensorRecord> sensor{};
 };
+
+struct PbptSceneLocation {
+    std::string scene_root_rel_to_resource_dir{};
+    std::string xml_filename{};
+};
+
+inline PbptSceneLocation make_pbpt_scene_location(
+    std::string scene_root_rel_to_resource_dir,
+    std::string xml_filename
+) {
+    return PbptSceneLocation{
+        .scene_root_rel_to_resource_dir = std::move(scene_root_rel_to_resource_dir),
+        .xml_filename = std::move(xml_filename)
+    };
+}
 
 namespace detail {
 
@@ -332,19 +348,57 @@ inline void register_imported_game_object(
     }
 }
 
+inline void validate_scene_location(const PbptSceneLocation& location) {
+    if (location.xml_filename.empty()) {
+        throw std::invalid_argument("xml_filename must not be empty.");
+    }
+
+    const std::filesystem::path xml_filename_path(location.xml_filename);
+    if (xml_filename_path.is_absolute() || xml_filename_path.has_parent_path()) {
+        throw std::invalid_argument("xml_filename must be a filename without path separator.");
+    }
+}
+
+inline std::filesystem::path validate_and_normalize_mesh_path(
+    const std::filesystem::path& mesh_path
+) {
+    if (mesh_path.empty()) {
+        throw std::runtime_error("obj filename must not be empty.");
+    }
+    if (mesh_path.is_absolute()) {
+        throw std::runtime_error("obj filename must be a relative path under meshes/.");
+    }
+
+    const std::filesystem::path normalized = mesh_path.lexically_normal();
+    if (normalized.empty()) {
+        throw std::runtime_error("obj filename must not be empty.");
+    }
+    for (const auto& part : normalized) {
+        if (part == "..") {
+            throw std::runtime_error("obj filename must not use parent directory traversal.");
+        }
+    }
+
+    auto it = normalized.begin();
+    if (it == normalized.end() || *it != "meshes") {
+        throw std::runtime_error("obj filename must resolve under meshes/ directory.");
+    }
+
+    return normalized;
+}
+
 } // namespace detail
 
 inline PbptImportResult import_pbpt_scene_xml_to_scene(
-    const std::string& xml_path,
+    const PbptSceneLocation& location,
     core::Scene& scene,
+    resource::ResourceManager& resources,
     const PbptImportOptions& options = {}
 ) {
-    if (xml_path.empty()) {
-        throw std::invalid_argument("xml_path must not be empty.");
-    }
-
+    detail::validate_scene_location(location);
+    const std::filesystem::path xml_abs_path = resources.resource_root_dir() / location.scene_root_rel_to_resource_dir / location.xml_filename;
     pugi::xml_document doc;
-    const pugi::xml_parse_result parse_result = doc.load_file(xml_path.c_str());
+    const pugi::xml_parse_result parse_result = doc.load_file(xml_abs_path.string().c_str());
     if (!parse_result) {
         throw std::runtime_error(std::string("XML load error: ") + parse_result.description());
     }
@@ -356,9 +410,6 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
 
     PbptImportResult result{};
     std::unordered_map<std::string, component::PbptSpectrum> reflectance_by_bsdf_id{};
-
-    const std::filesystem::path input_path = std::filesystem::absolute(std::filesystem::path(xml_path));
-    const std::filesystem::path base_dir = input_path.parent_path();
 
     for (const auto& bsdf_node : root.children("bsdf")) {
         const std::string type = bsdf_node.attribute("type").value();
@@ -487,13 +538,8 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
             throw std::runtime_error("obj shape is missing filename property.");
         }
 
-        std::filesystem::path mesh_path = filename_node.attribute("value").value();
-        if (mesh_path.empty()) {
-            throw std::runtime_error("obj filename must not be empty.");
-        }
-        if (options.resolve_mesh_to_absolute && mesh_path.is_relative()) {
-            mesh_path = (base_dir / mesh_path).lexically_normal();
-        }
+        std::filesystem::path mesh_path =
+            detail::validate_and_normalize_mesh_path(filename_node.attribute("value").value());
 
         const auto ref_node = shape_node.child("ref");
         if (!ref_node) {
@@ -514,7 +560,12 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
             detail::default_object_name(shape_node, mesh_path, shape_index)
         );
         detail::register_imported_game_object(result, go.name(), go.id());
-        (void)go.add_component<component::MeshRenderer>(mesh_path.string(), "");
+        const auto mesh_rel_to_resource_root =
+            (std::filesystem::path(location.scene_root_rel_to_resource_dir) / mesh_path).lexically_normal();
+        const resource::MeshHandle mesh_handle =
+            resources.create_mesh_from_obj_relative_path(mesh_rel_to_resource_root.generic_string());
+        const auto albedo_handle = resources.default_checkerboard_texture();
+        (void)go.add_component<component::MeshRenderer>(mesh_handle, albedo_handle);
         auto& pbpt_mesh = go.add_component<component::PbptMesh>();
         pbpt_mesh.set_reflectance_spectrum(reflectance_by_bsdf_id.at(bsdf_id));
         go.node().set_local_model_matrix(model);

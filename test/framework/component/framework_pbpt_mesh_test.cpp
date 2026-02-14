@@ -22,28 +22,28 @@ TEST(FrameworkPbptMeshTest, ThrowsWhenMeshRendererIsMissing) {
 TEST(FrameworkPbptMeshTest, CanAttachWhenMeshRendererExists) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>("assets/models/spot.obj", "");
+    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
     EXPECT_EQ(&pbpt_mesh.mesh_renderer(), &renderer);
-    EXPECT_EQ(pbpt_mesh.mesh_path(), "assets/models/spot.obj");
+    EXPECT_EQ(pbpt_mesh.mesh_handle(), resource::MeshHandle{10});
 }
 
-TEST(FrameworkPbptMeshTest, MeshPathTracksMeshRendererUpdates) {
+TEST(FrameworkPbptMeshTest, MeshHandleTracksMeshRendererUpdates) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>("assets/models/spot.obj", "");
+    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
-    EXPECT_EQ(pbpt_mesh.mesh_path(), "assets/models/spot.obj");
-    renderer.set_mesh_path("assets/models/stanford_bunny.obj");
-    EXPECT_EQ(pbpt_mesh.mesh_path(), "assets/models/stanford_bunny.obj");
+    EXPECT_EQ(pbpt_mesh.mesh_handle(), resource::MeshHandle{10});
+    renderer.set_mesh_handle(resource::MeshHandle{30});
+    EXPECT_EQ(pbpt_mesh.mesh_handle(), resource::MeshHandle{30});
 }
 
 TEST(FrameworkPbptMeshTest, ReflectanceSpectrumSetAndReadBack) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("mesh");
-    (void)go.add_component<MeshRenderer>("assets/models/spot.obj", "");
+    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
     const PbptSpectrum spectrum{
@@ -64,7 +64,7 @@ TEST(FrameworkPbptMeshTest, ReflectanceSpectrumSetAndReadBack) {
 TEST(FrameworkPbptMeshTest, ReflectanceSpectrumValidationThrowsForInvalidData) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("mesh");
-    (void)go.add_component<MeshRenderer>("assets/models/spot.obj", "");
+    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
     EXPECT_THROW(

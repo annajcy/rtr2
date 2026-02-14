@@ -14,6 +14,7 @@
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
+#include "rtr/resource/resource_manager.hpp"
 
 namespace rtr::framework::integration::testing {
 
@@ -38,6 +39,26 @@ struct TempDir {
     }
 };
 
+std::filesystem::path repo_assets_dir() {
+    return std::filesystem::path(__FILE__)
+               .parent_path()
+               .parent_path()
+               .parent_path()
+               .parent_path() /
+           "assets";
+}
+
+resource::MeshHandle create_test_mesh(resource::ResourceManager& resources) {
+    utils::ObjMeshData mesh{};
+    mesh.vertices = {
+        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
+    };
+    mesh.indices = {0, 1, 2};
+    return resources.create_mesh(std::move(mesh));
+}
+
 void setup_scene_with_camera(core::Scene& scene) {
     auto& camera_go = scene.create_game_object("camera");
     auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
@@ -46,11 +67,11 @@ void setup_scene_with_camera(core::Scene& scene) {
     scene.scene_graph().update_world_transforms();
 }
 
-void add_minimal_pbpt_emitter_shape(core::Scene& scene) {
+void add_minimal_pbpt_emitter_shape(core::Scene& scene, resource::ResourceManager& resources) {
     auto& go = scene.create_game_object("pbpt_test_shape");
     (void)go.add_component<component::MeshRenderer>(
-        "assets/models/colored_quad.obj",
-        "assets/textures/default_checkerboard_512.png"
+        create_test_mesh(resources),
+        resources.default_checkerboard_texture()
     );
     (void)go.add_component<component::PbptMesh>();
     (void)go.add_component<component::PbptLight>();
@@ -75,8 +96,9 @@ bool wait_for_terminal_state(
 
 TEST(PbptOfflineRenderServiceTest, StartTransitionsToRunningAndThenSucceeded) {
     core::Scene scene(1, "offline_service_scene");
+    resource::ResourceManager resources(2, repo_assets_dir());
     setup_scene_with_camera(scene);
-    add_minimal_pbpt_emitter_shape(scene);
+    add_minimal_pbpt_emitter_shape(scene, resources);
 
     TempDir temp_dir("rtr_pbpt_offline_success");
     const auto scene_xml = (temp_dir.path / "runtime_scene.xml").string();
@@ -103,7 +125,7 @@ TEST(PbptOfflineRenderServiceTest, StartTransitionsToRunningAndThenSucceeded) {
         }
     );
 
-    ASSERT_TRUE(service.start(scene, OfflineRenderConfig{
+    ASSERT_TRUE(service.start(scene, resources, OfflineRenderConfig{
         .scene_xml_path = scene_xml,
         .output_exr_path = output_exr,
         .spp = 8
@@ -123,8 +145,9 @@ TEST(PbptOfflineRenderServiceTest, StartTransitionsToRunningAndThenSucceeded) {
 
 TEST(PbptOfflineRenderServiceTest, RequestCancelTransitionsToCanceled) {
     core::Scene scene(1, "offline_service_scene");
+    resource::ResourceManager resources(2, repo_assets_dir());
     setup_scene_with_camera(scene);
-    add_minimal_pbpt_emitter_shape(scene);
+    add_minimal_pbpt_emitter_shape(scene, resources);
 
     TempDir temp_dir("rtr_pbpt_offline_cancel");
     const auto scene_xml = (temp_dir.path / "runtime_scene.xml").string();
@@ -150,7 +173,7 @@ TEST(PbptOfflineRenderServiceTest, RequestCancelTransitionsToCanceled) {
         }
     );
 
-    ASSERT_TRUE(service.start(scene, OfflineRenderConfig{
+    ASSERT_TRUE(service.start(scene, resources, OfflineRenderConfig{
         .scene_xml_path = scene_xml,
         .output_exr_path = output_exr,
         .spp = 4
@@ -165,8 +188,9 @@ TEST(PbptOfflineRenderServiceTest, RequestCancelTransitionsToCanceled) {
 
 TEST(PbptOfflineRenderServiceTest, BackendFailureTransitionsToFailed) {
     core::Scene scene(1, "offline_service_scene");
+    resource::ResourceManager resources(2, repo_assets_dir());
     setup_scene_with_camera(scene);
-    add_minimal_pbpt_emitter_shape(scene);
+    add_minimal_pbpt_emitter_shape(scene, resources);
 
     TempDir temp_dir("rtr_pbpt_offline_failed");
     const auto scene_xml = (temp_dir.path / "runtime_scene.xml").string();
@@ -180,7 +204,7 @@ TEST(PbptOfflineRenderServiceTest, BackendFailureTransitionsToFailed) {
         }
     );
 
-    ASSERT_TRUE(service.start(scene, OfflineRenderConfig{
+    ASSERT_TRUE(service.start(scene, resources, OfflineRenderConfig{
         .scene_xml_path = scene_xml,
         .output_exr_path = output_exr,
         .spp = 2

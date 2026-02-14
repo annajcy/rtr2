@@ -22,17 +22,17 @@ TEST(FrameworkPbptLightTest, ThrowsWhenMeshRendererIsMissing) {
 TEST(FrameworkPbptLightTest, CanAttachWhenMeshRendererExists) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("light");
-    auto& renderer = go.add_component<MeshRenderer>("assets/models/spot.obj", "");
+    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
     auto& pbpt_light = go.add_component<PbptLight>();
 
     EXPECT_EQ(&pbpt_light.mesh_renderer(), &renderer);
-    EXPECT_EQ(pbpt_light.mesh_path(), "assets/models/spot.obj");
+    EXPECT_EQ(pbpt_light.mesh_handle(), resource::MeshHandle{10});
 }
 
 TEST(FrameworkPbptLightTest, RadianceSpectrumValidationThrowsForInvalidData) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("light");
-    (void)go.add_component<MeshRenderer>("assets/models/spot.obj", "");
+    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
     auto& pbpt_light = go.add_component<PbptLight>();
 
     EXPECT_THROW(
@@ -58,7 +58,7 @@ TEST(FrameworkPbptLightTest, RadianceSpectrumValidationThrowsForInvalidData) {
 TEST(FrameworkPbptLightTest, RadianceSpectrumSetAndReadBack) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("light");
-    (void)go.add_component<MeshRenderer>("assets/models/spot.obj", "");
+    (void)go.add_component<MeshRenderer>(resource::MeshHandle{10}, resource::TextureHandle{20});
     auto& pbpt_light = go.add_component<PbptLight>();
 
     const PbptSpectrum spectrum{

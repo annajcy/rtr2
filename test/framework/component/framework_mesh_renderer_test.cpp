@@ -1,5 +1,4 @@
 #include <stdexcept>
-#include <string>
 
 #include "gtest/gtest.h"
 
@@ -8,67 +7,55 @@
 
 namespace rtr::framework::component::test {
 
-TEST(FrameworkMeshRendererTest, ConstructEmptyAlbedoFallsBackToCheckerboard) {
-    MeshRenderer renderer("assets/models/spot.obj", "");
-    EXPECT_EQ(
-        renderer.albedo_texture_path(),
-        std::string(MeshRenderer::kDefaultAlbedoCheckerboardPath)
-    );
+TEST(FrameworkMeshRendererTest, ConstructWithValidHandles) {
+    MeshRenderer renderer(resource::MeshHandle{1}, resource::TextureHandle{2});
+    EXPECT_EQ(renderer.mesh_handle(), resource::MeshHandle{1});
+    EXPECT_EQ(renderer.albedo_texture_handle(), resource::TextureHandle{2});
 }
 
-TEST(FrameworkMeshRendererTest, SetAlbedoEmptyFallsBackToCheckerboard) {
-    MeshRenderer renderer(
-        "assets/models/spot.obj",
-        "assets/textures/spot_texture.png"
+TEST(FrameworkMeshRendererTest, InvalidHandleThrows) {
+    EXPECT_THROW(
+        (void)MeshRenderer(resource::MeshHandle{}, resource::TextureHandle{2}),
+        std::invalid_argument
     );
-    renderer.set_albedo_texture_path("");
-    EXPECT_EQ(
-        renderer.albedo_texture_path(),
-        std::string(MeshRenderer::kDefaultAlbedoCheckerboardPath)
+    EXPECT_THROW(
+        (void)MeshRenderer(resource::MeshHandle{1}, resource::TextureHandle{}),
+        std::invalid_argument
     );
+
+    MeshRenderer renderer(resource::MeshHandle{1}, resource::TextureHandle{2});
+    EXPECT_THROW((void)renderer.set_mesh_handle(resource::MeshHandle{}), std::invalid_argument);
+    EXPECT_THROW((void)renderer.set_albedo_texture_handle(resource::TextureHandle{}), std::invalid_argument);
 }
 
-TEST(FrameworkMeshRendererTest, ConstructCustomAlbedoUsesCustomPath) {
-    MeshRenderer renderer(
-        "assets/models/spot.obj",
-        "assets/textures/spot_texture.png"
-    );
-    EXPECT_EQ(renderer.albedo_texture_path(), "assets/textures/spot_texture.png");
-}
+TEST(FrameworkMeshRendererTest, SetHandlesUpdatesState) {
+    MeshRenderer renderer(resource::MeshHandle{1}, resource::TextureHandle{2});
 
-TEST(FrameworkMeshRendererTest, SetAlbedoCustomOverridesDefault) {
-    MeshRenderer renderer("assets/models/spot.obj", "");
-    renderer.set_albedo_texture_path("assets/textures/viking_room.png");
-    EXPECT_EQ(renderer.albedo_texture_path(), "assets/textures/viking_room.png");
-}
+    renderer.set_mesh_handle(resource::MeshHandle{3});
+    renderer.set_albedo_texture_handle(resource::TextureHandle{4});
 
-TEST(FrameworkMeshRendererTest, MeshPathEmptyThrows) {
-    EXPECT_THROW((void)MeshRenderer("", ""), std::invalid_argument);
-
-    MeshRenderer renderer("assets/models/spot.obj", "");
-    EXPECT_THROW((void)renderer.set_mesh_path(""), std::invalid_argument);
+    EXPECT_EQ(renderer.mesh_handle(), resource::MeshHandle{3});
+    EXPECT_EQ(renderer.albedo_texture_handle(), resource::TextureHandle{4});
 }
 
 TEST(FrameworkMeshRendererTest, GameObjectCanAddAndQueryMeshRenderer) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>("assets/models/spot.obj", "");
+    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{11}, resource::TextureHandle{12});
 
     EXPECT_TRUE(go.has_component<MeshRenderer>());
     EXPECT_EQ(go.get_component<MeshRenderer>(), &renderer);
-    EXPECT_EQ(
-        renderer.albedo_texture_path(),
-        std::string(MeshRenderer::kDefaultAlbedoCheckerboardPath)
-    );
+    EXPECT_EQ(renderer.mesh_handle(), resource::MeshHandle{11});
+    EXPECT_EQ(renderer.albedo_texture_handle(), resource::TextureHandle{12});
 }
 
 TEST(FrameworkMeshRendererTest, GameObjectEnforcesUniqueMeshRendererType) {
     core::Scene scene(1, "scene");
     auto& go = scene.create_game_object("mesh");
-    (void)go.add_component<MeshRenderer>("assets/models/spot.obj", "");
+    (void)go.add_component<MeshRenderer>(resource::MeshHandle{1}, resource::TextureHandle{2});
 
     EXPECT_THROW(
-        (void)go.add_component<MeshRenderer>("assets/models/viking_room.obj", ""),
+        (void)go.add_component<MeshRenderer>(resource::MeshHandle{3}, resource::TextureHandle{4}),
         std::runtime_error
     );
 }

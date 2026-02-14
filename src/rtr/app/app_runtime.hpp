@@ -23,6 +23,7 @@ struct AppRuntimeConfig {
     std::uint32_t window_height{600};
     std::string window_title{"RTR2 AppRuntime"};
     std::uint32_t max_frames_in_flight{2};
+    std::string resource_root_dir{"./assets/"};
 
     double fixed_delta_seconds{1.0 / 60.0};
     std::uint32_t max_fixed_steps_per_frame{4};
@@ -78,7 +79,10 @@ public:
     explicit AppRuntime(AppRuntimeConfig config = {})
         : m_config(std::move(config)),
           m_world(std::make_unique<framework::core::World>()),
-          m_resources(std::make_unique<resource::ResourceManager>(m_config.max_frames_in_flight)),
+          m_resources(std::make_unique<resource::ResourceManager>(
+              m_config.max_frames_in_flight,
+              m_config.resource_root_dir
+          )),
           m_renderer(std::make_unique<system::render::Renderer>(
               static_cast<int>(m_config.window_width),
               static_cast<int>(m_config.window_height),

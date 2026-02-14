@@ -14,24 +14,26 @@
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/engine.hpp"
 #include "rtr/resource/resource_manager.hpp"
-#include "rtr/system/render/forward/pipeline/forward_scene_view_builder.hpp"
+#include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_scene_importer.hpp"
 #include "rtr/system/input/input_system.hpp"
 #include "rtr/system/input/input_types.hpp"
-#include "rtr/system/render/forward_pipeline.hpp"
+#include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
 #include "rtr/system/render/renderer.hpp"
 
 namespace {
 
 constexpr uint32_t kMaxFramesInFlight = 2;
 
-constexpr const char* kCboxScenePath =
-    "/Users/jinceyang/Desktop/codebase/graphics/rtr2/external/pbpt/asset/scene/cbox/cbox.xml";
-constexpr const char* kDefaultSceneXmlPath =
-    "/Users/jinceyang/Desktop/codebase/graphics/rtr2/external/pbpt/asset/scene/cbox/cbox_rtr_runtime.xml";
-constexpr const char* kDefaultOutputExrPath =
-    "/Users/jinceyang/Desktop/codebase/graphics/rtr2/external/pbpt/output/offline_ui.exr";
+constexpr const char* kCboxSceneRootRel =
+    "pbpt_scene/cbox";
+constexpr const char* kCboxSceneXmlFilename =
+    "cbox.xml";
+constexpr const char* kOutputExrPath =
+    "output/cbox_offline.exr";
+constexpr const char* kOutputSceneXmlFilename =
+    "output/cbox_output.xml";
 
 constexpr std::size_t kPathBufferSize = 1024;
 
@@ -150,7 +152,18 @@ std::pair<uint32_t, uint32_t> resolve_resolution_from_pbpt_scene_xml(const char*
 
 int main() {
     try {
-        const auto [scene_width, scene_height] = resolve_resolution_from_pbpt_scene_xml(kCboxScenePath);
+        rtr::resource::ResourceManager resource_manager(kMaxFramesInFlight);
+        rtr::framework::integration::PbptOfflineRenderService offline_render_service{};
+        
+        const auto import_location = rtr::framework::integration::make_pbpt_scene_location(
+            kCboxSceneRootRel,
+            kCboxSceneXmlFilename
+        );
+
+        const auto [scene_width, scene_height] =
+            resolve_resolution_from_pbpt_scene_xml(
+                (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / import_location.xml_filename).c_str()
+            );
 
         auto renderer = std::make_unique<rtr::system::render::Renderer>(
             static_cast<int>(scene_width),
@@ -164,7 +177,6 @@ int main() {
             rtr::system::render::ForwardPipelineConfig{}
         );
         auto* forward_pipeline = pipeline.get();
-        rtr::resource::ResourceManager resource_manager(kMaxFramesInFlight);
         forward_pipeline->set_resource_manager(&resource_manager);
 
         auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
@@ -174,6 +186,9 @@ int main() {
             }
             return forward_pipeline->imgui_pass().wants_capture_keyboard();
         });
+
+        rtr::framework::integration::PbptImportOptions import_options{};
+        import_options.free_look_input_state = &input_system->state();
 
         renderer->set_pipeline(std::move(pipeline));
 
@@ -186,11 +201,10 @@ int main() {
         engine.world().set_resource_manager(&resource_manager);
 
         auto& scene = engine.world().create_scene("cbox_scene");
-        rtr::framework::integration::PbptImportOptions import_options{};
-        import_options.free_look_input_state = &input_system->state();
         const auto import_result = rtr::framework::integration::import_pbpt_scene_xml_to_scene(
-            kCboxScenePath,
+            import_location,
             scene,
+            resource_manager,
             import_options
         );
 
@@ -213,16 +227,16 @@ int main() {
         }
 
         struct OfflineRenderUiState {
-            std::array<char, kPathBufferSize> output_exr_path{};
             std::array<char, kPathBufferSize> scene_xml_path{};
+            std::array<char, kPathBufferSize> output_exr_path{};
+            std::array<char, kPathBufferSize> output_scene_xml_path{};
             int spp{16};
         } ui_state{};
 
-        set_path_buffer(ui_state.output_exr_path, kDefaultOutputExrPath);
-        set_path_buffer(ui_state.scene_xml_path, kDefaultSceneXmlPath);
-
-        rtr::framework::integration::PbptOfflineRenderService offline_render_service{};
-
+        set_path_buffer(ui_state.scene_xml_path, (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / import_location.xml_filename).string());
+        set_path_buffer(ui_state.output_scene_xml_path, (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputSceneXmlFilename).string());
+        set_path_buffer(ui_state.output_exr_path, (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputExrPath).string());
+        
         forward_pipeline->imgui_pass().set_ui_callback([&]() {
             const auto state = offline_render_service.state();
 
@@ -232,14 +246,19 @@ int main() {
             ImGui::Text("Scene film: %u x %u", scene_width, scene_height);
 
             ImGui::InputText(
+                "Scene XML",
+                ui_state.scene_xml_path.data(),
+                ui_state.scene_xml_path.size()
+            );
+            ImGui::InputText(
                 "Output EXR",
                 ui_state.output_exr_path.data(),
                 ui_state.output_exr_path.size()
             );
             ImGui::InputText(
-                "Scene XML",
-                ui_state.scene_xml_path.data(),
-                ui_state.scene_xml_path.size()
+                "Output Scene XML",
+                ui_state.output_scene_xml_path.data(),
+                ui_state.output_scene_xml_path.size()
             );
             ImGui::InputInt("SPP", &ui_state.spp);
             ui_state.spp = std::clamp(ui_state.spp, 1, 4096);
@@ -270,13 +289,13 @@ int main() {
                 }
 
                 const rtr::framework::integration::OfflineRenderConfig config{
-                    .scene_xml_path = std::string(ui_state.scene_xml_path.data()),
+                    .scene_xml_path = std::string(ui_state.output_scene_xml_path.data()),
                     .output_exr_path = std::string(ui_state.output_exr_path.data()),
                     .spp = ui_state.spp,
                     .film_width = export_resolution.export_w,
                     .film_height = export_resolution.export_h
                 };
-                (void)offline_render_service.start(*active_scene, config);
+                (void)offline_render_service.start(*active_scene, resource_manager, config);
             }
             if (!can_render) {
                 ImGui::EndDisabled();

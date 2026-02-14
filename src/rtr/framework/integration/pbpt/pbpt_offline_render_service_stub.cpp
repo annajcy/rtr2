@@ -18,7 +18,11 @@ PbptOfflineRenderService::~PbptOfflineRenderService() {
     }
 }
 
-bool PbptOfflineRenderService::start(const core::Scene&, const OfflineRenderConfig&) {
+bool PbptOfflineRenderService::start(
+    const core::Scene&,
+    resource::ResourceManager&,
+    const OfflineRenderConfig&
+) {
     m_state.store(OfflineRenderState::Failed);
     set_message("PBPT runtime is disabled in this package build.");
     return false;

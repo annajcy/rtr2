@@ -45,7 +45,11 @@ PbptOfflineRenderService::~PbptOfflineRenderService() {
     }
 }
 
-bool PbptOfflineRenderService::start(const core::Scene& scene, const OfflineRenderConfig& config) {
+bool PbptOfflineRenderService::start(
+    const core::Scene& scene,
+    resource::ResourceManager& resources,
+    const OfflineRenderConfig& config
+) {
     std::scoped_lock lifecycle_lock(m_lifecycle_mutex);
 
     if (is_running()) {
@@ -84,7 +88,7 @@ bool PbptOfflineRenderService::start(const core::Scene& scene, const OfflineRend
             throw std::runtime_error("Offline render requires an active camera.");
         }
 
-        auto record = build_pbpt_scene_record(scene);
+        auto record = build_pbpt_scene_record(scene, resources);
         if (!record.sensor.has_value()) {
             throw std::runtime_error("Failed to export PBPT sensor from current active camera.");
         }
@@ -106,7 +110,11 @@ bool PbptOfflineRenderService::start(const core::Scene& scene, const OfflineRend
                 record.sensor->film_height = config.film_height;
             }
         }
-        const std::string scene_xml = serialize_pbpt_scene_xml(record);
+        const std::string scene_xml = serialize_pbpt_scene_xml(
+            record,
+            resources,
+            config.scene_xml_path
+        );
 
         std::filesystem::path scene_xml_path(config.scene_xml_path);
         if (scene_xml_path.has_parent_path()) {

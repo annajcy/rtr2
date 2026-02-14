@@ -4,14 +4,16 @@
 
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
+#include "rtr/resource/resource_manager.hpp"
 
 namespace rtr::framework::integration::testing {
 
 TEST(PbptOfflineRenderServiceStubTest, StartFailsWithDisabledMessage) {
     core::Scene scene(1, "stub_scene");
+    resource::ResourceManager resources{};
     PbptOfflineRenderService service;
 
-    EXPECT_FALSE(service.start(scene, OfflineRenderConfig{
+    EXPECT_FALSE(service.start(scene, resources, OfflineRenderConfig{
         .scene_xml_path = "unused_scene.xml",
         .output_exr_path = "unused_output.exr",
         .spp = 1

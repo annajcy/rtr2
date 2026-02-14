@@ -1,9 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
-
-#include "rtr/utils/obj_loader.hpp"
 
 namespace rtr::resource {
 
@@ -29,19 +26,6 @@ struct TextureHandle {
     bool operator==(const TextureHandle& other) const {
         return value == other.value;
     }
-};
-
-struct CpuMeshData {
-    std::vector<utils::ObjVertex> vertices{};
-    std::vector<std::uint32_t> indices{};
-};
-
-struct CpuTextureData {
-    std::uint32_t width{0};
-    std::uint32_t height{0};
-    std::uint32_t channels{4};
-    bool use_srgb{true};
-    std::vector<std::uint8_t> pixels{};
 };
 
 } // namespace rtr::resource

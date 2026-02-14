@@ -7,7 +7,7 @@
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
-#include "rtr/system/render/forward_scene_view.hpp"
+#include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 
 namespace rtr::system::render {
 
@@ -40,11 +40,19 @@ inline ForwardSceneView build_forward_scene_view(
         const auto node = scene.scene_graph().node(id);
         const glm::mat4 model = node.world_matrix();
         const glm::mat4 normal = glm::transpose(glm::inverse(model));
+        const resource::MeshHandle mesh_handle = mesh_renderer->mesh_handle();
+        const resource::TextureHandle albedo_handle = mesh_renderer->albedo_texture_handle();
+        if (!mesh_handle.is_valid() || !resources.mesh_alive(mesh_handle)) {
+            throw std::runtime_error("MeshRenderer mesh handle is invalid or unloaded.");
+        }
+        if (!albedo_handle.is_valid() || !resources.texture_alive(albedo_handle)) {
+            throw std::runtime_error("MeshRenderer albedo texture handle is invalid or unloaded.");
+        }
 
         view.renderables.emplace_back(ForwardSceneRenderable{
             .instance_id = static_cast<std::uint64_t>(id),
-            .mesh = resources.load_mesh(mesh_renderer->mesh_path()),
-            .albedo_texture = resources.load_texture(mesh_renderer->albedo_texture_path()),
+            .mesh = mesh_handle,
+            .albedo_texture = albedo_handle,
             .model = model,
             .normal = normal
         });

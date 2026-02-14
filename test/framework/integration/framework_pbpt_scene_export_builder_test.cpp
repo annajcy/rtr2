@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -15,10 +16,48 @@
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_scene_export_builder.hpp"
+#include "rtr/resource/resource_manager.hpp"
 
 namespace rtr::framework::integration::test {
 
-static component::PbptSpectrum make_test_spectrum(float base) {
+namespace {
+
+struct TempDir {
+    std::filesystem::path path{};
+
+    explicit TempDir(const std::string& name)
+        : path(std::filesystem::temp_directory_path() / name) {
+        std::filesystem::remove_all(path);
+        std::filesystem::create_directories(path);
+    }
+
+    ~TempDir() {
+        std::error_code ec;
+        std::filesystem::remove_all(path, ec);
+    }
+};
+
+resource::MeshHandle create_test_mesh(resource::ResourceManager& resources) {
+    utils::ObjMeshData mesh{};
+    mesh.vertices = {
+        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
+    };
+    mesh.indices = {0, 1, 2};
+    return resources.create_mesh(std::move(mesh));
+}
+
+resource::TextureHandle create_test_texture(resource::ResourceManager& resources) {
+    utils::ImageData tex{};
+    tex.width = 1;
+    tex.height = 1;
+    tex.channels = 4;
+    tex.pixels = {255, 255, 255, 255};
+    return resources.create_texture(std::move(tex), true);
+}
+
+component::PbptSpectrum make_test_spectrum(float base) {
     return {
         component::PbptSpectrumPoint{400.0f, base},
         component::PbptSpectrumPoint{500.0f, base + 0.1f},
@@ -27,7 +66,7 @@ static component::PbptSpectrum make_test_spectrum(float base) {
     };
 }
 
-static void expect_mat4_near(const glm::mat4& lhs, const glm::mat4& rhs, float eps = 1e-5f) {
+void expect_mat4_near(const glm::mat4& lhs, const glm::mat4& rhs, float eps = 1e-5f) {
     for (int c = 0; c < 4; ++c) {
         for (int r = 0; r < 4; ++r) {
             EXPECT_NEAR(lhs[c][r], rhs[c][r], eps);
@@ -35,7 +74,7 @@ static void expect_mat4_near(const glm::mat4& lhs, const glm::mat4& rhs, float e
     }
 }
 
-static std::size_t count_occurrences(const std::string& text, const std::string& needle) {
+std::size_t count_occurrences(const std::string& text, const std::string& needle) {
     std::size_t count = 0;
     std::size_t pos = 0;
     while ((pos = text.find(needle, pos)) != std::string::npos) {
@@ -45,7 +84,7 @@ static std::size_t count_occurrences(const std::string& text, const std::string&
     return count;
 }
 
-static std::string extract_matrix_value(const std::string& xml) {
+std::string extract_matrix_value(const std::string& xml) {
     const std::string marker = "<matrix value=\"";
     const std::size_t begin = xml.find(marker);
     if (begin == std::string::npos) {
@@ -59,7 +98,7 @@ static std::string extract_matrix_value(const std::string& xml) {
     return xml.substr(value_begin, value_end - value_begin);
 }
 
-static std::vector<float> parse_csv_floats(const std::string& csv) {
+std::vector<float> parse_csv_floats(const std::string& csv) {
     std::vector<float> values{};
     std::stringstream ss(csv);
     std::string item;
@@ -72,37 +111,42 @@ static std::vector<float> parse_csv_floats(const std::string& csv) {
     return values;
 }
 
+} // namespace
+
 TEST(FrameworkPbptSceneExportBuilderTest, BuildsRecordsFromActiveNodesWithMeshAndPbptMesh) {
     core::Scene scene(1, "scene");
+    resource::ResourceManager resources{};
 
     auto& go_ok = scene.create_game_object("");
-    (void)go_ok.add_component<component::MeshRenderer>("assets/models/spot.obj", "");
+    const auto expected_handle = create_test_mesh(resources);
+    const auto tex_handle = create_test_texture(resources);
+    (void)go_ok.add_component<component::MeshRenderer>(expected_handle, tex_handle);
     auto& go_ok_pbpt = go_ok.add_component<component::PbptMesh>();
     const component::PbptSpectrum reflectance = make_test_spectrum(0.2f);
     go_ok_pbpt.set_reflectance_spectrum(reflectance);
     go_ok.node().set_local_position({1.0f, 2.0f, 3.0f});
 
     auto& go_without_pbpt = scene.create_game_object("mesh_only");
-    (void)go_without_pbpt.add_component<component::MeshRenderer>("assets/models/stanford_bunny.obj", "");
+    (void)go_without_pbpt.add_component<component::MeshRenderer>(create_test_mesh(resources), tex_handle);
 
     auto& go_with_disabled_component = scene.create_game_object("disabled_component");
-    (void)go_with_disabled_component.add_component<component::MeshRenderer>("assets/models/colored_quad.obj", "");
+    (void)go_with_disabled_component.add_component<component::MeshRenderer>(create_test_mesh(resources), tex_handle);
     auto& disabled_pbpt = go_with_disabled_component.add_component<component::PbptMesh>();
     disabled_pbpt.set_enabled(false);
 
     auto& go_disabled = scene.create_game_object("disabled_go");
-    (void)go_disabled.add_component<component::MeshRenderer>("assets/models/spot.obj", "");
+    (void)go_disabled.add_component<component::MeshRenderer>(create_test_mesh(resources), tex_handle);
     (void)go_disabled.add_component<component::PbptMesh>();
     go_disabled.set_enabled(false);
 
     scene.scene_graph().update_world_transforms();
 
-    const auto record = build_pbpt_scene_record(scene);
+    const auto record = build_pbpt_scene_record(scene, resources);
     ASSERT_EQ(record.shapes.size(), 1u);
 
     const auto& shape = record.shapes.front();
     EXPECT_EQ(shape.object_name, "go_" + std::to_string(static_cast<std::uint64_t>(go_ok.id())));
-    EXPECT_EQ(shape.mesh_path, "assets/models/spot.obj");
+    EXPECT_EQ(shape.mesh_handle, expected_handle);
     EXPECT_EQ(shape.material_id, "mat_0");
     ASSERT_EQ(shape.reflectance_spectrum.size(), reflectance.size());
     for (std::size_t i = 0; i < reflectance.size(); ++i) {
@@ -115,21 +159,28 @@ TEST(FrameworkPbptSceneExportBuilderTest, BuildsRecordsFromActiveNodesWithMeshAn
 
 TEST(FrameworkPbptSceneExportBuilderTest, ThrowsWhenPbptLightExistsWithoutPbptMesh) {
     core::Scene scene(1, "scene");
+    resource::ResourceManager resources{};
     auto& go = scene.create_game_object("light_only");
-    (void)go.add_component<component::MeshRenderer>("assets/models/spot.obj", "");
+    (void)go.add_component<component::MeshRenderer>(create_test_mesh(resources), create_test_texture(resources));
     (void)go.add_component<component::PbptLight>();
 
     EXPECT_THROW(
-        (void)build_pbpt_scene_record(scene),
+        (void)build_pbpt_scene_record(scene, resources),
         std::runtime_error
     );
 }
 
-TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesDiffuseMaterials) {
+TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesMaterialsAndMeshFilesByHandle) {
+    TempDir temp_dir("rtr_pbpt_scene_export_builder_dedup");
+    const std::string out_xml = (temp_dir.path / "scene.xml").string();
+
+    resource::ResourceManager resources{};
+    const auto shared_mesh = create_test_mesh(resources);
+
     PbptSceneRecord record{};
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "a",
-        .mesh_path = "assets/models/spot.obj",
+        .mesh_handle = shared_mesh,
         .model = glm::mat4{1.0f},
         .reflectance_spectrum = make_test_spectrum(0.2f),
         .has_area_emitter = false,
@@ -138,7 +189,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesDiffuseMaterials
     });
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "b",
-        .mesh_path = "assets/models/stanford_bunny.obj",
+        .mesh_handle = shared_mesh,
         .model = glm::mat4{1.0f},
         .reflectance_spectrum = make_test_spectrum(0.2f),
         .has_area_emitter = false,
@@ -146,18 +197,35 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesDiffuseMaterials
         .material_id = ""
     });
 
-    const std::string xml = serialize_pbpt_scene_xml(record);
+    const std::string xml = serialize_pbpt_scene_xml(record, resources, out_xml);
 
     EXPECT_EQ(count_occurrences(xml, "<bsdf type=\"diffuse\""), 1u);
-    EXPECT_EQ(count_occurrences(xml, "<spectrum name=\"reflectance\""), 1u);
     EXPECT_EQ(count_occurrences(xml, "<ref id=\"mat_0\"/>"), 2u);
+    EXPECT_EQ(count_occurrences(xml, "<string name=\"filename\" value=\"meshes/mesh_"), 2u);
+
+    const auto meshes_dir = temp_dir.path / "meshes";
+    ASSERT_TRUE(std::filesystem::exists(meshes_dir));
+    const auto expected_mesh_file =
+        meshes_dir / ("mesh_" + std::to_string(shared_mesh.value) + ".obj");
+    EXPECT_TRUE(std::filesystem::exists(expected_mesh_file));
+    std::size_t file_count = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(meshes_dir)) {
+        if (entry.is_regular_file()) {
+            ++file_count;
+        }
+    }
+    EXPECT_EQ(file_count, 1u);
 }
 
 TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsAreaEmitterWhenPresent) {
+    TempDir temp_dir("rtr_pbpt_scene_export_builder_emitter");
+    const std::string out_xml = (temp_dir.path / "scene.xml").string();
+
+    resource::ResourceManager resources{};
     PbptSceneRecord record{};
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "light_mesh",
-        .mesh_path = "assets/models/spot.obj",
+        .mesh_handle = create_test_mesh(resources),
         .model = glm::mat4{1.0f},
         .reflectance_spectrum = make_test_spectrum(0.2f),
         .has_area_emitter = true,
@@ -170,12 +238,15 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsAreaEmitterWhenPresent)
         .material_id = ""
     });
 
-    const std::string xml = serialize_pbpt_scene_xml(record);
+    const std::string xml = serialize_pbpt_scene_xml(record, resources, out_xml);
     EXPECT_NE(xml.find("<emitter type=\"area\">"), std::string::npos);
     EXPECT_NE(xml.find("<spectrum name=\"radiance\""), std::string::npos);
 }
 
 TEST(FrameworkPbptSceneExportBuilderTest, SerializerUsesStableRowMajorMatrixOrder) {
+    TempDir temp_dir("rtr_pbpt_scene_export_builder_matrix");
+    const std::string out_xml = (temp_dir.path / "scene.xml").string();
+
     glm::mat4 matrix{1.0f};
     float value = 1.0f;
     for (int row = 0; row < 4; ++row) {
@@ -184,10 +255,11 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerUsesStableRowMajorMatrixOrde
         }
     }
 
+    resource::ResourceManager resources{};
     PbptSceneRecord record{};
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "mesh",
-        .mesh_path = "assets/models/spot.obj",
+        .mesh_handle = create_test_mesh(resources),
         .model = matrix,
         .reflectance_spectrum = make_test_spectrum(0.2f),
         .has_area_emitter = false,
@@ -195,7 +267,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerUsesStableRowMajorMatrixOrde
         .material_id = ""
     });
 
-    const std::string xml = serialize_pbpt_scene_xml(record);
+    const std::string xml = serialize_pbpt_scene_xml(record, resources, out_xml);
     const std::string matrix_value = extract_matrix_value(xml);
     ASSERT_FALSE(matrix_value.empty());
 
@@ -207,7 +279,11 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerUsesStableRowMajorMatrixOrde
 }
 
 TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsSensorAndIntegratorWithMatrix) {
+    TempDir temp_dir("rtr_pbpt_scene_export_builder_sensor");
+    const std::string out_xml = (temp_dir.path / "scene.xml").string();
+
     core::Scene scene(1, "scene");
+    resource::ResourceManager resources{};
 
     auto& camera_go = scene.create_game_object("camera");
     auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
@@ -219,14 +295,14 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsSensorAndIntegratorWith
     ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
 
     auto& mesh_go = scene.create_game_object("mesh");
-    (void)mesh_go.add_component<component::MeshRenderer>("assets/models/spot.obj", "");
+    (void)mesh_go.add_component<component::MeshRenderer>(create_test_mesh(resources), create_test_texture(resources));
     auto& pbpt_mesh = mesh_go.add_component<component::PbptMesh>();
     pbpt_mesh.set_reflectance_spectrum(make_test_spectrum(0.2f));
 
     scene.scene_graph().update_world_transforms();
 
-    const auto record = build_pbpt_scene_record(scene);
-    const std::string xml = serialize_pbpt_scene_xml(record);
+    const auto record = build_pbpt_scene_record(scene, resources);
+    const std::string xml = serialize_pbpt_scene_xml(record, resources, out_xml);
 
     EXPECT_NE(xml.find("<integrator type=\"path\">"), std::string::npos);
     EXPECT_NE(xml.find("<integer name=\"maxDepth\" value=\"-1\"/>"), std::string::npos);
@@ -236,11 +312,15 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsSensorAndIntegratorWith
     EXPECT_NE(xml.find("<spectrum name=\"reflectance\""), std::string::npos);
 }
 
-TEST(FrameworkPbptSceneExportBuilderTest, SerializerThrowsWhenShapeMeshPathIsEmpty) {
+TEST(FrameworkPbptSceneExportBuilderTest, SerializerThrowsWhenShapeMeshHandleIsInvalid) {
+    TempDir temp_dir("rtr_pbpt_scene_export_builder_invalid_handle");
+    const std::string out_xml = (temp_dir.path / "scene.xml").string();
+
+    resource::ResourceManager resources{};
     PbptSceneRecord record{};
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "mesh",
-        .mesh_path = "",
+        .mesh_handle = resource::MeshHandle{},
         .model = glm::mat4{1.0f},
         .reflectance_spectrum = make_test_spectrum(0.2f),
         .has_area_emitter = false,
@@ -249,7 +329,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerThrowsWhenShapeMeshPathIsEmp
     });
 
     EXPECT_THROW(
-        (void)serialize_pbpt_scene_xml(record),
+        (void)serialize_pbpt_scene_xml(record, resources, out_xml),
         std::runtime_error
     );
 }

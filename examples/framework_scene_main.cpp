@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <string>
 
 #include "imgui.h"
 
@@ -10,7 +11,7 @@
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/system/input/input_types.hpp"
-#include "rtr/system/render/forward_pipeline.hpp"
+#include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
 
 int main() {
     constexpr uint32_t kWidth = 1280;
@@ -63,24 +64,34 @@ int main() {
         );
         (void)scene.set_active_camera(camera_go.id());
 
+        auto add_mesh_renderer = [&](rtr::framework::core::GameObject& go,
+                                     const std::string& mesh_path,
+                                     const std::string& albedo_path) {
+            const auto mesh_handle =
+                runtime.resource_manager().create_mesh_from_obj_relative_path(mesh_path);
+
+            rtr::resource::TextureHandle albedo_handle{};
+            if (albedo_path.empty()) {
+                albedo_handle = runtime.resource_manager().default_checkerboard_texture();
+            } else {
+                albedo_handle = runtime.resource_manager().create_texture_from_relative_path(
+                    albedo_path,
+                    true
+                );
+            }
+            (void)go.add_component<rtr::framework::component::MeshRenderer>(mesh_handle, albedo_handle);
+        };
+
         auto& go_a = scene.create_game_object("mesh_a");
-        go_a.add_component<rtr::framework::component::MeshRenderer>(
-            "assets/models/spot.obj",
-            "assets/textures/spot_texture.png"
-        );
+        add_mesh_renderer(go_a, "models/spot.obj", "textures/spot_texture.png");
         go_a.node().set_local_position({-2.5f, 0.0f, 0.0f});
 
         auto& go_b = scene.create_game_object("mesh_b");
-        go_b.add_component<rtr::framework::component::MeshRenderer>(
-            "assets/models/stanford_bunny.obj",
-            "assets/textures/viking_room.png"
-        );
+        add_mesh_renderer(go_b, "models/stanford_bunny.obj", "textures/viking_room.png");
         go_b.node().set_local_position({0.0f, 0.0f, 0.0f});
 
         auto& go_c = scene.create_game_object("mesh_c");
-        go_c.add_component<rtr::framework::component::MeshRenderer>(
-            "assets/models/colored_quad.obj"
-        );
+        add_mesh_renderer(go_c, "models/colored_quad.obj", "");
         go_c.node().set_local_position({2.5f, 0.0f, 0.0f});
 
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{

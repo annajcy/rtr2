@@ -26,6 +26,14 @@ struct TempDir {
     }
 };
 
+std::filesystem::path repo_assets_dir() {
+    return std::filesystem::path(__FILE__)
+               .parent_path()
+               .parent_path()
+               .parent_path() /
+           "assets";
+}
+
 void write_text_file(const std::filesystem::path& path, const std::string& content) {
     std::filesystem::create_directories(path.parent_path());
     std::ofstream out(path, std::ios::binary);
@@ -35,31 +43,57 @@ void write_text_file(const std::filesystem::path& path, const std::string& conte
     out << content;
 }
 
-} // namespace
-
-TEST(ResourceManagerLifecycleTest, LoadMeshDeduplicatesNormalizedPath) {
-    TempDir temp_dir("rtr_resource_manager_mesh_dedup");
-    const auto mesh_path = temp_dir.path / "mesh.obj";
-    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
-
-    ResourceManager manager{};
-    const auto a = manager.load_mesh(mesh_path.string());
-    const auto b = manager.load_mesh((temp_dir.path / "." / "mesh.obj").string());
-
-    EXPECT_TRUE(a.is_valid());
-    EXPECT_EQ(a, b);
+void write_binary_ppm_1x1_white(const std::filesystem::path& path) {
+    std::filesystem::create_directories(path.parent_path());
+    std::ofstream out(path, std::ios::binary);
+    if (!out.is_open()) {
+        throw std::runtime_error("Failed to write file: " + path.string());
+    }
+    out << "P6\n1 1\n255\n";
+    const unsigned char white[3]{255, 255, 255};
+    out.write(reinterpret_cast<const char*>(white), sizeof(white));
 }
 
-TEST(ResourceManagerLifecycleTest, UnloadThenLoadSamePathReturnsNewHandle) {
-    TempDir temp_dir("rtr_resource_manager_mesh_reopen");
-    const auto mesh_path = temp_dir.path / "mesh.obj";
-    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+utils::ObjMeshData make_triangle_mesh() {
+    utils::ObjMeshData mesh{};
+    mesh.vertices = {
+        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
+    };
+    mesh.indices = {0, 1, 2};
+    return mesh;
+}
 
+utils::ImageData make_white_texture() {
+    utils::ImageData tex{};
+    tex.width = 1;
+    tex.height = 1;
+    tex.channels = 4;
+    tex.pixels = {255, 255, 255, 255};
+    return tex;
+}
+
+} // namespace
+
+TEST(ResourceManagerLifecycleTest, CreateMeshReturnsValidUniqueHandle) {
     ResourceManager manager{};
-    const auto old_handle = manager.load_mesh(mesh_path.string());
+
+    const auto a = manager.create_mesh(make_triangle_mesh());
+    const auto b = manager.create_mesh(make_triangle_mesh());
+
+    EXPECT_TRUE(a.is_valid());
+    EXPECT_TRUE(b.is_valid());
+    EXPECT_NE(a, b);
+}
+
+TEST(ResourceManagerLifecycleTest, UnloadThenCreateReturnsNewHandle) {
+    ResourceManager manager{};
+
+    const auto old_handle = manager.create_mesh(make_triangle_mesh());
     manager.unload_mesh(old_handle);
 
-    const auto new_handle = manager.load_mesh(mesh_path.string());
+    const auto new_handle = manager.create_mesh(make_triangle_mesh());
     EXPECT_TRUE(new_handle.is_valid());
     EXPECT_NE(old_handle, new_handle);
 
@@ -69,12 +103,8 @@ TEST(ResourceManagerLifecycleTest, UnloadThenLoadSamePathReturnsNewHandle) {
 }
 
 TEST(ResourceManagerLifecycleTest, UnloadMeshInvalidatesCpuAccess) {
-    TempDir temp_dir("rtr_resource_manager_mesh_unload");
-    const auto mesh_path = temp_dir.path / "mesh.obj";
-    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
-
     ResourceManager manager{};
-    const auto handle = manager.load_mesh(mesh_path.string());
+    const auto handle = manager.create_mesh(make_triangle_mesh());
 
     EXPECT_TRUE(manager.mesh_alive(handle));
     manager.unload_mesh(handle);
@@ -85,12 +115,8 @@ TEST(ResourceManagerLifecycleTest, UnloadMeshInvalidatesCpuAccess) {
 }
 
 TEST(ResourceManagerLifecycleTest, UnloadedHandleCannotAccessCpuOrGpu) {
-    TempDir temp_dir("rtr_resource_manager_unloaded_handle_invalidate");
-    const auto mesh_path = temp_dir.path / "mesh.obj";
-    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
-
     ResourceManager manager{};
-    const auto mesh_handle = manager.load_mesh(mesh_path.string());
+    const auto mesh_handle = manager.create_mesh(make_triangle_mesh());
     manager.unload_mesh(mesh_handle);
 
     EXPECT_THROW((void)manager.mesh_cpu(mesh_handle), std::runtime_error);
@@ -103,21 +129,78 @@ TEST(ResourceManagerLifecycleTest, UnloadedHandleCannotAccessCpuOrGpu) {
     );
 }
 
-TEST(ResourceManagerLifecycleTest, LoadTextureDeduplicatesNormalizedPathAndUnloadIsIdempotent) {
-    TempDir temp_dir("rtr_resource_manager_texture_dedup");
-    const auto tex_path = temp_dir.path / "dummy.ppm";
-    write_text_file(tex_path, "P3\n1 1\n255\n255 255 255\n");
-
+TEST(ResourceManagerLifecycleTest, CreateTextureThenUnloadIsIdempotent) {
     ResourceManager manager{};
-    const auto a = manager.load_texture(tex_path.string());
-    const auto b = manager.load_texture((temp_dir.path / "." / "dummy.ppm").string());
+    const auto handle = manager.create_texture(make_white_texture(), true);
+
+    EXPECT_TRUE(handle.is_valid());
+    EXPECT_TRUE(manager.texture_alive(handle));
+
+    manager.unload_texture(handle);
+    EXPECT_FALSE(manager.texture_alive(handle));
+    EXPECT_NO_THROW(manager.unload_texture(handle));
+}
+
+TEST(ResourceManagerLifecycleTest, DefaultCheckerboardTextureReturnsAliveHandle) {
+    ResourceManager manager(2, repo_assets_dir());
+    const auto a = manager.default_checkerboard_texture();
+    const auto b = manager.default_checkerboard_texture();
 
     EXPECT_TRUE(a.is_valid());
     EXPECT_EQ(a, b);
+    EXPECT_TRUE(manager.texture_alive(a));
+}
 
-    manager.unload_texture(a);
-    EXPECT_FALSE(manager.texture_alive(a));
-    EXPECT_NO_THROW(manager.unload_texture(a));
+TEST(ResourceManagerLifecycleTest, DefaultCheckerboardTextureThrowsWhenMissingUnderRoot) {
+    TempDir temp_dir("rtr_resource_manager_missing_checkerboard_test");
+    ResourceManager manager(2, temp_dir.path);
+    EXPECT_THROW((void)manager.default_checkerboard_texture(), std::runtime_error);
+}
+
+TEST(ResourceManagerLifecycleTest, CreateMeshAndTextureFromRelativePathUsesResourceRoot) {
+    TempDir temp_dir("rtr_resource_manager_relative_path_test");
+    write_text_file(
+        temp_dir.path / "meshes" / "tri.obj",
+        "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"
+    );
+    write_binary_ppm_1x1_white(temp_dir.path / "textures" / "white.ppm");
+
+    ResourceManager manager(2, temp_dir.path);
+    const auto mesh_handle = manager.create_mesh_from_obj_relative_path("meshes/tri.obj");
+    const auto tex_handle = manager.create_texture_from_relative_path("textures/white.ppm", true);
+
+    EXPECT_TRUE(mesh_handle.is_valid());
+    EXPECT_TRUE(tex_handle.is_valid());
+    EXPECT_TRUE(manager.mesh_alive(mesh_handle));
+    EXPECT_TRUE(manager.texture_alive(tex_handle));
+}
+
+TEST(ResourceManagerLifecycleTest, RelativePathApiRejectsAbsolutePath) {
+    TempDir temp_dir("rtr_resource_manager_relative_reject_abs_test");
+    ResourceManager manager(2, temp_dir.path);
+    const auto abs_path = (temp_dir.path / "meshes" / "tri.obj").string();
+
+    write_text_file(temp_dir.path / "meshes" / "tri.obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+    write_binary_ppm_1x1_white(temp_dir.path / "meshes" / "tri.ppm");
+
+    EXPECT_THROW((void)manager.create_mesh_from_obj_relative_path(abs_path), std::invalid_argument);
+    EXPECT_THROW(
+        (void)manager.create_texture_from_relative_path((temp_dir.path / "meshes" / "tri.ppm").string(), true),
+        std::invalid_argument
+    );
+}
+
+TEST(ResourceManagerLifecycleTest, RelativePathApiAllowsEscapeFromResourceRoot) {
+    TempDir temp_dir("rtr_resource_manager_relative_escape_test");
+    ResourceManager manager(2, temp_dir.path / "assets");
+    write_text_file(
+        temp_dir.path / "outside" / "tri.obj",
+        "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"
+    );
+    write_binary_ppm_1x1_white(temp_dir.path / "outside" / "tex.ppm");
+
+    EXPECT_NO_THROW((void)manager.create_mesh_from_obj_relative_path("../outside/tri.obj"));
+    EXPECT_NO_THROW((void)manager.create_texture_from_relative_path("../outside/tex.ppm", true));
 }
 
 } // namespace rtr::resource::test

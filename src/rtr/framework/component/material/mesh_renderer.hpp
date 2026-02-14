@@ -1,63 +1,52 @@
 #pragma once
 
 #include <stdexcept>
-#include <string>
-#include <string_view>
-#include <utility>
 
 #include "rtr/framework/component/component.hpp"
+#include "rtr/resource/resource_types.hpp"
 
 namespace rtr::framework::component {
 
 class MeshRenderer final : public Component {
-public:
-    static constexpr std::string_view kDefaultAlbedoCheckerboardPath =
-        "assets/textures/default_checkerboard_512.png";
-
 private:
-    std::string m_mesh_path{};
-    std::string m_albedo_texture_path{};
-
-    static std::string normalize_albedo_path(std::string albedo_texture_path) {
-        if (albedo_texture_path.empty()) {
-            return std::string{kDefaultAlbedoCheckerboardPath};
-        }
-        return albedo_texture_path;
-    }
+    resource::MeshHandle m_mesh{};
+    resource::TextureHandle m_albedo_texture{};
 
 public:
     explicit MeshRenderer(
-        std::string mesh_path,
-        std::string albedo_texture_path = ""
+        resource::MeshHandle mesh,
+        resource::TextureHandle albedo_texture
     )
-        : m_mesh_path(std::move(mesh_path)),
-          m_albedo_texture_path(normalize_albedo_path(std::move(albedo_texture_path))) {
-        if (m_mesh_path.empty()) {
-            throw std::invalid_argument("MeshRenderer mesh_path must not be empty.");
+        : m_mesh(mesh),
+          m_albedo_texture(albedo_texture) {
+        if (!m_mesh.is_valid()) {
+            throw std::invalid_argument("MeshRenderer mesh handle must be valid.");
+        }
+        if (!m_albedo_texture.is_valid()) {
+            throw std::invalid_argument("MeshRenderer albedo texture handle must be valid.");
         }
     }
 
-    const std::string& mesh_path() const {
-        return m_mesh_path;
+    resource::MeshHandle mesh_handle() const {
+        return m_mesh;
     }
 
-    void set_mesh_path(std::string mesh_path) {
-        if (mesh_path.empty()) {
-            throw std::invalid_argument("MeshRenderer mesh_path must not be empty.");
+    void set_mesh_handle(resource::MeshHandle mesh) {
+        if (!mesh.is_valid()) {
+            throw std::invalid_argument("MeshRenderer mesh handle must be valid.");
         }
-        m_mesh_path = std::move(mesh_path);
+        m_mesh = mesh;
     }
 
-    const std::string& albedo_texture_path() const {
-        return m_albedo_texture_path;
+    resource::TextureHandle albedo_texture_handle() const {
+        return m_albedo_texture;
     }
 
-    void set_albedo_texture_path(std::string albedo_texture_path) {
-        m_albedo_texture_path = normalize_albedo_path(std::move(albedo_texture_path));
-    }
-
-    void reset_albedo_to_default() {
-        m_albedo_texture_path = std::string{kDefaultAlbedoCheckerboardPath};
+    void set_albedo_texture_handle(resource::TextureHandle albedo_texture) {
+        if (!albedo_texture.is_valid()) {
+            throw std::invalid_argument("MeshRenderer albedo texture handle must be valid.");
+        }
+        m_albedo_texture = albedo_texture;
     }
 };
 

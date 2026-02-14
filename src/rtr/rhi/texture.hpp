@@ -15,7 +15,6 @@
 #include <cmath>
 #include "device.hpp"
 #include "buffer.hpp"
-#include "rtr/utils/image_loader.hpp"
 
 namespace rtr::rhi {
 
@@ -212,26 +211,6 @@ public:
             false
         );
         return image;
-    }
-
-    static Image create_image_from_file(
-        Device* device,
-        const std::string& file_path,
-        bool use_srgb = true, // 默认为 true，即颜色贴图
-        bool flip_y = true,
-        bool generate_mipmaps = true
-    ) {
-        auto image_loader = rtr::utils::ImageLoader(file_path, flip_y, 4);
-
-        return create_image_from_rgba8(
-            device,
-            static_cast<uint32_t>(image_loader.width()),
-            static_cast<uint32_t>(image_loader.height()),
-            image_loader.data(),
-            image_loader.data_size(),
-            use_srgb,
-            generate_mipmaps
-        );
     }
 
     static Image create_image_from_rgba8(

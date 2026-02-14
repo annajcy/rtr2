@@ -12,6 +12,10 @@ namespace rtr::framework::core {
 class Scene;
 }
 
+namespace rtr::resource {
+class ResourceManager;
+}
+
 namespace rtr::framework::integration {
 using OfflineRenderWorkerThread = std::thread;
 
@@ -52,7 +56,11 @@ public:
     PbptOfflineRenderService& operator=(const PbptOfflineRenderService&) = delete;
     ~PbptOfflineRenderService();
 
-    bool start(const core::Scene& scene, const OfflineRenderConfig& config);
+    bool start(
+        const core::Scene& scene,
+        resource::ResourceManager& resources,
+        const OfflineRenderConfig& config
+    );
     void request_cancel();
     OfflineRenderState state() const;
     float progress_01() const;

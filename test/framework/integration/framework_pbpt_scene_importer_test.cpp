@@ -13,7 +13,9 @@
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_scene_importer.hpp"
+#include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/input/input_state.hpp"
+#include "rtr/utils/image_io.hpp"
 
 namespace rtr::framework::integration::test {
 
@@ -43,6 +45,18 @@ void write_text_file(const std::filesystem::path& path, const std::string& conte
     out << content;
 }
 
+void write_default_checkerboard(const std::filesystem::path& root_dir) {
+    utils::ImageData image{};
+    image.width = 1;
+    image.height = 1;
+    image.channels = 4;
+    image.pixels = {255, 255, 255, 255};
+    utils::write_image_to_path(
+        image,
+        (root_dir / "textures" / "default_checkerboard_512.png").string()
+    );
+}
+
 const core::GameObject* find_mesh_object(const core::Scene& scene) {
     for (const auto& go : scene.game_objects()) {
         if (go && go->get_component<component::PbptMesh>() != nullptr) {
@@ -50,6 +64,22 @@ const core::GameObject* find_mesh_object(const core::Scene& scene) {
         }
     }
     return nullptr;
+}
+
+PbptSceneLocation make_location(
+    const std::filesystem::path& resource_root,
+    const std::filesystem::path& xml_path
+) {
+    const std::filesystem::path rel = xml_path.lexically_relative(resource_root);
+    std::filesystem::path scene_root = rel.parent_path();
+    if (scene_root.empty()) {
+        scene_root = ".";
+    }
+
+    return make_pbpt_scene_location(
+        scene_root.generic_string(),
+        rel.filename().string()
+    );
 }
 
 } // namespace
@@ -103,7 +133,13 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
     );
 
     core::Scene scene(1, "scene");
-    const auto result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene);
+    write_default_checkerboard(temp_dir.path);
+    resource::ResourceManager resources(2, temp_dir.path);
+    const auto result = import_pbpt_scene_xml_to_scene(
+        make_location(temp_dir.path, xml_path),
+        scene,
+        resources
+    );
 
     EXPECT_EQ(result.imported_shape_count, 1u);
     EXPECT_EQ(result.imported_light_shape_count, 1u);
@@ -131,7 +167,8 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
     ASSERT_NE(pbpt_mesh, nullptr);
     ASSERT_NE(pbpt_light, nullptr);
 
-    EXPECT_EQ(renderer->mesh_path(), std::filesystem::absolute(mesh_path).string());
+    EXPECT_TRUE(renderer->mesh_handle().is_valid());
+    EXPECT_TRUE(resources.mesh_alive(renderer->mesh_handle()));
 
     const auto& reflectance = pbpt_mesh->reflectance_spectrum();
     ASSERT_EQ(reflectance.size(), 4u);
@@ -177,8 +214,10 @@ TEST(FrameworkPbptSceneImporterTest, ThrowsForInvalidMatrixElementCount) {
     );
 
     core::Scene scene(1, "scene");
+    write_default_checkerboard(temp_dir.path);
+    resource::ResourceManager resources(2, temp_dir.path);
     EXPECT_THROW(
-        (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene),
+        (void)import_pbpt_scene_xml_to_scene(make_location(temp_dir.path, xml_path), scene, resources),
         std::runtime_error
     );
 }
@@ -212,8 +251,10 @@ TEST(FrameworkPbptSceneImporterTest, ThrowsForDuplicateImportedNameBetweenCamera
     );
 
     core::Scene scene(1, "scene");
+    write_default_checkerboard(temp_dir.path);
+    resource::ResourceManager resources(2, temp_dir.path);
     EXPECT_THROW(
-        (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene),
+        (void)import_pbpt_scene_xml_to_scene(make_location(temp_dir.path, xml_path), scene, resources),
         std::runtime_error
     );
 }
@@ -240,7 +281,13 @@ TEST(FrameworkPbptSceneImporterTest, RecordsDefaultShapeNameWhenShapeIdMissing) 
     );
 
     core::Scene scene(1, "scene");
-    const auto result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene);
+    write_default_checkerboard(temp_dir.path);
+    resource::ResourceManager resources(2, temp_dir.path);
+    const auto result = import_pbpt_scene_xml_to_scene(
+        make_location(temp_dir.path, xml_path),
+        scene,
+        resources
+    );
 
     EXPECT_EQ(result.imported_shape_count, 1u);
     ASSERT_TRUE(result.imported_game_object_id_by_name.contains("tri_default"));
@@ -272,7 +319,9 @@ TEST(FrameworkPbptSceneImporterTest, LookAtSensorAlignsWithRtrCameraFrontConvent
     );
 
     core::Scene scene(1, "scene");
-    (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene);
+    write_default_checkerboard(temp_dir.path);
+    resource::ResourceManager resources(2, temp_dir.path);
+    (void)import_pbpt_scene_xml_to_scene(make_location(temp_dir.path, xml_path), scene, resources);
 
     const auto* camera = dynamic_cast<const core::PerspectiveCamera*>(scene.active_camera());
     ASSERT_NE(camera, nullptr);
@@ -306,9 +355,16 @@ TEST(FrameworkPbptSceneImporterTest, AttachesFreeLookControllerWhenInputStatePro
 
     core::Scene scene(1, "scene");
     system::input::InputState input_state{};
+    write_default_checkerboard(temp_dir.path);
+    resource::ResourceManager resources(2, temp_dir.path);
     PbptImportOptions options{};
     options.free_look_input_state = &input_state;
-    (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, options);
+    (void)import_pbpt_scene_xml_to_scene(
+        make_location(temp_dir.path, xml_path),
+        scene,
+        resources,
+        options
+    );
 
     const auto active_camera_owner = scene.camera_manager().active_camera_owner_id();
     ASSERT_NE(active_camera_owner, core::kInvalidGameObjectId);
@@ -317,6 +373,187 @@ TEST(FrameworkPbptSceneImporterTest, AttachesFreeLookControllerWhenInputStatePro
     EXPECT_NE(
         active_camera_go->get_component<component::FreeLookCameraController>(),
         nullptr
+    );
+}
+
+TEST(FrameworkPbptSceneImporterTest, RelativeMeshFilenameResolvesFromXmlDirectoryWithinRoot) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_xml_dir_resolve_test");
+    const auto resource_root = temp_dir.path / "assets";
+    const auto scene_dir = resource_root / "pbpt_scene" / "cbox";
+    const auto mesh_path = scene_dir / "meshes" / "tri.obj";
+    const auto xml_path = scene_dir / "scene.xml";
+
+    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+    write_default_checkerboard(resource_root);
+    write_text_file(
+        xml_path,
+        R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <bsdf type="diffuse" id="mat_white">
+    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
+  </bsdf>
+  <shape type="obj" id="mesh_a">
+    <string name="filename" value="meshes/tri.obj"/>
+    <ref id="mat_white"/>
+  </shape>
+</scene>)XML"
+    );
+
+    core::Scene scene(1, "scene");
+    resource::ResourceManager resources(2, resource_root);
+    const auto result = import_pbpt_scene_xml_to_scene(
+        make_location(resource_root, xml_path),
+        scene,
+        resources
+    );
+    EXPECT_EQ(result.imported_shape_count, 1u);
+}
+
+TEST(FrameworkPbptSceneImporterTest, AllowsRelativeSceneRootEscapingResourceRoot) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_outside_root_test");
+    const auto resource_root = temp_dir.path / "assets";
+    const auto xml_path = temp_dir.path / "outside_scene" / "scene.xml";
+    const auto mesh_path = temp_dir.path / "outside_scene" / "meshes" / "tri.obj";
+    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+    write_default_checkerboard(resource_root);
+
+    write_text_file(
+        xml_path,
+        R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <bsdf type="diffuse" id="mat_white">
+    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
+  </bsdf>
+  <shape type="obj">
+    <string name="filename" value="meshes/tri.obj"/>
+    <ref id="mat_white"/>
+  </shape>
+</scene>)XML"
+    );
+
+    core::Scene scene(1, "scene");
+    resource::ResourceManager resources(2, resource_root);
+    const auto result = import_pbpt_scene_xml_to_scene(
+        make_pbpt_scene_location("../outside_scene", "scene.xml"),
+        scene,
+        resources
+    );
+    EXPECT_EQ(result.imported_shape_count, 1u);
+}
+
+TEST(FrameworkPbptSceneImporterTest, ThrowsWhenXmlFilenameContainsPathSeparator) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_bad_xml_filename_test");
+    const auto resource_root = temp_dir.path / "assets";
+    resource::ResourceManager resources(2, resource_root);
+    core::Scene scene(1, "scene");
+
+    EXPECT_THROW(
+        (void)import_pbpt_scene_xml_to_scene(
+            make_pbpt_scene_location("pbpt_scene/cbox", "nested/scene.xml"),
+            scene,
+            resources
+        ),
+        std::invalid_argument
+    );
+}
+
+TEST(FrameworkPbptSceneImporterTest, ThrowsWhenMeshFilenameIsNotUnderMeshesDirectory) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_bad_mesh_dir_test");
+    const auto resource_root = temp_dir.path / "assets";
+    const auto scene_dir = resource_root / "pbpt_scene" / "cbox";
+    const auto xml_path = scene_dir / "scene.xml";
+    write_text_file(scene_dir / "models" / "tri.obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+    write_default_checkerboard(resource_root);
+    write_text_file(
+        xml_path,
+        R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <bsdf type="diffuse" id="mat_white">
+    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
+  </bsdf>
+  <shape type="obj">
+    <string name="filename" value="models/tri.obj"/>
+    <ref id="mat_white"/>
+  </shape>
+</scene>)XML"
+    );
+
+    core::Scene scene(1, "scene");
+    resource::ResourceManager resources(2, resource_root);
+    EXPECT_THROW(
+        (void)import_pbpt_scene_xml_to_scene(
+            make_location(resource_root, xml_path),
+            scene,
+            resources
+        ),
+        std::runtime_error
+    );
+}
+
+TEST(FrameworkPbptSceneImporterTest, ThrowsWhenMeshFilenameUsesParentTraversal) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_escape_root_test");
+    const auto resource_root = temp_dir.path / "assets";
+    const auto scene_dir = resource_root / "pbpt_scene" / "cbox";
+    const auto xml_path = scene_dir / "scene.xml";
+
+    write_default_checkerboard(resource_root);
+    write_text_file(
+        xml_path,
+        R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <bsdf type="diffuse" id="mat_white">
+    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
+  </bsdf>
+  <shape type="obj">
+    <string name="filename" value="../../../outside/tri.obj"/>
+    <ref id="mat_white"/>
+  </shape>
+</scene>)XML"
+    );
+
+    core::Scene scene(1, "scene");
+    resource::ResourceManager resources(2, resource_root);
+    EXPECT_THROW(
+        (void)import_pbpt_scene_xml_to_scene(
+            make_location(resource_root, xml_path),
+            scene,
+            resources
+        ),
+        std::runtime_error
+    );
+}
+
+TEST(FrameworkPbptSceneImporterTest, ThrowsWhenMeshFilenameIsAbsolutePath) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_abs_default_test");
+    const auto mesh_path = (temp_dir.path / "meshes" / "tri_abs.obj");
+    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+
+    const auto xml_path = temp_dir.path / "scene_abs_default.xml";
+    const std::string xml =
+        std::string("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                    "<scene version=\"0.4.0\">\n"
+                    "  <bsdf type=\"diffuse\" id=\"mat_white\">\n"
+                    "    <spectrum name=\"reflectance\" value=\"400:0.7, 500:0.7, 600:0.7, 700:0.7\"/>\n"
+                    "  </bsdf>\n"
+                    "  <shape type=\"obj\">\n"
+                    "    <string name=\"filename\" value=\"") +
+        mesh_path.string() +
+        "\"/>\n"
+        "    <ref id=\"mat_white\"/>\n"
+        "  </shape>\n"
+        "</scene>\n";
+    write_text_file(xml_path, xml);
+
+    core::Scene scene(1, "scene");
+    write_default_checkerboard(temp_dir.path);
+    resource::ResourceManager resources(2, temp_dir.path);
+    EXPECT_THROW(
+        (void)import_pbpt_scene_xml_to_scene(
+            make_location(temp_dir.path, xml_path),
+            scene,
+            resources
+        ),
+        std::runtime_error
     );
 }
 

@@ -9,7 +9,7 @@
 
 #include <glm/geometric.hpp>
 
-#include "rtr/utils/obj_loader.hpp"
+#include "rtr/utils/obj_io.hpp"
 
 namespace rtr::utils::test {
 
@@ -41,7 +41,7 @@ void write_text_file(const std::filesystem::path& path, const std::string& conte
 
 } // namespace
 
-TEST(ObjLoaderTest, LoadsTriangleWithUvAndNormal) {
+TEST(ObjIoTest, LoadsTriangleWithUvAndNormal) {
     TempDir temp_dir("rtr_obj_loader_triangle_test");
     const auto obj_path = temp_dir.path / "triangle.obj";
 
@@ -57,7 +57,7 @@ TEST(ObjLoaderTest, LoadsTriangleWithUvAndNormal) {
         "f 1/1/1 2/2/1 3/3/1\n"
     );
 
-    const auto data = load_obj(obj_path.string());
+    const auto data = load_obj_from_path(obj_path.string());
     ASSERT_EQ(data.vertices.size(), 3u);
     ASSERT_EQ(data.indices.size(), 3u);
 
@@ -70,7 +70,7 @@ TEST(ObjLoaderTest, LoadsTriangleWithUvAndNormal) {
     EXPECT_FLOAT_EQ(data.vertices[2].normal.z, 1.0f);
 }
 
-TEST(ObjLoaderTest, ReusesVertexIndicesForSharedVertices) {
+TEST(ObjIoTest, ReusesVertexIndicesForSharedVertices) {
     TempDir temp_dir("rtr_obj_loader_reuse_test");
     const auto obj_path = temp_dir.path / "quad.obj";
 
@@ -84,7 +84,7 @@ TEST(ObjLoaderTest, ReusesVertexIndicesForSharedVertices) {
         "f 1 3 4\n"
     );
 
-    const auto data = load_obj(obj_path.string());
+    const auto data = load_obj_from_path(obj_path.string());
     ASSERT_EQ(data.vertices.size(), 4u);
     ASSERT_EQ(data.indices.size(), 6u);
 
@@ -92,7 +92,7 @@ TEST(ObjLoaderTest, ReusesVertexIndicesForSharedVertices) {
     EXPECT_GE(std::count(data.indices.begin(), data.indices.end(), 2u), 2);
 }
 
-TEST(ObjLoaderTest, GeneratesNormalsWhenInputNormalsMissing) {
+TEST(ObjIoTest, GeneratesNormalsWhenInputNormalsMissing) {
     TempDir temp_dir("rtr_obj_loader_generate_normal_test");
     const auto obj_path = temp_dir.path / "triangle_no_normals.obj";
 
@@ -104,7 +104,7 @@ TEST(ObjLoaderTest, GeneratesNormalsWhenInputNormalsMissing) {
         "f 1 2 3\n"
     );
 
-    const auto data = load_obj(obj_path.string());
+    const auto data = load_obj_from_path(obj_path.string());
     ASSERT_EQ(data.vertices.size(), 3u);
     ASSERT_EQ(data.indices.size(), 3u);
 
@@ -115,7 +115,7 @@ TEST(ObjLoaderTest, GeneratesNormalsWhenInputNormalsMissing) {
     }
 }
 
-TEST(ObjLoaderTest, ThrowsWhenFaceReferencesOutOfRangeVertexIndex) {
+TEST(ObjIoTest, ThrowsWhenFaceReferencesOutOfRangeVertexIndex) {
     TempDir temp_dir("rtr_obj_loader_invalid_index_test");
     const auto obj_path = temp_dir.path / "invalid.obj";
 
@@ -127,9 +127,27 @@ TEST(ObjLoaderTest, ThrowsWhenFaceReferencesOutOfRangeVertexIndex) {
     );
 
     EXPECT_THROW(
-        (void)load_obj(obj_path.string()),
+        (void)load_obj_from_path(obj_path.string()),
         std::runtime_error
     );
+}
+
+TEST(ObjIoTest, WritesObjThatCanBeReadBack) {
+    TempDir temp_dir("rtr_obj_io_write_roundtrip_test");
+    const auto obj_path = temp_dir.path / "roundtrip.obj";
+
+    ObjMeshData mesh{};
+    mesh.vertices = {
+        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
+    };
+    mesh.indices = {0u, 1u, 2u};
+
+    write_obj_to_path(mesh, obj_path.string());
+    const auto loaded = load_obj_from_path(obj_path.string());
+    EXPECT_EQ(loaded.indices.size(), 3u);
+    EXPECT_EQ(loaded.vertices.size(), 3u);
 }
 
 } // namespace rtr::utils::test

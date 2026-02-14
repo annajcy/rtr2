@@ -33,10 +33,15 @@ rtr_add_test(
     utils/file_loader_test.cpp
 )
 rtr_add_test(
-    test_obj_loader
-    utils/obj_loader_test.cpp
+    test_obj_io
+    utils/obj_io_test.cpp
     glm::glm
     tinyobjloader::tinyobjloader
+)
+rtr_add_test(
+    test_image_io
+    utils/image_io_test.cpp
+    stb_impl
 )
 
 # system
@@ -129,7 +134,7 @@ rtr_add_test(
 rtr_add_test(
     test_framework_pbpt_scene_export_builder
     framework/integration/framework_pbpt_scene_export_builder_test.cpp
-    glm::glm
+    rtr
 )
 rtr_add_test(
     test_framework_pbpt_scene_importer

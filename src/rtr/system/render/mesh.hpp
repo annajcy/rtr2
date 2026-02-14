@@ -5,7 +5,6 @@
 #include <cstring>
 #include <memory>
 #include <stdexcept>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -14,16 +13,21 @@
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/command.hpp"
 #include "rtr/rhi/device.hpp"
-#include "rtr/resource/resource_types.hpp"
-#include "rtr/utils/obj_loader.hpp"
+#include "rtr/utils/obj_types.hpp"
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
+
+namespace rtr::resource {
+class ResourceManager;
+}
 
 namespace rtr::system::render {
 
 class Mesh {
 public:
     using Vertex = rtr::utils::ObjVertex;
+
+    friend class rtr::resource::ResourceManager;
 
     static void copy_buffer(
         rhi::Device* device,
@@ -72,15 +76,8 @@ public:
         return buffer;
     }
 
-    static Mesh from_obj(rhi::Device* device, const std::string& filepath) {
-        auto mesh_data = rtr::utils::load_obj(filepath);
-        resource::CpuMeshData cpu_data{};
-        cpu_data.vertices = std::move(mesh_data.vertices);
-        cpu_data.indices = std::move(mesh_data.indices);
-        return from_cpu_data(device, cpu_data);
-    }
-
-    static Mesh from_cpu_data(rhi::Device* device, const resource::CpuMeshData& cpu_data) {
+private:
+    static Mesh from_cpu_data(rhi::Device* device, const utils::ObjMeshData& cpu_data) {
         if (cpu_data.vertices.empty() || cpu_data.indices.empty()) {
             throw std::runtime_error("Mesh CPU data is empty and cannot create GPU buffers.");
         }
@@ -111,6 +108,8 @@ public:
             std::move(index_buffer)
         );
     }
+
+public:
 
     static vk::VertexInputBindingDescription binding_description() {
         vk::VertexInputBindingDescription desc{};
