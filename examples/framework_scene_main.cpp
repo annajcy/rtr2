@@ -4,11 +4,11 @@
 
 #include "imgui.h"
 
-#include "rtr/framework/component/free_look_camera_controller.hpp"
-#include "rtr/framework/component/mesh_renderer.hpp"
+#include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/engine.hpp"
-#include "rtr/framework/integration/forward_scene_view_builder.hpp"
+#include "rtr/system/render/forward/pipeline/forward_scene_view_builder.hpp"
 #include "rtr/system/input/input_system.hpp"
 #include "rtr/system/input/input_types.hpp"
 #include "rtr/system/render/forward_pipeline.hpp"
@@ -116,7 +116,7 @@ int main() {
                 }
 
                 forward_pipeline->set_scene_view(
-                    rtr::framework::integration::build_forward_scene_view(*active_scene)
+                    rtr::system::render::build_forward_scene_view(*active_scene)
                 );
                 renderer->draw_frame();
 

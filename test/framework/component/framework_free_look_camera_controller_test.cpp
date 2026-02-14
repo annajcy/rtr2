@@ -7,7 +7,7 @@
 #include <glm/trigonometric.hpp>
 
 #include "rtr/framework/component/component.hpp"
-#include "rtr/framework/component/free_look_camera_controller.hpp"
+#include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/scene_graph.hpp"
 #include "rtr/system/input/input_state.hpp"

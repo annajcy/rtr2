@@ -3,8 +3,8 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/mesh_renderer.hpp"
-#include "rtr/framework/component/pbpt_mesh.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/scene.hpp"
 
 namespace rtr::framework::component::test {

@@ -76,6 +76,7 @@ jobs:
               libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev
               uuid-dev libgl1-mesa-dev libglvnd-dev libwayland-dev libxkbcommon-dev
               libxcursor-dev libxinerama-dev libxcb-cursor-dev libxcb-util-dev libxcb-util0-dev
+              xvfb
             )
             sudo apt-get install -y --no-install-recommends "${pkgs[@]}"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
@@ -208,11 +209,21 @@ jobs:
         run: |
           set -e
           source build/${{ matrix.build_type }}/generators/conanrun.sh
-          ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
+          ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} -LE integration --output-on-failure
+
+      - name: GPU Integration Tests (non-blocking, Ubuntu Debug)
+        if: runner.os == 'Linux' && matrix.build_type == 'Debug'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -e
+          source build/${{ matrix.build_type }}/generators/conanrun.sh
+          xvfb-run -a env RTR_RUN_GPU_TESTS=1 \
+            ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} -L integration --output-on-failure
 
       - name: Test (${{ matrix.build_type }}) on Windows
         if: runner.os == 'Windows'
         shell: cmd
         run: |
           call "build\${{ matrix.build_type }}\generators\conanrun.bat"
-          ctest --test-dir "build\${{ matrix.build_type }}" --output-on-failure
+          ctest --test-dir "build\${{ matrix.build_type }}" -LE integration --output-on-failure

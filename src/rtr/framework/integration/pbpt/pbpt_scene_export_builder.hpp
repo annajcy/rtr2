@@ -13,9 +13,9 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
-#include "rtr/framework/component/mesh_renderer.hpp"
-#include "rtr/framework/component/pbpt_light.hpp"
-#include "rtr/framework/component/pbpt_mesh.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/pbpt/pbpt_light.hpp"
+#include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
 

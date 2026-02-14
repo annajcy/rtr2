@@ -1,130 +1,160 @@
 include(CTest)
 include(GoogleTest)
 
-add_executable(event_center_test
-    event_center_test.cpp
-)
-target_include_directories(event_center_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(event_center_test PRIVATE gtest::gtest)
-gtest_discover_tests(event_center_test)
+function(rtr_add_test TARGET_NAME TEST_SOURCE)
+    add_executable(${TARGET_NAME} ${TEST_SOURCE})
+    target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(${TARGET_NAME} PRIVATE gtest::gtest ${ARGN})
+    gtest_discover_tests(
+        ${TARGET_NAME}
+        DISCOVERY_TIMEOUT 60
+        PROPERTIES LABELS "unit"
+    )
+endfunction()
 
-add_executable(input_system_test
-    input_system_test.cpp
-)
-target_include_directories(input_system_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(input_system_test PRIVATE gtest::gtest glfw Vulkan::Loader)
-gtest_discover_tests(input_system_test)
+function(rtr_add_integration_test TARGET_NAME TEST_SOURCE)
+    add_executable(${TARGET_NAME} ${TEST_SOURCE})
+    target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(${TARGET_NAME} PRIVATE gtest::gtest ${ARGN})
+    gtest_discover_tests(
+        ${TARGET_NAME}
+        DISCOVERY_TIMEOUT 60
+        PROPERTIES LABELS "integration;gpu"
+    )
+endfunction()
 
-add_executable(framework_engine_test
-    framework_engine_test.cpp
+# utils
+rtr_add_test(
+    test_event_center
+    utils/event_center_test.cpp
 )
-target_include_directories(framework_engine_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_engine_test PRIVATE gtest::gtest glm::glm)
-gtest_discover_tests(framework_engine_test)
+rtr_add_test(
+    test_file_loader
+    utils/file_loader_test.cpp
+)
+rtr_add_test(
+    test_obj_loader
+    utils/obj_loader_test.cpp
+    glm::glm
+    tinyobjloader::tinyobjloader
+)
 
-add_executable(framework_world_scene_test
-    framework_world_scene_test.cpp
+# system
+rtr_add_test(
+    test_input_system
+    system/input/input_system_test.cpp
+    glfw
+    Vulkan::Loader
 )
-target_include_directories(framework_world_scene_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_world_scene_test PRIVATE gtest::gtest glm::glm)
-gtest_discover_tests(framework_world_scene_test)
+rtr_add_test(
+    test_framework_forward_scene_view_builder
+    system/render/framework_forward_scene_view_builder_test.cpp
+    glm::glm
+)
+rtr_add_test(
+    test_pipeline_base
+    system/render/pipeline_base_test.cpp
+    rtr
+)
+rtr_add_integration_test(
+    test_frame_scheduler_integration
+    system/render/frame_scheduler_integration_test.cpp
+    rtr
+)
+rtr_add_integration_test(
+    test_renderer_integration
+    system/render/renderer_integration_test.cpp
+    rtr
+)
 
-add_executable(framework_scene_graph_test
-    framework_scene_graph_test.cpp
+# framework/core
+rtr_add_test(
+    test_framework_engine
+    framework/core/framework_engine_test.cpp
+    glm::glm
 )
-target_include_directories(framework_scene_graph_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_scene_graph_test PRIVATE gtest::gtest glm::glm)
-gtest_discover_tests(framework_scene_graph_test)
+rtr_add_test(
+    test_framework_world_scene
+    framework/core/framework_world_scene_test.cpp
+    glm::glm
+)
+rtr_add_test(
+    test_framework_scene_graph
+    framework/core/framework_scene_graph_test.cpp
+    glm::glm
+)
+rtr_add_test(
+    test_framework_camera
+    framework/core/framework_camera_test.cpp
+    glm::glm
+)
 
-add_executable(framework_camera_test
-    framework_camera_test.cpp
+# framework/component
+rtr_add_test(
+    test_framework_mesh_renderer
+    framework/component/framework_mesh_renderer_test.cpp
+    glm::glm
 )
-target_include_directories(framework_camera_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_camera_test PRIVATE gtest::gtest glm::glm)
-gtest_discover_tests(framework_camera_test)
+rtr_add_test(
+    test_framework_pbpt_mesh
+    framework/component/framework_pbpt_mesh_test.cpp
+    glm::glm
+)
+rtr_add_test(
+    test_framework_pbpt_light
+    framework/component/framework_pbpt_light_test.cpp
+    glm::glm
+)
+rtr_add_test(
+    test_pbpt_spectrum
+    framework/component/pbpt_spectrum_test.cpp
+)
+rtr_add_test(
+    test_framework_free_look_camera_controller
+    framework/component/framework_free_look_camera_controller_test.cpp
+    glm::glm
+    glfw
+    Vulkan::Loader
+)
+rtr_add_test(
+    test_framework_trackball_camera_controller
+    framework/component/framework_trackball_camera_controller_test.cpp
+    glm::glm
+    glfw
+    Vulkan::Loader
+)
 
-add_executable(framework_mesh_renderer_test
-    framework_mesh_renderer_test.cpp
+# framework/integration
+rtr_add_test(
+    test_framework_pbpt_scene_export_builder
+    framework/integration/framework_pbpt_scene_export_builder_test.cpp
+    glm::glm
 )
-target_include_directories(framework_mesh_renderer_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_mesh_renderer_test PRIVATE gtest::gtest glm::glm)
-gtest_discover_tests(framework_mesh_renderer_test)
+rtr_add_test(
+    test_framework_pbpt_scene_importer
+    framework/integration/framework_pbpt_scene_importer_test.cpp
+    rtr
+)
 
-add_executable(framework_pbpt_mesh_test
-    framework_pbpt_mesh_test.cpp
+# rhi
+rtr_add_test(
+    test_image_transition
+    rhi/image_transition_test.cpp
+    rtr
 )
-target_include_directories(framework_pbpt_mesh_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_pbpt_mesh_test PRIVATE gtest::gtest glm::glm)
-gtest_discover_tests(framework_pbpt_mesh_test)
-
-add_executable(framework_pbpt_light_test
-    framework_pbpt_light_test.cpp
-)
-target_include_directories(framework_pbpt_light_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_pbpt_light_test PRIVATE gtest::gtest glm::glm)
-gtest_discover_tests(framework_pbpt_light_test)
-
-add_executable(framework_forward_scene_view_builder_test
-    framework_forward_scene_view_builder_test.cpp
-)
-target_include_directories(framework_forward_scene_view_builder_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_forward_scene_view_builder_test PRIVATE gtest::gtest glm::glm)
-gtest_discover_tests(framework_forward_scene_view_builder_test)
-
-add_executable(framework_pbpt_scene_export_builder_test
-    framework_pbpt_scene_export_builder_test.cpp
-)
-target_include_directories(framework_pbpt_scene_export_builder_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_pbpt_scene_export_builder_test PRIVATE gtest::gtest glm::glm)
-gtest_discover_tests(framework_pbpt_scene_export_builder_test)
-
-add_executable(framework_pbpt_scene_importer_test
-    framework_pbpt_scene_importer_test.cpp
-)
-target_include_directories(framework_pbpt_scene_importer_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(framework_pbpt_scene_importer_test PRIVATE gtest::gtest rtr)
-gtest_discover_tests(framework_pbpt_scene_importer_test)
 
 if(RTR_ENABLE_PBPT_RUNTIME)
-    add_executable(framework_pbpt_offline_render_service_test
-        framework_pbpt_offline_render_service_test.cpp
+    rtr_add_test(
+        test_framework_pbpt_offline_render_service
+        framework/integration/framework_pbpt_offline_render_service_test.cpp
+        rtr_framework_integration
+        rtr
     )
-    target_include_directories(framework_pbpt_offline_render_service_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-    target_link_libraries(framework_pbpt_offline_render_service_test PRIVATE gtest::gtest rtr_framework_integration rtr)
-    gtest_discover_tests(framework_pbpt_offline_render_service_test)
 else()
-    add_executable(framework_pbpt_offline_render_service_stub_test
-        framework_pbpt_offline_render_service_stub_test.cpp
+    rtr_add_test(
+        test_framework_pbpt_offline_render_service_stub
+        framework/integration/framework_pbpt_offline_render_service_stub_test.cpp
+        rtr_framework_integration
+        rtr
     )
-    target_include_directories(framework_pbpt_offline_render_service_stub_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-    target_link_libraries(framework_pbpt_offline_render_service_stub_test PRIVATE gtest::gtest rtr_framework_integration rtr)
-    gtest_discover_tests(framework_pbpt_offline_render_service_stub_test)
 endif()
-
-add_executable(framework_free_look_camera_controller_test
-    framework_free_look_camera_controller_test.cpp
-)
-target_include_directories(framework_free_look_camera_controller_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(
-    framework_free_look_camera_controller_test
-    PRIVATE
-        gtest::gtest
-        glm::glm
-        glfw
-        Vulkan::Loader
-)
-gtest_discover_tests(framework_free_look_camera_controller_test)
-
-add_executable(framework_trackball_camera_controller_test
-    framework_trackball_camera_controller_test.cpp
-)
-target_include_directories(framework_trackball_camera_controller_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(
-    framework_trackball_camera_controller_test
-    PRIVATE
-        gtest::gtest
-        glm::glm
-        glfw
-        Vulkan::Loader
-)
-gtest_discover_tests(framework_trackball_camera_controller_test)

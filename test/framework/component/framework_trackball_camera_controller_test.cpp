@@ -6,7 +6,7 @@
 #include <glm/geometric.hpp>
 #include <glm/trigonometric.hpp>
 
-#include "rtr/framework/component/trackball_camera_controller.hpp"
+#include "rtr/framework/component/camera_control/trackball_camera_controller.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/system/input/input_state.hpp"
 #include "rtr/system/input/input_types.hpp"

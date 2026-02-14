@@ -6,9 +6,9 @@
 
 #include <glm/gtc/quaternion.hpp>
 
-#include "rtr/framework/component/mesh_renderer.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
-#include "rtr/framework/integration/forward_scene_view_builder.hpp"
+#include "rtr/system/render/forward/pipeline/forward_scene_view_builder.hpp"
 
 namespace rtr::framework::integration::test {
 
@@ -26,7 +26,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ThrowsWhenNoActiveCamera) {
     (void)go.add_component<component::MeshRenderer>("assets/models/spot.obj", "");
 
     EXPECT_THROW(
-        (void)build_forward_scene_view(scene),
+        (void)system::render::build_forward_scene_view(scene),
         std::runtime_error
     );
 }
@@ -51,7 +51,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ExtractsOnlyActiveNodesWithMeshRender
 
     parent.set_enabled(false);
 
-    const auto view = build_forward_scene_view(scene);
+    const auto view = system::render::build_forward_scene_view(scene);
     std::vector<std::uint64_t> ids{};
     ids.reserve(view.renderables.size());
     for (const auto& renderable : view.renderables) {
@@ -78,7 +78,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ComputesModelAndNormalFromWorldTransf
     node.set_local_scale({2.0f, 1.5f, 0.5f});
     scene.scene_graph().update_world_transforms();
 
-    const auto view = build_forward_scene_view(scene);
+    const auto view = system::render::build_forward_scene_view(scene);
     auto it = std::find_if(
         view.renderables.begin(),
         view.renderables.end(),

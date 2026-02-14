@@ -10,10 +10,10 @@
 
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
-#include "rtr/framework/component/mesh_renderer.hpp"
-#include "rtr/framework/component/pbpt_light.hpp"
-#include "rtr/framework/component/pbpt_mesh.hpp"
-#include "rtr/framework/integration/pbpt_offline_render_service.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/pbpt/pbpt_light.hpp"
+#include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
+#include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
 
 namespace rtr::framework::integration::testing {
 

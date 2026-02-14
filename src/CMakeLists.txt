@@ -17,9 +17,9 @@ target_link_libraries(rtr INTERFACE
     pugixml::pugixml
 )
 
-set(RTR_FRAMEWORK_INTEGRATION_SOURCE rtr/framework/integration/pbpt_offline_render_service.cpp)
+set(RTR_FRAMEWORK_INTEGRATION_SOURCE rtr/framework/integration/pbpt/pbpt_offline_render_service.cpp)
 if(NOT RTR_ENABLE_PBPT_RUNTIME)
-  set(RTR_FRAMEWORK_INTEGRATION_SOURCE rtr/framework/integration/pbpt_offline_render_service_stub.cpp)
+  set(RTR_FRAMEWORK_INTEGRATION_SOURCE rtr/framework/integration/pbpt/pbpt_offline_render_service_stub.cpp)
 endif()
 
 add_library(rtr_framework_integration STATIC

@@ -10,11 +10,11 @@
 
 #include <glm/mat4x4.hpp>
 
-#include "rtr/framework/component/mesh_renderer.hpp"
-#include "rtr/framework/component/pbpt_light.hpp"
-#include "rtr/framework/component/pbpt_mesh.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/pbpt/pbpt_light.hpp"
+#include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/scene.hpp"
-#include "rtr/framework/integration/pbpt_scene_export_builder.hpp"
+#include "rtr/framework/integration/pbpt/pbpt_scene_export_builder.hpp"
 
 namespace rtr::framework::integration::test {
 

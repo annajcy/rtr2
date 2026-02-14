@@ -1,23 +1,22 @@
 #pragma once
 
 #include <stdexcept>
-#include <utility>
 
 #include <glm/gtc/matrix_inverse.hpp>
 
-#include "rtr/framework/component/mesh_renderer.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/system/render/forward_scene_view.hpp"
 
-namespace rtr::framework::integration {
+namespace rtr::system::render {
 
-inline system::render::ForwardSceneView build_forward_scene_view(const core::Scene& scene) {
+inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& scene) {
     const auto* active_camera = scene.active_camera();
     if (active_camera == nullptr) {
         throw std::runtime_error("Active scene does not have an active camera.");
     }
 
-    system::render::ForwardSceneView view{};
+    ForwardSceneView view{};
     view.camera.view = active_camera->view_matrix();
     view.camera.proj = active_camera->projection_matrix();
 
@@ -29,7 +28,7 @@ inline system::render::ForwardSceneView build_forward_scene_view(const core::Sce
         if (go == nullptr) {
             continue;
         }
-        const auto* mesh_renderer = go->get_component<component::MeshRenderer>();
+        const auto* mesh_renderer = go->get_component<framework::component::MeshRenderer>();
         if (mesh_renderer == nullptr) {
             continue;
         }
@@ -38,7 +37,7 @@ inline system::render::ForwardSceneView build_forward_scene_view(const core::Sce
         const glm::mat4 model = node.world_matrix();
         const glm::mat4 normal = glm::transpose(glm::inverse(model));
 
-        view.renderables.emplace_back(system::render::ForwardSceneRenderable{
+        view.renderables.emplace_back(ForwardSceneRenderable{
             .instance_id = static_cast<std::uint64_t>(id),
             .mesh_path = mesh_renderer->mesh_path(),
             .albedo_texture_path = mesh_renderer->albedo_texture_path(),
@@ -50,4 +49,4 @@ inline system::render::ForwardSceneView build_forward_scene_view(const core::Sce
     return view;
 }
 
-} // namespace rtr::framework::integration
+} // namespace rtr::system::render

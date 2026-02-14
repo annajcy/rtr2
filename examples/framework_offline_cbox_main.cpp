@@ -13,9 +13,9 @@
 
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/engine.hpp"
-#include "rtr/framework/integration/forward_scene_view_builder.hpp"
-#include "rtr/framework/integration/pbpt_offline_render_service.hpp"
-#include "rtr/framework/integration/pbpt_scene_importer.hpp"
+#include "rtr/system/render/forward/pipeline/forward_scene_view_builder.hpp"
+#include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
+#include "rtr/framework/integration/pbpt/pbpt_scene_importer.hpp"
 #include "rtr/system/input/input_system.hpp"
 #include "rtr/system/input/input_types.hpp"
 #include "rtr/system/render/forward_pipeline.hpp"
@@ -322,7 +322,7 @@ int main() {
                 }
 
                 forward_pipeline->set_scene_view(
-                    rtr::framework::integration::build_forward_scene_view(*active_scene)
+                    rtr::system::render::build_forward_scene_view(*active_scene)
                 );
                 renderer->draw_frame();
 

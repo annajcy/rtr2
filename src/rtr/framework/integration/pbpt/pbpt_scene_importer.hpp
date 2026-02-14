@@ -17,14 +17,14 @@
 #include <glm/vec3.hpp>
 #include <pugixml.hpp>
 
-#include "rtr/framework/component/mesh_renderer.hpp"
-#include "rtr/framework/component/free_look_camera_controller.hpp"
-#include "rtr/framework/component/pbpt_light.hpp"
-#include "rtr/framework/component/pbpt_mesh.hpp"
-#include "rtr/framework/component/pbpt_spectrum.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
+#include "rtr/framework/component/pbpt/pbpt_light.hpp"
+#include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
+#include "rtr/framework/component/pbpt/pbpt_spectrum.hpp"
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
-#include "rtr/framework/integration/pbpt_scene_export_builder.hpp"
+#include "rtr/framework/integration/pbpt/pbpt_scene_export_builder.hpp"
 #include "rtr/system/input/input_state.hpp"
 
 namespace rtr::framework::integration {

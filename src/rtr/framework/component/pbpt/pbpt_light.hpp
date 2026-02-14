@@ -5,8 +5,8 @@
 #include <utility>
 
 #include "rtr/framework/component/component.hpp"
-#include "rtr/framework/component/mesh_renderer.hpp"
-#include "rtr/framework/component/pbpt_spectrum.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/pbpt/pbpt_spectrum.hpp"
 #include "rtr/framework/core/game_object.hpp"
 
 namespace rtr::framework::component {

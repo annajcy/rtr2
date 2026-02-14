@@ -3,7 +3,7 @@
 #include <string>
 
 #include "rtr/framework/core/scene.hpp"
-#include "rtr/framework/integration/pbpt_offline_render_service.hpp"
+#include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
 
 namespace rtr::framework::integration::testing {
 
