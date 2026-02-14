@@ -14,6 +14,18 @@
 #include "vulkan/vulkan_enums.hpp"
 #include <cstdint>
 
+namespace rtr::framework::core {
+class World;
+}
+
+namespace rtr::resource {
+class ResourceManager;
+}
+
+namespace rtr::system::input {
+class InputSystem;
+}
+
 namespace rtr::system::render {
 
 struct PipelineRuntime {
@@ -39,6 +51,26 @@ public:
 
     // Renderer owns command buffer begin/end/reset/submit; pipeline only records draw commands.
     virtual void render(FrameContext& ctx) = 0;
+};
+
+struct FramePrepareContext {
+    framework::core::World& world;
+    resource::ResourceManager& resources;
+    system::input::InputSystem& input;
+    std::uint64_t frame_serial{0};
+    double delta_seconds{0.0};
+};
+
+class IFramePreparePipeline {
+public:
+    virtual ~IFramePreparePipeline() = default;
+    virtual void prepare_frame(const FramePrepareContext& ctx) = 0;
+};
+
+class IResourceAwarePipeline {
+public:
+    virtual ~IResourceAwarePipeline() = default;
+    virtual void set_resource_manager(resource::ResourceManager* manager) = 0;
 };
 
 struct SwapchainChangeSummary {

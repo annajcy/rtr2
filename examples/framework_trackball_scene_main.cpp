@@ -1,18 +1,16 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 
 #include "imgui.h"
 
+#include "rtr/app/app_runtime.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/camera_control/trackball_camera_controller.hpp"
 #include "rtr/framework/core/camera.hpp"
-#include "rtr/framework/core/engine.hpp"
-#include "rtr/system/render/forward/pipeline/forward_scene_view_builder.hpp"
-#include "rtr/system/input/input_system.hpp"
 #include "rtr/system/input/input_types.hpp"
 #include "rtr/system/render/forward_pipeline.hpp"
-#include "rtr/system/render/renderer.hpp"
 
 int main() {
     constexpr uint32_t kWidth = 1280;
@@ -20,15 +18,15 @@ int main() {
     constexpr uint32_t kMaxFramesInFlight = 2;
 
     try {
-        auto renderer = std::make_unique<rtr::system::render::Renderer>(
-            static_cast<int>(kWidth),
-            static_cast<int>(kHeight),
-            "RTR Framework TrackBall Scene",
-            kMaxFramesInFlight
-        );
+        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
+            .window_width = kWidth,
+            .window_height = kHeight,
+            .window_title = "RTR Framework TrackBall Scene",
+            .max_frames_in_flight = kMaxFramesInFlight
+        });
 
         auto pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
-            renderer->build_pipeline_runtime(),
+            runtime.renderer().build_pipeline_runtime(),
             rtr::system::render::ForwardPipelineConfig{}
         );
         auto* forward_pipeline = pipeline.get();
@@ -43,31 +41,23 @@ int main() {
             ImGui::End();
         });
 
-        auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
-        input_system->set_is_intercept_capture([forward_pipeline](bool is_mouse) {
+        runtime.input_system().set_is_intercept_capture([forward_pipeline](bool is_mouse) {
             if (is_mouse) {
                 return forward_pipeline->imgui_pass().wants_capture_mouse();
             }
             return forward_pipeline->imgui_pass().wants_capture_keyboard();
         });
 
-        renderer->set_pipeline(std::move(pipeline));
+        runtime.set_pipeline(std::move(pipeline));
 
-        rtr::framework::core::Engine engine(rtr::framework::core::EngineConfig{
-            .window_width = kWidth,
-            .window_height = kHeight,
-            .window_title = "RTR Framework TrackBall Scene",
-            .max_frames_in_flight = kMaxFramesInFlight
-        });
-
-        auto& scene = engine.world().create_scene("main_scene");
+        auto& scene = runtime.world().create_scene("main_scene");
 
         auto& camera_go = scene.create_game_object("main_camera");
         auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
         camera.set_aspect_ratio(static_cast<float>(kWidth) / static_cast<float>(kHeight));
         camera_go.node().set_local_position({0.0f, 2.0f, -8.0f});
         auto& trackball = camera_go.add_component<rtr::framework::component::TrackBallCameraController>(
-            &input_system->state(),
+            &runtime.input_system().state(),
             &scene.camera_manager()
         );
         trackball.set_target({0.0f, 0.0f, 0.0f});
@@ -93,12 +83,9 @@ int main() {
         );
         go_c.node().set_local_position({2.5f, 0.0f, 0.0f});
 
-        engine.set_loop_hooks(rtr::framework::core::Engine::LoopHooks{
-            .input_begin = [&]() { input_system->begin_frame(); },
-            .input_poll = [&]() { renderer->window().poll_events(); },
-            .input_end = [&]() { input_system->end_frame(); },
-            .render = [&]() {
-                auto* active_scene = engine.world().active_scene();
+        runtime.set_callbacks(rtr::app::RuntimeCallbacks{
+            .on_pre_render = [](rtr::app::RuntimeContext& ctx) {
+                auto* active_scene = ctx.world.active_scene();
                 if (active_scene == nullptr) {
                     throw std::runtime_error("No active scene.");
                 }
@@ -108,27 +95,23 @@ int main() {
                     throw std::runtime_error("Active scene has no active camera.");
                 }
 
-                const auto [fb_w, fb_h] = renderer->window().framebuffer_size();
+                const auto [fb_w, fb_h] = ctx.renderer.window().framebuffer_size();
                 if (fb_w > 0 && fb_h > 0) {
                     active_camera->set_aspect_ratio(
                         static_cast<float>(fb_w) / static_cast<float>(fb_h)
                     );
                 }
 
-                forward_pipeline->set_scene_view(
-                    rtr::system::render::build_forward_scene_view(*active_scene)
-                );
-                renderer->draw_frame();
-
-                if (input_system->state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
-                    renderer->window().close();
+                if (ctx.input.state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
+                    ctx.renderer.window().close();
                 }
-            },
-            .should_close = [&]() { return renderer->window().is_should_close(); }
+            }
         });
 
-        engine.run();
-        renderer->device().wait_idle();
+        const auto result = runtime.run();
+        if (!result.ok) {
+            throw std::runtime_error(result.error_message);
+        }
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;

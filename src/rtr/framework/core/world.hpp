@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -10,6 +11,10 @@
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/types.hpp"
 
+namespace rtr::resource {
+class ResourceManager;
+}
+
 namespace rtr::framework::core {
 
 class World {
@@ -17,6 +22,7 @@ private:
     SceneId m_next_scene_id{1};
     SceneId m_active_scene_id{core::kInvalidSceneId};
     std::vector<std::unique_ptr<Scene>> m_scenes{};
+    resource::ResourceManager* m_resource_manager{};
 
 public:
     World() = default;
@@ -97,6 +103,24 @@ public:
 
     std::size_t scene_count() const {
         return m_scenes.size();
+    }
+
+    void set_resource_manager(resource::ResourceManager* resource_manager) {
+        m_resource_manager = resource_manager;
+    }
+
+    resource::ResourceManager& resource_manager() {
+        if (m_resource_manager == nullptr) {
+            throw std::runtime_error("World resource manager is not bound.");
+        }
+        return *m_resource_manager;
+    }
+
+    const resource::ResourceManager& resource_manager() const {
+        if (m_resource_manager == nullptr) {
+            throw std::runtime_error("World resource manager is not bound.");
+        }
+        return *m_resource_manager;
     }
 
     void fixed_tick(const FixedTickContext& ctx) {

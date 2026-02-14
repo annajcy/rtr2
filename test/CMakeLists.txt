@@ -49,6 +49,7 @@ rtr_add_test(
 rtr_add_test(
     test_framework_forward_scene_view_builder
     system/render/framework_forward_scene_view_builder_test.cpp
+    rtr
     glm::glm
 )
 rtr_add_test(
@@ -158,3 +159,10 @@ else()
         rtr
     )
 endif()
+
+# resource
+rtr_add_test(
+    test_resource_manager_lifecycle
+    resource/resource_manager_lifecycle_test.cpp
+    rtr
+)

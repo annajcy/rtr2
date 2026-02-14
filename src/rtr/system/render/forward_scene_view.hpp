@@ -1,10 +1,11 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include <vector>
 
 #include <glm/mat4x4.hpp>
+
+#include "rtr/resource/resource_types.hpp"
 
 namespace rtr::system::render {
 
@@ -15,8 +16,8 @@ struct ForwardSceneCameraData {
 
 struct ForwardSceneRenderable {
     std::uint64_t instance_id{0};
-    std::string mesh_path{};
-    std::string albedo_texture_path{};
+    resource::MeshHandle mesh{};
+    resource::TextureHandle albedo_texture{};
     glm::mat4 model{1.0f};
     glm::mat4 normal{1.0f};
 };

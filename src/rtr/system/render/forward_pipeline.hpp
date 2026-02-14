@@ -11,10 +11,13 @@
 #include <utility>
 #include <vector>
 
+#include "rtr/framework/core/world.hpp"
+#include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/descriptor.hpp"
 #include "rtr/rhi/shader_module.hpp"
 #include "rtr/rhi/texture.hpp"
+#include "rtr/system/render/forward/pipeline/forward_scene_view_builder.hpp"
 #include "rtr/system/render/forward_scene_view.hpp"
 #include "rtr/system/render/mesh.hpp"
 #include "rtr/system/render/pipeline.hpp"
@@ -203,10 +206,16 @@ public:
     }
 };
 
-class ForwardPipeline : public RenderPipelineBase {
+class ForwardPipeline : public RenderPipelineBase,
+                        public IFramePreparePipeline,
+                        public IResourceAwarePipeline {
 private:
     static constexpr uint32_t kMaxRenderables = 256;
     static constexpr uint32_t kMaxTextures = 256;
+
+    struct TextureSetCacheEntry {
+        vk::raii::DescriptorSet set{nullptr};
+    };
 
     vk::raii::PipelineLayout m_pipeline_layout{nullptr};
     vk::raii::Pipeline m_pipeline{nullptr};
@@ -225,9 +234,8 @@ private:
     std::unique_ptr<rhi::DescriptorSetLayout> m_texture_layout{nullptr};
     std::unique_ptr<rhi::DescriptorPool> m_descriptor_pool{nullptr};
 
-    std::unordered_map<std::string, std::unique_ptr<render::Mesh>> m_mesh_cache{};
-    std::unordered_map<std::string, std::unique_ptr<rhi::Image>> m_texture_cache{};
-    std::unordered_map<std::string, vk::raii::DescriptorSet> m_texture_sets{};
+    resource::ResourceManager* m_resource_manager{};
+    std::unordered_map<resource::TextureHandle, TextureSetCacheEntry> m_texture_sets{};
     std::unique_ptr<rhi::Sampler> m_texture_sampler{nullptr};
 
     std::unique_ptr<render::ForwardPass> m_forward_pass{nullptr};
@@ -324,6 +332,19 @@ public:
         m_descriptor_pool.reset();
     }
 
+    void set_resource_manager(resource::ResourceManager* manager) override {
+        m_resource_manager = manager;
+        m_texture_sets.clear();
+    }
+
+    void prepare_frame(const FramePrepareContext& ctx) override {
+        auto* active_scene = ctx.world.active_scene();
+        if (active_scene == nullptr) {
+            throw std::runtime_error("ForwardPipeline prepare_frame requires an active scene.");
+        }
+        set_scene_view(build_forward_scene_view(*active_scene, ctx.resources));
+    }
+
     void set_scene_view(ForwardSceneView scene_view) {
         m_scene_view = std::move(scene_view);
     }
@@ -365,6 +386,9 @@ public:
         if (extent.width == 0 || extent.height == 0) {
             return;
         }
+        if (m_resource_manager == nullptr) {
+            throw std::runtime_error("ForwardPipeline requires resource manager before render().");
+        }
         if (!m_scene_view.has_value()) {
             throw std::runtime_error("ForwardPipeline requires scene view before render().");
         }
@@ -390,14 +414,15 @@ public:
 
         auto& frame_uniform_buffers = m_object_uniform_buffers[frame_index];
         auto& frame_sets = m_object_sets[frame_index];
+        prune_dead_texture_sets();
 
         std::vector<ForwardPass::DrawItem> draw_items{};
         draw_items.reserve(scene_view.renderables.size());
 
         for (std::size_t i = 0; i < scene_view.renderables.size(); ++i) {
             const auto& renderable = scene_view.renderables[i];
-            auto& mesh = require_mesh(renderable.mesh_path);
-            auto& texture_set = require_texture_set(renderable.albedo_texture_path);
+            auto& mesh = require_mesh(renderable.mesh);
+            auto& texture_set = require_texture_set(renderable.albedo_texture);
 
             UniformBufferObject ubo{};
             ubo.model = renderable.model;
@@ -427,54 +452,59 @@ public:
     }
 
 private:
-    render::Mesh& require_mesh(const std::string& mesh_path) {
-        if (mesh_path.empty()) {
-            throw std::runtime_error("Renderable mesh_path is empty.");
+    void prune_dead_texture_sets() {
+        if (m_resource_manager == nullptr) {
+            return;
         }
-
-        if (auto it = m_mesh_cache.find(mesh_path); it != m_mesh_cache.end()) {
-            return *it->second;
-        }
-
-        auto mesh = std::make_unique<render::Mesh>(render::Mesh::from_obj(m_device, mesh_path));
-        render::Mesh* ptr = mesh.get();
-        m_mesh_cache.emplace(mesh_path, std::move(mesh));
-        return *ptr;
+        std::erase_if(m_texture_sets, [&](const auto& item) {
+            return !m_resource_manager->texture_alive(item.first);
+        });
     }
 
-    vk::raii::DescriptorSet& require_texture_set(const std::string& texture_path) {
-        if (texture_path.empty()) {
-            throw std::runtime_error("Renderable albedo_texture_path is empty.");
+    render::Mesh& require_mesh(resource::MeshHandle mesh_handle) {
+        if (!mesh_handle.is_valid()) {
+            throw std::runtime_error("Renderable mesh handle is invalid.");
+        }
+        if (m_resource_manager == nullptr) {
+            throw std::runtime_error("ForwardPipeline missing resource manager.");
+        }
+        return m_resource_manager->require_mesh_rhi(mesh_handle, m_device);
+    }
+
+    vk::raii::DescriptorSet& require_texture_set(resource::TextureHandle texture_handle) {
+        if (!texture_handle.is_valid()) {
+            throw std::runtime_error("Renderable texture handle is invalid.");
+        }
+        if (m_resource_manager == nullptr) {
+            throw std::runtime_error("ForwardPipeline missing resource manager.");
         }
 
-        if (auto it = m_texture_sets.find(texture_path); it != m_texture_sets.end()) {
-            return it->second;
+        if (auto it = m_texture_sets.find(texture_handle); it != m_texture_sets.end()) {
+            return it->second.set;
         }
 
-        if (m_texture_sets.size() >= kMaxTextures) {
+        const bool is_new_handle = m_texture_sets.find(texture_handle) == m_texture_sets.end();
+        if (is_new_handle && m_texture_sets.size() >= kMaxTextures) {
             throw std::runtime_error("Texture count exceeds preallocated ForwardPipeline capacity.");
         }
 
-        auto image = std::make_unique<rhi::Image>(
-            rhi::Image::create_image_from_file(m_device, texture_path, true)
-        );
-        rhi::Image* image_ptr = image.get();
+        rhi::Image& image = m_resource_manager->require_texture_rhi(texture_handle, m_device);
 
         auto descriptor_set = m_descriptor_pool->allocate(*m_texture_layout);
         {
             rhi::DescriptorWriter writer;
             writer.write_combined_image(
                 0,
-                *image_ptr->image_view(),
+                *image.image_view(),
                 *m_texture_sampler->sampler(),
                 vk::ImageLayout::eShaderReadOnlyOptimal
             );
             writer.update(m_device, *descriptor_set);
         }
 
-        m_texture_cache.emplace(texture_path, std::move(image));
-        auto [inserted_it, _] = m_texture_sets.emplace(texture_path, std::move(descriptor_set));
-        return inserted_it->second;
+        auto& entry = m_texture_sets[texture_handle];
+        entry.set = std::move(descriptor_set);
+        return entry.set;
     }
 
     void create_per_object_resources() {

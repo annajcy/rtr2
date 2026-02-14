@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -13,6 +14,7 @@
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/command.hpp"
 #include "rtr/rhi/device.hpp"
+#include "rtr/resource/resource_types.hpp"
 #include "rtr/utils/obj_loader.hpp"
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
@@ -72,15 +74,22 @@ public:
 
     static Mesh from_obj(rhi::Device* device, const std::string& filepath) {
         auto mesh_data = rtr::utils::load_obj(filepath);
-        if (mesh_data.vertices.empty() || mesh_data.indices.empty()) {
-            throw std::runtime_error("OBJ file is empty or contains no valid faces: " + filepath);
+        resource::CpuMeshData cpu_data{};
+        cpu_data.vertices = std::move(mesh_data.vertices);
+        cpu_data.indices = std::move(mesh_data.indices);
+        return from_cpu_data(device, cpu_data);
+    }
+
+    static Mesh from_cpu_data(rhi::Device* device, const resource::CpuMeshData& cpu_data) {
+        if (cpu_data.vertices.empty() || cpu_data.indices.empty()) {
+            throw std::runtime_error("Mesh CPU data is empty and cannot create GPU buffers.");
         }
 
         auto vertex_buffer = std::make_unique<rhi::Buffer>(
             Mesh::create_device_local_with_data(
                 device,
-                mesh_data.vertices.data(),
-                sizeof(Vertex) * mesh_data.vertices.size(),
+                cpu_data.vertices.data(),
+                sizeof(Vertex) * cpu_data.vertices.size(),
                 vk::BufferUsageFlagBits::eVertexBuffer
             )
         );
@@ -88,16 +97,16 @@ public:
         auto index_buffer = std::make_unique<rhi::Buffer>(
             Mesh::create_device_local_with_data(
                 device,
-                mesh_data.indices.data(),
-                sizeof(uint32_t) * mesh_data.indices.size(),
+                cpu_data.indices.data(),
+                sizeof(uint32_t) * cpu_data.indices.size(),
                 vk::BufferUsageFlagBits::eIndexBuffer
             )
         );
 
         return Mesh(
             device,
-            static_cast<uint32_t>(mesh_data.vertices.size()),
-            static_cast<uint32_t>(mesh_data.indices.size()),
+            static_cast<uint32_t>(cpu_data.vertices.size()),
+            static_cast<uint32_t>(cpu_data.indices.size()),
             std::move(vertex_buffer),
             std::move(index_buffer)
         );

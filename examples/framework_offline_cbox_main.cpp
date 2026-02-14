@@ -13,6 +13,7 @@
 
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/engine.hpp"
+#include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/render/forward/pipeline/forward_scene_view_builder.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_scene_importer.hpp"
@@ -163,6 +164,8 @@ int main() {
             rtr::system::render::ForwardPipelineConfig{}
         );
         auto* forward_pipeline = pipeline.get();
+        rtr::resource::ResourceManager resource_manager(kMaxFramesInFlight);
+        forward_pipeline->set_resource_manager(&resource_manager);
 
         auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
         input_system->set_is_intercept_capture([forward_pipeline](bool is_mouse) {
@@ -180,6 +183,7 @@ int main() {
             .window_title = "RTR Framework Offline CBox",
             .max_frames_in_flight = kMaxFramesInFlight
         });
+        engine.world().set_resource_manager(&resource_manager);
 
         auto& scene = engine.world().create_scene("cbox_scene");
         rtr::framework::integration::PbptImportOptions import_options{};
@@ -322,9 +326,14 @@ int main() {
                 }
 
                 forward_pipeline->set_scene_view(
-                    rtr::system::render::build_forward_scene_view(*active_scene)
+                    rtr::system::render::build_forward_scene_view(
+                        *active_scene,
+                        engine.world().resource_manager()
+                    )
                 );
                 renderer->draw_frame();
+                static std::uint64_t frame_serial = 0;
+                resource_manager.tick(frame_serial++);
 
                 if (input_system->state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
                     renderer->window().close();
@@ -335,6 +344,7 @@ int main() {
 
         engine.run();
         renderer->device().wait_idle();
+        resource_manager.flush_after_wait_idle();
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;

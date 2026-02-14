@@ -6,7 +6,9 @@
 #include "vulkan/vulkan_handles.hpp"
 #include "vulkan/vulkan_raii.hpp"
 #include "vulkan/vulkan_structs.hpp"
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <sys/types.h>
 #include <algorithm>
@@ -221,15 +223,51 @@ public:
     ) {
         auto image_loader = rtr::utils::ImageLoader(file_path, flip_y, 4);
 
+        return create_image_from_rgba8(
+            device,
+            static_cast<uint32_t>(image_loader.width()),
+            static_cast<uint32_t>(image_loader.height()),
+            image_loader.data(),
+            image_loader.data_size(),
+            use_srgb,
+            generate_mipmaps
+        );
+    }
+
+    static Image create_image_from_rgba8(
+        Device* device,
+        uint32_t width,
+        uint32_t height,
+        const uint8_t* rgba_data,
+        std::size_t data_size,
+        bool use_srgb = true,
+        bool generate_mipmaps = true
+    ) {
+        if (device == nullptr) {
+            throw std::invalid_argument("Image::create_image_from_rgba8 requires non-null device.");
+        }
+        if (width == 0 || height == 0) {
+            throw std::invalid_argument("Image::create_image_from_rgba8 requires non-zero extent.");
+        }
+        if (rgba_data == nullptr || data_size == 0) {
+            throw std::invalid_argument("Image::create_image_from_rgba8 requires non-empty pixel data.");
+        }
+
+        const std::size_t min_expected = static_cast<std::size_t>(width) *
+                                         static_cast<std::size_t>(height) *
+                                         4u;
+        if (data_size < min_expected) {
+            throw std::invalid_argument("Image::create_image_from_rgba8 pixel data size is smaller than width*height*4.");
+        }
+
         auto stage_buffer = Buffer::create_host_visible_buffer(
             device,
-            image_loader.data_size(),
+            data_size,
             vk::BufferUsageFlagBits::eTransferSrc
         );
 
-        // 将图像数据复制到 staging buffer
         stage_buffer.map();
-        std::memcpy(stage_buffer.mapped_data(), image_loader.data(), image_loader.data_size());
+        std::memcpy(stage_buffer.mapped_data(), rgba_data, data_size);
         stage_buffer.unmap();
 
         vk::Format format = use_srgb ? vk::Format::eR8G8B8A8Srgb : vk::Format::eR8G8B8A8Unorm;
@@ -241,8 +279,8 @@ public:
 
         auto image = Image(
             device,
-            static_cast<uint32_t>(image_loader.width()),
-            static_cast<uint32_t>(image_loader.height()),
+            width,
+            height,
             format,
             vk::ImageTiling::eOptimal,
             usage,

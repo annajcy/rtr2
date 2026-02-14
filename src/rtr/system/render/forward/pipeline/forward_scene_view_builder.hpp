@@ -6,11 +6,15 @@
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
+#include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/render/forward_scene_view.hpp"
 
 namespace rtr::system::render {
 
-inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& scene) {
+inline ForwardSceneView build_forward_scene_view(
+    const framework::core::Scene& scene,
+    resource::ResourceManager& resources
+) {
     const auto* active_camera = scene.active_camera();
     if (active_camera == nullptr) {
         throw std::runtime_error("Active scene does not have an active camera.");
@@ -39,8 +43,8 @@ inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& s
 
         view.renderables.emplace_back(ForwardSceneRenderable{
             .instance_id = static_cast<std::uint64_t>(id),
-            .mesh_path = mesh_renderer->mesh_path(),
-            .albedo_texture_path = mesh_renderer->albedo_texture_path(),
+            .mesh = resources.load_mesh(mesh_renderer->mesh_path()),
+            .albedo_texture = resources.load_texture(mesh_renderer->albedo_texture_path()),
             .model = model,
             .normal = normal
         });
