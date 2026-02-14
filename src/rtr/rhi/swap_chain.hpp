@@ -5,11 +5,11 @@
 #include <cstdlib>
 #include <utility>
 #include <vector>
-#include <iostream>
 
 #include "device.hpp"
 #include "rtr/rhi/context.hpp"
 #include "rtr/rhi/window.hpp"
+#include "rtr/utils/log.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
@@ -32,6 +32,7 @@ private:
 
 public:
     SwapChain(Window* window, Context* context, Device* device) : m_window(window), m_context(context), m_device(device) {
+        auto logger = utils::get_logger("rhi.swapchain");
         auto surface_formats = m_device->physical_device().getSurfaceFormatsKHR(*m_context->surface());
         auto surface_format = choose_surface_format(surface_formats);
         auto present_mode = choose_present_mode(m_device->physical_device().getSurfacePresentModesKHR(*m_context->surface()));
@@ -43,8 +44,12 @@ public:
             image_count = capabilities.maxImageCount;
         }
 
-        std::cout << image_count << " swapchain images will be created with extent ("
-                  << extent.width << ", " << extent.height << ")." << std::endl;
+        logger->info(
+            "Creating swapchain: image_count={}, extent=({},{})",
+            image_count,
+            extent.width,
+            extent.height
+        );
 
         vk::SwapchainCreateInfoKHR create_info{};
         create_info.surface = *m_context->surface();
@@ -66,6 +71,7 @@ public:
         m_images = m_swapchain.getImages();
         m_image_format = surface_format.format;
         m_extent = extent;
+        logger->info("Swapchain created with {} images.", m_images.size());
 
         create_image_views();
     }

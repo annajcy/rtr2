@@ -10,6 +10,7 @@
 
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/world.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::framework::core {
 
@@ -37,6 +38,10 @@ public:
     };
 
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("framework.core.engine");
+    }
+
     EngineConfig m_config{};
     std::unique_ptr<World> m_world{};
     LoopHooks m_hooks{};
@@ -112,6 +117,24 @@ public:
     }
 
     void run() {
+        auto log = logger();
+        if (m_config.fixed_delta_seconds <= 0.0) {
+            log->warn(
+                "Engine fixed_delta_seconds={} <= 0, fixed tick loop is effectively disabled.",
+                m_config.fixed_delta_seconds
+            );
+        }
+        if (m_config.max_fixed_steps_per_frame == 0) {
+            log->warn("Engine max_fixed_steps_per_frame=0, fixed tick loop is disabled.");
+        }
+        log->info(
+            "Engine run started (paused={}, fixed_dt={}, max_fixed_steps_per_frame={}, max_frame_delta={})",
+            m_paused,
+            m_config.fixed_delta_seconds,
+            m_config.max_fixed_steps_per_frame,
+            m_config.max_frame_delta_seconds
+        );
+
         const auto default_now = []() -> double {
             using Clock = std::chrono::steady_clock;
             const auto now = Clock::now().time_since_epoch();
@@ -120,9 +143,11 @@ public:
         const auto now_fn = m_hooks.now_seconds ? m_hooks.now_seconds : default_now;
         double previous_time = now_fn();
         double accumulator = 0.0;
+        bool closed_by_hook = false;
 
         while (!m_stop_requested) {
             if (m_hooks.should_close && m_hooks.should_close()) {
+                closed_by_hook = true;
                 break;
             }
 
@@ -175,6 +200,14 @@ public:
                 m_hooks.input_end();
             }
         }
+
+        log->info(
+            "Engine run finished (frames={}, fixed_ticks={}, stop_requested={}, should_close={})",
+            m_frame_index,
+            m_fixed_tick_index,
+            m_stop_requested,
+            closed_by_hook
+        );
     }
 };
 

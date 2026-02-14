@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -10,6 +9,7 @@
 #include "rtr/rhi/command.hpp"
 #include "rtr/rhi/device.hpp"
 #include "rtr/rhi/swap_chain.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::system::render {
 
@@ -70,6 +70,7 @@ public:
           m_context(context),
           m_device(device),
           m_max_frames_in_flight(max_frames_in_flight) {
+        auto log = utils::get_logger("render.frame_scheduler");
 
         m_swapchain = std::make_unique<rhi::SwapChain>(window, context, device);
         m_command_pool = std::make_unique<rhi::CommandPool>(
@@ -84,12 +85,18 @@ public:
 
         init_per_image_resource();
         init_per_frame_resources();
+        log->info(
+            "FrameScheduler initialized (max_frames_in_flight={}, image_count={})",
+            m_max_frames_in_flight,
+            m_swapchain->images().size()
+        );
     }
 
     FrameScheduler(const FrameScheduler&) = delete;
     FrameScheduler& operator=(const FrameScheduler&) = delete;
 
     std::optional<FrameTicket> begin_frame() {
+        auto log = utils::get_logger("render.frame_scheduler");
         auto& frame_res = m_per_frame_resources[m_current_frame_index];
 
         vk::Result wait_result = m_device->device().waitForFences(
@@ -98,7 +105,7 @@ public:
             UINT64_MAX
         );
         if (wait_result != vk::Result::eSuccess) {
-            std::cerr << "Failed to wait for fence" << std::endl;
+            log->error("Failed to wait for in-flight fence: {}", vk::to_string(wait_result));
             return std::nullopt;
         }
 
@@ -108,11 +115,13 @@ public:
             frame_res.image_available_semaphore
         );
         if (result == vk::Result::eErrorOutOfDateKHR) {
+            log->info("Swapchain acquire returned out-of-date; recreating swapchain resources.");
             m_device->device().waitIdle();
             recreate_swapchain_resources();
             return std::nullopt;
         }
         if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+            log->error("Failed to acquire swapchain image: {}", vk::to_string(result));
             throw std::runtime_error("Failed to acquire swapchain image");
         }
 
@@ -125,6 +134,7 @@ public:
     }
 
     void submit_and_present(const FrameTicket& ticket) {
+        auto log = utils::get_logger("render.frame_scheduler");
         auto& frame_res = m_per_frame_resources[ticket.frame_index];
         auto& image_res = m_per_image_resources[ticket.image_index];
 
@@ -143,16 +153,19 @@ public:
 
         bool needs_recreation = false;
         if (present_result == vk::Result::eErrorOutOfDateKHR) {
+            log->info("Present returned out-of-date; scheduling swapchain recreation.");
             needs_recreation = true;
         } else if (present_result == vk::Result::eSuboptimalKHR) {
-            std::cout << "Swapchain suboptimal during presentation." << std::endl;
+            log->warn("Swapchain suboptimal during presentation; scheduling recreation.");
             needs_recreation = true;
         } else if (present_result != vk::Result::eSuccess) {
+            log->error("Failed to present swapchain image: {}", vk::to_string(present_result));
             throw std::runtime_error("Failed to present swapchain image");
         }
 
         if (needs_recreation || m_framebuffer_resized) {
             m_framebuffer_resized = false;
+            log->info("Recreating swapchain resources after present/resize event.");
             m_device->device().waitIdle();
             recreate_swapchain_resources();
         }
@@ -161,7 +174,8 @@ public:
     }
 
     void on_window_resized(uint32_t width, uint32_t height) {
-        std::cout << "FrameScheduler: Window resized to (" << width << ", " << height << ")" << std::endl;
+        utils::get_logger("render.frame_scheduler")
+            ->info("Window resized to ({}, {}), scheduling swapchain recreation.", width, height);
         m_framebuffer_resized = true;
     }
 
@@ -189,10 +203,13 @@ public:
 
 private:
     void recreate_swapchain_resources() {
+        const auto old_generation = m_swapchain_generation;
         init_swapchain();
         init_per_image_resource();
         init_per_frame_resources();
         ++m_swapchain_generation;
+        utils::get_logger("render.frame_scheduler")
+            ->info("Swapchain resources recreated (generation {} -> {}).", old_generation, m_swapchain_generation);
     }
 
     void init_swapchain() {

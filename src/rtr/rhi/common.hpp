@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <iostream>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -17,6 +16,7 @@
 #include "vulkan/vulkan_handles.hpp"
 #include "vulkan/vulkan_raii.hpp"
 #include "vulkan/vulkan_structs.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::rhi {
 
@@ -213,6 +213,7 @@ inline std::optional<std::pair<vk::raii::Context, vk::raii::Instance>> make_inst
     const std::vector<std::string>& required_extensions,
     const vk::ApplicationInfo& app_info
 ) {
+    auto logger = utils::get_logger("rhi.context");
     vk::raii::Context context{};
 
     auto ext_prop = context.enumerateInstanceExtensionProperties();
@@ -220,15 +221,14 @@ inline std::optional<std::pair<vk::raii::Context, vk::raii::Instance>> make_inst
         ext_prop, 
         required_extensions
     )) {
-        std::cout << "Not all required extensions are supported:" << std::endl;
-        std::cout << "Required extensions:" << std::endl;
+        logger->error("Not all required Vulkan instance extensions are supported.");
+        logger->error("Required extensions:");
         for (const auto& ext : required_extensions) {
-            std::cout << "  " << ext << std::endl;
+            logger->error("  {}", ext);
         }
-        std::cout << std::endl;
-        std::cout << "Available extensions:" << std::endl;
+        logger->error("Available extensions:");
         for (const auto& ext : ext_prop) {
-            std::cout << "  " << ext.extensionName << std::endl;
+            logger->error("  {}", std::string(ext.extensionName.data()));
         }
         return std::nullopt;
     }
@@ -238,7 +238,7 @@ inline std::optional<std::pair<vk::raii::Context, vk::raii::Instance>> make_inst
         layer_prop,
         required_layers
     )) {
-        std::cout << "Not all required layers are supported:" << std::endl;
+        logger->error("Not all required Vulkan layers are supported.");
         return std::nullopt;
     }
 
@@ -268,10 +268,17 @@ inline std::optional<std::pair<vk::raii::Context, vk::raii::Instance>> make_inst
 }
 
 inline VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData, void*) {
-    if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eError || 
-        severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
-    ) {
-        std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << std::endl;
+    auto logger = utils::get_logger("rhi.context");
+    const std::string message = (pCallbackData != nullptr && pCallbackData->pMessage != nullptr)
+        ? pCallbackData->pMessage
+        : "<null validation message>";
+
+    if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
+        logger->error("Validation layer [{}]: {}", to_string(type), message);
+    } else if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
+        logger->warn("Validation layer [{}]: {}", to_string(type), message);
+    } else {
+        logger->debug("Validation layer [{}]: {}", to_string(type), message);
     }
     return vk::False;
 }

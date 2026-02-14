@@ -16,6 +16,7 @@
 #include "rtr/rhi/mesh.hpp"
 #include "rtr/rhi/texture.hpp"
 #include "rtr/utils/image_io.hpp"
+#include "rtr/utils/log.hpp"
 #include "rtr/utils/obj_io.hpp"
 
 namespace rtr::resource {
@@ -64,7 +65,13 @@ public:
         std::filesystem::path resource_root_dir = std::filesystem::path(std::string(kDefaultResourceRootDir))
     )
         : m_frames_in_flight(std::max<std::uint32_t>(frames_in_flight, 1)),
-          m_resource_root_dir(std::move(resource_root_dir)) {}
+          m_resource_root_dir(std::move(resource_root_dir)) {
+        logger()->info(
+            "ResourceManager initialized (frames_in_flight={}, root='{}')",
+            m_frames_in_flight,
+            m_resource_root_dir.string()
+        );
+    }
 
     void set_frames_in_flight(std::uint32_t frames_in_flight) {
         m_frames_in_flight = std::max<std::uint32_t>(frames_in_flight, 1);
@@ -82,10 +89,18 @@ public:
         validate_mesh_data(cpu);
 
         const MeshHandle handle{m_next_mesh_id++};
+        const auto vertex_count = cpu.vertices.size();
+        const auto index_count = cpu.indices.size();
         m_mesh_records.emplace(handle, MeshRecord{
             .cpu = std::move(cpu),
             .gpu = nullptr
         });
+        logger()->debug(
+            "Mesh created (handle={}, vertices={}, indices={})",
+            handle.value,
+            vertex_count,
+            index_count
+        );
         return handle;
     }
 
@@ -94,16 +109,28 @@ public:
         cpu = normalize_to_rgba8(std::move(cpu));
 
         const TextureHandle handle{m_next_texture_id++};
+        const auto width = cpu.width;
+        const auto height = cpu.height;
+        const auto channels = cpu.channels;
         m_texture_records.emplace(handle, TextureRecord{
             .cpu = std::move(cpu),
             .use_srgb = use_srgb,
             .gpu = nullptr
         });
+        logger()->debug(
+            "Texture created (handle={}, size={}x{}, channels={}, srgb={})",
+            handle.value,
+            width,
+            height,
+            channels,
+            use_srgb
+        );
         return handle;
     }
 
     MeshHandle create_mesh_from_obj_relative_path(const std::string& rel_path) {
         const auto abs_path = resolve_resource_path(rel_path);
+        logger()->debug("Loading mesh from relative path '{}' -> '{}'", rel_path, abs_path.string());
         return create_mesh(utils::load_obj_from_path(abs_path.string()));
     }
 
@@ -112,29 +139,34 @@ public:
         bool use_srgb = true
     ) {
         const auto abs_path = resolve_resource_path(rel_path);
+        logger()->debug("Loading texture from relative path '{}' -> '{}'", rel_path, abs_path.string());
         return create_texture(utils::load_image_from_path(abs_path.string(), true, 4), use_srgb);
     }
 
     void unload_mesh(MeshHandle handle) {
         auto it = m_mesh_records.find(handle);
         if (it == m_mesh_records.end()) {
+            logger()->warn("unload_mesh ignored: invalid mesh handle={}", handle.value);
             return;
         }
 
         MeshRecord& record = it->second;
         retire_mesh_gpu(record);
         m_mesh_records.erase(it);
+        logger()->debug("Mesh unloaded (handle={})", handle.value);
     }
 
     void unload_texture(TextureHandle handle) {
         auto it = m_texture_records.find(handle);
         if (it == m_texture_records.end()) {
+            logger()->warn("unload_texture ignored: invalid texture handle={}", handle.value);
             return;
         }
 
         TextureRecord& record = it->second;
         retire_texture_gpu(record);
         m_texture_records.erase(it);
+        logger()->debug("Texture unloaded (handle={})", handle.value);
     }
 
     const utils::ObjMeshData& mesh_cpu(MeshHandle handle) {
@@ -161,6 +193,7 @@ public:
 
     rhi::Mesh& require_mesh_rhi(MeshHandle handle, rhi::Device* device) {
         if (device == nullptr) {
+            logger()->error("require_mesh_rhi failed for handle={}: device is null.", handle.value);
             throw std::invalid_argument("ResourceManager require_mesh_rhi requires non-null device.");
         }
 
@@ -170,6 +203,7 @@ public:
         if (record.gpu) {
             return *record.gpu;
         }
+        logger()->debug("Mesh handle={} triggering first GPU upload.", handle.value);
         record.gpu = std::make_unique<rhi::Mesh>(
             rhi::Mesh::from_cpu_data(device, record.cpu)
         );
@@ -178,6 +212,7 @@ public:
 
     rhi::Image& require_texture_rhi(TextureHandle handle, rhi::Device* device) {
         if (device == nullptr) {
+            logger()->error("require_texture_rhi failed for handle={}: device is null.", handle.value);
             throw std::invalid_argument("ResourceManager require_texture_rhi requires non-null device.");
         }
 
@@ -187,6 +222,7 @@ public:
         if (record.gpu) {
             return *record.gpu;
         }
+        logger()->debug("Texture handle={} triggering first GPU upload.", handle.value);
         const auto& cpu = record.cpu;
         record.gpu = std::make_unique<rhi::Image>(
             rhi::Image::create_image_from_rgba8(
@@ -215,6 +251,13 @@ public:
     }
 
     void flush_after_wait_idle() {
+        logger()->info(
+            "Flushing GPU caches after wait_idle (live_meshes={}, live_textures={}, retired_meshes={}, retired_textures={})",
+            m_mesh_records.size(),
+            m_texture_records.size(),
+            m_retired_meshes.size(),
+            m_retired_textures.size()
+        );
         m_retired_meshes.clear();
         m_retired_textures.clear();
 
@@ -229,17 +272,24 @@ public:
     }
 
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("resource.manager");
+    }
+
     static void validate_mesh_data(const utils::ObjMeshData& mesh) {
         if (mesh.vertices.empty() || mesh.indices.empty()) {
+            logger()->error("validate_mesh_data failed: mesh vertices/indices are empty.");
             throw std::invalid_argument("ObjMeshData must not be empty.");
         }
     }
 
     static void validate_texture_data(const utils::ImageData& image) {
         if (image.width == 0 || image.height == 0) {
+            logger()->error("validate_texture_data failed: width/height must be positive.");
             throw std::invalid_argument("ImageData width/height must be positive.");
         }
         if (image.channels == 0 || image.channels > 4) {
+            logger()->error("validate_texture_data failed: channels={} not in [1,4].", image.channels);
             throw std::invalid_argument("ImageData channels must be in [1, 4].");
         }
         const std::size_t expected_size =
@@ -247,6 +297,11 @@ private:
             static_cast<std::size_t>(image.height) *
             static_cast<std::size_t>(image.channels);
         if (image.pixels.size() < expected_size) {
+            logger()->error(
+                "validate_texture_data failed: pixel buffer too small (expected_at_least={}, actual={}).",
+                expected_size,
+                image.pixels.size()
+            );
             throw std::invalid_argument("ImageData pixels size is insufficient.");
         }
     }
@@ -293,11 +348,13 @@ private:
 
     std::filesystem::path resolve_resource_path(const std::string& rel_path) const {
         if (rel_path.empty()) {
+            logger()->error("resolve_resource_path failed: relative path is empty.");
             throw std::invalid_argument("Relative resource path must not be empty.");
         }
 
         const std::filesystem::path path(rel_path);
         if (path.is_absolute()) {
+            logger()->error("resolve_resource_path failed: absolute path '{}' is not allowed.", rel_path);
             throw std::invalid_argument("Relative resource path API does not accept absolute path.");
         }
 
@@ -310,12 +367,14 @@ private:
 
     void ensure_mesh_cpu_loaded(const MeshRecord& record) const {
         if (record.cpu.vertices.empty() || record.cpu.indices.empty()) {
+            logger()->error("ensure_mesh_cpu_loaded failed: mesh CPU payload missing.");
             throw std::runtime_error("Mesh CPU data is missing for live handle.");
         }
     }
 
     void ensure_texture_cpu_loaded(const TextureRecord& record) const {
         if (record.cpu.pixels.empty()) {
+            logger()->error("ensure_texture_cpu_loaded failed: texture CPU payload missing.");
             throw std::runtime_error("Texture CPU data is missing for live handle.");
         }
     }
@@ -325,10 +384,12 @@ private:
             return;
         }
 
+        const auto retire_frame = retire_after_frame();
         m_retired_meshes.emplace_back(RetiredMeshGpu{
-            .retire_after_frame = retire_after_frame(),
+            .retire_after_frame = retire_frame,
             .mesh = std::move(record.gpu)
         });
+        logger()->debug("Retired mesh GPU allocation (release_after_frame={})", retire_frame);
     }
 
     void retire_texture_gpu(TextureRecord& record) {
@@ -336,15 +397,18 @@ private:
             return;
         }
 
+        const auto retire_frame = retire_after_frame();
         m_retired_textures.emplace_back(RetiredTextureGpu{
-            .retire_after_frame = retire_after_frame(),
+            .retire_after_frame = retire_frame,
             .image = std::move(record.gpu)
         });
+        logger()->debug("Retired texture GPU allocation (release_after_frame={})", retire_frame);
     }
 
     MeshRecord& require_mesh_record(MeshHandle handle) {
         const auto it = m_mesh_records.find(handle);
         if (it == m_mesh_records.end()) {
+            logger()->error("Invalid/unloaded mesh handle requested: {}", handle.value);
             throw std::runtime_error("Mesh handle is invalid or unloaded.");
         }
         return it->second;
@@ -353,6 +417,7 @@ private:
     TextureRecord& require_texture_record(TextureHandle handle) {
         const auto it = m_texture_records.find(handle);
         if (it == m_texture_records.end()) {
+            logger()->error("Invalid/unloaded texture handle requested: {}", handle.value);
             throw std::runtime_error("Texture handle is invalid or unloaded.");
         }
         return it->second;

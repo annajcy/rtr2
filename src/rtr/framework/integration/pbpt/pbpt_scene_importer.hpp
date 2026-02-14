@@ -31,8 +31,13 @@
 #include "rtr/framework/integration/pbpt/pbpt_scene_export_builder.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/input/input_state.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::framework::integration {
+
+inline std::shared_ptr<spdlog::logger> pbpt_import_logger() {
+    return utils::get_logger("framework.integration.pbpt.import");
+}
 
 struct PbptImportOptions {
     bool require_supported_cbox_subset{true};
@@ -395,11 +400,16 @@ inline void register_imported_game_object(
 
 inline void validate_scene_location(const PbptSceneLocation& location) {
     if (location.xml_filename.empty()) {
+        pbpt_import_logger()->error("validate_scene_location failed: xml_filename is empty.");
         throw std::invalid_argument("xml_filename must not be empty.");
     }
 
     const std::filesystem::path xml_filename_path(location.xml_filename);
     if (xml_filename_path.is_absolute() || xml_filename_path.has_parent_path()) {
+        pbpt_import_logger()->error(
+            "validate_scene_location failed: xml_filename '{}' contains path separator or is absolute.",
+            location.xml_filename
+        );
         throw std::invalid_argument("xml_filename must be a filename without path separator.");
     }
 }
@@ -408,24 +418,38 @@ inline std::filesystem::path validate_and_normalize_mesh_path(
     const std::filesystem::path& mesh_path
 ) {
     if (mesh_path.empty()) {
+        pbpt_import_logger()->error("validate_and_normalize_mesh_path failed: mesh path is empty.");
         throw std::runtime_error("obj filename must not be empty.");
     }
     if (mesh_path.is_absolute()) {
+        pbpt_import_logger()->error(
+            "validate_and_normalize_mesh_path failed: mesh path '{}' is absolute.",
+            mesh_path.string()
+        );
         throw std::runtime_error("obj filename must be a relative path under meshes/.");
     }
 
     const std::filesystem::path normalized = mesh_path.lexically_normal();
     if (normalized.empty()) {
+        pbpt_import_logger()->error("validate_and_normalize_mesh_path failed: normalized path is empty.");
         throw std::runtime_error("obj filename must not be empty.");
     }
     for (const auto& part : normalized) {
         if (part == "..") {
+            pbpt_import_logger()->error(
+                "validate_and_normalize_mesh_path failed: mesh path '{}' uses parent traversal.",
+                normalized.string()
+            );
             throw std::runtime_error("obj filename must not use parent directory traversal.");
         }
     }
 
     auto it = normalized.begin();
     if (it == normalized.end() || *it != "meshes") {
+        pbpt_import_logger()->error(
+            "validate_and_normalize_mesh_path failed: mesh path '{}' is outside meshes/.",
+            normalized.string()
+        );
         throw std::runtime_error("obj filename must resolve under meshes/ directory.");
     }
 
@@ -440,16 +464,20 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
     resource::ResourceManager& resources,
     const PbptImportOptions& options = {}
 ) {
+    auto log = pbpt_import_logger();
     detail::validate_scene_location(location);
     const std::filesystem::path xml_abs_path = resources.resource_root_dir() / location.scene_root_rel_to_resource_dir / location.xml_filename;
+    log->info("Importing PBPT scene XML from '{}'.", xml_abs_path.string());
     pugi::xml_document doc;
     const pugi::xml_parse_result parse_result = doc.load_file(xml_abs_path.string().c_str());
     if (!parse_result) {
+        log->error("PBPT XML load error for '{}': {}", xml_abs_path.string(), parse_result.description());
         throw std::runtime_error(std::string("XML load error: ") + parse_result.description());
     }
 
     const pugi::xml_node root = doc.child("scene");
     if (!root) {
+        log->error("PBPT XML import failed: root node <scene> is missing.");
         throw std::runtime_error("XML root node <scene> is missing.");
     }
 
@@ -460,11 +488,13 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
         const std::string type = bsdf_node.attribute("type").value();
         const std::string id = bsdf_node.attribute("id").value();
         if (id.empty()) {
+            log->error("PBPT XML import failed: bsdf node missing id.");
             throw std::runtime_error("bsdf id is required.");
         }
 
         if (type != "diffuse") {
             if (options.require_supported_cbox_subset) {
+                log->error("PBPT XML import failed: unsupported bsdf type '{}'.", type);
                 throw std::runtime_error("Unsupported bsdf type: " + type);
             }
             continue;
@@ -477,9 +507,11 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
         PbptIntegratorRecord integrator{};
         integrator.type = integrator_node.attribute("type").value();
         if (integrator.type.empty()) {
+            log->error("PBPT XML import failed: integrator type is empty.");
             throw std::runtime_error("integrator type is required.");
         }
         if (integrator.type != "path" && options.require_supported_cbox_subset) {
+            log->error("PBPT XML import failed: unsupported integrator type '{}'.", integrator.type);
             throw std::runtime_error("Unsupported integrator type: " + integrator.type);
         }
 
@@ -494,6 +526,7 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
     if (const auto sensor_node = root.child("sensor"); sensor_node) {
         const std::string type = sensor_node.attribute("type").value();
         if (type != "perspective" && options.require_supported_cbox_subset) {
+            log->error("PBPT XML import failed: unsupported sensor type '{}'.", type);
             throw std::runtime_error("Unsupported sensor type: " + type);
         }
 
@@ -563,6 +596,7 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
         const std::string type = shape_node.attribute("type").value();
         if (type != "obj") {
             if (options.require_supported_cbox_subset) {
+                log->error("PBPT XML import failed: unsupported shape type '{}'.", type);
                 throw std::runtime_error("Unsupported shape type: " + type);
             }
             continue;
@@ -570,6 +604,7 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
 
         const auto filename_node = detail::find_named_child(shape_node, "string", "filename");
         if (!filename_node) {
+            log->error("PBPT XML import failed: obj shape missing filename property.");
             throw std::runtime_error("obj shape is missing filename property.");
         }
 
@@ -578,11 +613,13 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
 
         const auto ref_node = shape_node.child("ref");
         if (!ref_node) {
+            log->error("PBPT XML import failed: shape missing material ref id.");
             throw std::runtime_error("shape is missing material ref id.");
         }
 
         const std::string bsdf_id = ref_node.attribute("id").value();
         if (!reflectance_by_bsdf_id.contains(bsdf_id)) {
+            log->error("PBPT XML import failed: unknown shape material ref id '{}'.", bsdf_id);
             throw std::runtime_error("shape ref id is unknown: " + bsdf_id);
         }
 
@@ -616,16 +653,19 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
         if (const auto emitter_node = shape_node.child("emitter"); emitter_node) {
             const std::string emitter_type = emitter_node.attribute("type").value();
             if (emitter_type != "area" && options.require_supported_cbox_subset) {
+                log->error("PBPT XML import failed: unsupported emitter type '{}'.", emitter_type);
                 throw std::runtime_error("Unsupported emitter type: " + emitter_type);
             }
 
             const auto radiance_node = detail::find_named_child(emitter_node, "spectrum", "radiance");
             if (!radiance_node) {
+                log->error("PBPT XML import failed: area emitter missing radiance spectrum.");
                 throw std::runtime_error("area emitter is missing radiance spectrum.");
             }
 
             const std::string value = radiance_node.attribute("value").value();
             if (value.empty()) {
+                log->error("PBPT XML import failed: area emitter radiance spectrum is empty.");
                 throw std::runtime_error("area emitter radiance spectrum is empty.");
             }
 
@@ -641,6 +681,12 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
     }
 
     scene.scene_graph().update_world_transforms();
+    log->info(
+        "PBPT XML import completed (shapes={}, lights={}, camera_imported={}).",
+        result.imported_shape_count,
+        result.imported_light_shape_count,
+        result.sensor.has_value()
+    );
     return result;
 }
 

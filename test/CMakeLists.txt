@@ -4,7 +4,7 @@ include(GoogleTest)
 function(rtr_add_test TARGET_NAME TEST_SOURCE)
     add_executable(${TARGET_NAME} ${TEST_SOURCE})
     target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
-    target_link_libraries(${TARGET_NAME} PRIVATE gtest::gtest ${ARGN})
+    target_link_libraries(${TARGET_NAME} PRIVATE gtest::gtest spdlog::spdlog ${ARGN})
     gtest_discover_tests(
         ${TARGET_NAME}
         DISCOVERY_TIMEOUT 60
@@ -15,7 +15,7 @@ endfunction()
 function(rtr_add_integration_test TARGET_NAME TEST_SOURCE)
     add_executable(${TARGET_NAME} ${TEST_SOURCE})
     target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
-    target_link_libraries(${TARGET_NAME} PRIVATE gtest::gtest ${ARGN})
+    target_link_libraries(${TARGET_NAME} PRIVATE gtest::gtest spdlog::spdlog ${ARGN})
     gtest_discover_tests(
         ${TARGET_NAME}
         DISCOVERY_TIMEOUT 60
@@ -42,6 +42,12 @@ rtr_add_test(
     test_image_io
     utils/image_io_test.cpp
     stb_impl
+)
+rtr_add_test(
+    test_log_system
+    utils/log_system_test.cpp
+    rtr
+    rtr_framework_integration
 )
 
 # system

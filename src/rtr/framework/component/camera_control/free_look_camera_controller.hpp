@@ -14,6 +14,7 @@
 #include "rtr/framework/core/game_object.hpp"
 #include "rtr/system/input/input_state.hpp"
 #include "rtr/system/input/input_types.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::framework::component {
 
@@ -28,6 +29,10 @@ struct FreeLookCameraControllerConfig {
 
 class FreeLookCameraController final : public Component {
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("framework.component.free_look");
+    }
+
     static constexpr float kEpsilon = 1e-5f;
 
     const system::input::InputState* m_input_state{nullptr};
@@ -41,6 +46,11 @@ private:
 
     void validate_config(const FreeLookCameraControllerConfig& config) const {
         if (config.pitch_min_degrees > config.pitch_max_degrees) {
+            logger()->error(
+                "FreeLook config invalid: pitch_min_degrees={} > pitch_max_degrees={}.",
+                config.pitch_min_degrees,
+                config.pitch_max_degrees
+            );
             throw std::invalid_argument(
                 "FreeLookCameraControllerConfig pitch_min_degrees must be <= pitch_max_degrees."
             );
@@ -49,15 +59,22 @@ private:
 
     void validate_dependencies() {
         if (owner() == nullptr) {
+            logger()->error("FreeLook validate_dependencies failed: owner is null.");
             throw std::runtime_error("FreeLookCameraController owner is null.");
         }
         if (m_input_state == nullptr) {
+            logger()->error("FreeLook validate_dependencies failed: input_state is null.");
             throw std::runtime_error("FreeLookCameraController input_state is null.");
         }
         if (m_camera_manager == nullptr) {
+            logger()->error("FreeLook validate_dependencies failed: camera_manager is null.");
             throw std::runtime_error("FreeLookCameraController camera_manager is null.");
         }
         if (m_camera_manager->camera(owner()->id()) == nullptr) {
+            logger()->error(
+                "FreeLook validate_dependencies failed: no camera bound for owner {}.",
+                owner()->id()
+            );
             throw std::runtime_error(
                 "FreeLookCameraController owner does not have a bound camera."
             );
@@ -74,6 +91,10 @@ private:
     void initialize_angles_from_front() {
         auto* camera = m_camera_manager->camera(owner()->id());
         if (camera == nullptr) {
+            logger()->error(
+                "FreeLook initialize_angles_from_front failed: no camera bound for owner {}.",
+                owner()->id()
+            );
             throw std::runtime_error(
                 "FreeLookCameraController owner does not have a bound camera."
             );
@@ -146,6 +167,7 @@ public:
 
         auto* go = owner();
         if (go == nullptr) {
+            logger()->error("FreeLook on_update failed: owner is null.");
             throw std::runtime_error("FreeLookCameraController owner is null.");
         }
 
@@ -177,6 +199,12 @@ public:
                 std::cos(yaw_rad) * cos_pitch
             });
             node.set_world_rotation(world_rotation_looking_to(desired_front));
+            logger()->trace(
+                "FreeLook node rotation updated (owner_id={}, yaw_deg={}, pitch_deg={})",
+                go->id(),
+                m_yaw_degrees,
+                m_pitch_degrees
+            );
         }
 
         float speed = m_config.move_speed;
@@ -187,6 +215,10 @@ public:
         glm::vec3 move_direction(0.0f);
         auto* camera = m_camera_manager->camera(go->id());
         if (camera == nullptr) {
+            logger()->error(
+                "FreeLook on_update failed: no camera bound for owner {}.",
+                go->id()
+            );
             throw std::runtime_error(
                 "FreeLookCameraController owner does not have a bound camera."
             );
@@ -217,7 +249,17 @@ public:
         if (glm::length(move_direction) > 0.0f) {
             move_direction = glm::normalize(move_direction);
             const float dt = static_cast<float>(std::max(ctx.delta_seconds, 0.0));
-            node.set_world_position(node.world_position() + move_direction * speed * dt);
+            const glm::vec3 delta = move_direction * speed * dt;
+            node.set_world_position(node.world_position() + delta);
+            logger()->trace(
+                "FreeLook node position updated (owner_id={}, delta=[{:.4f}, {:.4f}, {:.4f}], speed={:.4f}, dt={:.4f})",
+                go->id(),
+                delta.x,
+                delta.y,
+                delta.z,
+                speed,
+                dt
+            );
         }
 
         const float scroll_y = static_cast<float>(m_input_state->mouse_scroll_dy());

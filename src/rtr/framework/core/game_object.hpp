@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
@@ -12,11 +13,16 @@
 #include "rtr/framework/core/scene_graph.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/types.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::framework::core {
 
 class GameObject {
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("framework.core.game_object");
+    }
+
     GameObjectId m_id{core::kInvalidGameObjectId};
     std::string m_name{"GameObject"};
     bool m_components_destroyed{false};
@@ -40,6 +46,11 @@ public:
         try {
             destroy_components();
         } catch (...) {
+            logger()->error(
+                "destroy_components threw during GameObject destructor (game_object_id={}, name='{}').",
+                m_id,
+                m_name
+            );
             // Destructor must not throw.
         }
     }
@@ -67,6 +78,11 @@ public:
 
     void set_enabled(bool enabled) {
         if (m_scene_graph == nullptr) {
+            logger()->error(
+                "set_enabled failed: GameObject {} ('{}') is not attached to a SceneGraph.",
+                m_id,
+                m_name
+            );
             throw std::runtime_error("GameObject is not attached to a SceneGraph.");
         }
         m_scene_graph->set_enabled(m_id, enabled);
@@ -78,6 +94,11 @@ public:
 
     SceneGraph::NodeView node() {
         if (m_scene_graph == nullptr) {
+            logger()->error(
+                "node() failed: GameObject {} ('{}') is not attached to a SceneGraph.",
+                m_id,
+                m_name
+            );
             throw std::runtime_error("GameObject is not attached to a SceneGraph.");
         }
         return m_scene_graph->node(m_id);
@@ -85,6 +106,11 @@ public:
 
     SceneGraph::ConstNodeView node() const {
         if (m_scene_graph == nullptr) {
+            logger()->error(
+                "node() const failed: GameObject {} ('{}') is not attached to a SceneGraph.",
+                m_id,
+                m_name
+            );
             throw std::runtime_error("GameObject is not attached to a SceneGraph.");
         }
         return m_scene_graph->node(m_id);
@@ -112,6 +138,12 @@ public:
     TComponent& add_component(TArgs&&... args) {
         static_assert(std::is_base_of_v<component::Component, TComponent>);
         if (has_component<TComponent>()) {
+            logger()->warn(
+                "add_component rejected: duplicate component type '{}' on GameObject {} ('{}').",
+                typeid(TComponent).name(),
+                m_id,
+                m_name
+            );
             throw std::runtime_error("GameObject already has this component type.");
         }
         auto component = std::make_unique<TComponent>(std::forward<TArgs>(args)...);
@@ -119,6 +151,13 @@ public:
         component->on_awake();
         TComponent* instance = component.get();
         m_components.emplace_back(std::move(component));
+        logger()->debug(
+            "Component added (game_object_id={}, name='{}', component_type='{}', component_count={})",
+            m_id,
+            m_name,
+            typeid(TComponent).name(),
+            m_components.size()
+        );
         return *instance;
     }
 

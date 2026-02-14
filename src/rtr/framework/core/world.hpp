@@ -10,6 +10,7 @@
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/types.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::resource {
 class ResourceManager;
@@ -19,6 +20,10 @@ namespace rtr::framework::core {
 
 class World {
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("framework.core.world");
+    }
+
     SceneId m_next_scene_id{1};
     SceneId m_active_scene_id{core::kInvalidSceneId};
     std::vector<std::unique_ptr<Scene>> m_scenes{};
@@ -33,12 +38,20 @@ public:
     World& operator=(World&&) noexcept = default;
 
     Scene& create_scene(std::string name = "Scene") {
+        auto log = logger();
         auto scene = std::make_unique<Scene>(m_next_scene_id++, std::move(name));
         Scene* ptr = scene.get();
         m_scenes.emplace_back(std::move(scene));
         if (m_active_scene_id == core::kInvalidSceneId) {
             m_active_scene_id = ptr->id();
         }
+        log->info(
+            "Scene created (scene_id={}, name='{}', scene_count={}, active_scene_id={})",
+            ptr->id(),
+            ptr->name(),
+            m_scenes.size(),
+            m_active_scene_id
+        );
         return *ptr;
     }
 
@@ -66,9 +79,11 @@ public:
 
     bool set_active_scene(SceneId id) {
         if (find_scene(id) == nullptr) {
+            logger()->warn("set_active_scene failed: scene {} does not exist.", id);
             return false;
         }
         m_active_scene_id = id;
+        logger()->info("Active scene changed to {}.", id);
         return true;
     }
 
@@ -79,9 +94,16 @@ public:
                 if (m_active_scene_id == id) {
                     m_active_scene_id = m_scenes.empty() ? core::kInvalidSceneId : m_scenes.front()->id();
                 }
+                logger()->info(
+                    "Scene destroyed (scene_id={}, scene_count={}, active_scene_id={})",
+                    id,
+                    m_scenes.size(),
+                    m_active_scene_id
+                );
                 return true;
             }
         }
+        logger()->warn("destroy_scene ignored: scene {} does not exist.", id);
         return false;
     }
 
@@ -107,10 +129,12 @@ public:
 
     void set_resource_manager(resource::ResourceManager* resource_manager) {
         m_resource_manager = resource_manager;
+        logger()->info("ResourceManager bound to World (bound={}).", m_resource_manager != nullptr);
     }
 
     resource::ResourceManager& resource_manager() {
         if (m_resource_manager == nullptr) {
+            logger()->error("World resource_manager() failed: ResourceManager is not bound.");
             throw std::runtime_error("World resource manager is not bound.");
         }
         return *m_resource_manager;
@@ -118,6 +142,7 @@ public:
 
     const resource::ResourceManager& resource_manager() const {
         if (m_resource_manager == nullptr) {
+            logger()->error("World resource_manager() const failed: ResourceManager is not bound.");
             throw std::runtime_error("World resource manager is not bound.");
         }
         return *m_resource_manager;

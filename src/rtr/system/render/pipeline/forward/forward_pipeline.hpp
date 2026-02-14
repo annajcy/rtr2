@@ -20,6 +20,7 @@
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 #include "rtr/system/render/pipeline.hpp"
 #include "rtr/system/render/render_pass.hpp"
+#include "rtr/utils/log.hpp"
 #include "vulkan/vulkan.hpp"
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -415,10 +416,13 @@ public:
 
 private:
     rhi::Mesh& require_mesh(resource::MeshHandle mesh_handle) {
+        auto logger = utils::get_logger("render.pipeline.forward");
         if (!mesh_handle.is_valid()) {
+            logger->error("Renderable mesh handle is invalid.");
             throw std::runtime_error("Renderable mesh handle is invalid.");
         }
         if (m_resource_manager == nullptr) {
+            logger->error("ForwardPipeline missing resource manager while requesting mesh handle={}.", mesh_handle.value);
             throw std::runtime_error("ForwardPipeline missing resource manager.");
         }
         return m_resource_manager->require_mesh_rhi(mesh_handle, m_device);

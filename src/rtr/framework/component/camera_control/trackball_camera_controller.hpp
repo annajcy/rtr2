@@ -15,6 +15,7 @@
 #include "rtr/framework/core/game_object.hpp"
 #include "rtr/system/input/input_state.hpp"
 #include "rtr/system/input/input_types.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::framework::component {
 
@@ -30,6 +31,10 @@ struct TrackBallCameraControllerConfig {
 
 class TrackBallCameraController final : public Component {
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("framework.component.trackball");
+    }
+
     static constexpr float kEpsilon = 1e-5f;
 
     const system::input::InputState* m_input_state{nullptr};
@@ -46,11 +51,17 @@ private:
 
     void validate_config(const TrackBallCameraControllerConfig& config) const {
         if (config.pitch_min_degrees > config.pitch_max_degrees) {
+            logger()->error(
+                "TrackBall config invalid: pitch_min_degrees={} > pitch_max_degrees={}.",
+                config.pitch_min_degrees,
+                config.pitch_max_degrees
+            );
             throw std::invalid_argument(
                 "TrackBallCameraControllerConfig pitch_min_degrees must be <= pitch_max_degrees."
             );
         }
         if (glm::length(config.world_up) <= kEpsilon) {
+            logger()->error("TrackBall config invalid: world_up has zero length.");
             throw std::invalid_argument(
                 "TrackBallCameraControllerConfig world_up must have non-zero length."
             );
@@ -59,15 +70,22 @@ private:
 
     void validate_dependencies() {
         if (owner() == nullptr) {
+            logger()->error("TrackBall validate_dependencies failed: owner is null.");
             throw std::runtime_error("TrackBallCameraController owner is null.");
         }
         if (m_input_state == nullptr) {
+            logger()->error("TrackBall validate_dependencies failed: input_state is null.");
             throw std::runtime_error("TrackBallCameraController input_state is null.");
         }
         if (m_camera_manager == nullptr) {
+            logger()->error("TrackBall validate_dependencies failed: camera_manager is null.");
             throw std::runtime_error("TrackBallCameraController camera_manager is null.");
         }
         if (m_camera_manager->camera(owner()->id()) == nullptr) {
+            logger()->error(
+                "TrackBall validate_dependencies failed: no camera bound for owner {}.",
+                owner()->id()
+            );
             throw std::runtime_error(
                 "TrackBallCameraController owner does not have a bound camera."
             );
@@ -201,6 +219,7 @@ public:
 
         auto* go = owner();
         if (go == nullptr) {
+            logger()->error("TrackBall on_update failed: owner is null.");
             throw std::runtime_error("TrackBallCameraController owner is null.");
         }
 
@@ -224,6 +243,13 @@ public:
                 m_config.pitch_max_degrees
             );
             apply_pose_from_orbit_state();
+            logger()->trace(
+                "TrackBall node orbit updated (owner_id={}, yaw_deg={}, pitch_deg={}, radius={:.4f})",
+                go->id(),
+                m_yaw_degrees,
+                m_pitch_degrees,
+                m_radius
+            );
         } else if (middle_down) {
             auto node = go->node();
             const float distance_scale = std::max(m_radius, kEpsilon);
@@ -237,12 +263,23 @@ public:
             if (glm::length(look_dir) > kEpsilon) {
                 node.set_world_rotation(world_rotation_looking_to(look_dir));
             }
+            logger()->trace(
+                "TrackBall node pan updated (owner_id={}, delta=[{:.4f}, {:.4f}, {:.4f}])",
+                go->id(),
+                delta.x,
+                delta.y,
+                delta.z
+            );
         }
 
         const float scroll_y = static_cast<float>(m_input_state->mouse_scroll_dy());
         if (scroll_y != 0.0f) {
             auto* camera = m_camera_manager->camera(go->id());
             if (camera == nullptr) {
+                logger()->error(
+                    "TrackBall on_update failed: no camera bound for owner {}.",
+                    go->id()
+                );
                 throw std::runtime_error(
                     "TrackBallCameraController owner does not have a bound camera."
                 );
