@@ -1,8 +1,8 @@
+#include <pbpt/math/math.h>
 #include <stdexcept>
 
 #include "gtest/gtest.h"
 
-#include <glm/vec4.hpp>
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
@@ -28,7 +28,7 @@ TEST(FrameworkPbptMeshTest, CanAttachWhenMeshRendererExists) {
 
     EXPECT_EQ(&pbpt_mesh.mesh_renderer(), &renderer);
     EXPECT_EQ(pbpt_mesh.mesh_handle(), resource::MeshHandle{10});
-    EXPECT_EQ(renderer.base_color(), glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    EXPECT_EQ(renderer.base_color(), pbpt::math::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 }
 
 TEST(FrameworkPbptMeshTest, MeshHandleTracksMeshRendererUpdates) {
@@ -48,9 +48,9 @@ TEST(FrameworkPbptMeshTest, MeshRendererAccessorTracksBaseColorUpdates) {
     auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
-    renderer.set_base_color(glm::vec4(0.2f, 0.4f, 0.6f, 1.0f));
+    renderer.set_base_color(pbpt::math::vec4(0.2f, 0.4f, 0.6f, 1.0f));
     const auto& exposed_renderer = pbpt_mesh.mesh_renderer();
-    EXPECT_EQ(exposed_renderer.base_color(), glm::vec4(0.2f, 0.4f, 0.6f, 1.0f));
+    EXPECT_EQ(exposed_renderer.base_color(), pbpt::math::vec4(0.2f, 0.4f, 0.6f, 1.0f));
 }
 
 } // namespace rtr::framework::component::test

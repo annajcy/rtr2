@@ -1,23 +1,21 @@
+#include <pbpt/math/math.h>
 #include "gtest/gtest.h"
 
 #include <stdexcept>
 
-#include <glm/ext/matrix_clip_space.hpp>
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
 
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
 
 namespace rtr::framework::core::test {
 
-static void expect_vec3_near(const glm::vec3& lhs, const glm::vec3& rhs, float eps = 1e-5f) {
-    EXPECT_NEAR(lhs.x, rhs.x, eps);
-    EXPECT_NEAR(lhs.y, rhs.y, eps);
-    EXPECT_NEAR(lhs.z, rhs.z, eps);
+static void expect_vec3_near(const pbpt::math::vec3& lhs, const pbpt::math::vec3& rhs, float eps = 1e-5f) {
+    EXPECT_NEAR(lhs.x(), rhs.x(), eps);
+    EXPECT_NEAR(lhs.y(), rhs.y(), eps);
+    EXPECT_NEAR(lhs.z(), rhs.z(), eps);
 }
 
-static void expect_mat4_near(const glm::mat4& lhs, const glm::mat4& rhs, float eps = 1e-5f) {
+static void expect_mat4_near(const pbpt::math::mat4& lhs, const pbpt::math::mat4& rhs, float eps = 1e-5f) {
     for (int c = 0; c < 4; ++c) {
         for (int r = 0; r < 4; ++r) {
             EXPECT_NEAR(lhs[c][r], rhs[c][r], eps);
@@ -129,7 +127,7 @@ TEST(FrameworkCameraTest, CameraFrontMatchesGameObjectWorldFront) {
 
     ASSERT_TRUE(scene.scene_graph().set_parent(camera_go.id(), parent.id(), false));
     scene.scene_graph().node(parent.id()).set_local_rotation(
-        glm::angleAxis(glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f))
+        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::vec3(0.0f, 1.0f, 0.0f))
     );
     scene.scene_graph().update_world_transforms();
 
@@ -144,10 +142,10 @@ TEST(FrameworkCameraTest, CameraViewMatrixUsesNodeWorldTransform) {
     scene.scene_graph().node(camera_go.id()).set_local_position({1.0f, 2.0f, 3.0f});
     scene.scene_graph().update_world_transforms();
 
-    const glm::mat4 expected = glm::lookAt(
-        glm::vec3(1.0f, 2.0f, 3.0f),
-        glm::vec3(1.0f, 2.0f, 2.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f)
+    const pbpt::math::mat4 expected = pbpt::math::lookAt(
+        pbpt::math::vec3(1.0f, 2.0f, 3.0f),
+        pbpt::math::vec3(1.0f, 2.0f, 2.0f),
+        pbpt::math::vec3(0.0f, 1.0f, 0.0f)
     );
     expect_mat4_near(camera.view_matrix(), expected);
 }
@@ -160,7 +158,7 @@ TEST(FrameworkCameraTest, PerspectiveAndOrthographicProjectionMatricesMatchGLM) 
     perspective.far_bound() = 200.0f;
     expect_mat4_near(
         perspective.projection_matrix(),
-        glm::perspective(glm::radians(60.0f), 2.0f, 0.2f, 200.0f)
+        pbpt::math::perspective(pbpt::math::radians(60.0f), 2.0f, 0.2f, 200.0f)
     );
 
     OrthographicCamera orthographic;
@@ -172,7 +170,7 @@ TEST(FrameworkCameraTest, PerspectiveAndOrthographicProjectionMatricesMatchGLM) 
     orthographic.far_bound() = 30.0f;
     expect_mat4_near(
         orthographic.projection_matrix(),
-        glm::ortho(-10.0f, 10.0f, -4.0f, 4.0f, -20.0f, 30.0f)
+        pbpt::math::ortho(-10.0f, 10.0f, -4.0f, 4.0f, -20.0f, 30.0f)
     );
 }
 

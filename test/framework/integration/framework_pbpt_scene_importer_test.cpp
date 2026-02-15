@@ -1,3 +1,4 @@
+#include <pbpt/math/math.h>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
@@ -5,7 +6,6 @@
 
 #include "gtest/gtest.h"
 
-#include <glm/vec3.hpp>
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
@@ -163,10 +163,10 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
         component::PbptSpectrumPoint{600.0f, 0.7f},
         component::PbptSpectrumPoint{700.0f, 0.7f},
     });
-    EXPECT_NEAR(renderer->base_color().x, expected_base_color.r, 1e-5f);
-    EXPECT_NEAR(renderer->base_color().y, expected_base_color.g, 1e-5f);
-    EXPECT_NEAR(renderer->base_color().z, expected_base_color.b, 1e-5f);
-    EXPECT_NEAR(renderer->base_color().w, 1.0f, 1e-6f);
+    EXPECT_NEAR(renderer->base_color().x(), expected_base_color.r, 1e-5f);
+    EXPECT_NEAR(renderer->base_color().y(), expected_base_color.g, 1e-5f);
+    EXPECT_NEAR(renderer->base_color().z(), expected_base_color.b, 1e-5f);
+    EXPECT_NEAR(renderer->base_color().w(), 1.0f, 1e-6f);
 
     const auto& radiance = pbpt_light->area_emitter().radiance_spectrum;
     ASSERT_EQ(radiance.size(), 4u);
@@ -175,9 +175,9 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
 
     scene.scene_graph().update_world_transforms();
     const auto world_pos = mesh_go->node().world_position();
-    EXPECT_NEAR(world_pos.x, 1.0f, 1e-5f);
-    EXPECT_NEAR(world_pos.y, 2.0f, 1e-5f);
-    EXPECT_NEAR(world_pos.z, 3.0f, 1e-5f);
+    EXPECT_NEAR(world_pos.x(), 1.0f, 1e-5f);
+    EXPECT_NEAR(world_pos.y(), 2.0f, 1e-5f);
+    EXPECT_NEAR(world_pos.z(), 3.0f, 1e-5f);
 
     ASSERT_NE(scene.active_camera(), nullptr);
 }
@@ -218,10 +218,10 @@ TEST(FrameworkPbptSceneImporterTest, ImportsRgbReflectanceAndMapsToBaseColor) {
     const auto* pbpt_mesh = mesh_go->get_component<component::PbptMesh>();
     ASSERT_NE(renderer, nullptr);
     ASSERT_NE(pbpt_mesh, nullptr);
-    EXPECT_NEAR(renderer->base_color().x, 0.2f, 1e-6f);
-    EXPECT_NEAR(renderer->base_color().y, 0.4f, 1e-6f);
-    EXPECT_NEAR(renderer->base_color().z, 0.6f, 1e-6f);
-    EXPECT_NEAR(renderer->base_color().w, 1.0f, 1e-6f);
+    EXPECT_NEAR(renderer->base_color().x(), 0.2f, 1e-6f);
+    EXPECT_NEAR(renderer->base_color().y(), 0.4f, 1e-6f);
+    EXPECT_NEAR(renderer->base_color().z(), 0.6f, 1e-6f);
+    EXPECT_NEAR(renderer->base_color().w(), 1.0f, 1e-6f);
 }
 
 TEST(FrameworkPbptSceneImporterTest, ThrowsForInvalidMatrixElementCount) {
@@ -357,10 +357,10 @@ TEST(FrameworkPbptSceneImporterTest, LookAtSensorAlignsWithRtrCameraFrontConvent
     const auto* camera = dynamic_cast<const core::PerspectiveCamera*>(scene.active_camera());
     ASSERT_NE(camera, nullptr);
 
-    const glm::vec3 front = camera->front();
-    EXPECT_NEAR(front.x, 0.0f, 1e-5f);
-    EXPECT_NEAR(front.y, 0.0f, 1e-5f);
-    EXPECT_NEAR(front.z, 1.0f, 1e-5f);
+    const pbpt::math::vec3 front = camera->front();
+    EXPECT_NEAR(front.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(front.y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(front.z(), 1.0f, 1e-5f);
 }
 
 TEST(FrameworkPbptSceneImporterTest, AttachesFreeLookControllerWhenInputStateProvided) {

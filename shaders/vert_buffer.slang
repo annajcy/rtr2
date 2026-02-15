@@ -12,10 +12,10 @@ struct PSInput {
 };
 
 struct UniformBufferObject {
-    float4x4 model;
-    float4x4 view;
-    float4x4 proj;
-    float4x4 normal; // inverse-transpose of model
+    row_major float4x4 model;
+    row_major float4x4 view;
+    row_major float4x4 proj;
+    row_major float4x4 normal; // inverse-transpose of model
     float4 base_color;
 };
 
@@ -25,9 +25,9 @@ ConstantBuffer<UniformBufferObject> ubo;
 [shader("vertex")]
 PSInput vertMain(VSInput input) {
     PSInput output;
-    float4 world_pos = mul(float4(input.in_position, 1.0), ubo.model);
-    float4 view_pos = mul(world_pos, ubo.view);
-    output.pos = mul(view_pos, ubo.proj);
+    float4 world_pos = mul(ubo.model, float4(input.in_position, 1.0));
+    float4 view_pos = mul(ubo.view, world_pos);
+    output.pos = mul(ubo.proj, view_pos);
     // Proper normal transform uses inverse-transpose of the upper-left 3x3.
     float3x3 normal_mat = (float3x3)ubo.normal;
     float3 world_normal = normalize(mul(normal_mat, input.in_normal));

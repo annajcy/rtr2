@@ -1,10 +1,10 @@
 #pragma once
 
+#include <pbpt/math/math.h>
+
 #include <algorithm>
 #include <stdexcept>
 
-#include <glm/ext/matrix_clip_space.hpp>
-#include <glm/ext/matrix_transform.hpp>
 
 #include "rtr/framework/core/scene_graph.hpp"
 #include "rtr/framework/core/types.hpp"
@@ -81,18 +81,18 @@ public:
         return m_scene_graph->node(m_owner_id);
     }
 
-    glm::vec3 front() const {
+    pbpt::math::vec3 front() const {
         // Camera convention: local -Z is forward.
         return node().world_back();
     }
 
-    glm::mat4 view_matrix() const {
+    pbpt::math::mat4 view_matrix() const {
         // Keep RTR view transform strictly consistent with exported PBPT
         // sensor.toWorld: view = inverse(camera_to_world).
-        return glm::inverse(node().world_matrix());
+        return pbpt::math::inverse(node().world_matrix());
     }
 
-    virtual glm::mat4 projection_matrix() const = 0;
+    virtual pbpt::math::mat4 projection_matrix() const = 0;
     virtual void adjust_zoom(float delta_zoom) = 0;
     virtual void set_aspect_ratio(float aspect_ratio) = 0;
 };
@@ -125,9 +125,9 @@ public:
         return m_aspect_ratio;
     }
 
-    glm::mat4 projection_matrix() const override {
-        return glm::perspective(
-            glm::radians(m_fov_degrees),
+    pbpt::math::mat4 projection_matrix() const override {
+        return pbpt::math::perspective(
+            pbpt::math::radians(m_fov_degrees),
             m_aspect_ratio,
             m_near_bound,
             m_far_bound
@@ -208,8 +208,8 @@ public:
         m_far_bound = half;
     }
 
-    glm::mat4 projection_matrix() const override {
-        return glm::ortho(
+    pbpt::math::mat4 projection_matrix() const override {
+        return pbpt::math::ortho(
             m_left_bound,
             m_right_bound,
             m_bottom_bound,
@@ -220,32 +220,32 @@ public:
     }
 
     void adjust_zoom(float delta_zoom) override {
-        const glm::vec2 center = {
+        const pbpt::math::vec2 center = {
             (m_left_bound + m_right_bound) * 0.5f,
             (m_bottom_bound + m_top_bound) * 0.5f
         };
         const float half_w = std::max((m_right_bound - m_left_bound) * 0.5f + delta_zoom, 0.01f);
         const float half_h = std::max((m_top_bound - m_bottom_bound) * 0.5f + delta_zoom, 0.01f);
-        m_left_bound = center.x - half_w;
-        m_right_bound = center.x + half_w;
-        m_bottom_bound = center.y - half_h;
-        m_top_bound = center.y + half_h;
+        m_left_bound = center.x() - half_w;
+        m_right_bound = center.x() + half_w;
+        m_bottom_bound = center.y() - half_h;
+        m_top_bound = center.y() + half_h;
     }
 
     void set_aspect_ratio(float aspect_ratio) override {
         if (aspect_ratio <= 0.0f) {
             return;
         }
-        const glm::vec2 center = {
+        const pbpt::math::vec2 center = {
             (m_left_bound + m_right_bound) * 0.5f,
             (m_bottom_bound + m_top_bound) * 0.5f
         };
         const float half_h = (m_top_bound - m_bottom_bound) * 0.5f;
         const float half_w = std::max(half_h * aspect_ratio, 0.01f);
-        m_left_bound = center.x - half_w;
-        m_right_bound = center.x + half_w;
-        m_bottom_bound = center.y - half_h;
-        m_top_bound = center.y + half_h;
+        m_left_bound = center.x() - half_w;
+        m_right_bound = center.x() + half_w;
+        m_bottom_bound = center.y() - half_h;
+        m_top_bound = center.y() + half_h;
     }
 };
 

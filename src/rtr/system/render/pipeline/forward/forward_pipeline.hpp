@@ -1,6 +1,9 @@
 #pragma once
 
+#include <pbpt/math/math.h>
+
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -23,9 +26,6 @@
 #include "rtr/utils/log.hpp"
 #include "vulkan/vulkan.hpp"
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/glm.hpp>
-
 namespace rtr::system::render {
 
 struct ForwardPipelineConfig {
@@ -34,13 +34,29 @@ struct ForwardPipelineConfig {
     std::string fragment_shader_filename{"vert_buffer_frag.spv"};
 };
 
-struct UniformBufferObject {
-    alignas(16) glm::mat4 model;
-    alignas(16) glm::mat4 view;
-    alignas(16) glm::mat4 proj;
-    alignas(16) glm::mat4 normal;
-    alignas(16) glm::vec4 base_color;
+struct GpuMat4 {
+    // Stored as contiguous row-major values for an explicit CPU->GPU contract.
+    alignas(16) std::array<float, 16> values{};
 };
+
+struct UniformBufferObjectGpu {
+    alignas(16) GpuMat4 model{};
+    alignas(16) GpuMat4 view{};
+    alignas(16) GpuMat4 proj{};
+    alignas(16) GpuMat4 normal{};
+    alignas(16) std::array<float, 4> base_color{};
+};
+
+inline GpuMat4 pack_mat4_row_major(const pbpt::math::mat4& matrix) {
+    GpuMat4 packed{};
+    std::size_t index = 0;
+    for (int row = 0; row < 4; ++row) {
+        for (int col = 0; col < 4; ++col) {
+            packed.values[index++] = static_cast<float>(matrix[row][col]);
+        }
+    }
+    return packed;
+}
 
 class ForwardPass final : public render::IRenderPass {
 public:
@@ -230,7 +246,7 @@ public:
         const ForwardPipelineConfig& config = {}
     )
         : RenderPipelineBase(runtime) {
-        m_uniform_buffer_size = sizeof(UniformBufferObject);
+        m_uniform_buffer_size = sizeof(UniformBufferObjectGpu);
 
         m_vertex_shader_module = std::make_unique<rhi::ShaderModule>(
             rhi::ShaderModule::from_file(
@@ -403,7 +419,7 @@ public:
             throw std::runtime_error("Renderable count exceeds preallocated ForwardPipeline capacity.");
         }
 
-        glm::mat4 proj = scene_view.camera.proj;
+        pbpt::math::mat4 proj = scene_view.camera.proj;
         proj[1][1] *= -1;
 
         auto& frame_uniform_buffers = m_object_uniform_buffers[frame_index];
@@ -416,12 +432,17 @@ public:
             const auto& renderable = scene_view.renderables[i];
             auto& mesh = require_mesh(renderable.mesh);
 
-            UniformBufferObject ubo{};
-            ubo.model = renderable.model;
-            ubo.view = scene_view.camera.view;
-            ubo.proj = proj;
-            ubo.normal = renderable.normal;
-            ubo.base_color = renderable.base_color;
+            UniformBufferObjectGpu ubo{};
+            ubo.model = pack_mat4_row_major(renderable.model);
+            ubo.view = pack_mat4_row_major(scene_view.camera.view);
+            ubo.proj = pack_mat4_row_major(proj);
+            ubo.normal = pack_mat4_row_major(renderable.normal);
+            ubo.base_color = {
+                static_cast<float>(renderable.base_color.x()),
+                static_cast<float>(renderable.base_color.y()),
+                static_cast<float>(renderable.base_color.z()),
+                static_cast<float>(renderable.base_color.w())
+            };
 
             std::memcpy(frame_uniform_buffers[i]->mapped_data(), &ubo, sizeof(ubo));
 

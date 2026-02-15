@@ -1,8 +1,8 @@
+#include <pbpt/math/math.h>
 #include <stdexcept>
 
 #include "gtest/gtest.h"
 
-#include <glm/vec4.hpp>
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
@@ -12,7 +12,7 @@ namespace rtr::framework::component::test {
 TEST(FrameworkMeshRendererTest, ConstructWithValidHandles) {
     MeshRenderer renderer(resource::MeshHandle{1});
     EXPECT_EQ(renderer.mesh_handle(), resource::MeshHandle{1});
-    EXPECT_EQ(renderer.base_color(), glm::vec4(1.0f));
+    EXPECT_EQ(renderer.base_color(), pbpt::math::vec4(1.0f));
 }
 
 TEST(FrameworkMeshRendererTest, InvalidMeshHandleThrows) {
@@ -26,18 +26,18 @@ TEST(FrameworkMeshRendererTest, InvalidMeshHandleThrows) {
 }
 
 TEST(FrameworkMeshRendererTest, AllowsCustomBaseColor) {
-    MeshRenderer renderer(resource::MeshHandle{1}, glm::vec4{0.2f, 0.3f, 0.4f, 1.0f});
-    EXPECT_EQ(renderer.base_color(), glm::vec4(0.2f, 0.3f, 0.4f, 1.0f));
+    MeshRenderer renderer(resource::MeshHandle{1}, pbpt::math::vec4{0.2f, 0.3f, 0.4f, 1.0f});
+    EXPECT_EQ(renderer.base_color(), pbpt::math::vec4(0.2f, 0.3f, 0.4f, 1.0f));
 }
 
 TEST(FrameworkMeshRendererTest, SettersUpdateState) {
     MeshRenderer renderer(resource::MeshHandle{1});
 
     renderer.set_mesh_handle(resource::MeshHandle{3});
-    renderer.set_base_color(glm::vec4{0.1f, 0.2f, 0.3f, 1.0f});
+    renderer.set_base_color(pbpt::math::vec4{0.1f, 0.2f, 0.3f, 1.0f});
 
     EXPECT_EQ(renderer.mesh_handle(), resource::MeshHandle{3});
-    EXPECT_EQ(renderer.base_color(), glm::vec4(0.1f, 0.2f, 0.3f, 1.0f));
+    EXPECT_EQ(renderer.base_color(), pbpt::math::vec4(0.1f, 0.2f, 0.3f, 1.0f));
 }
 
 TEST(FrameworkMeshRendererTest, GameObjectCanAddAndQueryMeshRenderer) {

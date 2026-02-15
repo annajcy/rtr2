@@ -38,7 +38,11 @@ set(RTR_DEFAULT_BUILD_EXAMPLES ${PROJECT_IS_TOP_LEVEL})
 option(RTR_BUILD_TESTS "Build the project's tests" ${RTR_DEFAULT_BUILD_TESTS})
 option(RTR_BUILD_EXAMPLES "Build the project's examples" ${RTR_DEFAULT_BUILD_EXAMPLES})
 option(RTR_COMPILE_SHADERS "Build the project's shaders" ON)
-option(RTR_ENABLE_PBPT_RUNTIME "Enable PBPT offline runtime implementation" ON)
+
+set(PBPT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(PBPT_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(PBPT_BUILD_DOCUMENTATION OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/pbpt)
 
 include(third_party) 
 add_subdirectory(src)
@@ -46,7 +50,7 @@ add_subdirectory(src)
 set(RTR_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/rtr")
 
 install(
-  TARGETS rtr rtr_framework_integration imgui_vk stb_impl
+  TARGETS rtr imgui_vk stb_impl
   EXPORT rtrTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -57,6 +61,14 @@ install(
 install(
   DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  FILES_MATCHING
+  PATTERN "*.hpp"
+  PATTERN "*.h"
+)
+
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/pbpt/src/pbpt/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/pbpt
   FILES_MATCHING
   PATTERN "*.hpp"
   PATTERN "*.h"
@@ -108,6 +120,4 @@ if(RTR_BUILD_TESTS)
 else()
   message(STATUS "RTR_BUILD_TESTS is OFF; tests will NOT be built.")
 endif()
-
-
 

@@ -1,10 +1,10 @@
+#include <pbpt/math/math.h>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
 
-#include <glm/vec4.hpp>
 
 #include "rtr/app/app_runtime.hpp"
 #include "rtr/editor/editor_attach.hpp"
@@ -69,7 +69,7 @@ int main() {
 
         auto add_mesh_renderer = [&](rtr::framework::core::GameObject& go,
                                      const std::string& mesh_path,
-                                     const glm::vec4& base_color) {
+                                     const pbpt::math::vec4& base_color) {
             const auto mesh_handle =
                 runtime.resource_manager().create_mesh_from_obj_relative_path(mesh_path);
             (void)go.add_component<rtr::framework::component::MeshRenderer>(
@@ -79,18 +79,25 @@ int main() {
         };
 
         auto& go_a = scene.create_game_object("mesh_a");
-        add_mesh_renderer(go_a, "models/spot.obj", glm::vec4{0.2f, 0.7f, 0.9f, 1.0f});
+        add_mesh_renderer(go_a, "models/spot.obj", pbpt::math::vec4{0.2f, 0.7f, 0.9f, 1.0f});
         go_a.node().set_local_position({-2.5f, 0.0f, 0.0f});
 
         auto& go_b = scene.create_game_object("mesh_b");
-        add_mesh_renderer(go_b, "models/stanford_bunny.obj", glm::vec4{0.9f, 0.85f, 0.75f, 1.0f});
+        add_mesh_renderer(go_b, "models/stanford_bunny.obj", pbpt::math::vec4{0.9f, 0.85f, 0.75f, 1.0f});
         go_b.node().set_local_position({0.0f, 0.0f, 0.0f});
 
         auto& go_c = scene.create_game_object("mesh_c");
-        add_mesh_renderer(go_c, "models/colored_quad.obj", glm::vec4{0.9f, 0.25f, 0.25f, 1.0f});
+        add_mesh_renderer(go_c, "models/colored_quad.obj", pbpt::math::vec4{0.9f, 0.25f, 0.25f, 1.0f});
         go_c.node().set_local_position({2.5f, 0.0f, 0.0f});
 
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{
+            .on_post_update = [editor_host](rtr::app::RuntimeContext& ctx) {
+                editor_host->begin_frame(rtr::editor::EditorFrameData{
+                    .frame_serial = ctx.frame_serial,
+                    .delta_seconds = ctx.delta_seconds,
+                    .paused = ctx.paused,
+                });
+            },
             .on_pre_render = [](rtr::app::RuntimeContext& ctx) {
                 auto* active_scene = ctx.world.active_scene();
                 if (active_scene == nullptr) {
@@ -112,13 +119,6 @@ int main() {
                 if (ctx.input.state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
                     ctx.renderer.window().close();
                 }
-            },
-            .on_post_update = [editor_host](rtr::app::RuntimeContext& ctx) {
-                editor_host->begin_frame(rtr::editor::EditorFrameData{
-                    .frame_serial = ctx.frame_serial,
-                    .delta_seconds = ctx.delta_seconds,
-                    .paused = ctx.paused,
-                });
             }
         });
 

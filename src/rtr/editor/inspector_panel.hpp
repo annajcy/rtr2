@@ -1,12 +1,11 @@
 #pragma once
 
+#include <pbpt/math/math.h>
+
 #include <algorithm>
 #include <array>
 #include <cstdio>
 
-#include <glm/geometric.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/trigonometric.hpp>
 
 #include "imgui.h"
 
@@ -34,42 +33,42 @@ private:
     static void draw_transform_editor(framework::core::GameObject& game_object) {
         auto node = game_object.node();
 
-        glm::vec3 local_position = node.local_position();
-        if (ImGui::DragFloat3("Position", &local_position.x, 0.05f)) {
+        pbpt::math::vec3 local_position = node.local_position();
+        if (ImGui::DragFloat3("Position", &local_position.x(), 0.05f)) {
             node.set_local_position(local_position);
             logger()->debug(
                 "Transform position updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
                 game_object.id(),
-                local_position.x,
-                local_position.y,
-                local_position.z
+                local_position.x(),
+                local_position.y(),
+                local_position.z()
             );
         }
 
-        glm::vec3 local_euler = node.rotation_euler();
-        if (ImGui::DragFloat3("Rotation (deg)", &local_euler.x, 0.5f)) {
-            node.set_local_rotation(glm::quat(glm::radians(local_euler)));
+        pbpt::math::vec3 local_euler = node.rotation_euler();
+        if (ImGui::DragFloat3("Rotation (deg)", &local_euler.x(), 0.5f)) {
+            node.set_local_rotation(pbpt::math::quat(pbpt::math::radians(local_euler)));
             logger()->debug(
                 "Transform rotation updated (game_object_id={}, euler_deg=[{:.3f}, {:.3f}, {:.3f}]).",
                 game_object.id(),
-                local_euler.x,
-                local_euler.y,
-                local_euler.z
+                local_euler.x(),
+                local_euler.y(),
+                local_euler.z()
             );
         }
 
-        glm::vec3 local_scale = node.local_scale();
-        if (ImGui::DragFloat3("Scale", &local_scale.x, 0.02f)) {
-            local_scale.x = std::max(local_scale.x, 0.0001f);
-            local_scale.y = std::max(local_scale.y, 0.0001f);
-            local_scale.z = std::max(local_scale.z, 0.0001f);
+        pbpt::math::vec3 local_scale = node.local_scale();
+        if (ImGui::DragFloat3("Scale", &local_scale.x(), 0.02f)) {
+            local_scale.x() = std::max(local_scale.x(), 0.0001f);
+            local_scale.y() = std::max(local_scale.y(), 0.0001f);
+            local_scale.z() = std::max(local_scale.z(), 0.0001f);
             node.set_local_scale(local_scale);
             logger()->debug(
                 "Transform scale updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
                 game_object.id(),
-                local_scale.x,
-                local_scale.y,
-                local_scale.z
+                local_scale.x(),
+                local_scale.y(),
+                local_scale.z()
             );
         }
     }
@@ -183,16 +182,16 @@ private:
                 );
             }
 
-            glm::vec4 base_color = mesh_renderer->base_color();
-            if (ImGui::ColorEdit4("Base Color", &base_color.x)) {
+            pbpt::math::vec4 base_color = mesh_renderer->base_color();
+            if (ImGui::ColorEdit4("Base Color", &base_color.x())) {
                 mesh_renderer->set_base_color(base_color);
                 logger()->debug(
                     "MeshRenderer base_color updated (game_object_id={}, rgba=[{:.3f}, {:.3f}, {:.3f}, {:.3f}]).",
                     game_object.id(),
-                    base_color.x,
-                    base_color.y,
-                    base_color.z,
-                    base_color.w
+                    base_color.x(),
+                    base_color.y(),
+                    base_color.z(),
+                    base_color.w()
                 );
             }
 
@@ -284,7 +283,7 @@ private:
             dirty |= ImGui::DragFloat("Zoom Speed##trackball", &config.zoom_speed, 0.01f, 0.01f, 20.0f);
             dirty |= ImGui::DragFloat("Pitch Min##trackball", &config.pitch_min_degrees, 0.1f, -179.0f, 179.0f);
             dirty |= ImGui::DragFloat("Pitch Max##trackball", &config.pitch_max_degrees, 0.1f, -179.0f, 179.0f);
-            dirty |= ImGui::DragFloat3("World Up", &config.world_up.x, 0.01f, -1.0f, 1.0f);
+            dirty |= ImGui::DragFloat3("World Up", &config.world_up.x(), 0.01f, -1.0f, 1.0f);
 
             if (config.pitch_min_degrees > config.pitch_max_degrees) {
                 const float old_min = config.pitch_min_degrees;
@@ -300,19 +299,19 @@ private:
                     config.pitch_max_degrees
                 );
             }
-            if (glm::length(config.world_up) <= 1e-6f) {
-                const glm::vec3 old_world_up = config.world_up;
-                config.world_up = glm::vec3{0.0f, 1.0f, 0.0f};
+            if (pbpt::math::length(config.world_up) <= 1e-6f) {
+                const pbpt::math::vec3 old_world_up = config.world_up;
+                config.world_up = pbpt::math::vec3{0.0f, 1.0f, 0.0f};
                 dirty = true;
                 logger()->debug(
                     "TrackBall world_up corrected (game_object_id={}, old=[{:.3f}, {:.3f}, {:.3f}], new=[{:.3f}, {:.3f}, {:.3f}]).",
                     game_object.id(),
-                    old_world_up.x,
-                    old_world_up.y,
-                    old_world_up.z,
-                    config.world_up.x,
-                    config.world_up.y,
-                    config.world_up.z
+                    old_world_up.x(),
+                    old_world_up.y(),
+                    old_world_up.z(),
+                    config.world_up.x(),
+                    config.world_up.y(),
+                    config.world_up.z()
                 );
             }
 
@@ -326,21 +325,21 @@ private:
                     config.zoom_speed,
                     config.pitch_min_degrees,
                     config.pitch_max_degrees,
-                    config.world_up.x,
-                    config.world_up.y,
-                    config.world_up.z
+                    config.world_up.x(),
+                    config.world_up.y(),
+                    config.world_up.z()
                 );
             }
 
-            glm::vec3 target = trackball->target();
-            if (ImGui::DragFloat3("Target", &target.x, 0.05f)) {
+            pbpt::math::vec3 target = trackball->target();
+            if (ImGui::DragFloat3("Target", &target.x(), 0.05f)) {
                 trackball->set_target(target);
                 logger()->debug(
                     "TrackBall target updated (game_object_id={}, target=[{:.4f}, {:.4f}, {:.4f}]).",
                     game_object.id(),
-                    target.x,
-                    target.y,
-                    target.z
+                    target.x(),
+                    target.y(),
+                    target.z()
                 );
             }
         }

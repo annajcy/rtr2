@@ -1,14 +1,11 @@
 #pragma once
 
+#include <pbpt/math/math.h>
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
-#include <glm/common.hpp>
-#include <glm/geometric.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/trigonometric.hpp>
-#include <glm/vec3.hpp>
 
 #include "rtr/framework/component/component.hpp"
 #include "rtr/framework/core/camera_manager.hpp"
@@ -25,8 +22,8 @@ struct TrackBallCameraControllerConfig {
     float zoom_speed{0.35f};
     float pitch_min_degrees{-89.0f};
     float pitch_max_degrees{89.0f};
-    glm::vec3 world_up{0.0f, 1.0f, 0.0f};
-    glm::vec3 default_target{0.0f, 0.0f, 0.0f};
+    pbpt::math::vec3 world_up{0.0f, 1.0f, 0.0f};
+    pbpt::math::vec3 default_target{0.0f, 0.0f, 0.0f};
 };
 
 class TrackBallCameraController final : public Component {
@@ -44,7 +41,7 @@ private:
     bool m_validated_once{false};
     bool m_orbit_initialized{false};
 
-    glm::vec3 m_target_world{0.0f, 0.0f, 0.0f};
+    pbpt::math::vec3 m_target_world{0.0f, 0.0f, 0.0f};
     float m_radius{1.0f};
     float m_yaw_degrees{0.0f};
     float m_pitch_degrees{0.0f};
@@ -60,7 +57,7 @@ private:
                 "TrackBallCameraControllerConfig pitch_min_degrees must be <= pitch_max_degrees."
             );
         }
-        if (glm::length(config.world_up) <= kEpsilon) {
+        if (pbpt::math::length(config.world_up) <= kEpsilon) {
             logger()->error("TrackBall config invalid: world_up has zero length.");
             throw std::invalid_argument(
                 "TrackBallCameraControllerConfig world_up must have non-zero length."
@@ -101,14 +98,14 @@ private:
 
     void sync_spherical_from_current_position() {
         const auto node = owner()->node();
-        const glm::vec3 world_position = node.world_position();
-        const glm::vec3 offset = world_position - m_target_world;
-        m_radius = std::max(glm::length(offset), kEpsilon);
-        m_yaw_degrees = glm::degrees(std::atan2(offset.x, offset.z));
-        m_pitch_degrees = glm::degrees(
-            glm::asin(glm::clamp(offset.y / m_radius, -1.0f, 1.0f))
+        const pbpt::math::vec3 world_position = node.world_position();
+        const pbpt::math::vec3 offset = world_position - m_target_world;
+        m_radius = std::max(pbpt::math::length(offset), kEpsilon);
+        m_yaw_degrees = pbpt::math::degrees(std::atan2(offset.x(), offset.z()));
+        m_pitch_degrees = pbpt::math::degrees(
+            pbpt::math::asin(pbpt::math::clamp(offset.y() / m_radius, -1.0f, 1.0f))
         );
-        m_pitch_degrees = glm::clamp(
+        m_pitch_degrees = pbpt::math::clamp(
             m_pitch_degrees,
             m_config.pitch_min_degrees,
             m_config.pitch_max_degrees
@@ -118,50 +115,50 @@ private:
     void initialize_orbit_state() {
         sync_spherical_from_current_position();
         auto node = owner()->node();
-        const glm::vec3 look_dir = m_target_world - node.world_position();
-        if (glm::length(look_dir) > kEpsilon) {
+        const pbpt::math::vec3 look_dir = m_target_world - node.world_position();
+        if (pbpt::math::length(look_dir) > kEpsilon) {
             node.set_world_rotation(world_rotation_looking_to(look_dir));
         }
         m_orbit_initialized = true;
     }
 
-    glm::vec3 spherical_direction() const {
-        const float yaw_rad = glm::radians(m_yaw_degrees);
-        const float pitch_rad = glm::radians(m_pitch_degrees);
+    pbpt::math::vec3 spherical_direction() const {
+        const float yaw_rad = pbpt::math::radians(m_yaw_degrees);
+        const float pitch_rad = pbpt::math::radians(m_pitch_degrees);
         const float cos_pitch = std::cos(pitch_rad);
-        return glm::normalize(glm::vec3{
+        return pbpt::math::normalize(pbpt::math::vec3{
             std::sin(yaw_rad) * cos_pitch,
             std::sin(pitch_rad),
             std::cos(yaw_rad) * cos_pitch
         });
     }
 
-    glm::quat world_rotation_looking_to(const glm::vec3& forward_dir) const {
-        const glm::vec3 forward = glm::normalize(forward_dir);
-        glm::vec3 up = glm::normalize(m_config.world_up);
+    pbpt::math::quat world_rotation_looking_to(const pbpt::math::vec3& forward_dir) const {
+        const pbpt::math::vec3 forward = pbpt::math::normalize(forward_dir);
+        pbpt::math::vec3 up = pbpt::math::normalize(m_config.world_up);
 
         // Keep camera basis stable when forward is nearly parallel to world up.
-        if (glm::length(glm::cross(up, forward)) <= kEpsilon) {
-            up = glm::vec3(0.0f, 0.0f, 1.0f);
-            if (glm::length(glm::cross(up, forward)) <= kEpsilon) {
-                up = glm::vec3(1.0f, 0.0f, 0.0f);
+        if (pbpt::math::length(pbpt::math::cross(up, forward)) <= kEpsilon) {
+            up = pbpt::math::vec3(0.0f, 0.0f, 1.0f);
+            if (pbpt::math::length(pbpt::math::cross(up, forward)) <= kEpsilon) {
+                up = pbpt::math::vec3(1.0f, 0.0f, 0.0f);
             }
         }
 
-        const glm::vec3 right = glm::normalize(glm::cross(forward, up));
-        const glm::vec3 corrected_up = glm::normalize(glm::cross(right, forward));
+        const pbpt::math::vec3 right = pbpt::math::normalize(pbpt::math::cross(forward, up));
+        const pbpt::math::vec3 corrected_up = pbpt::math::normalize(pbpt::math::cross(right, forward));
 
         // Camera convention uses local -Z as front.
-        const glm::mat3 basis(right, corrected_up, -forward);
-        return glm::normalize(glm::quat_cast(basis));
+        const pbpt::math::mat3 basis = pbpt::math::mat3::from_cols(right, corrected_up, -forward);
+        return pbpt::math::normalize(pbpt::math::quat_cast(basis));
     }
 
     void apply_pose_from_orbit_state() {
         auto node = owner()->node();
-        const glm::vec3 dir = spherical_direction();
-        const glm::vec3 position = m_target_world + dir * m_radius;
-        const glm::vec3 look_dir = m_target_world - position;
-        if (glm::length(look_dir) <= kEpsilon) {
+        const pbpt::math::vec3 dir = spherical_direction();
+        const pbpt::math::vec3 position = m_target_world + dir * m_radius;
+        const pbpt::math::vec3 look_dir = m_target_world - position;
+        if (pbpt::math::length(look_dir) <= kEpsilon) {
             return;
         }
 
@@ -201,12 +198,12 @@ public:
         return m_config;
     }
 
-    void set_target(const glm::vec3& target_world) {
+    void set_target(const pbpt::math::vec3& target_world) {
         m_target_world = target_world;
         m_orbit_initialized = false;
     }
 
-    const glm::vec3& target() const {
+    const pbpt::math::vec3& target() const {
         return m_target_world;
     }
 
@@ -237,7 +234,7 @@ public:
         if (left_down) {
             m_yaw_degrees += static_cast<float>(m_input_state->mouse_dx()) * m_config.rotate_speed;
             m_pitch_degrees += static_cast<float>(m_input_state->mouse_dy()) * m_config.rotate_speed;
-            m_pitch_degrees = glm::clamp(
+            m_pitch_degrees = pbpt::math::clamp(
                 m_pitch_degrees,
                 m_config.pitch_min_degrees,
                 m_config.pitch_max_degrees
@@ -253,22 +250,22 @@ public:
         } else if (middle_down) {
             auto node = go->node();
             const float distance_scale = std::max(m_radius, kEpsilon);
-            const glm::vec3 delta =
+            const pbpt::math::vec3 delta =
                 node.world_right() * static_cast<float>(m_input_state->mouse_dx()) * m_config.pan_speed * distance_scale +
                 node.world_up() * static_cast<float>(m_input_state->mouse_dy()) * m_config.pan_speed * distance_scale;
 
             m_target_world += delta;
             node.set_world_position(node.world_position() + delta);
-            const glm::vec3 look_dir = m_target_world - node.world_position();
-            if (glm::length(look_dir) > kEpsilon) {
+            const pbpt::math::vec3 look_dir = m_target_world - node.world_position();
+            if (pbpt::math::length(look_dir) > kEpsilon) {
                 node.set_world_rotation(world_rotation_looking_to(look_dir));
             }
             logger()->trace(
                 "TrackBall node pan updated (owner_id={}, delta=[{:.4f}, {:.4f}, {:.4f}])",
                 go->id(),
-                delta.x,
-                delta.y,
-                delta.z
+                delta.x(),
+                delta.y(),
+                delta.z()
             );
         }
 
