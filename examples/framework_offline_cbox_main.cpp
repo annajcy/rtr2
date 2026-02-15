@@ -368,9 +368,9 @@ int main() {
             }
         };
 
-        // Remove selected cbox primitives from the imported scene.
-        remove_required_imported_game_object("cbox_floor");
-        remove_required_imported_game_object("cbox_redwall");
+        // // Remove selected cbox primitives from the imported scene.
+        // remove_required_imported_game_object("cbox_floor");
+        // remove_required_imported_game_object("cbox_redwall");
 
         if (scene.active_camera() == nullptr) {
             throw std::runtime_error("Imported cbox scene has no active camera.");

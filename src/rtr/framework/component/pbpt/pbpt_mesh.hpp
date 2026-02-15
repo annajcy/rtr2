@@ -4,12 +4,9 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <utility>
-#include <variant>
 
 #include "rtr/framework/component/component.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/pbpt/pbpt_spectrum.hpp"
 #include "rtr/framework/core/game_object.hpp"
 #include "rtr/utils/log.hpp"
 
@@ -43,19 +40,11 @@ inline void validate_pbpt_rgb(
     }
 }
 
-using PbptReflectance = std::variant<PbptSpectrum, PbptRgb>;
-
-struct PbptDiffuseBsdf {
-    PbptReflectance reflectance{make_constant_pbpt_spectrum(0.7f)};
-};
-
 class PbptMesh final : public Component {
 private:
     static std::shared_ptr<spdlog::logger> logger() {
         return utils::get_logger("framework.component.pbpt_mesh");
     }
-
-    PbptDiffuseBsdf m_diffuse_bsdf{};
 
     const MeshRenderer& require_mesh_renderer() const {
         const auto* go = owner();
@@ -87,52 +76,6 @@ public:
 
     resource::MeshHandle mesh_handle() const {
         return require_mesh_renderer().mesh_handle();
-    }
-
-    const PbptDiffuseBsdf& diffuse_bsdf() const {
-        return m_diffuse_bsdf;
-    }
-
-    const PbptReflectance& reflectance() const {
-        return m_diffuse_bsdf.reflectance;
-    }
-
-    bool is_reflectance_spectrum() const {
-        return std::holds_alternative<PbptSpectrum>(m_diffuse_bsdf.reflectance);
-    }
-
-    bool is_reflectance_rgb() const {
-        return std::holds_alternative<PbptRgb>(m_diffuse_bsdf.reflectance);
-    }
-
-    const PbptSpectrum& reflectance_spectrum() const {
-        const auto* spectrum = std::get_if<PbptSpectrum>(&m_diffuse_bsdf.reflectance);
-        if (spectrum == nullptr) {
-            logger()->error("reflectance_spectrum() failed: current reflectance is not spectrum.");
-            throw std::logic_error("PbptMesh reflectance is not a spectrum.");
-        }
-        return *spectrum;
-    }
-
-    const PbptRgb& reflectance_rgb() const {
-        const auto* rgb = std::get_if<PbptRgb>(&m_diffuse_bsdf.reflectance);
-        if (rgb == nullptr) {
-            logger()->error("reflectance_rgb() failed: current reflectance is not rgb.");
-            throw std::logic_error("PbptMesh reflectance is not rgb.");
-        }
-        return *rgb;
-    }
-
-    void set_reflectance_spectrum(PbptSpectrum points) {
-        validate_pbpt_spectrum(points, "PbptMesh.reflectance_spectrum");
-        m_diffuse_bsdf.reflectance = std::move(points);
-        logger()->debug("PbptMesh reflectance set to spectrum.");
-    }
-
-    void set_reflectance_rgb(PbptRgb rgb) {
-        validate_pbpt_rgb(rgb, "PbptMesh.reflectance_rgb");
-        m_diffuse_bsdf.reflectance = rgb;
-        logger()->debug("PbptMesh reflectance set to rgb.");
     }
 };
 

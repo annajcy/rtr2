@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -77,37 +76,6 @@ inline component::PbptSpectrum pbpt_rgb_to_spectrum(const component::PbptRgb& rg
     }
     component::validate_pbpt_spectrum(piecewise, "PbptReflectanceConvert.spectrum");
     return piecewise;
-}
-
-inline component::PbptRgb pbpt_reflectance_to_rgb(const component::PbptReflectance& reflectance) {
-    return std::visit(
-        [](const auto& source) -> component::PbptRgb {
-            using SourceT = std::decay_t<decltype(source)>;
-            if constexpr (std::is_same_v<SourceT, component::PbptSpectrum>) {
-                return pbpt_spectrum_to_rgb(source);
-            } else {
-                return source;
-            }
-        },
-        reflectance
-    );
-}
-
-inline component::PbptSpectrum pbpt_reflectance_to_spectrum(
-    const component::PbptReflectance& reflectance
-) {
-    return std::visit(
-        [](const auto& source) -> component::PbptSpectrum {
-            using SourceT = std::decay_t<decltype(source)>;
-            if constexpr (std::is_same_v<SourceT, component::PbptRgb>) {
-                return pbpt_rgb_to_spectrum(source);
-            } else {
-                component::validate_pbpt_spectrum(source, "PbptReflectanceConvert.spectrum");
-                return source;
-            }
-        },
-        reflectance
-    );
 }
 
 } // namespace rtr::framework::integration

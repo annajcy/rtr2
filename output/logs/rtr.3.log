@@ -1,12 +1,64 @@
-[2026-02-15 09:54:49.543] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
-[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='z', order=20, visible=true, panel_count=1).
-[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='a', order=10, visible=true, panel_count=2).
-[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='b', order=20, visible=true, panel_count=3).
-[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='visible', order=0, visible=true, panel_count=1).
-[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='hidden', order=1, visible=false, panel_count=2).
-[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='alpha', order=0, visible=true, panel_count=1).
-[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='beta', order=1, visible=true, panel_count=2).
-[2026-02-15 09:54:49.543] [debug] [editor.host] Panel removed (id='alpha', panel_count=1).
-[2026-02-15 09:54:49.543] [warning] [editor.host] remove_panel ignored: panel id='missing' not found.
-[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='dup', order=0, visible=true, panel_count=1).
-[2026-02-15 09:54:49.543] [error] [editor.host] register_panel failed: duplicate panel id='dup'.
+[2026-02-15 12:15:10.243] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
+[2026-02-15 12:15:10.244] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-15 12:15:10.244] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='', count=1)
+[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=1, name='', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=1, name='', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 12:15:10.244] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='mesh_only', count=2)
+[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=2, vertices=3, indices=3)
+[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=2, name='mesh_only', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.244] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=3, name='disabled_component', count=3)
+[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=3, vertices=3, indices=3)
+[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=3, name='disabled_component', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=3, name='disabled_component', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 12:15:10.244] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=4, name='disabled_go', count=4)
+[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=4, vertices=3, indices=3)
+[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=4, name='disabled_go', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=4, name='disabled_go', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 12:15:10.244] [debug] [framework.integration.pbpt.export] Building PBPT scene record from Scene 1 ('scene').
+[2026-02-15 12:15:10.244] [debug] [framework.integration.pbpt.export] PBPT scene record built (shape_count=1, has_sensor=false, active_material_count=1).
+[2026-02-15 12:15:10.244] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-15 12:15:10.244] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='light_only', count=1)
+[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=1, name='light_only', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=1, name='light_only', component_type='N3rtr9framework9component9PbptLightE', component_count=2)
+[2026-02-15 12:15:10.244] [debug] [framework.integration.pbpt.export] Building PBPT scene record from Scene 1 ('scene').
+[2026-02-15 12:15:10.244] [error] [framework.integration.pbpt.export] PBPT export failed: GameObject 'light_only' has PbptLight without PbptMesh.
+[2026-02-15 12:15:10.244] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.244] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=2, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_dedup/scene.xml').
+[2026-02-15 12:15:10.244] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_dedup/meshes'.
+[2026-02-15 12:15:10.245] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=1, shapes=2).
+[2026-02-15 12:15:10.245] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-15 12:15:10.245] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.245] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=1, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_rgb_reflectance/scene.xml').
+[2026-02-15 12:15:10.245] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_rgb_reflectance/meshes'.
+[2026-02-15 12:15:10.246] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=1, shapes=1).
+[2026-02-15 12:15:10.246] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-15 12:15:10.246] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.246] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=1, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_emitter/scene.xml').
+[2026-02-15 12:15:10.246] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_emitter/meshes'.
+[2026-02-15 12:15:10.246] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=1, shapes=1).
+[2026-02-15 12:15:10.247] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-15 12:15:10.247] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.247] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=1, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_matrix/scene.xml').
+[2026-02-15 12:15:10.247] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_matrix/meshes'.
+[2026-02-15 12:15:10.247] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=1, shapes=1).
+[2026-02-15 12:15:10.248] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-15 12:15:10.248] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='camera', count=1)
+[2026-02-15 12:15:10.248] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
+[2026-02-15 12:15:10.248] [info] [framework.core.camera_manager] Active camera owner changed to 1.
+[2026-02-15 12:15:10.248] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
+[2026-02-15 12:15:10.248] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='mesh', count=2)
+[2026-02-15 12:15:10.248] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.248] [debug] [framework.core.game_object] Component added (game_object_id=2, name='mesh', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.248] [debug] [framework.core.game_object] Component added (game_object_id=2, name='mesh', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 12:15:10.248] [debug] [framework.integration.pbpt.export] Building PBPT scene record from Scene 1 ('scene').
+[2026-02-15 12:15:10.248] [debug] [framework.integration.pbpt.export] PBPT scene record built (shape_count=1, has_sensor=true, active_material_count=1).
+[2026-02-15 12:15:10.248] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=1, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_sensor/scene.xml').
+[2026-02-15 12:15:10.248] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_sensor/meshes'.
+[2026-02-15 12:15:10.248] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=1, shapes=1).
+[2026-02-15 12:15:10.249] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-15 12:15:10.249] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=1, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_invalid_handle/scene.xml').
+[2026-02-15 12:15:10.249] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_invalid_handle/meshes'.
+[2026-02-15 12:15:10.249] [error] [framework.integration.pbpt.export] serialize_pbpt_scene_xml failed: invalid/unloaded mesh handle 0.

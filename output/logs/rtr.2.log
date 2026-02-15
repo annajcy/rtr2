@@ -1,18 +1,82 @@
-[2026-02-15 09:54:49.556] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
-[2026-02-15 09:54:49.557] [info] [framework.core.world] Scene created (scene_id=1, name='main', scene_count=1, active_scene_id=1)
-[2026-02-15 09:54:49.557] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='node', count=1)
-[2026-02-15 09:54:49.557] [debug] [editor.context] Runtime dependency bound (world=true, resources=false, renderer=false, input=false).
-[2026-02-15 09:54:49.557] [debug] [editor.context] Selection changed (old_scene_id=0, old_game_object_id=0, new_scene_id=1, new_game_object_id=1).
-[2026-02-15 09:54:49.557] [info] [framework.core.world] Scene created (scene_id=1, name='main', scene_count=1, active_scene_id=1)
-[2026-02-15 09:54:49.557] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='node', count=1)
-[2026-02-15 09:54:49.557] [debug] [editor.context] Runtime dependency bound (world=true, resources=false, renderer=false, input=false).
-[2026-02-15 09:54:49.557] [debug] [editor.context] Selection changed (old_scene_id=0, old_game_object_id=0, new_scene_id=1, new_game_object_id=1).
-[2026-02-15 09:54:49.557] [warning] [framework.core.camera_manager] destroy_camera ignored: owner 1 has no camera.
-[2026-02-15 09:54:49.557] [info] [framework.core.scene] GameObject subtree destroyed (scene_id=1, root_game_object_id=1, removed_count=1, success=true, remaining=0)
-[2026-02-15 09:54:49.557] [debug] [editor.context] Selection invalidated and cleared (scene_id=1, game_object_id=1, scene_exists=true).
-[2026-02-15 09:54:49.557] [info] [framework.core.world] Scene created (scene_id=1, name='main', scene_count=1, active_scene_id=1)
-[2026-02-15 09:54:49.557] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='node', count=1)
-[2026-02-15 09:54:49.557] [debug] [editor.context] Runtime dependency bound (world=true, resources=false, renderer=false, input=false).
-[2026-02-15 09:54:49.557] [debug] [editor.context] Selection changed (old_scene_id=0, old_game_object_id=0, new_scene_id=1, new_game_object_id=1).
-[2026-02-15 09:54:49.557] [info] [framework.core.world] Scene destroyed (scene_id=1, scene_count=0, active_scene_id=0)
-[2026-02-15 09:54:49.557] [debug] [editor.context] Selection invalidated and cleared (scene_id=1, game_object_id=1, scene_exists=false).
+[2026-02-15 12:15:10.245] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
+[2026-02-15 12:15:10.246] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_test')
+[2026-02-15 12:15:10.246] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_test/./scene.xml'.
+[2026-02-15 12:15:10.246] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='pbpt_camera', count=1)
+[2026-02-15 12:15:10.246] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
+[2026-02-15 12:15:10.246] [info] [framework.core.camera_manager] Active camera owner changed to 1.
+[2026-02-15 12:15:10.246] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
+[2026-02-15 12:15:10.246] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='mesh_a', count=2)
+[2026-02-15 12:15:10.246] [debug] [resource.manager] Loading mesh from relative path 'meshes/tri.obj' -> '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_test/meshes/tri.obj'
+[2026-02-15 12:15:10.247] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.247] [debug] [framework.core.game_object] Component added (game_object_id=2, name='mesh_a', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.247] [debug] [framework.core.game_object] Component added (game_object_id=2, name='mesh_a', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 12:15:10.247] [debug] [framework.core.game_object] Component added (game_object_id=2, name='mesh_a', component_type='N3rtr9framework9component9PbptLightE', component_count=3)
+[2026-02-15 12:15:10.247] [debug] [framework.component.pbpt_light] PbptLight radiance_spectrum updated.
+[2026-02-15 12:15:10.247] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=1, lights=1, camera_imported=true).
+[2026-02-15 12:15:10.248] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_rgb_reflectance_test')
+[2026-02-15 12:15:10.248] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_rgb_reflectance_test/./scene_rgb.xml'.
+[2026-02-15 12:15:10.248] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='mesh_rgb', count=1)
+[2026-02-15 12:15:10.248] [debug] [resource.manager] Loading mesh from relative path 'meshes/tri.obj' -> '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_rgb_reflectance_test/meshes/tri.obj'
+[2026-02-15 12:15:10.248] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.248] [debug] [framework.core.game_object] Component added (game_object_id=1, name='mesh_rgb', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.248] [debug] [framework.core.game_object] Component added (game_object_id=1, name='mesh_rgb', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 12:15:10.248] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=1, lights=0, camera_imported=false).
+[2026-02-15 12:15:10.250] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_invalid_matrix_test')
+[2026-02-15 12:15:10.250] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_invalid_matrix_test/./scene_invalid_matrix.xml'.
+[2026-02-15 12:15:10.251] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_duplicate_name_test')
+[2026-02-15 12:15:10.251] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_duplicate_name_test/./scene_duplicate_name.xml'.
+[2026-02-15 12:15:10.251] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='pbpt_camera', count=1)
+[2026-02-15 12:15:10.251] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
+[2026-02-15 12:15:10.251] [info] [framework.core.camera_manager] Active camera owner changed to 1.
+[2026-02-15 12:15:10.251] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
+[2026-02-15 12:15:10.251] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='pbpt_camera', count=2)
+[2026-02-15 12:15:10.251] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_default_name_test')
+[2026-02-15 12:15:10.251] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_default_name_test/./scene_default_name.xml'.
+[2026-02-15 12:15:10.252] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='tri_default', count=1)
+[2026-02-15 12:15:10.252] [debug] [resource.manager] Loading mesh from relative path 'meshes/tri_default.obj' -> '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_default_name_test/meshes/tri_default.obj'
+[2026-02-15 12:15:10.252] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.252] [debug] [framework.core.game_object] Component added (game_object_id=1, name='tri_default', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.252] [debug] [framework.core.game_object] Component added (game_object_id=1, name='tri_default', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 12:15:10.252] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=1, lights=0, camera_imported=false).
+[2026-02-15 12:15:10.253] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_lookat_camera_test')
+[2026-02-15 12:15:10.253] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_lookat_camera_test/./scene_lookat.xml'.
+[2026-02-15 12:15:10.253] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='pbpt_camera', count=1)
+[2026-02-15 12:15:10.253] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
+[2026-02-15 12:15:10.253] [info] [framework.core.camera_manager] Active camera owner changed to 1.
+[2026-02-15 12:15:10.253] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
+[2026-02-15 12:15:10.253] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=0, lights=0, camera_imported=true).
+[2026-02-15 12:15:10.253] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_freelook_test')
+[2026-02-15 12:15:10.253] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_freelook_test/./scene_with_sensor.xml'.
+[2026-02-15 12:15:10.253] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='pbpt_camera', count=1)
+[2026-02-15 12:15:10.253] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
+[2026-02-15 12:15:10.253] [info] [framework.core.camera_manager] Active camera owner changed to 1.
+[2026-02-15 12:15:10.253] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
+[2026-02-15 12:15:10.253] [debug] [framework.core.game_object] Component added (game_object_id=1, name='pbpt_camera', component_type='N3rtr9framework9component24FreeLookCameraControllerE', component_count=1)
+[2026-02-15 12:15:10.253] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=0, lights=0, camera_imported=true).
+[2026-02-15 12:15:10.254] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_xml_dir_resolve_test/assets')
+[2026-02-15 12:15:10.254] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_xml_dir_resolve_test/assets/pbpt_scene/cbox/scene.xml'.
+[2026-02-15 12:15:10.254] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='mesh_a', count=1)
+[2026-02-15 12:15:10.254] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/tri.obj' -> '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_xml_dir_resolve_test/assets/pbpt_scene/cbox/meshes/tri.obj'
+[2026-02-15 12:15:10.254] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.254] [debug] [framework.core.game_object] Component added (game_object_id=1, name='mesh_a', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.254] [debug] [framework.core.game_object] Component added (game_object_id=1, name='mesh_a', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 12:15:10.254] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=1, lights=0, camera_imported=false).
+[2026-02-15 12:15:10.255] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_outside_root_test/assets')
+[2026-02-15 12:15:10.255] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_outside_root_test/assets/../outside_scene/scene.xml'.
+[2026-02-15 12:15:10.255] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='tri', count=1)
+[2026-02-15 12:15:10.255] [debug] [resource.manager] Loading mesh from relative path '../outside_scene/meshes/tri.obj' -> '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_outside_root_test/outside_scene/meshes/tri.obj'
+[2026-02-15 12:15:10.255] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
+[2026-02-15 12:15:10.255] [debug] [framework.core.game_object] Component added (game_object_id=1, name='tri', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-15 12:15:10.255] [debug] [framework.core.game_object] Component added (game_object_id=1, name='tri', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-15 12:15:10.255] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=1, lights=0, camera_imported=false).
+[2026-02-15 12:15:10.256] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_bad_xml_filename_test/assets')
+[2026-02-15 12:15:10.256] [error] [framework.integration.pbpt.import] validate_scene_location failed: xml_filename 'nested/scene.xml' contains path separator or is absolute.
+[2026-02-15 12:15:10.257] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_bad_mesh_dir_test/assets')
+[2026-02-15 12:15:10.257] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_bad_mesh_dir_test/assets/pbpt_scene/cbox/scene.xml'.
+[2026-02-15 12:15:10.257] [error] [framework.integration.pbpt.import] validate_and_normalize_mesh_path failed: mesh path 'models/tri.obj' is outside meshes/.
+[2026-02-15 12:15:10.258] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_escape_root_test/assets')
+[2026-02-15 12:15:10.258] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_escape_root_test/assets/pbpt_scene/cbox/scene.xml'.
+[2026-02-15 12:15:10.258] [error] [framework.integration.pbpt.import] validate_and_normalize_mesh_path failed: mesh path '../../../outside/tri.obj' uses parent traversal.
+[2026-02-15 12:15:10.259] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_abs_default_test')
+[2026-02-15 12:15:10.259] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_abs_default_test/./scene_abs_default.xml'.
+[2026-02-15 12:15:10.259] [error] [framework.integration.pbpt.import] validate_and_normalize_mesh_path failed: mesh path '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_importer_abs_default_test/meshes/tri_abs.obj' is absolute.
