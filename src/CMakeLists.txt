@@ -12,7 +12,7 @@ target_link_libraries(rtr INTERFACE
     glfw 
     Vulkan::Loader 
     spdlog::spdlog
-  TinyGLTF::TinyGLTF
+    TinyGLTF::TinyGLTF
     slang::slang
     glm::glm
     tinyobjloader::tinyobjloader

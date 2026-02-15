@@ -1,13 +1,20 @@
 #pragma once
 
+#include <stdexcept>
+
 #include "imgui.h"
 
 #include "rtr/editor/editor_panel.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::editor {
 
 class StatsPanel final : public IEditorPanel {
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("editor.panel.stats");
+    }
+
     bool m_visible{true};
     int m_order{300};
 
@@ -31,6 +38,11 @@ public:
     void on_imgui(EditorContext& ctx) override {
         if (!m_visible) {
             return;
+        }
+
+        if (!ctx.is_bound()) {
+            logger()->error("StatsPanel on_imgui failed: EditorContext is not fully bound.");
+            throw std::runtime_error("StatsPanel requires bound EditorContext.");
         }
 
         if (!ImGui::Begin("Stats", &m_visible)) {
@@ -62,4 +74,3 @@ public:
 };
 
 } // namespace rtr::editor
-

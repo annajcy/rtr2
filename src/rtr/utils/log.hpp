@@ -1,16 +1,23 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "spdlog/details/log_msg.h"
 #include "spdlog/logger.h"
+#include "spdlog/sinks/sink.h"
 #include "spdlog/sinks/null_sink.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
@@ -27,6 +34,17 @@ enum class LogLevel {
     critical,
     off,
 };
+
+struct LogEntry {
+    spdlog::log_clock::time_point timestamp{};
+    LogLevel level{LogLevel::info};
+    std::string logger_name{};
+    std::string message{};
+    std::optional<std::uint64_t> sequence{};
+};
+
+using LogSubscriber = std::function<void(const LogEntry&)>;
+using LogSubscriptionHandle = std::uint64_t;
 
 constexpr LogLevel build_default_log_level() {
 #if !defined(NDEBUG)
@@ -69,18 +87,81 @@ inline spdlog::level::level_enum to_spdlog_level(LogLevel level) {
     return spdlog::level::info;
 }
 
+inline LogLevel to_log_level(spdlog::level::level_enum level) {
+    switch (level) {
+    case spdlog::level::trace:
+        return LogLevel::trace;
+    case spdlog::level::debug:
+        return LogLevel::debug;
+    case spdlog::level::info:
+        return LogLevel::info;
+    case spdlog::level::warn:
+        return LogLevel::warn;
+    case spdlog::level::err:
+        return LogLevel::err;
+    case spdlog::level::critical:
+        return LogLevel::critical;
+    case spdlog::level::off:
+        return LogLevel::off;
+    default:
+        return LogLevel::info;
+    }
+}
+
 struct Registry {
     std::mutex mutex{};
+    std::mutex subscribers_mutex{};
     bool initialized{false};
     LogConfig config{};
     std::vector<spdlog::sink_ptr> sinks{};
     std::unordered_map<std::string, std::shared_ptr<spdlog::logger>> loggers{};
+    std::unordered_map<LogSubscriptionHandle, LogSubscriber> subscribers{};
+    LogSubscriptionHandle next_subscriber_handle{1};
+    std::atomic<std::uint64_t> next_sequence{1};
 };
 
 inline Registry& registry() {
     static Registry instance{};
     return instance;
 }
+
+class LogSubscriberSink final : public spdlog::sinks::sink {
+public:
+    void log(const spdlog::details::log_msg& msg) override {
+        auto& reg = registry();
+
+        LogEntry entry{};
+        entry.timestamp = msg.time;
+        entry.level = to_log_level(msg.level);
+        entry.logger_name.assign(msg.logger_name.data(), msg.logger_name.size());
+        entry.message.assign(msg.payload.data(), msg.payload.size());
+        entry.sequence = reg.next_sequence.fetch_add(1, std::memory_order_relaxed);
+
+        std::vector<LogSubscriber> callbacks{};
+        {
+            std::scoped_lock lock(reg.subscribers_mutex);
+            callbacks.reserve(reg.subscribers.size());
+            for (const auto& [_, subscriber] : reg.subscribers) {
+                callbacks.push_back(subscriber);
+            }
+        }
+
+        for (const auto& callback : callbacks) {
+            if (!callback) {
+                continue;
+            }
+            try {
+                callback(entry);
+            } catch (...) {
+                // Subscriber callback errors must not break the logging pipeline.
+            }
+        }
+    }
+
+    void flush() override {}
+    void set_pattern(const std::string& /*pattern*/) override {}
+    void set_formatter(std::unique_ptr<spdlog::formatter> /*sink_formatter*/) override {}
+};
 
 inline std::shared_ptr<spdlog::logger> create_logger_unlocked(
     Registry& reg,
@@ -113,6 +194,9 @@ inline void init_unlocked(Registry& reg, const LogConfig& config) {
     reg.config = config;
     reg.sinks.clear();
     reg.loggers.clear();
+    reg.next_sequence.store(1, std::memory_order_relaxed);
+
+    reg.sinks.push_back(std::make_shared<LogSubscriberSink>());
 
     if (config.enable_console) {
         auto sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -178,7 +262,13 @@ inline void shutdown_logging() {
 
     reg.loggers.clear();
     reg.sinks.clear();
+    reg.next_sequence.store(1, std::memory_order_relaxed);
     reg.initialized = false;
+    {
+        std::scoped_lock subscribers_lock(reg.subscribers_mutex);
+        reg.subscribers.clear();
+        reg.next_subscriber_handle = 1;
+    }
 }
 
 inline void set_level(LogLevel level) {
@@ -209,6 +299,34 @@ inline std::shared_ptr<spdlog::logger> get_logger(std::string_view module) {
     auto logger = log_detail::create_logger_unlocked(reg, name);
     reg.loggers.emplace(name, logger);
     return logger;
+}
+
+inline LogSubscriptionHandle subscribe_logs(LogSubscriber cb) {
+    if (!cb) {
+        return 0;
+    }
+
+    auto& reg = log_detail::registry();
+    {
+        std::scoped_lock lock(reg.mutex);
+        if (!reg.initialized) {
+            log_detail::init_unlocked(reg, LogConfig{});
+        }
+    }
+
+    std::scoped_lock subscribers_lock(reg.subscribers_mutex);
+    const auto handle = reg.next_subscriber_handle++;
+    reg.subscribers.emplace(handle, std::move(cb));
+    return handle;
+}
+
+inline bool unsubscribe_logs(LogSubscriptionHandle handle) {
+    if (handle == 0) {
+        return false;
+    }
+    auto& reg = log_detail::registry();
+    std::scoped_lock subscribers_lock(reg.subscribers_mutex);
+    return reg.subscribers.erase(handle) > 0;
 }
 
 } // namespace rtr::utils

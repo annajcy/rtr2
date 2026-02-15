@@ -6,6 +6,7 @@
 #include "rtr/editor/editor_host.hpp"
 #include "rtr/editor/hierarchy_panel.hpp"
 #include "rtr/editor/inspector_panel.hpp"
+#include "rtr/editor/logger_panel.hpp"
 #include "rtr/editor/stats_panel.hpp"
 #include "rtr/framework/core/world.hpp"
 #include "rtr/resource/resource_manager.hpp"
@@ -50,6 +51,7 @@ int main() {
         editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
         rtr::editor::attach_editor_host(*shadertoy_pipeline, editor_host);
         rtr::editor::bind_input_capture_to_pipeline(*input_system, *shadertoy_pipeline);
 

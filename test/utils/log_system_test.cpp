@@ -2,8 +2,10 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "gtest/gtest.h"
 
@@ -104,6 +106,119 @@ resource::MeshHandle create_triangle_mesh(resource::ResourceManager& resources) 
 class DummyFrameworkComponent final : public framework::component::Component {};
 
 } // namespace
+
+TEST(LogSystemTest, SubscribeOnlyReceivesEventsAfterSubscription) {
+    shutdown_logging();
+    LogConfig config{};
+    config.enable_console = false;
+    config.enable_file = false;
+    config.level = LogLevel::debug;
+    init_logging(config);
+
+    auto logger = get_logger("log.subscribe.test");
+    const std::string before_token = "subscribe-before-token";
+    const std::string after_token = "subscribe-after-token";
+    logger->info("{}", before_token);
+
+    std::mutex mutex{};
+    std::vector<std::string> messages{};
+    const auto handle = subscribe_logs([&](const LogEntry& entry) {
+        std::scoped_lock lock(mutex);
+        messages.push_back(entry.message);
+    });
+
+    logger->info("{}", after_token);
+    ASSERT_TRUE(unsubscribe_logs(handle));
+
+    bool found_before = false;
+    bool found_after = false;
+    {
+        std::scoped_lock lock(mutex);
+        for (const auto& message : messages) {
+            if (message.find(before_token) != std::string::npos) {
+                found_before = true;
+            }
+            if (message.find(after_token) != std::string::npos) {
+                found_after = true;
+            }
+        }
+    }
+
+    EXPECT_FALSE(found_before);
+    EXPECT_TRUE(found_after);
+    shutdown_logging();
+}
+
+TEST(LogSystemTest, UnsubscribeStopsReceivingEvents) {
+    shutdown_logging();
+    LogConfig config{};
+    config.enable_console = false;
+    config.enable_file = false;
+    config.level = LogLevel::debug;
+    init_logging(config);
+
+    auto logger = get_logger("log.unsubscribe.test");
+    std::mutex mutex{};
+    std::vector<std::string> messages{};
+
+    const auto handle = subscribe_logs([&](const LogEntry& entry) {
+        std::scoped_lock lock(mutex);
+        messages.push_back(entry.message);
+    });
+    logger->info("unsubscribe-before");
+    ASSERT_TRUE(unsubscribe_logs(handle));
+    logger->info("unsubscribe-after");
+
+    int before_count = 0;
+    int after_count = 0;
+    {
+        std::scoped_lock lock(mutex);
+        for (const auto& message : messages) {
+            if (message.find("unsubscribe-before") != std::string::npos) {
+                ++before_count;
+            }
+            if (message.find("unsubscribe-after") != std::string::npos) {
+                ++after_count;
+            }
+        }
+    }
+
+    EXPECT_GE(before_count, 1);
+    EXPECT_EQ(after_count, 0);
+    shutdown_logging();
+}
+
+TEST(LogSystemTest, MultipleSubscribersReceiveRealtimeEvents) {
+    shutdown_logging();
+    LogConfig config{};
+    config.enable_console = false;
+    config.enable_file = false;
+    config.level = LogLevel::debug;
+    init_logging(config);
+
+    auto logger = get_logger("log.multi_subscriber.test");
+    int subscriber_a_count = 0;
+    int subscriber_b_count = 0;
+
+    const auto handle_a = subscribe_logs([&](const LogEntry& entry) {
+        if (entry.message.find("multi-subscriber-token") != std::string::npos) {
+            ++subscriber_a_count;
+        }
+    });
+    const auto handle_b = subscribe_logs([&](const LogEntry& entry) {
+        if (entry.message.find("multi-subscriber-token") != std::string::npos) {
+            ++subscriber_b_count;
+        }
+    });
+
+    logger->info("multi-subscriber-token");
+    ASSERT_TRUE(unsubscribe_logs(handle_a));
+    ASSERT_TRUE(unsubscribe_logs(handle_b));
+
+    EXPECT_EQ(subscriber_a_count, 1);
+    EXPECT_EQ(subscriber_b_count, 1);
+    shutdown_logging();
+}
 
 TEST(LogSystemTest, InitIsIdempotentAndLoggerIsCachedAndLevelCanChange) {
     shutdown_logging();
