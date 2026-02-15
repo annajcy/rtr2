@@ -10,11 +10,16 @@
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/scene_graph.hpp"
 #include "rtr/framework/core/types.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::editor {
 
 class HierarchyPanel final : public IEditorPanel {
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("editor.panel.hierarchy");
+    }
+
     bool m_visible{true};
     int m_order{100};
 
@@ -76,7 +81,19 @@ private:
         );
 
         if (ImGui::IsItemClicked()) {
+            const bool selection_changed =
+                !ctx.selection().has_game_object() ||
+                ctx.selection().scene_id != scene_id ||
+                ctx.selection().game_object_id != node_id;
             ctx.set_selection(scene_id, node_id);
+            if (selection_changed) {
+                logger()->debug(
+                    "Hierarchy selected node (scene_id={}, game_object_id={}, name='{}').",
+                    scene_id,
+                    node_id,
+                    find_name_or_default(names, node_id)
+                );
+            }
         }
 
         if (!is_leaf && open) {
@@ -150,4 +167,3 @@ public:
 };
 
 } // namespace rtr::editor
-

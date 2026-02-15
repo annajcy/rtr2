@@ -11,6 +11,7 @@
 #include "rtr/editor/editor_host.hpp"
 #include "rtr/editor/hierarchy_panel.hpp"
 #include "rtr/editor/inspector_panel.hpp"
+#include "rtr/editor/logger_panel.hpp"
 #include "rtr/editor/stats_panel.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
@@ -47,6 +48,7 @@ int main() {
         editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
         rtr::editor::attach_editor_host(*forward_pipeline, editor_host);
 
         rtr::editor::bind_input_capture_to_pipeline(runtime.input_system(), *forward_pipeline);

@@ -15,6 +15,7 @@
 #include "rtr/editor/editor_host.hpp"
 #include "rtr/editor/hierarchy_panel.hpp"
 #include "rtr/editor/inspector_panel.hpp"
+#include "rtr/editor/logger_panel.hpp"
 #include "rtr/editor/stats_panel.hpp"
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/engine.hpp"
@@ -385,6 +386,7 @@ int main() {
         editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
         editor_host->register_panel(std::make_unique<OfflineRenderPanel>(
             offline_render_service,
             engine,

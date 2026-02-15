@@ -154,6 +154,11 @@ rtr_add_test(
     glfw
     Vulkan::Loader
 )
+rtr_add_test(
+    test_logger_panel
+    editor/logger_panel_test.cpp
+    rtr
+)
 
 # framework/integration
 rtr_add_test(

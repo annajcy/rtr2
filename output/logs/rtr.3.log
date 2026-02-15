@@ -1,63 +1,12 @@
-[2026-02-15 01:21:26.566] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
-[2026-02-15 01:21:26.567] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-15 01:21:26.567] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from './assets/pbpt_scene/cbox/cbox.xml'.
-[2026-02-15 01:21:26.568] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='pbpt_camera', count=1)
-[2026-02-15 01:21:26.568] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
-[2026-02-15 01:21:26.568] [info] [framework.core.camera_manager] Active camera owner changed to 1.
-[2026-02-15 01:21:26.568] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
-[2026-02-15 01:21:26.568] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='cbox_luminaire', count=2)
-[2026-02-15 01:21:26.568] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_luminaire.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_luminaire.obj'
-[2026-02-15 01:21:26.569] [debug] [resource.manager] Mesh created (handle=1, vertices=4, indices=6)
-[2026-02-15 01:21:26.569] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:21:26.569] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:21:26.569] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:21:26.569] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component9PbptLightE', component_count=3)
-[2026-02-15 01:21:26.569] [debug] [framework.component.pbpt_light] PbptLight radiance_spectrum updated.
-[2026-02-15 01:21:26.569] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=3, name='cbox_floor', count=3)
-[2026-02-15 01:21:26.569] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_floor.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_floor.obj'
-[2026-02-15 01:21:26.570] [debug] [resource.manager] Mesh created (handle=2, vertices=4, indices=6)
-[2026-02-15 01:21:26.570] [debug] [framework.core.game_object] Component added (game_object_id=3, name='cbox_floor', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:21:26.570] [debug] [framework.core.game_object] Component added (game_object_id=3, name='cbox_floor', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:21:26.570] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:21:26.570] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=4, name='cbox_ceiling', count=4)
-[2026-02-15 01:21:26.570] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_ceiling.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_ceiling.obj'
-[2026-02-15 01:21:26.570] [debug] [resource.manager] Mesh created (handle=3, vertices=8, indices=12)
-[2026-02-15 01:21:26.571] [debug] [framework.core.game_object] Component added (game_object_id=4, name='cbox_ceiling', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:21:26.571] [debug] [framework.core.game_object] Component added (game_object_id=4, name='cbox_ceiling', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:21:26.571] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:21:26.571] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=5, name='cbox_back', count=5)
-[2026-02-15 01:21:26.571] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_back.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_back.obj'
-[2026-02-15 01:21:26.571] [debug] [resource.manager] Mesh created (handle=4, vertices=4, indices=6)
-[2026-02-15 01:21:26.572] [debug] [framework.core.game_object] Component added (game_object_id=5, name='cbox_back', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:21:26.572] [debug] [framework.core.game_object] Component added (game_object_id=5, name='cbox_back', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:21:26.572] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:21:26.572] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=6, name='cbox_greenwall', count=6)
-[2026-02-15 01:21:26.572] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_greenwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_greenwall.obj'
-[2026-02-15 01:21:26.572] [debug] [resource.manager] Mesh created (handle=5, vertices=4, indices=6)
-[2026-02-15 01:21:26.572] [debug] [framework.core.game_object] Component added (game_object_id=6, name='cbox_greenwall', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:21:26.572] [debug] [framework.core.game_object] Component added (game_object_id=6, name='cbox_greenwall', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:21:26.572] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:21:26.572] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=7, name='cbox_redwall', count=7)
-[2026-02-15 01:21:26.572] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_redwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_redwall.obj'
-[2026-02-15 01:21:26.573] [debug] [resource.manager] Mesh created (handle=6, vertices=4, indices=6)
-[2026-02-15 01:21:26.573] [debug] [framework.core.game_object] Component added (game_object_id=7, name='cbox_redwall', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:21:26.573] [debug] [framework.core.game_object] Component added (game_object_id=7, name='cbox_redwall', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:21:26.573] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:21:26.573] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=8, name='cbox_smallbox', count=8)
-[2026-02-15 01:21:26.573] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_smallbox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_smallbox.obj'
-[2026-02-15 01:21:26.574] [debug] [resource.manager] Mesh created (handle=7, vertices=24, indices=36)
-[2026-02-15 01:21:26.574] [debug] [framework.core.game_object] Component added (game_object_id=8, name='cbox_smallbox', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:21:26.574] [debug] [framework.core.game_object] Component added (game_object_id=8, name='cbox_smallbox', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:21:26.574] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:21:26.574] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=9, name='cbox_largebox', count=9)
-[2026-02-15 01:21:26.574] [debug] [resource.manager] Loading mesh from relative path 'pbpt_scene/cbox/meshes/cbox_largebox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_largebox.obj'
-[2026-02-15 01:21:26.574] [debug] [resource.manager] Mesh created (handle=8, vertices=24, indices=36)
-[2026-02-15 01:21:26.575] [debug] [framework.core.game_object] Component added (game_object_id=9, name='cbox_largebox', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 01:21:26.575] [debug] [framework.core.game_object] Component added (game_object_id=9, name='cbox_largebox', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 01:21:26.575] [debug] [framework.component.pbpt_mesh] PbptMesh reflectance set to spectrum.
-[2026-02-15 01:21:26.575] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=8, lights=1, camera_imported=true).
-[2026-02-15 01:21:26.575] [debug] [framework.integration.pbpt.export] Building PBPT scene record from Scene 1 ('pbpt_roundtrip').
-[2026-02-15 01:21:26.576] [debug] [framework.integration.pbpt.export] PBPT scene record built (shape_count=8, has_sensor=true, active_material_count=4).
-[2026-02-15 01:21:26.576] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=8, scene_xml_path='/tmp/cbox_rtr_roundtrip.xml').
-[2026-02-15 01:21:26.577] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/tmp/meshes'.
-[2026-02-15 01:21:26.580] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=4, shapes=8).
+[2026-02-15 09:54:49.543] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
+[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='z', order=20, visible=true, panel_count=1).
+[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='a', order=10, visible=true, panel_count=2).
+[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='b', order=20, visible=true, panel_count=3).
+[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='visible', order=0, visible=true, panel_count=1).
+[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='hidden', order=1, visible=false, panel_count=2).
+[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='alpha', order=0, visible=true, panel_count=1).
+[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='beta', order=1, visible=true, panel_count=2).
+[2026-02-15 09:54:49.543] [debug] [editor.host] Panel removed (id='alpha', panel_count=1).
+[2026-02-15 09:54:49.543] [warning] [editor.host] remove_panel ignored: panel id='missing' not found.
+[2026-02-15 09:54:49.543] [debug] [editor.host] Panel registered (id='dup', order=0, visible=true, panel_count=1).
+[2026-02-15 09:54:49.543] [error] [editor.host] register_panel failed: duplicate panel id='dup'.
