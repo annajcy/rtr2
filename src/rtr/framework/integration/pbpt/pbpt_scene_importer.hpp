@@ -12,7 +12,6 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <variant>
 
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/mat4x4.hpp>
@@ -171,7 +170,7 @@ inline component::PbptRgb parse_pbpt_rgb(
     return rgb;
 }
 
-inline component::PbptReflectance parse_bsdf_reflectance(
+inline component::PbptRgb parse_bsdf_reflectance(
     const pugi::xml_node& bsdf_node
 ) {
     for (const auto& child : bsdf_node.children()) {
@@ -188,12 +187,16 @@ inline component::PbptReflectance parse_bsdf_reflectance(
             continue;
         }
         if (tag == "spectrum") {
-            return parse_pbpt_spectrum(value, "bsdf.reflectance");
+            return pbpt_spectrum_to_rgb(parse_pbpt_spectrum(value, "bsdf.reflectance"));
         }
         return parse_pbpt_rgb(value, "bsdf.reflectance");
     }
 
-    return component::make_constant_pbpt_spectrum(0.7f);
+    return component::PbptRgb{
+        .r = 0.7f,
+        .g = 0.7f,
+        .b = 0.7f
+    };
 }
 
 inline glm::mat4 parse_matrix_row_major(const std::string& text, std::string_view field_name) {
@@ -482,7 +485,7 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
     }
 
     PbptImportResult result{};
-    std::unordered_map<std::string, component::PbptReflectance> reflectance_by_bsdf_id{};
+    std::unordered_map<std::string, component::PbptRgb> reflectance_by_bsdf_id{};
 
     for (const auto& bsdf_node : root.children("bsdf")) {
         const std::string type = bsdf_node.attribute("type").value();
@@ -636,18 +639,12 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
             (std::filesystem::path(location.scene_root_rel_to_resource_dir) / mesh_path).lexically_normal();
         const resource::MeshHandle mesh_handle =
             resources.create_mesh_from_obj_relative_path(mesh_rel_to_resource_root.generic_string());
-        const component::PbptReflectance reflectance = reflectance_by_bsdf_id.at(bsdf_id);
-        const component::PbptRgb base_rgb = pbpt_reflectance_to_rgb(reflectance);
+        const component::PbptRgb base_rgb = reflectance_by_bsdf_id.at(bsdf_id);
         (void)go.add_component<component::MeshRenderer>(
             mesh_handle,
             glm::vec4{base_rgb.r, base_rgb.g, base_rgb.b, 1.0f}
         );
-        auto& pbpt_mesh = go.add_component<component::PbptMesh>();
-        if (const auto* spectrum = std::get_if<component::PbptSpectrum>(&reflectance)) {
-            pbpt_mesh.set_reflectance_spectrum(*spectrum);
-        } else {
-            pbpt_mesh.set_reflectance_rgb(std::get<component::PbptRgb>(reflectance));
-        }
+        (void)go.add_component<component::PbptMesh>();
         go.node().set_local_model_matrix(model);
 
         if (const auto emitter_node = shape_node.child("emitter"); emitter_node) {

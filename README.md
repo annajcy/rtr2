@@ -192,13 +192,13 @@ Initialize the PBPT submodule:
 git submodule update --init --recursive
 ```
 
-`PbptMesh` and `PbptLight` use spectrum points (`lambda_nm`, `value`) and
-serialize to Mitsuba-style XML:
-- BSDF reflectance: `<spectrum name="reflectance" value="..."/>`
+`PbptMesh` uses `MeshRenderer.base_color` (`rgb`) as the only reflectance source,
+and `PbptLight` uses spectrum points (`lambda_nm`, `value`) for area light radiance.
+Serialization is Mitsuba-style XML:
+- BSDF reflectance: `<rgb name="reflectance" value="r g b"/>`
 - Area light radiance: `<spectrum name="radiance" value="..."/>`
 
 Default spectrum points:
-- Reflectance: `400:0.7, 500:0.7, 600:0.7, 700:0.7`
 - Radiance: `400:1.0, 500:1.0, 600:1.0, 700:1.0`
 
 To manually validate Cornell Box rendering in PBPT:

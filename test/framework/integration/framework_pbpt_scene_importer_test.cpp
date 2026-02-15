@@ -157,12 +157,12 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
     EXPECT_TRUE(renderer->mesh_handle().is_valid());
     EXPECT_TRUE(resources.mesh_alive(renderer->mesh_handle()));
 
-    const auto& reflectance = pbpt_mesh->reflectance_spectrum();
-    ASSERT_EQ(reflectance.size(), 4u);
-    EXPECT_FLOAT_EQ(reflectance[0].lambda_nm, 400.0f);
-    EXPECT_FLOAT_EQ(reflectance[0].value, 0.7f);
-    const auto expected_base_color =
-        pbpt_reflectance_to_rgb(component::PbptReflectance{reflectance});
+    const auto expected_base_color = pbpt_spectrum_to_rgb({
+        component::PbptSpectrumPoint{400.0f, 0.7f},
+        component::PbptSpectrumPoint{500.0f, 0.7f},
+        component::PbptSpectrumPoint{600.0f, 0.7f},
+        component::PbptSpectrumPoint{700.0f, 0.7f},
+    });
     EXPECT_NEAR(renderer->base_color().x, expected_base_color.r, 1e-5f);
     EXPECT_NEAR(renderer->base_color().y, expected_base_color.g, 1e-5f);
     EXPECT_NEAR(renderer->base_color().z, expected_base_color.b, 1e-5f);
@@ -218,12 +218,6 @@ TEST(FrameworkPbptSceneImporterTest, ImportsRgbReflectanceAndMapsToBaseColor) {
     const auto* pbpt_mesh = mesh_go->get_component<component::PbptMesh>();
     ASSERT_NE(renderer, nullptr);
     ASSERT_NE(pbpt_mesh, nullptr);
-    ASSERT_TRUE(pbpt_mesh->is_reflectance_rgb());
-
-    const auto& rgb = pbpt_mesh->reflectance_rgb();
-    EXPECT_FLOAT_EQ(rgb.r, 0.2f);
-    EXPECT_FLOAT_EQ(rgb.g, 0.4f);
-    EXPECT_FLOAT_EQ(rgb.b, 0.6f);
     EXPECT_NEAR(renderer->base_color().x, 0.2f, 1e-6f);
     EXPECT_NEAR(renderer->base_color().y, 0.4f, 1e-6f);
     EXPECT_NEAR(renderer->base_color().z, 0.6f, 1e-6f);
