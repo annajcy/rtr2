@@ -1,5 +1,7 @@
 #pragma once
 
+#include <pbpt/math/math.h>
+
 #include <cstdint>
 #include <filesystem>
 #include <iomanip>
@@ -11,8 +13,6 @@
 #include <utility>
 #include <vector>
 
-#include <glm/mat4x4.hpp>
-#include <glm/vec3.hpp>
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
@@ -35,7 +35,7 @@ struct PbptIntegratorRecord {
 };
 
 struct PbptSensorRecord {
-    glm::mat4 to_world{1.0f};
+    pbpt::math::mat4 to_world{1.0f};
     float fov_degrees{45.0f};
     float near_clip{0.1f};
     float far_clip{1000.0f};
@@ -49,7 +49,7 @@ struct PbptSensorRecord {
 struct PbptShapeRecord {
     std::string object_name{};
     resource::MeshHandle mesh_handle{};
-    glm::mat4 model{1.0f};
+    pbpt::math::mat4 model{1.0f};
     component::PbptRgb reflectance{
         .r = 0.7f,
         .g = 0.7f,
@@ -96,7 +96,7 @@ inline std::string reflectance_key(const component::PbptRgb& reflectance) {
     return "rgb:" + rgb_value_string(reflectance);
 }
 
-inline std::string serialize_matrix_row_major(const glm::mat4& matrix) {
+inline std::string serialize_matrix_row_major(const pbpt::math::mat4& matrix) {
     std::ostringstream oss;
     oss << std::setprecision(9);
     for (int row = 0; row < 4; ++row) {
@@ -104,8 +104,8 @@ inline std::string serialize_matrix_row_major(const glm::mat4& matrix) {
             if (row != 0 || col != 0) {
                 oss << ", ";
             }
-            // GLM is column-major, convert to row-major ordering.
-            oss << matrix[col][row];
+            // pbpt::math matrices are accessed as matrix[row][col].
+            oss << matrix[row][col];
         }
     }
     return oss.str();
@@ -210,11 +210,11 @@ inline PbptSceneRecord build_pbpt_scene_record(
             throw std::runtime_error("Pbpt export requires valid and alive mesh handle.");
         }
 
-        const glm::vec4 base_color = mesh_renderer->base_color();
+        const pbpt::math::vec4 base_color = mesh_renderer->base_color();
         const component::PbptRgb reflectance{
-            .r = base_color.x,
-            .g = base_color.y,
-            .b = base_color.z
+            .r = base_color.x(),
+            .g = base_color.y(),
+            .b = base_color.z()
         };
         component::validate_pbpt_rgb(reflectance, "MeshRenderer.base_color");
         const std::string reflectance_key = detail::reflectance_key(reflectance);

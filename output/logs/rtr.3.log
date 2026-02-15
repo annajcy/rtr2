@@ -1,64 +1,86 @@
-[2026-02-15 12:15:10.243] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
-[2026-02-15 12:15:10.244] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-15 12:15:10.244] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='', count=1)
-[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
-[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=1, name='', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=1, name='', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 12:15:10.244] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='mesh_only', count=2)
-[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=2, vertices=3, indices=3)
-[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=2, name='mesh_only', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 12:15:10.244] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=3, name='disabled_component', count=3)
-[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=3, vertices=3, indices=3)
-[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=3, name='disabled_component', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=3, name='disabled_component', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 12:15:10.244] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=4, name='disabled_go', count=4)
-[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=4, vertices=3, indices=3)
-[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=4, name='disabled_go', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=4, name='disabled_go', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 12:15:10.244] [debug] [framework.integration.pbpt.export] Building PBPT scene record from Scene 1 ('scene').
-[2026-02-15 12:15:10.244] [debug] [framework.integration.pbpt.export] PBPT scene record built (shape_count=1, has_sensor=false, active_material_count=1).
-[2026-02-15 12:15:10.244] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-15 12:15:10.244] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='light_only', count=1)
-[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
-[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=1, name='light_only', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 12:15:10.244] [debug] [framework.core.game_object] Component added (game_object_id=1, name='light_only', component_type='N3rtr9framework9component9PbptLightE', component_count=2)
-[2026-02-15 12:15:10.244] [debug] [framework.integration.pbpt.export] Building PBPT scene record from Scene 1 ('scene').
-[2026-02-15 12:15:10.244] [error] [framework.integration.pbpt.export] PBPT export failed: GameObject 'light_only' has PbptLight without PbptMesh.
-[2026-02-15 12:15:10.244] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-15 12:15:10.244] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
-[2026-02-15 12:15:10.244] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=2, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_dedup/scene.xml').
-[2026-02-15 12:15:10.244] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_dedup/meshes'.
-[2026-02-15 12:15:10.245] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=1, shapes=2).
-[2026-02-15 12:15:10.245] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-15 12:15:10.245] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
-[2026-02-15 12:15:10.245] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=1, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_rgb_reflectance/scene.xml').
-[2026-02-15 12:15:10.245] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_rgb_reflectance/meshes'.
-[2026-02-15 12:15:10.246] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=1, shapes=1).
-[2026-02-15 12:15:10.246] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-15 12:15:10.246] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
-[2026-02-15 12:15:10.246] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=1, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_emitter/scene.xml').
-[2026-02-15 12:15:10.246] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_emitter/meshes'.
-[2026-02-15 12:15:10.246] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=1, shapes=1).
-[2026-02-15 12:15:10.247] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-15 12:15:10.247] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
-[2026-02-15 12:15:10.247] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=1, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_matrix/scene.xml').
-[2026-02-15 12:15:10.247] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_matrix/meshes'.
-[2026-02-15 12:15:10.247] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=1, shapes=1).
-[2026-02-15 12:15:10.248] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-15 12:15:10.248] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='camera', count=1)
-[2026-02-15 12:15:10.248] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
-[2026-02-15 12:15:10.248] [info] [framework.core.camera_manager] Active camera owner changed to 1.
-[2026-02-15 12:15:10.248] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
-[2026-02-15 12:15:10.248] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='mesh', count=2)
-[2026-02-15 12:15:10.248] [debug] [resource.manager] Mesh created (handle=1, vertices=3, indices=3)
-[2026-02-15 12:15:10.248] [debug] [framework.core.game_object] Component added (game_object_id=2, name='mesh', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-15 12:15:10.248] [debug] [framework.core.game_object] Component added (game_object_id=2, name='mesh', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-15 12:15:10.248] [debug] [framework.integration.pbpt.export] Building PBPT scene record from Scene 1 ('scene').
-[2026-02-15 12:15:10.248] [debug] [framework.integration.pbpt.export] PBPT scene record built (shape_count=1, has_sensor=true, active_material_count=1).
-[2026-02-15 12:15:10.248] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=1, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_sensor/scene.xml').
-[2026-02-15 12:15:10.248] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_sensor/meshes'.
-[2026-02-15 12:15:10.248] [info] [framework.integration.pbpt.export] PBPT scene XML serialization completed (materials=1, shapes=1).
-[2026-02-15 12:15:10.249] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-15 12:15:10.249] [debug] [framework.integration.pbpt.export] Serializing PBPT scene XML (shape_count=1, scene_xml_path='/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_invalid_handle/scene.xml').
-[2026-02-15 12:15:10.249] [debug] [framework.integration.pbpt.export] PBPT mesh output directory: '/var/folders/vj/b1_rhv0s2pzg83frqvbgp7fw0000gn/T/rtr_pbpt_scene_export_builder_invalid_handle/meshes'.
-[2026-02-15 12:15:10.249] [error] [framework.integration.pbpt.export] serialize_pbpt_scene_xml failed: invalid/unloaded mesh handle 0.
+[2026-02-16 02:11:11.093] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
+[2026-02-16 02:11:11.093] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-16 02:11:11.318] [info] [rhi.context] Vulkan instance created (app='RTR Framework Quickstart', validation_layers=true)
+[2026-02-16 02:11:11.321] [info] [rhi.context] Vulkan surface created.
+[2026-02-16 02:11:11.321] [info] [rhi.context] Vulkan debug messenger created.
+[2026-02-16 02:11:11.323] [info] [rhi.device] Physical device selected: 'Apple M1 Pro' (queue_family_index=0)
+[2026-02-16 02:11:11.330] [info] [rhi.device] Logical device created.
+[2026-02-16 02:11:11.331] [info] [rhi.device] Graphics queue created.
+[2026-02-16 02:11:11.331] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(2560,1440)
+[2026-02-16 02:11:11.332] [info] [rhi.swapchain] Swapchain created with 3 images.
+[2026-02-16 02:11:11.333] [info] [render.frame_scheduler] FrameScheduler initialized (max_frames_in_flight=2, image_count=3)
+[2026-02-16 02:11:11.334] [info] [framework.core.world] ResourceManager bound to World (bound=true).
+[2026-02-16 02:11:11.334] [info] [app.runtime] AppRuntime initialized (window=1280x720, title='RTR Framework Quickstart', frames_in_flight=2, paused=false)
+[2026-02-16 02:11:11.356] [debug] [editor.context] Runtime dependency bound (world=true, resources=true, renderer=true, input=true).
+[2026-02-16 02:11:11.356] [info] [editor.host] Editor runtime bound (world=true, resources=true, renderer=true, input=true).
+[2026-02-16 02:11:11.356] [debug] [editor.host] Panel registered (id='hierarchy', order=100, visible=true, panel_count=1).
+[2026-02-16 02:11:11.356] [debug] [editor.host] Panel registered (id='inspector', order=200, visible=true, panel_count=2).
+[2026-02-16 02:11:11.356] [debug] [editor.host] Panel registered (id='stats', order=300, visible=true, panel_count=3).
+[2026-02-16 02:11:11.356] [debug] [editor.host] Panel registered (id='logger', order=350, visible=true, panel_count=4).
+[2026-02-16 02:11:11.356] [info] [editor.attach] EditorHost attached to ImGui overlay pipeline.
+[2026-02-16 02:11:11.356] [debug] [editor.attach] Input capture hook bound to ImGui overlay pipeline.
+[2026-02-16 02:11:11.357] [info] [app.runtime] Pipeline bound to runtime.
+[2026-02-16 02:11:11.357] [info] [framework.core.world] Scene created (scene_id=1, name='main_scene', scene_count=1, active_scene_id=1)
+[2026-02-16 02:11:11.357] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='main_camera', count=1)
+[2026-02-16 02:11:11.357] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
+[2026-02-16 02:11:11.357] [debug] [framework.core.game_object] Component added (game_object_id=1, name='main_camera', component_type='N3rtr9framework9component24FreeLookCameraControllerE', component_count=1)
+[2026-02-16 02:11:11.357] [info] [framework.core.camera_manager] Active camera owner changed to 1.
+[2026-02-16 02:11:11.357] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
+[2026-02-16 02:11:11.357] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='mesh_a', count=2)
+[2026-02-16 02:11:11.357] [debug] [resource.manager] Loading mesh from relative path 'models/spot.obj' -> 'assets/models/spot.obj'
+[2026-02-16 02:11:11.376] [debug] [resource.manager] Mesh created (handle=1, vertices=3225, indices=17568)
+[2026-02-16 02:11:11.376] [debug] [framework.core.game_object] Component added (game_object_id=2, name='mesh_a', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 02:11:11.376] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=3, name='mesh_b', count=3)
+[2026-02-16 02:11:11.376] [debug] [resource.manager] Loading mesh from relative path 'models/stanford_bunny.obj' -> 'assets/models/stanford_bunny.obj'
+[2026-02-16 02:11:11.390] [debug] [resource.manager] Mesh created (handle=2, vertices=2503, indices=14904)
+[2026-02-16 02:11:11.390] [debug] [framework.core.game_object] Component added (game_object_id=3, name='mesh_b', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 02:11:11.390] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=4, name='mesh_c', count=4)
+[2026-02-16 02:11:11.390] [debug] [resource.manager] Loading mesh from relative path 'models/colored_quad.obj' -> 'assets/models/colored_quad.obj'
+[2026-02-16 02:11:11.390] [debug] [resource.manager] Mesh created (handle=3, vertices=4, indices=6)
+[2026-02-16 02:11:11.390] [debug] [framework.core.game_object] Component added (game_object_id=4, name='mesh_c', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 02:11:11.390] [info] [app.runtime] Run started (paused=false, fixed_dt=0.016666666666666666, max_fixed_steps_per_frame=4, max_frame_delta=0.1)
+[2026-02-16 02:11:11.480] [debug] [resource.manager] Mesh handle=1 triggering first GPU upload.
+[2026-02-16 02:11:11.480] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=3225, indices=17568, vertex_bytes=103200, index_bytes=70272)
+[2026-02-16 02:11:11.480] [debug] [rhi.mesh] GPU buffer copy start (bytes=103200)
+[2026-02-16 02:11:11.483] [debug] [rhi.mesh] GPU buffer copy finished (bytes=103200)
+[2026-02-16 02:11:11.484] [debug] [rhi.mesh] GPU buffer copy start (bytes=70272)
+[2026-02-16 02:11:11.484] [debug] [rhi.mesh] GPU buffer copy finished (bytes=70272)
+[2026-02-16 02:11:11.484] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 02:11:11.484] [debug] [resource.manager] Mesh handle=2 triggering first GPU upload.
+[2026-02-16 02:11:11.484] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=2503, indices=14904, vertex_bytes=80096, index_bytes=59616)
+[2026-02-16 02:11:11.484] [debug] [rhi.mesh] GPU buffer copy start (bytes=80096)
+[2026-02-16 02:11:11.484] [debug] [rhi.mesh] GPU buffer copy finished (bytes=80096)
+[2026-02-16 02:11:11.485] [debug] [rhi.mesh] GPU buffer copy start (bytes=59616)
+[2026-02-16 02:11:11.485] [debug] [rhi.mesh] GPU buffer copy finished (bytes=59616)
+[2026-02-16 02:11:11.485] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 02:11:11.485] [debug] [resource.manager] Mesh handle=3 triggering first GPU upload.
+[2026-02-16 02:11:11.485] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
+[2026-02-16 02:11:11.485] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
+[2026-02-16 02:11:11.485] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
+[2026-02-16 02:11:11.485] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
+[2026-02-16 02:11:11.486] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
+[2026-02-16 02:11:11.486] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 02:11:14.916] [debug] [editor.context] Selection changed (old_scene_id=0, old_game_object_id=0, new_scene_id=1, new_game_object_id=3).
+[2026-02-16 02:11:14.916] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=3, name='mesh_b').
+[2026-02-16 02:11:15.682] [debug] [editor.context] Selection changed (old_scene_id=1, old_game_object_id=3, new_scene_id=1, new_game_object_id=4).
+[2026-02-16 02:11:15.682] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=4, name='mesh_c').
+[2026-02-16 02:11:16.357] [debug] [editor.context] Selection changed (old_scene_id=1, old_game_object_id=4, new_scene_id=1, new_game_object_id=3).
+[2026-02-16 02:11:16.357] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=3, name='mesh_b').
+[2026-02-16 02:11:17.057] [debug] [editor.context] Selection changed (old_scene_id=1, old_game_object_id=3, new_scene_id=1, new_game_object_id=2).
+[2026-02-16 02:11:17.057] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=2, name='mesh_a').
+[2026-02-16 02:11:18.957] [debug] [editor.context] Selection changed (old_scene_id=1, old_game_object_id=2, new_scene_id=1, new_game_object_id=1).
+[2026-02-16 02:11:18.957] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=1, name='main_camera').
+[2026-02-16 02:11:21.115] [debug] [editor.context] Selection changed (old_scene_id=1, old_game_object_id=1, new_scene_id=1, new_game_object_id=2).
+[2026-02-16 02:11:21.115] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=2, name='mesh_a').
+[2026-02-16 02:11:21.574] [debug] [editor.context] Selection changed (old_scene_id=1, old_game_object_id=2, new_scene_id=1, new_game_object_id=3).
+[2026-02-16 02:11:21.574] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=3, name='mesh_b').
+[2026-02-16 02:11:22.165] [debug] [editor.context] Selection changed (old_scene_id=1, old_game_object_id=3, new_scene_id=1, new_game_object_id=4).
+[2026-02-16 02:11:22.165] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=4, name='mesh_c').
+[2026-02-16 02:11:23.508] [debug] [editor.context] Selection changed (old_scene_id=1, old_game_object_id=4, new_scene_id=1, new_game_object_id=3).
+[2026-02-16 02:11:23.508] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=3, name='mesh_b').
+[2026-02-16 02:11:25.099] [debug] [editor.context] Selection changed (old_scene_id=1, old_game_object_id=3, new_scene_id=1, new_game_object_id=2).
+[2026-02-16 02:11:25.099] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=2, name='mesh_a').
+[2026-02-16 02:11:25.949] [debug] [editor.context] Selection changed (old_scene_id=1, old_game_object_id=2, new_scene_id=1, new_game_object_id=1).
+[2026-02-16 02:11:25.949] [debug] [editor.panel.hierarchy] Hierarchy selected node (scene_id=1, game_object_id=1, name='main_camera').
+[2026-02-16 02:11:37.290] [info] [resource.manager] Flushing GPU caches after wait_idle (live_meshes=3, live_textures=0, retired_meshes=0, retired_textures=0)
+[2026-02-16 02:11:37.291] [info] [app.runtime] Run finished (ok=true, frames_rendered=3080, fixed_ticks=1552)

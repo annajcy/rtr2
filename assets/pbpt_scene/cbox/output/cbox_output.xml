@@ -10,7 +10,7 @@
     <float name="farClip" value="2800"/>
     <float name="focusDistance" value="1000"/>
     <transform name="toWorld">
-      <matrix value="-0.987281919, -0.00302380999, 0.158950657, 278, 0, 0.9998191, 0.0190201346, 273, -0.158979416, 0.0187782329, -0.987103343, -800, 0, 0, 0, 1"/>
+      <matrix value="-0.999825716, 0.000905127497, -0.018654719, 278, 2.91038305e-11, 0.998824954, 0.0484630205, 273, 0.0186766647, 0.0484545641, -0.998650908, -800, 0, 0, 0, 1"/>
     </transform>
     <float name="fov" value="39.3077"/>
     <sampler type="ldsampler">
@@ -33,6 +33,9 @@
   </bsdf>
   <bsdf type="diffuse" id="mat_3">
     <rgb name="reflectance" value="0.493886 0.0488682 0.0511639"/>
+  </bsdf>
+  <bsdf type="diffuse" id="mat_4">
+    <rgb name="reflectance" value="0.748825 0.0428577 0.880531"/>
   </bsdf>
   <shape type="obj" id="cbox_luminaire">
     <string name="filename" value="meshes/mesh_1.obj"/>
@@ -89,8 +92,8 @@
   <shape type="obj" id="cbox_largebox">
     <string name="filename" value="meshes/mesh_8.obj"/>
     <transform name="toWorld">
-      <matrix value="1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1"/>
+      <matrix value="1, 0, 0, 0, 0, 1, 0, 8.35000038, 0, 0, 1, 0, 0, 0, 0, 1"/>
     </transform>
-    <ref id="mat_1"/>
+    <ref id="mat_4"/>
   </shape>
 </scene>

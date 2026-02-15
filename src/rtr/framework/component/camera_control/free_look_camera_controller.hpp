@@ -1,13 +1,11 @@
 #pragma once
 
+#include <pbpt/math/math.h>
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
-#include <glm/common.hpp>
-#include <glm/geometric.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/trigonometric.hpp>
 
 #include "rtr/framework/component/component.hpp"
 #include "rtr/framework/core/camera_manager.hpp"
@@ -100,10 +98,10 @@ private:
             );
         }
 
-        const glm::vec3 front = glm::normalize(camera->front());
-        m_yaw_degrees = glm::degrees(std::atan2(front.x, front.z));
-        m_pitch_degrees = glm::degrees(std::asin(glm::clamp(front.y, -1.0f, 1.0f)));
-        m_pitch_degrees = glm::clamp(
+        const pbpt::math::vec3 front = pbpt::math::normalize(camera->front());
+        m_yaw_degrees = pbpt::math::degrees(std::atan2(front.x(), front.z()));
+        m_pitch_degrees = pbpt::math::degrees(std::asin(pbpt::math::clamp(front.y(), -1.0f, 1.0f)));
+        m_pitch_degrees = pbpt::math::clamp(
             m_pitch_degrees,
             m_config.pitch_min_degrees,
             m_config.pitch_max_degrees
@@ -111,22 +109,22 @@ private:
         m_angles_initialized = true;
     }
 
-    glm::quat world_rotation_looking_to(const glm::vec3& forward_dir) const {
-        const glm::vec3 forward = glm::normalize(forward_dir);
-        glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-        if (glm::length(glm::cross(up, forward)) <= kEpsilon) {
-            up = glm::vec3(0.0f, 0.0f, 1.0f);
-            if (glm::length(glm::cross(up, forward)) <= kEpsilon) {
-                up = glm::vec3(1.0f, 0.0f, 0.0f);
+    pbpt::math::quat world_rotation_looking_to(const pbpt::math::vec3& forward_dir) const {
+        const pbpt::math::vec3 forward = pbpt::math::normalize(forward_dir);
+        pbpt::math::vec3 up = pbpt::math::vec3(0.0f, 1.0f, 0.0f);
+        if (pbpt::math::length(pbpt::math::cross(up, forward)) <= kEpsilon) {
+            up = pbpt::math::vec3(0.0f, 0.0f, 1.0f);
+            if (pbpt::math::length(pbpt::math::cross(up, forward)) <= kEpsilon) {
+                up = pbpt::math::vec3(1.0f, 0.0f, 0.0f);
             }
         }
 
-        const glm::vec3 right = glm::normalize(glm::cross(forward, up));
-        const glm::vec3 corrected_up = glm::normalize(glm::cross(right, forward));
+        const pbpt::math::vec3 right = pbpt::math::normalize(pbpt::math::cross(forward, up));
+        const pbpt::math::vec3 corrected_up = pbpt::math::normalize(pbpt::math::cross(right, forward));
 
         // Camera convention: local -Z is front.
-        const glm::mat3 basis(right, corrected_up, -forward);
-        return glm::normalize(glm::quat_cast(basis));
+        const pbpt::math::mat3 basis = pbpt::math::mat3::from_cols(right, corrected_up, -forward);
+        return pbpt::math::normalize(pbpt::math::quat_cast(basis));
     }
 
 public:
@@ -184,16 +182,16 @@ public:
         if (m_input_state->mouse_button_down(system::input::MouseButton::RIGHT)) {
             m_yaw_degrees += static_cast<float>(m_input_state->mouse_dx()) * m_config.mouse_sensitivity;
             m_pitch_degrees -= static_cast<float>(m_input_state->mouse_dy()) * m_config.mouse_sensitivity;
-            m_pitch_degrees = glm::clamp(
+            m_pitch_degrees = pbpt::math::clamp(
                 m_pitch_degrees,
                 m_config.pitch_min_degrees,
                 m_config.pitch_max_degrees
             );
 
-            const float yaw_rad = glm::radians(m_yaw_degrees);
-            const float pitch_rad = glm::radians(m_pitch_degrees);
+            const float yaw_rad = pbpt::math::radians(m_yaw_degrees);
+            const float pitch_rad = pbpt::math::radians(m_pitch_degrees);
             const float cos_pitch = std::cos(pitch_rad);
-            const glm::vec3 desired_front = glm::normalize(glm::vec3{
+            const pbpt::math::vec3 desired_front = pbpt::math::normalize(pbpt::math::vec3{
                 std::sin(yaw_rad) * cos_pitch,
                 std::sin(pitch_rad),
                 std::cos(yaw_rad) * cos_pitch
@@ -212,7 +210,7 @@ public:
             speed *= m_config.sprint_multiplier;
         }
 
-        glm::vec3 move_direction(0.0f);
+        pbpt::math::vec3 move_direction(0.0f);
         auto* camera = m_camera_manager->camera(go->id());
         if (camera == nullptr) {
             logger()->error(
@@ -223,9 +221,9 @@ public:
                 "FreeLookCameraController owner does not have a bound camera."
             );
         }
-        const glm::vec3 world_front = camera->front();
-        const glm::vec3 world_right = node.world_right();
-        const glm::vec3 world_up = node.world_up();
+        const pbpt::math::vec3 world_front = camera->front();
+        const pbpt::math::vec3 world_right = node.world_right();
+        const pbpt::math::vec3 world_up = node.world_up();
 
         if (m_input_state->key_down(system::input::KeyCode::W)) {
             move_direction += world_front;
@@ -246,17 +244,17 @@ public:
             move_direction -= world_up;
         }
 
-        if (glm::length(move_direction) > 0.0f) {
-            move_direction = glm::normalize(move_direction);
+        if (pbpt::math::length(move_direction) > 0.0f) {
+            move_direction = pbpt::math::normalize(move_direction);
             const float dt = static_cast<float>(std::max(ctx.delta_seconds, 0.0));
-            const glm::vec3 delta = move_direction * speed * dt;
+            const pbpt::math::vec3 delta = move_direction * speed * dt;
             node.set_world_position(node.world_position() + delta);
             logger()->trace(
                 "FreeLook node position updated (owner_id={}, delta=[{:.4f}, {:.4f}, {:.4f}], speed={:.4f}, dt={:.4f})",
                 go->id(),
-                delta.x,
-                delta.y,
-                delta.z,
+                delta.x(),
+                delta.y(),
+                delta.z(),
                 speed,
                 dt
             );

@@ -105,32 +105,16 @@ jobs:
           else
             echo "No conan_recipe directory; skipping custom recipes."
           fi
-          PBPT_VER="0.1.0-dev.${GITHUB_SHA::7}"
-          uv run conan create external/pbpt \
-            --name=pbpt \
-            --version=${PBPT_VER} \
-            -pr:h=external/pbpt/profiles/pbpt \
-            -pr:b=external/pbpt/profiles/pbpt \
-            -s build_type=${{ matrix.build_type }} \
-            -o with_tests=False \
-            -o with_examples=False \
-            -o with_docs=False \
-            --build=missing
-          uv run conan list "pbpt/${PBPT_VER}"
           uv run conan graph info . \
             -pr:h=profiles/rtr2 \
             -pr:b=profiles/rtr2 \
             -s build_type=${{ matrix.build_type }} \
-            -s compiler.cppstd=23 \
-            -o '&:with_pbpt=True' \
-            -o '&:pbpt_version='"${PBPT_VER}"
+            -s compiler.cppstd=23
           uv run conan install . \
             -pr:h=profiles/rtr2 \
             -pr:b=profiles/rtr2 \
             -s build_type=${{ matrix.build_type }} \
             -s compiler.cppstd=23 \
-            -o '&:with_pbpt=True' \
-            -o '&:pbpt_version='"${PBPT_VER}" \
             --build=missing
 
       - name: Conan Setup (README) on Windows
@@ -147,32 +131,16 @@ jobs:
           } else {
             Write-Host "No conan_recipe directory; skipping custom recipes."
           }
-          $pbptVer = "0.1.0-dev.$($env:GITHUB_SHA.Substring(0,7))"
-          uv run conan create external/pbpt `
-            --name=pbpt `
-            --version=$pbptVer `
-            -pr:h=external/pbpt/profiles/pbpt `
-            -pr:b=external/pbpt/profiles/pbpt `
-            -s build_type=${{ matrix.build_type }} `
-            -o with_tests=False `
-            -o with_examples=False `
-            -o with_docs=False `
-            --build=missing
-          uv run conan list "pbpt/$pbptVer"
           uv run conan graph info . `
             -pr:h=profiles/rtr2 `
             -pr:b=profiles/rtr2 `
             -s build_type=${{ matrix.build_type }} `
-            -s compiler.cppstd=23 `
-            -o '&:with_pbpt=True' `
-            -o "&:pbpt_version=$pbptVer"
+            -s compiler.cppstd=23
           uv run conan install . `
             -pr:h=profiles/rtr2 `
             -pr:b=profiles/rtr2 `
             -s build_type=${{ matrix.build_type }} `
             -s compiler.cppstd=23 `
-            -o '&:with_pbpt=True' `
-            -o "&:pbpt_version=$pbptVer" `
             --build=missing
 
       - name: Configure and Build (CMake Presets) on Linux/macOS

@@ -7,7 +7,6 @@
 #include <stdexcept>
 #include <utility>
 
-#include <glm/glm.hpp>
 
 #include "buffer.hpp"
 #include "command.hpp"

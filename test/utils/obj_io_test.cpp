@@ -1,3 +1,4 @@
+#include <pbpt/math/math.h>
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -7,7 +8,6 @@
 
 #include "gtest/gtest.h"
 
-#include <glm/geometric.hpp>
 
 #include "rtr/utils/obj_io.hpp"
 
@@ -65,9 +65,9 @@ TEST(ObjIoTest, LoadsTriangleWithUvAndNormal) {
     EXPECT_EQ(data.indices[1], 1u);
     EXPECT_EQ(data.indices[2], 2u);
 
-    EXPECT_FLOAT_EQ(data.vertices[1].uv.x, 1.0f);
-    EXPECT_FLOAT_EQ(data.vertices[1].uv.y, 0.0f);
-    EXPECT_FLOAT_EQ(data.vertices[2].normal.z, 1.0f);
+    EXPECT_FLOAT_EQ(data.vertices[1].uv.x(), 1.0f);
+    EXPECT_FLOAT_EQ(data.vertices[1].uv.y(), 0.0f);
+    EXPECT_FLOAT_EQ(data.vertices[2].normal.z(), 1.0f);
 }
 
 TEST(ObjIoTest, ReusesVertexIndicesForSharedVertices) {
@@ -109,7 +109,7 @@ TEST(ObjIoTest, GeneratesNormalsWhenInputNormalsMissing) {
     ASSERT_EQ(data.indices.size(), 3u);
 
     for (const auto& vertex : data.vertices) {
-        const auto len = glm::length(vertex.normal);
+        const auto len = pbpt::math::length(vertex.normal);
         EXPECT_TRUE(std::isfinite(len));
         EXPECT_GT(len, 0.0f);
     }

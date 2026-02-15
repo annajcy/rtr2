@@ -1,6 +1,7 @@
 #pragma once
 
-#include <glm/vec4.hpp>
+#include <pbpt/math/math.h>
+
 
 #include <stdexcept>
 
@@ -17,12 +18,12 @@ private:
     }
 
     resource::MeshHandle m_mesh{};
-    glm::vec4 m_base_color{1.0f, 1.0f, 1.0f, 1.0f};
+    pbpt::math::vec4 m_base_color{1.0f, 1.0f, 1.0f, 1.0f};
 
 public:
     explicit MeshRenderer(
         resource::MeshHandle mesh,
-        glm::vec4 base_color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}
+        pbpt::math::vec4 base_color = pbpt::math::vec4{1.0f, 1.0f, 1.0f, 1.0f}
     )
         : m_mesh(mesh),
           m_base_color(base_color) {
@@ -47,11 +48,11 @@ public:
         m_mesh = mesh;
     }
 
-    const glm::vec4& base_color() const {
+    const pbpt::math::vec4& base_color() const {
         return m_base_color;
     }
 
-    void set_base_color(const glm::vec4& base_color) {
+    void set_base_color(const pbpt::math::vec4& base_color) {
         m_base_color = base_color;
     }
 };

@@ -8,4 +8,4 @@ add_executable(pbpt_cbox_roundtrip_main pbpt_cbox_roundtrip_main.cpp)
 target_link_libraries(pbpt_cbox_roundtrip_main PRIVATE rtr)
 
 add_executable(framework_offline_cbox_main framework_offline_cbox_main.cpp)
-target_link_libraries(framework_offline_cbox_main PRIVATE rtr rtr_framework_integration)
+target_link_libraries(framework_offline_cbox_main PRIVATE rtr)

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <pbpt/math/math.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
@@ -13,10 +15,6 @@
 #include <utility>
 #include <vector>
 
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/mat4x4.hpp>
-#include <glm/vec3.hpp>
-#include <glm/vec4.hpp>
 #include <pugixml.hpp>
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
@@ -104,7 +102,7 @@ inline std::vector<float> parse_float_list(std::string text, std::string_view fi
     return values;
 }
 
-inline glm::vec3 parse_vec3_csv(const std::string& text, std::string_view field_name) {
+inline pbpt::math::vec3 parse_vec3_csv(const std::string& text, std::string_view field_name) {
     const auto values = parse_float_list(text, field_name);
     if (values.size() != 3u) {
         throw std::runtime_error(std::string(field_name) + " must have exactly 3 values.");
@@ -199,17 +197,17 @@ inline component::PbptRgb parse_bsdf_reflectance(
     };
 }
 
-inline glm::mat4 parse_matrix_row_major(const std::string& text, std::string_view field_name) {
+inline pbpt::math::mat4 parse_matrix_row_major(const std::string& text, std::string_view field_name) {
     const auto values = parse_float_list(text, field_name);
     if (values.size() != 16u) {
         throw std::runtime_error(std::string(field_name) + " must contain exactly 16 float values.");
     }
 
-    glm::mat4 matrix{1.0f};
+    pbpt::math::mat4 matrix{1.0f};
     std::size_t idx = 0;
     for (int row = 0; row < 4; ++row) {
         for (int col = 0; col < 4; ++col) {
-            matrix[col][row] = values[idx++];
+            matrix[row][col] = values[idx++];
         }
     }
     return matrix;
@@ -265,11 +263,11 @@ inline std::optional<std::string> find_string_property(
     return value;
 }
 
-inline glm::mat4 parse_shape_transform(
+inline pbpt::math::mat4 parse_shape_transform(
     const pugi::xml_node& transform_node,
     bool strict_mode
 ) {
-    glm::mat4 transform{1.0f};
+    pbpt::math::mat4 transform{1.0f};
 
     for (const auto& child : transform_node.children()) {
         const std::string_view tag = child.name();
@@ -278,7 +276,7 @@ inline glm::mat4 parse_shape_transform(
             if (value.empty()) {
                 throw std::runtime_error("shape transform matrix is missing value.");
             }
-            transform *= parse_matrix_row_major(value, "shape.transform.matrix");
+            transform = transform * parse_matrix_row_major(value, "shape.transform.matrix");
             continue;
         }
 
@@ -286,7 +284,7 @@ inline glm::mat4 parse_shape_transform(
             const float x = child.attribute("x").as_float(0.0f);
             const float y = child.attribute("y").as_float(0.0f);
             const float z = child.attribute("z").as_float(0.0f);
-            transform *= glm::translate(glm::mat4{1.0f}, glm::vec3{x, y, z});
+            transform = transform * pbpt::math::translate(pbpt::math::mat4{1.0f}, pbpt::math::vec3{x, y, z});
             continue;
         }
 
@@ -298,13 +296,13 @@ inline glm::mat4 parse_shape_transform(
     return transform;
 }
 
-inline glm::mat4 parse_sensor_to_world(
+inline pbpt::math::mat4 parse_sensor_to_world(
     const pugi::xml_node& transform_node,
     bool strict_mode
 ) {
     bool has_look_at = false;
     bool has_matrix = false;
-    glm::mat4 to_world{1.0f};
+    pbpt::math::mat4 to_world{1.0f};
 
     for (const auto& child : transform_node.children()) {
         const std::string_view tag = child.name();
@@ -320,32 +318,44 @@ inline glm::mat4 parse_sensor_to_world(
                 throw std::runtime_error("Sensor lookAt must provide origin/target/up.");
             }
 
-            const glm::vec3 origin = parse_vec3_csv(origin_text, "sensor.lookAt.origin");
-            const glm::vec3 target = parse_vec3_csv(target_text, "sensor.lookAt.target");
-            const glm::vec3 up = parse_vec3_csv(up_text, "sensor.lookAt.up");
-            const glm::vec3 forward = glm::normalize(target - origin);
-            if (glm::length(forward) < 1e-6f) {
+            const pbpt::math::vec3 origin = parse_vec3_csv(origin_text, "sensor.lookAt.origin");
+            const pbpt::math::vec3 target = parse_vec3_csv(target_text, "sensor.lookAt.target");
+            const pbpt::math::vec3 up = parse_vec3_csv(up_text, "sensor.lookAt.up");
+            const pbpt::math::vec3 forward = pbpt::math::normalize(target - origin);
+            if (pbpt::math::length(forward) < 1e-6f) {
                 throw std::runtime_error("sensor.lookAt origin and target must be different.");
             }
 
-            glm::vec3 up_dir = glm::normalize(up);
-            if (glm::length(up_dir) < 1e-6f) {
+            pbpt::math::vec3 up_dir = pbpt::math::normalize(up);
+            if (pbpt::math::length(up_dir) < 1e-6f) {
                 throw std::runtime_error("sensor.lookAt up vector must be non-zero.");
             }
 
             // RTR camera convention: local -Z is front, +Y is up.
-            const glm::vec3 right = glm::normalize(glm::cross(forward, up_dir));
-            if (glm::length(right) < 1e-6f) {
+            const pbpt::math::vec3 right = pbpt::math::normalize(pbpt::math::cross(forward, up_dir));
+            if (pbpt::math::length(right) < 1e-6f) {
                 throw std::runtime_error("sensor.lookAt up vector must not be parallel to view direction.");
             }
 
-            up_dir = glm::normalize(glm::cross(right, forward));
-            to_world = glm::mat4{1.0f};
-            to_world[0] = glm::vec4(right, 0.0f);
-            to_world[1] = glm::vec4(up_dir, 0.0f);
+            up_dir = pbpt::math::normalize(pbpt::math::cross(right, forward));
+            // Matrix[row][col] storage: put camera basis in columns and translation in column 3.
+            to_world = pbpt::math::mat4{1.0f};
+            to_world[0][0] = right.x();
+            to_world[1][0] = right.y();
+            to_world[2][0] = right.z();
+
+            to_world[0][1] = up_dir.x();
+            to_world[1][1] = up_dir.y();
+            to_world[2][1] = up_dir.z();
+
             // Local +Z points backwards when local -Z is camera forward.
-            to_world[2] = glm::vec4(-forward, 0.0f);
-            to_world[3] = glm::vec4(origin, 1.0f);
+            to_world[0][2] = -forward.x();
+            to_world[1][2] = -forward.y();
+            to_world[2][2] = -forward.z();
+
+            to_world[0][3] = origin.x();
+            to_world[1][3] = origin.y();
+            to_world[2][3] = origin.z();
             has_look_at = true;
             continue;
         }
@@ -626,7 +636,7 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
             throw std::runtime_error("shape ref id is unknown: " + bsdf_id);
         }
 
-        glm::mat4 model{1.0f};
+        pbpt::math::mat4 model{1.0f};
         if (const auto transform_node = shape_node.child("transform"); transform_node) {
             model = detail::parse_shape_transform(transform_node, options.require_supported_cbox_subset);
         }
@@ -642,7 +652,7 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
         const component::PbptRgb base_rgb = reflectance_by_bsdf_id.at(bsdf_id);
         (void)go.add_component<component::MeshRenderer>(
             mesh_handle,
-            glm::vec4{base_rgb.r, base_rgb.g, base_rgb.b, 1.0f}
+            pbpt::math::vec4{base_rgb.r, base_rgb.g, base_rgb.b, 1.0f}
         );
         (void)go.add_component<component::PbptMesh>();
         go.node().set_local_model_matrix(model);

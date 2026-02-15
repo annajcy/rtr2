@@ -1,5 +1,7 @@
 #pragma once
 
+#include <pbpt/math/math.h>
+
 #include <cctype>
 #include <cstdint>
 #include <filesystem>
@@ -13,8 +15,6 @@
 
 #include <tiny_obj_loader.h>
 
-#include <glm/geometric.hpp>
-#include <glm/glm.hpp>
 
 #include "rtr/utils/obj_types.hpp"
 
@@ -41,7 +41,7 @@ struct VertexKeyHash {
     }
 };
 
-inline glm::vec3 read_position(
+inline pbpt::math::vec3 read_position(
     const std::vector<tinyobj::real_t>& vertices,
     int index,
     const std::string& filepath
@@ -50,14 +50,14 @@ inline glm::vec3 read_position(
     if (base + 2u >= vertices.size()) {
         throw std::runtime_error("OBJ vertex index out of range in " + filepath);
     }
-    return glm::vec3(
+    return pbpt::math::vec3(
         static_cast<float>(vertices[base + 0u]),
         static_cast<float>(vertices[base + 1u]),
         static_cast<float>(vertices[base + 2u])
     );
 }
 
-inline glm::vec2 read_texcoord(
+inline pbpt::math::vec2 read_texcoord(
     const std::vector<tinyobj::real_t>& texcoords,
     int index,
     const std::string& filepath
@@ -66,13 +66,13 @@ inline glm::vec2 read_texcoord(
     if (base + 1u >= texcoords.size()) {
         throw std::runtime_error("OBJ texcoord index out of range in " + filepath);
     }
-    return glm::vec2(
+    return pbpt::math::vec2(
         static_cast<float>(texcoords[base + 0u]),
         static_cast<float>(texcoords[base + 1u])
     );
 }
 
-inline glm::vec3 read_normal(
+inline pbpt::math::vec3 read_normal(
     const std::vector<tinyobj::real_t>& normals,
     int index,
     const std::string& filepath
@@ -81,7 +81,7 @@ inline glm::vec3 read_normal(
     if (base + 2u >= normals.size()) {
         throw std::runtime_error("OBJ normal index out of range in " + filepath);
     }
-    return glm::vec3(
+    return pbpt::math::vec3(
         static_cast<float>(normals[base + 0u]),
         static_cast<float>(normals[base + 1u]),
         static_cast<float>(normals[base + 2u])
@@ -155,24 +155,24 @@ inline ObjMeshData load_obj_from_path(const std::string& filepath) {
     }
 
     if (!has_input_normals) {
-        std::vector<glm::vec3> accum_normals(data.vertices.size(), glm::vec3(0.0f));
+        std::vector<pbpt::math::vec3> accum_normals(data.vertices.size(), pbpt::math::vec3(0.0f));
         for (size_t i = 0; i + 2u < data.indices.size(); i += 3u) {
             const auto i0 = data.indices[i + 0u];
             const auto i1 = data.indices[i + 1u];
             const auto i2 = data.indices[i + 2u];
-            const glm::vec3& p0 = data.vertices[i0].position;
-            const glm::vec3& p1 = data.vertices[i1].position;
-            const glm::vec3& p2 = data.vertices[i2].position;
-            const glm::vec3 face_normal = glm::normalize(glm::cross(p1 - p0, p2 - p0));
+            const pbpt::math::vec3& p0 = data.vertices[i0].position;
+            const pbpt::math::vec3& p1 = data.vertices[i1].position;
+            const pbpt::math::vec3& p2 = data.vertices[i2].position;
+            const pbpt::math::vec3 face_normal = pbpt::math::normalize(pbpt::math::cross(p1 - p0, p2 - p0));
             accum_normals[i0] += face_normal;
             accum_normals[i1] += face_normal;
             accum_normals[i2] += face_normal;
         }
         for (size_t v = 0; v < data.vertices.size(); ++v) {
-            if (glm::length(accum_normals[v]) > 0.0f) {
-                data.vertices[v].normal = glm::normalize(accum_normals[v]);
+            if (pbpt::math::length(accum_normals[v]) > 0.0f) {
+                data.vertices[v].normal = pbpt::math::normalize(accum_normals[v]);
             } else {
-                data.vertices[v].normal = glm::vec3(0.0f, 1.0f, 0.0f);
+                data.vertices[v].normal = pbpt::math::vec3(0.0f, 1.0f, 0.0f);
             }
         }
     }
@@ -201,13 +201,13 @@ inline void write_obj_to_path(const ObjMeshData& mesh, const std::string& path) 
 
     out << std::setprecision(9);
     for (const auto& vertex : mesh.vertices) {
-        out << "v " << vertex.position.x << ' ' << vertex.position.y << ' ' << vertex.position.z << '\n';
+        out << "v " << vertex.position.x() << ' ' << vertex.position.y() << ' ' << vertex.position.z() << '\n';
     }
     for (const auto& vertex : mesh.vertices) {
-        out << "vt " << vertex.uv.x << ' ' << vertex.uv.y << '\n';
+        out << "vt " << vertex.uv.x() << ' ' << vertex.uv.y() << '\n';
     }
     for (const auto& vertex : mesh.vertices) {
-        out << "vn " << vertex.normal.x << ' ' << vertex.normal.y << ' ' << vertex.normal.z << '\n';
+        out << "vn " << vertex.normal.x() << ' ' << vertex.normal.y() << ' ' << vertex.normal.z() << '\n';
     }
 
     const std::uint32_t max_index = static_cast<std::uint32_t>(mesh.vertices.size());

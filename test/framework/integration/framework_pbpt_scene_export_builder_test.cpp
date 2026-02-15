@@ -1,3 +1,4 @@
+#include <pbpt/math/math.h>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -9,7 +10,6 @@
 
 #include "gtest/gtest.h"
 
-#include <glm/mat4x4.hpp>
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
@@ -56,7 +56,7 @@ component::PbptRgb make_test_rgb(float base) {
     };
 }
 
-void expect_mat4_near(const glm::mat4& lhs, const glm::mat4& rhs, float eps = 1e-5f) {
+void expect_mat4_near(const pbpt::math::mat4& lhs, const pbpt::math::mat4& rhs, float eps = 1e-5f) {
     for (int c = 0; c < 4; ++c) {
         for (int r = 0; r < 4; ++r) {
             EXPECT_NEAR(lhs[c][r], rhs[c][r], eps);
@@ -111,7 +111,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, BuildsRecordsFromActiveNodesWithMeshAn
     const auto expected_handle = create_test_mesh(resources);
     auto& renderer = go_ok.add_component<component::MeshRenderer>(expected_handle);
     const component::PbptRgb reflectance = make_test_rgb(0.2f);
-    renderer.set_base_color(glm::vec4(reflectance.r, reflectance.g, reflectance.b, 1.0f));
+    renderer.set_base_color(pbpt::math::vec4(reflectance.r, reflectance.g, reflectance.b, 1.0f));
     (void)go_ok.add_component<component::PbptMesh>();
     go_ok.node().set_local_position({1.0f, 2.0f, 3.0f});
 
@@ -168,7 +168,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesMaterialsAndMesh
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "a",
         .mesh_handle = shared_mesh,
-        .model = glm::mat4{1.0f},
+        .model = pbpt::math::mat4{1.0f},
         .reflectance = make_test_rgb(0.2f),
         .has_area_emitter = false,
         .radiance_spectrum = {},
@@ -177,7 +177,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerDeduplicatesMaterialsAndMesh
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "b",
         .mesh_handle = shared_mesh,
-        .model = glm::mat4{1.0f},
+        .model = pbpt::math::mat4{1.0f},
         .reflectance = make_test_rgb(0.2f),
         .has_area_emitter = false,
         .radiance_spectrum = {},
@@ -213,7 +213,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerWritesRgbReflectance) {
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "rgb_mesh",
         .mesh_handle = create_test_mesh(resources),
-        .model = glm::mat4{1.0f},
+        .model = pbpt::math::mat4{1.0f},
         .reflectance = component::PbptRgb{.r = 0.25f, .g = 0.5f, .b = 0.75f},
         .has_area_emitter = false,
         .radiance_spectrum = {},
@@ -234,7 +234,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsAreaEmitterWhenPresent)
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "light_mesh",
         .mesh_handle = create_test_mesh(resources),
-        .model = glm::mat4{1.0f},
+        .model = pbpt::math::mat4{1.0f},
         .reflectance = make_test_rgb(0.2f),
         .has_area_emitter = true,
         .radiance_spectrum = {
@@ -255,11 +255,11 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerUsesStableRowMajorMatrixOrde
     TempDir temp_dir("rtr_pbpt_scene_export_builder_matrix");
     const std::string out_xml = (temp_dir.path / "scene.xml").string();
 
-    glm::mat4 matrix{1.0f};
+    pbpt::math::mat4 matrix{1.0f};
     float value = 1.0f;
     for (int row = 0; row < 4; ++row) {
         for (int col = 0; col < 4; ++col) {
-            matrix[col][row] = value++;
+            matrix[row][col] = value++;
         }
     }
 
@@ -284,6 +284,9 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerUsesStableRowMajorMatrixOrde
     for (std::size_t i = 0; i < numbers.size(); ++i) {
         EXPECT_NEAR(numbers[i], static_cast<float>(i + 1), 1e-5f);
     }
+    EXPECT_NEAR(numbers[3], matrix[0][3], 1e-5f);
+    EXPECT_NEAR(numbers[7], matrix[1][3], 1e-5f);
+    EXPECT_NEAR(numbers[11], matrix[2][3], 1e-5f);
 }
 
 TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsSensorAndIntegratorWithMatrix) {
@@ -304,7 +307,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerEmitsSensorAndIntegratorWith
 
     auto& mesh_go = scene.create_game_object("mesh");
     auto& mesh_renderer = mesh_go.add_component<component::MeshRenderer>(create_test_mesh(resources));
-    mesh_renderer.set_base_color(glm::vec4(0.2f, 0.3f, 0.4f, 1.0f));
+    mesh_renderer.set_base_color(pbpt::math::vec4(0.2f, 0.3f, 0.4f, 1.0f));
     (void)mesh_go.add_component<component::PbptMesh>();
 
     scene.scene_graph().update_world_transforms();
@@ -330,7 +333,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerThrowsWhenShapeMeshHandleIsI
     record.shapes.emplace_back(PbptShapeRecord{
         .object_name = "mesh",
         .mesh_handle = resource::MeshHandle{},
-        .model = glm::mat4{1.0f},
+        .model = pbpt::math::mat4{1.0f},
         .reflectance = make_test_rgb(0.2f),
         .has_area_emitter = false,
         .radiance_spectrum = {},

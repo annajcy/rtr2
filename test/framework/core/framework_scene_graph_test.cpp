@@ -1,3 +1,4 @@
+#include <pbpt/math/math.h>
 #include <algorithm>
 #include <stdexcept>
 #include <vector>
@@ -17,10 +18,10 @@ public:
     }
 };
 
-static void expect_vec3_near(const glm::vec3& lhs, const glm::vec3& rhs, float eps = 1e-5f) {
-    EXPECT_NEAR(lhs.x, rhs.x, eps);
-    EXPECT_NEAR(lhs.y, rhs.y, eps);
-    EXPECT_NEAR(lhs.z, rhs.z, eps);
+static void expect_vec3_near(const pbpt::math::vec3& lhs, const pbpt::math::vec3& rhs, float eps = 1e-5f) {
+    EXPECT_NEAR(lhs.x(), rhs.x(), eps);
+    EXPECT_NEAR(lhs.y(), rhs.y(), eps);
+    EXPECT_NEAR(lhs.z(), rhs.z(), eps);
 }
 
 TEST(SceneGraphTest, CreateGameObjectRegistersNode) {
@@ -55,11 +56,11 @@ TEST(SceneGraphTest, SetParentWorldStaysKeepsWorldPosition) {
     scene.scene_graph().node(parent.id()).set_local_position({10.0f, 0.0f, 0.0f});
     scene.scene_graph().node(child.id()).set_local_position({5.0f, 0.0f, 0.0f});
     scene.scene_graph().update_world_transforms();
-    const glm::vec3 before = scene.scene_graph().node(child.id()).world_position();
+    const pbpt::math::vec3 before = scene.scene_graph().node(child.id()).world_position();
 
     ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id()));
     scene.scene_graph().update_world_transforms();
-    const glm::vec3 after = scene.scene_graph().node(child.id()).world_position();
+    const pbpt::math::vec3 after = scene.scene_graph().node(child.id()).world_position();
 
     expect_vec3_near(before, after);
 }

@@ -1,3 +1,4 @@
+#include <pbpt/math/math.h>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -83,19 +84,19 @@ resource::MeshHandle create_triangle_mesh(resource::ResourceManager& resources) 
     utils::ObjMeshData mesh{};
 
     utils::ObjVertex v0{};
-    v0.position = glm::vec3(0.0f, 0.0f, 0.0f);
-    v0.uv = glm::vec2(0.0f, 0.0f);
-    v0.normal = glm::vec3(0.0f, 0.0f, 1.0f);
+    v0.position = pbpt::math::vec3(0.0f, 0.0f, 0.0f);
+    v0.uv = pbpt::math::vec2(0.0f, 0.0f);
+    v0.normal = pbpt::math::vec3(0.0f, 0.0f, 1.0f);
 
     utils::ObjVertex v1{};
-    v1.position = glm::vec3(1.0f, 0.0f, 0.0f);
-    v1.uv = glm::vec2(1.0f, 0.0f);
-    v1.normal = glm::vec3(0.0f, 0.0f, 1.0f);
+    v1.position = pbpt::math::vec3(1.0f, 0.0f, 0.0f);
+    v1.uv = pbpt::math::vec2(1.0f, 0.0f);
+    v1.normal = pbpt::math::vec3(0.0f, 0.0f, 1.0f);
 
     utils::ObjVertex v2{};
-    v2.position = glm::vec3(0.0f, 1.0f, 0.0f);
-    v2.uv = glm::vec2(0.0f, 1.0f);
-    v2.normal = glm::vec3(0.0f, 0.0f, 1.0f);
+    v2.position = pbpt::math::vec3(0.0f, 1.0f, 0.0f);
+    v2.uv = pbpt::math::vec2(0.0f, 1.0f);
+    v2.normal = pbpt::math::vec3(0.0f, 0.0f, 1.0f);
 
     mesh.vertices = {v0, v1, v2};
     mesh.indices = {0, 1, 2};
@@ -394,17 +395,8 @@ TEST(LogSystemTest, PbptServiceLifecycleLogsAreWritten) {
     }));
 
     get_logger("framework.integration.pbpt.offline_service")->flush();
-    get_logger("framework.integration.pbpt.offline_service_stub")->flush();
-
-    const bool has_runtime_module =
-        file_contains(log_file, "[framework.integration.pbpt.offline_service]");
-    const bool has_stub_module =
-        file_contains(log_file, "[framework.integration.pbpt.offline_service_stub]");
-    EXPECT_TRUE(has_runtime_module || has_stub_module);
-    EXPECT_TRUE(
-        file_contains(log_file, "Offline render start") ||
-        file_contains(log_file, "runtime is disabled")
-    );
+    EXPECT_TRUE(file_contains(log_file, "[framework.integration.pbpt.offline_service]"));
+    EXPECT_TRUE(file_contains(log_file, "Offline render start"));
 
     shutdown_logging();
 }

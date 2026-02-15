@@ -15,18 +15,15 @@ class RTRConan(ConanFile):
         "with_tests": [True, False],
         "with_examples": [True, False],
         "compile_shaders": [True, False],
-        "with_pbpt": [True, False],
         "slang_version": ["ANY"],
-        "pbpt_version": ["ANY"],
     }
 
     default_options = {
         "with_tests": True,
         "with_examples": True,
         "compile_shaders": True,
-        "with_pbpt": True,
         "slang_version": "2025.10.4",
-        "pbpt_version": "0.1.0"
+        "embree/*:shared": True,
     }
 
     generators = "CMakeDeps", "VirtualBuildEnv", "VirtualRunEnv"
@@ -55,7 +52,6 @@ class RTRConan(ConanFile):
                 "**/build/*",
                 "output/*",
                 "**/output/*",
-                "external/pbpt/*",
                 "docs/*",
                 "**/__pycache__/*",
                 "*.pyc",
@@ -65,19 +61,18 @@ class RTRConan(ConanFile):
         )
 
     def requirements(self):
-        self.requires("glfw/3.4")
+        self.requires("glfw/3.4", transitive_headers=True)
         self.requires("tinygltf/[>=2.8 <3]")
-        self.requires("imgui/1.92.2b-docking")
-        self.requires("stb/cci.20240531", override=True)
-        self.requires("spdlog/[>=1.13 <2]")
-        self.requires("vulkan-loader/[>=1.3]")
-        self.requires("glm/cci.20230113")
-        self.requires("tinyobjloader/2.0.0-rc10")
-        self.requires("pugixml/1.14")
+        self.requires("imgui/1.92.2b-docking", transitive_headers=True)
+        self.requires("stb/cci.20240531", transitive_headers=True)
+        self.requires("spdlog/[>=1.13 <2]", transitive_headers=True)
+        self.requires("vulkan-loader/[>=1.3]", transitive_headers=True)
+        self.requires("tinyobjloader/2.0.0-rc10", transitive_headers=True)
+        self.requires("pugixml/1.14", transitive_headers=True)
 
-        if self.options.with_pbpt:
-            pbpt_ver = str(self.options.pbpt_version)
-            self.requires(f"pbpt/{pbpt_ver}")
+        self.requires("openexr/3.2.4", transitive_headers=True)
+        self.requires("embree/4.4.0", transitive_headers=True)
+        self.requires("onetbb/2021.12.0", transitive_headers=True)
 
         slang_ver = str(self.options.slang_version)
         self.requires(f"slang/{slang_ver}")
@@ -96,7 +91,6 @@ class RTRConan(ConanFile):
         tc.cache_variables["RTR_BUILD_TESTS"] = "ON" if self.options.with_tests else "OFF"
         tc.cache_variables["RTR_BUILD_EXAMPLES"] = "ON" if self.options.with_examples else "OFF"
         tc.cache_variables["RTR_COMPILE_SHADERS"] = "ON" if self.options.compile_shaders else "OFF"
-        tc.cache_variables["RTR_ENABLE_PBPT_RUNTIME"] = "ON" if self.options.with_pbpt else "OFF"
         tc.generate()
 
     def build(self):
@@ -129,16 +123,16 @@ class RTRConan(ConanFile):
             "imgui_vk",
             "stb_impl",
             "spdlog::spdlog",
-            "TinyGLTF::TinyGLTF",
+            "tinygltf::tinygltf",
             "slang::slang",
-            "glm::glm",
             "tinyobjloader::tinyobjloader",
             "pugixml::pugixml",
+            "openexr::openexr",
+            "embree::embree",
+            "onetbb::onetbb",
+            "stb::stb",
         ]
-
-        framework_component = self.cpp_info.components["framework_integration"]
-        framework_component.set_property("cmake_target_name", "rtr::framework_integration")
-        framework_component.libs = ["rtr_framework_integration"]
-        framework_component.requires = ["rtr"]
-        if self.options.with_pbpt:
-            framework_component.requires.append("pbpt::pbpt")
+        core_component.libs.extend([
+            "pbpt_rgb_spectrum_lut",
+            "pbpt_stb_impl",
+        ])

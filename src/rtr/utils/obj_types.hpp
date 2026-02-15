@@ -1,16 +1,17 @@
 #pragma once
 
+#include <pbpt/math/math.h>
+
 #include <cstdint>
 #include <vector>
 
-#include <glm/glm.hpp>
 
 namespace rtr::utils {
 
 struct ObjVertex {
-    glm::vec3 position{0.0f};
-    glm::vec2 uv{0.0f};
-    glm::vec3 normal{0.0f};
+    pbpt::math::vec3 position{0.0f};
+    pbpt::math::vec2 uv{0.0f};
+    pbpt::math::vec3 normal{0.0f};
 };
 
 struct ObjMeshData {
