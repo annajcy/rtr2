@@ -101,7 +101,7 @@ resource::MeshHandle create_triangle_mesh(resource::ResourceManager& resources) 
     mesh.vertices = {v0, v1, v2};
     mesh.indices = {0, 1, 2};
 
-    return resources.create_mesh(std::move(mesh));
+    return resources.create<rtr::resource::MeshResourceKind>(std::move(mesh));
 }
 
 class DummyFrameworkComponent final : public framework::component::Component {};
@@ -423,7 +423,7 @@ TEST(LogSystemTest, ResourceManagerAndRhiMeshLogsAppearDuringFirstGpuUpload) {
 
     resource::ResourceManager resources(2, "./assets/");
     const auto handle = create_triangle_mesh(resources);
-    (void)resources.require_mesh_rhi(handle, &device);
+    (void)resources.require_gpu<rtr::resource::MeshResourceKind>(handle, &device);
     device.wait_idle();
 
     get_logger("resource.manager")->flush();

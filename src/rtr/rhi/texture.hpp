@@ -213,7 +213,7 @@ public:
         return image;
     }
 
-    static Image create_image_from_rgba8(
+    static Image from_rgba8(
         Device* device,
         uint32_t width,
         uint32_t height,

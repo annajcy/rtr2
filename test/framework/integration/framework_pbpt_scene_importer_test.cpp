@@ -155,7 +155,7 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
     ASSERT_NE(pbpt_light, nullptr);
 
     EXPECT_TRUE(renderer->mesh_handle().is_valid());
-    EXPECT_TRUE(resources.mesh_alive(renderer->mesh_handle()));
+    EXPECT_TRUE(resources.alive<rtr::resource::MeshResourceKind>(renderer->mesh_handle()));
 
     const auto expected_base_color = pbpt_spectrum_to_rgb({
         component::PbptSpectrumPoint{400.0f, 0.7f},

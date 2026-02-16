@@ -475,7 +475,7 @@ private:
             logger->error("ForwardPipeline missing resource manager while requesting mesh handle={}.", mesh_handle.value);
             throw std::runtime_error("ForwardPipeline missing resource manager.");
         }
-        return m_resource_manager->require_mesh_rhi(mesh_handle, m_device);
+        return m_resource_manager->require_gpu<rtr::resource::MeshResourceKind>(mesh_handle, m_device);
     }
 
     void create_per_object_resources() {

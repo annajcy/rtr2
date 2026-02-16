@@ -201,7 +201,7 @@ inline PbptSceneRecord build_pbpt_scene_record(
         }
 
         const resource::MeshHandle mesh_handle = pbpt_mesh->mesh_handle();
-        if (!mesh_handle.is_valid() || !resources.mesh_alive(mesh_handle)) {
+        if (!mesh_handle.is_valid() || !resources.alive<rtr::resource::MeshResourceKind>(mesh_handle)) {
             log->error(
                 "PBPT export failed: GameObject '{}' has invalid/unloaded mesh handle {}.",
                 go->name(),
@@ -298,7 +298,7 @@ inline std::string serialize_pbpt_scene_xml(
 
     std::unordered_map<resource::MeshHandle, std::string> mesh_relative_path_by_handle{};
     for (const auto& shape : record.shapes) {
-        if (!shape.mesh_handle.is_valid() || !resources.mesh_alive(shape.mesh_handle)) {
+        if (!shape.mesh_handle.is_valid() || !resources.alive<rtr::resource::MeshResourceKind>(shape.mesh_handle)) {
             log->error(
                 "serialize_pbpt_scene_xml failed: invalid/unloaded mesh handle {}.",
                 shape.mesh_handle.value
@@ -314,7 +314,7 @@ inline std::string serialize_pbpt_scene_xml(
         const std::filesystem::path abs_mesh_path = mesh_output_dir / filename;
         const std::filesystem::path rel_mesh_path = detail::make_mesh_relative_xml_path(shape.mesh_handle);
 
-        utils::write_obj_to_path(resources.mesh_cpu(shape.mesh_handle), abs_mesh_path.string());
+        utils::write_obj_to_path(resources.cpu<rtr::resource::MeshResourceKind>(shape.mesh_handle), abs_mesh_path.string());
         mesh_relative_path_by_handle.emplace(shape.mesh_handle, rel_mesh_path.generic_string());
     }
 

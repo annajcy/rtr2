@@ -42,7 +42,7 @@ inline ForwardSceneView build_forward_scene_view(
         const pbpt::math::mat4 model = node.world_matrix();
         const pbpt::math::mat4 normal = pbpt::math::transpose(pbpt::math::inverse(model));
         const resource::MeshHandle mesh_handle = mesh_renderer->mesh_handle();
-        if (!mesh_handle.is_valid() || !resources.mesh_alive(mesh_handle)) {
+        if (!mesh_handle.is_valid() || !resources.alive<rtr::resource::MeshResourceKind>(mesh_handle)) {
             throw std::runtime_error("MeshRenderer mesh handle is invalid or unloaded.");
         }
 

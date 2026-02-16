@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "rtr/resource/resource_fwd.hpp"
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/frame_scheduler.hpp"
 #include "rtr/rhi/buffer.hpp"
@@ -16,10 +17,6 @@
 
 namespace rtr::framework::core {
 class World;
-}
-
-namespace rtr::resource {
-class ResourceManager;
 }
 
 namespace rtr::system::input {

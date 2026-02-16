@@ -10,11 +10,8 @@
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/types.hpp"
+#include "rtr/resource/resource_fwd.hpp"
 #include "rtr/utils/log.hpp"
-
-namespace rtr::resource {
-class ResourceManager;
-}
 
 namespace rtr::framework::core {
 

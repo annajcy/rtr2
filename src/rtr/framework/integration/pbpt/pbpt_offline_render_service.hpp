@@ -25,10 +25,6 @@ namespace rtr::framework::core {
 class Scene;
 }
 
-namespace rtr::resource {
-class ResourceManager;
-}
-
 namespace rtr::framework::integration {
 using OfflineRenderWorkerThread = std::thread;
 

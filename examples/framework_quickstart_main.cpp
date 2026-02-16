@@ -71,7 +71,7 @@ int main() {
                                      const std::string& mesh_path,
                                      const pbpt::math::vec4& base_color) {
             const auto mesh_handle =
-                runtime.resource_manager().create_mesh_from_obj_relative_path(mesh_path);
+                runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(mesh_path);
             (void)go.add_component<rtr::framework::component::MeshRenderer>(
                 mesh_handle,
                 base_color

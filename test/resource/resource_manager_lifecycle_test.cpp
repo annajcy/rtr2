@@ -71,8 +71,8 @@ utils::ImageData make_white_texture() {
 TEST(ResourceManagerLifecycleTest, CreateMeshReturnsValidUniqueHandle) {
     ResourceManager manager{};
 
-    const auto a = manager.create_mesh(make_triangle_mesh());
-    const auto b = manager.create_mesh(make_triangle_mesh());
+    const auto a = manager.create<rtr::resource::MeshResourceKind>(make_triangle_mesh());
+    const auto b = manager.create<rtr::resource::MeshResourceKind>(make_triangle_mesh());
 
     EXPECT_TRUE(a.is_valid());
     EXPECT_TRUE(b.is_valid());
@@ -82,38 +82,38 @@ TEST(ResourceManagerLifecycleTest, CreateMeshReturnsValidUniqueHandle) {
 TEST(ResourceManagerLifecycleTest, UnloadThenCreateReturnsNewHandle) {
     ResourceManager manager{};
 
-    const auto old_handle = manager.create_mesh(make_triangle_mesh());
-    manager.unload_mesh(old_handle);
+    const auto old_handle = manager.create<rtr::resource::MeshResourceKind>(make_triangle_mesh());
+    manager.unload<rtr::resource::MeshResourceKind>(old_handle);
 
-    const auto new_handle = manager.create_mesh(make_triangle_mesh());
+    const auto new_handle = manager.create<rtr::resource::MeshResourceKind>(make_triangle_mesh());
     EXPECT_TRUE(new_handle.is_valid());
     EXPECT_NE(old_handle, new_handle);
 
-    const auto& cpu = manager.mesh_cpu(new_handle);
+    const auto& cpu = manager.cpu<rtr::resource::MeshResourceKind>(new_handle);
     EXPECT_FALSE(cpu.vertices.empty());
     EXPECT_FALSE(cpu.indices.empty());
 }
 
 TEST(ResourceManagerLifecycleTest, UnloadMeshInvalidatesCpuAccess) {
     ResourceManager manager{};
-    const auto handle = manager.create_mesh(make_triangle_mesh());
+    const auto handle = manager.create<rtr::resource::MeshResourceKind>(make_triangle_mesh());
 
-    EXPECT_TRUE(manager.mesh_alive(handle));
-    manager.unload_mesh(handle);
-    EXPECT_FALSE(manager.mesh_alive(handle));
+    EXPECT_TRUE(manager.alive<rtr::resource::MeshResourceKind>(handle));
+    manager.unload<rtr::resource::MeshResourceKind>(handle);
+    EXPECT_FALSE(manager.alive<rtr::resource::MeshResourceKind>(handle));
 
-    EXPECT_THROW((void)manager.mesh_cpu(handle), std::runtime_error);
-    EXPECT_NO_THROW(manager.unload_mesh(handle));
+    EXPECT_THROW((void)manager.cpu<rtr::resource::MeshResourceKind>(handle), std::runtime_error);
+    EXPECT_NO_THROW(manager.unload<rtr::resource::MeshResourceKind>(handle));
 }
 
 TEST(ResourceManagerLifecycleTest, UnloadedHandleCannotAccessCpuOrGpu) {
     ResourceManager manager{};
-    const auto mesh_handle = manager.create_mesh(make_triangle_mesh());
-    manager.unload_mesh(mesh_handle);
+    const auto mesh_handle = manager.create<rtr::resource::MeshResourceKind>(make_triangle_mesh());
+    manager.unload<rtr::resource::MeshResourceKind>(mesh_handle);
 
-    EXPECT_THROW((void)manager.mesh_cpu(mesh_handle), std::runtime_error);
+    EXPECT_THROW((void)manager.cpu<rtr::resource::MeshResourceKind>(mesh_handle), std::runtime_error);
     EXPECT_THROW(
-        (void)manager.require_mesh_rhi(
+        (void)manager.require_gpu<rtr::resource::MeshResourceKind>(
             mesh_handle,
             reinterpret_cast<rhi::Device*>(0x1)
         ),
@@ -123,14 +123,17 @@ TEST(ResourceManagerLifecycleTest, UnloadedHandleCannotAccessCpuOrGpu) {
 
 TEST(ResourceManagerLifecycleTest, CreateTextureThenUnloadIsIdempotent) {
     ResourceManager manager{};
-    const auto handle = manager.create_texture(make_white_texture(), true);
+    const auto handle = manager.create<rtr::resource::TextureResourceKind>(
+        make_white_texture(),
+        TextureCreateOptions{.use_srgb = true}
+    );
 
     EXPECT_TRUE(handle.is_valid());
-    EXPECT_TRUE(manager.texture_alive(handle));
+    EXPECT_TRUE(manager.alive<rtr::resource::TextureResourceKind>(handle));
 
-    manager.unload_texture(handle);
-    EXPECT_FALSE(manager.texture_alive(handle));
-    EXPECT_NO_THROW(manager.unload_texture(handle));
+    manager.unload<rtr::resource::TextureResourceKind>(handle);
+    EXPECT_FALSE(manager.alive<rtr::resource::TextureResourceKind>(handle));
+    EXPECT_NO_THROW(manager.unload<rtr::resource::TextureResourceKind>(handle));
 }
 
 TEST(ResourceManagerLifecycleTest, CreateMeshAndTextureFromRelativePathUsesResourceRoot) {
@@ -142,13 +145,16 @@ TEST(ResourceManagerLifecycleTest, CreateMeshAndTextureFromRelativePathUsesResou
     write_binary_ppm_1x1_white(temp_dir.path / "textures" / "white.ppm");
 
     ResourceManager manager(2, temp_dir.path);
-    const auto mesh_handle = manager.create_mesh_from_obj_relative_path("meshes/tri.obj");
-    const auto tex_handle = manager.create_texture_from_relative_path("textures/white.ppm", true);
+    const auto mesh_handle = manager.create_from_relative_path<rtr::resource::MeshResourceKind>("meshes/tri.obj");
+    const auto tex_handle = manager.create_from_relative_path<rtr::resource::TextureResourceKind>(
+        "textures/white.ppm",
+        TextureCreateOptions{.use_srgb = true}
+    );
 
     EXPECT_TRUE(mesh_handle.is_valid());
     EXPECT_TRUE(tex_handle.is_valid());
-    EXPECT_TRUE(manager.mesh_alive(mesh_handle));
-    EXPECT_TRUE(manager.texture_alive(tex_handle));
+    EXPECT_TRUE(manager.alive<rtr::resource::MeshResourceKind>(mesh_handle));
+    EXPECT_TRUE(manager.alive<rtr::resource::TextureResourceKind>(tex_handle));
 }
 
 TEST(ResourceManagerLifecycleTest, RelativePathApiRejectsAbsolutePath) {
@@ -159,9 +165,12 @@ TEST(ResourceManagerLifecycleTest, RelativePathApiRejectsAbsolutePath) {
     write_text_file(temp_dir.path / "meshes" / "tri.obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
     write_binary_ppm_1x1_white(temp_dir.path / "meshes" / "tri.ppm");
 
-    EXPECT_THROW((void)manager.create_mesh_from_obj_relative_path(abs_path), std::invalid_argument);
+    EXPECT_THROW((void)manager.create_from_relative_path<rtr::resource::MeshResourceKind>(abs_path), std::invalid_argument);
     EXPECT_THROW(
-        (void)manager.create_texture_from_relative_path((temp_dir.path / "meshes" / "tri.ppm").string(), true),
+        (void)manager.create_from_relative_path<rtr::resource::TextureResourceKind>(
+            (temp_dir.path / "meshes" / "tri.ppm").string(),
+            TextureCreateOptions{.use_srgb = true}
+        ),
         std::invalid_argument
     );
 }
@@ -175,8 +184,11 @@ TEST(ResourceManagerLifecycleTest, RelativePathApiAllowsEscapeFromResourceRoot) 
     );
     write_binary_ppm_1x1_white(temp_dir.path / "outside" / "tex.ppm");
 
-    EXPECT_NO_THROW((void)manager.create_mesh_from_obj_relative_path("../outside/tri.obj"));
-    EXPECT_NO_THROW((void)manager.create_texture_from_relative_path("../outside/tex.ppm", true));
+    EXPECT_NO_THROW((void)manager.create_from_relative_path<rtr::resource::MeshResourceKind>("../outside/tri.obj"));
+    EXPECT_NO_THROW((void)manager.create_from_relative_path<rtr::resource::TextureResourceKind>(
+        "../outside/tex.ppm",
+        TextureCreateOptions{.use_srgb = true}
+    ));
 }
 
 } // namespace rtr::resource::test

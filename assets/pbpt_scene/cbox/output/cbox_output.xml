@@ -10,15 +10,15 @@
     <float name="farClip" value="2800"/>
     <float name="focusDistance" value="1000"/>
     <transform name="toWorld">
-      <matrix value="-0.999825716, 0.000905127497, -0.018654719, 278, 2.91038305e-11, 0.998824954, 0.0484630205, 273, 0.0186766647, 0.0484545641, -0.998650908, -800, 0, 0, 0, 1"/>
+      <matrix value="-0.999907732, 2.62516005e-05, 0.0135966986, 278, -9.09494702e-13, 0.999998152, -0.00193073007, 273, -0.0135967247, -0.00193055149, -0.999905825, -800, 0, 0, 0, 1"/>
     </transform>
     <float name="fov" value="39.3077"/>
     <sampler type="ldsampler">
       <integer name="sampleCount" value="16"/>
     </sampler>
     <film type="hdrfilm">
-      <integer name="width" value="1512"/>
-      <integer name="height" value="949"/>
+      <integer name="width" value="512"/>
+      <integer name="height" value="512"/>
       <rfilter type="gaussian"/>
     </film>
   </sensor>
@@ -29,13 +29,22 @@
     <rgb name="reflectance" value="0.738257 0.735978 0.738682"/>
   </bsdf>
   <bsdf type="diffuse" id="mat_2">
-    <rgb name="reflectance" value="0.0684181 0.398456 0.0865668"/>
+    <rgb name="reflectance" value="0.00681338 0.0412219 0.128319"/>
   </bsdf>
   <bsdf type="diffuse" id="mat_3">
-    <rgb name="reflectance" value="0.493886 0.0488682 0.0511639"/>
+    <rgb name="reflectance" value="0.726581 0.831858 0.0883389"/>
   </bsdf>
   <bsdf type="diffuse" id="mat_4">
-    <rgb name="reflectance" value="0.748825 0.0428577 0.880531"/>
+    <rgb name="reflectance" value="0.0684181 0.398456 0.0865668"/>
+  </bsdf>
+  <bsdf type="diffuse" id="mat_5">
+    <rgb name="reflectance" value="0.493886 0.0488682 0.0511639"/>
+  </bsdf>
+  <bsdf type="diffuse" id="mat_6">
+    <rgb name="reflectance" value="0.729581 0.133918 0.840708"/>
+  </bsdf>
+  <bsdf type="diffuse" id="mat_7">
+    <rgb name="reflectance" value="0.172013 0.105803 0.853982"/>
   </bsdf>
   <shape type="obj" id="cbox_luminaire">
     <string name="filename" value="meshes/mesh_1.obj"/>
@@ -59,41 +68,41 @@
     <transform name="toWorld">
       <matrix value="1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1"/>
     </transform>
-    <ref id="mat_1"/>
+    <ref id="mat_2"/>
   </shape>
   <shape type="obj" id="cbox_back">
     <string name="filename" value="meshes/mesh_4.obj"/>
     <transform name="toWorld">
       <matrix value="1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1"/>
     </transform>
-    <ref id="mat_1"/>
+    <ref id="mat_3"/>
   </shape>
   <shape type="obj" id="cbox_greenwall">
     <string name="filename" value="meshes/mesh_5.obj"/>
     <transform name="toWorld">
       <matrix value="1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1"/>
     </transform>
-    <ref id="mat_2"/>
+    <ref id="mat_4"/>
   </shape>
   <shape type="obj" id="cbox_redwall">
     <string name="filename" value="meshes/mesh_6.obj"/>
     <transform name="toWorld">
       <matrix value="1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1"/>
     </transform>
-    <ref id="mat_3"/>
+    <ref id="mat_5"/>
   </shape>
   <shape type="obj" id="cbox_smallbox">
     <string name="filename" value="meshes/mesh_7.obj"/>
     <transform name="toWorld">
       <matrix value="1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1"/>
     </transform>
-    <ref id="mat_1"/>
+    <ref id="mat_6"/>
   </shape>
   <shape type="obj" id="cbox_largebox">
     <string name="filename" value="meshes/mesh_8.obj"/>
     <transform name="toWorld">
-      <matrix value="1, 0, 0, 0, 0, 1, 0, 8.35000038, 0, 0, 1, 0, 0, 0, 0, 1"/>
+      <matrix value="1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1"/>
     </transform>
-    <ref id="mat_4"/>
+    <ref id="mat_7"/>
   </shape>
 </scene>
