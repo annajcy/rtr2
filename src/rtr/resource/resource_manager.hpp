@@ -1,66 +1,84 @@
 #pragma once
 
 #include <algorithm>
+#include <concepts>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "rtr/resource/resource_fwd.hpp"
+#include "rtr/resource/resource_kinds.hpp"
 #include "rtr/resource/resource_types.hpp"
 #include "rtr/rhi/device.hpp"
-#include "rtr/rhi/mesh.hpp"
-#include "rtr/rhi/texture.hpp"
-#include "rtr/utils/image_io.hpp"
 #include "rtr/utils/log.hpp"
-#include "rtr/utils/obj_io.hpp"
 
 namespace rtr::resource {
 
-class ResourceManager {
+namespace detail {
+
+template <class... Types>
+struct unique_types : std::true_type {};
+
+template <class Type, class... Rest>
+struct unique_types<Type, Rest...>
+    : std::bool_constant<(!std::same_as<Type, Rest> && ...) && unique_types<Rest...>::value> {};
+
+template <class Kind, class... SupportedKinds>
+inline constexpr bool contains_kind_v = (std::same_as<Kind, SupportedKinds> || ...);
+
+} // namespace detail
+
+template <class Kind0, class Kind1, class... Kinds>
+class ResourceManagerT {
 public:
     static constexpr std::string_view kDefaultResourceRootDir = "./assets/";
 
 private:
-    struct MeshRecord {
-        utils::ObjMeshData cpu{};
-        std::unique_ptr<rhi::Mesh> gpu{};
+    template <ResourceKind Kind>
+    struct ResourceRecord {
+        typename Kind::cpu_type cpu{};
+        typename Kind::options_type options{};
+        std::unique_ptr<typename Kind::gpu_type> gpu{};
     };
 
-    struct TextureRecord {
-        utils::ImageData cpu{};
-        bool use_srgb{true};
-        std::unique_ptr<rhi::Image> gpu{};
-    };
-
-    struct RetiredMeshGpu {
+    template <ResourceKind Kind>
+    struct RetiredGpu {
         std::uint64_t retire_after_frame{0};
-        std::unique_ptr<rhi::Mesh> mesh{};
+        std::unique_ptr<typename Kind::gpu_type> gpu{};
     };
 
-    struct RetiredTextureGpu {
-        std::uint64_t retire_after_frame{0};
-        std::unique_ptr<rhi::Image> image{};
+    template <ResourceKind Kind>
+    struct ResourceStorage {
+        std::uint64_t next_id{1};
+        std::unordered_map<ResourceHandle<Kind>, ResourceRecord<Kind>> records{};
+        std::vector<RetiredGpu<Kind>> retired{};
     };
 
-    std::uint64_t m_next_mesh_id{1};
-    std::uint64_t m_next_texture_id{1};
+    static_assert(
+        ResourceKind<Kind0> && ResourceKind<Kind1> && (ResourceKind<Kinds> && ...),
+        "ResourceManager template parameters must satisfy ResourceKind."
+    );
+    static_assert(
+        detail::unique_types<Kind0, Kind1, Kinds...>::value,
+        "ResourceManager kinds must be unique."
+    );
+
     std::uint64_t m_current_frame_serial{0};
     std::uint32_t m_frames_in_flight{2};
     std::filesystem::path m_resource_root_dir{std::string(kDefaultResourceRootDir)};
 
-    std::unordered_map<MeshHandle, MeshRecord> m_mesh_records{};
-    std::unordered_map<TextureHandle, TextureRecord> m_texture_records{};
-
-    std::vector<RetiredMeshGpu> m_retired_meshes{};
-    std::vector<RetiredTextureGpu> m_retired_textures{};
+    std::tuple<ResourceStorage<Kind0>, ResourceStorage<Kind1>, ResourceStorage<Kinds>...> m_storages{};
 
 public:
-    explicit ResourceManager(
+    explicit ResourceManagerT(
         std::uint32_t frames_in_flight = 2,
         std::filesystem::path resource_root_dir = std::filesystem::path(std::string(kDefaultResourceRootDir))
     )
@@ -85,155 +103,91 @@ public:
         m_resource_root_dir = std::move(resource_root_dir);
     }
 
-    MeshHandle create_mesh(utils::ObjMeshData cpu) {
-        validate_mesh_data(cpu);
+    template <ResourceKind Kind>
+    ResourceHandle<Kind> create(
+        typename Kind::cpu_type cpu,
+        typename Kind::options_type options = {}
+    ) {
+        auto& store = storage<Kind>();
 
-        const MeshHandle handle{m_next_mesh_id++};
-        const auto vertex_count = cpu.vertices.size();
-        const auto index_count = cpu.indices.size();
-        m_mesh_records.emplace(handle, MeshRecord{
+        Kind::validate_cpu(cpu);
+        cpu = Kind::normalize_cpu(std::move(cpu), options);
+        Kind::validate_cpu(cpu);
+
+        const ResourceHandle<Kind> handle{store.next_id++};
+        store.records.emplace(handle, ResourceRecord<Kind>{
             .cpu = std::move(cpu),
+            .options = std::move(options),
             .gpu = nullptr
         });
-        logger()->debug(
-            "Mesh created (handle={}, vertices={}, indices={})",
-            handle.value,
-            vertex_count,
-            index_count
-        );
+        logger()->debug("Resource created (handle={})", handle.value);
         return handle;
     }
 
-    TextureHandle create_texture(utils::ImageData cpu, bool use_srgb = true) {
-        validate_texture_data(cpu);
-        cpu = normalize_to_rgba8(std::move(cpu));
-
-        const TextureHandle handle{m_next_texture_id++};
-        const auto width = cpu.width;
-        const auto height = cpu.height;
-        const auto channels = cpu.channels;
-        m_texture_records.emplace(handle, TextureRecord{
-            .cpu = std::move(cpu),
-            .use_srgb = use_srgb,
-            .gpu = nullptr
-        });
-        logger()->debug(
-            "Texture created (handle={}, size={}x{}, channels={}, srgb={})",
-            handle.value,
-            width,
-            height,
-            channels,
-            use_srgb
-        );
-        return handle;
-    }
-
-    MeshHandle create_mesh_from_obj_relative_path(const std::string& rel_path) {
-        const auto abs_path = resolve_resource_path(rel_path);
-        logger()->debug("Loading mesh from relative path '{}' -> '{}'", rel_path, abs_path.string());
-        return create_mesh(utils::load_obj_from_path(abs_path.string()));
-    }
-
-    TextureHandle create_texture_from_relative_path(
+    template <ResourceKind Kind>
+    ResourceHandle<Kind> create_from_relative_path(
         const std::string& rel_path,
-        bool use_srgb = true
+        typename Kind::options_type options = {}
     ) {
         const auto abs_path = resolve_resource_path(rel_path);
-        logger()->debug("Loading texture from relative path '{}' -> '{}'", rel_path, abs_path.string());
-        return create_texture(utils::load_image_from_path(abs_path.string(), true, 4), use_srgb);
+        logger()->debug("Loading resource from relative path '{}' -> '{}'", rel_path, abs_path.string());
+        auto cpu = Kind::load_from_path(abs_path, options);
+        return create<Kind>(std::move(cpu), std::move(options));
     }
 
-    void unload_mesh(MeshHandle handle) {
-        auto it = m_mesh_records.find(handle);
-        if (it == m_mesh_records.end()) {
-            logger()->warn("unload_mesh ignored: invalid mesh handle={}", handle.value);
+    template <ResourceKind Kind>
+    void save_cpu_to_relative_path(ResourceHandle<Kind> handle, const std::string& rel_path) {
+        const auto abs_path = resolve_resource_path(rel_path);
+        const auto& record = require_record<Kind>(handle);
+        ensure_cpu_loaded(record);
+        Kind::save_to_path(record.cpu, abs_path);
+    }
+
+    template <ResourceKind Kind>
+    void unload(ResourceHandle<Kind> handle) {
+        auto& store = storage<Kind>();
+        auto it = store.records.find(handle);
+        if (it == store.records.end()) {
+            logger()->warn("unload ignored: invalid handle={}", handle.value);
             return;
         }
 
-        MeshRecord& record = it->second;
-        retire_mesh_gpu(record);
-        m_mesh_records.erase(it);
-        logger()->debug("Mesh unloaded (handle={})", handle.value);
+        ResourceRecord<Kind>& record = it->second;
+        retire_gpu(record);
+        store.records.erase(it);
+        logger()->debug("Resource unloaded (handle={})", handle.value);
     }
 
-    void unload_texture(TextureHandle handle) {
-        auto it = m_texture_records.find(handle);
-        if (it == m_texture_records.end()) {
-            logger()->warn("unload_texture ignored: invalid texture handle={}", handle.value);
-            return;
-        }
-
-        TextureRecord& record = it->second;
-        retire_texture_gpu(record);
-        m_texture_records.erase(it);
-        logger()->debug("Texture unloaded (handle={})", handle.value);
-    }
-
-    const utils::ObjMeshData& mesh_cpu(MeshHandle handle) {
-        auto& record = require_mesh_record(handle);
-        ensure_mesh_cpu_loaded(record);
+    template <ResourceKind Kind>
+    const typename Kind::cpu_type& cpu(ResourceHandle<Kind> handle) {
+        auto& record = require_record<Kind>(handle);
+        ensure_cpu_loaded(record);
         return record.cpu;
     }
 
-    const utils::ImageData& texture_cpu(TextureHandle handle) {
-        auto& record = require_texture_record(handle);
-        ensure_texture_cpu_loaded(record);
-        return record.cpu;
+    template <ResourceKind Kind>
+    bool alive(ResourceHandle<Kind> handle) const {
+        const auto& store = storage<Kind>();
+        return store.records.find(handle) != store.records.end();
     }
 
-    bool mesh_alive(MeshHandle handle) const {
-        const auto it = m_mesh_records.find(handle);
-        return it != m_mesh_records.end();
-    }
-
-    bool texture_alive(TextureHandle handle) const {
-        const auto it = m_texture_records.find(handle);
-        return it != m_texture_records.end();
-    }
-
-    rhi::Mesh& require_mesh_rhi(MeshHandle handle, rhi::Device* device) {
+    template <ResourceKind Kind>
+    typename Kind::gpu_type& require_gpu(ResourceHandle<Kind> handle, rhi::Device* device) {
         if (device == nullptr) {
-            logger()->error("require_mesh_rhi failed for handle={}: device is null.", handle.value);
-            throw std::invalid_argument("ResourceManager require_mesh_rhi requires non-null device.");
+            logger()->error("require_gpu failed for handle={}: device is null.", handle.value);
+            throw std::invalid_argument("ResourceManager require_gpu requires non-null device.");
         }
 
-        auto& record = require_mesh_record(handle);
-        ensure_mesh_cpu_loaded(record);
+        auto& record = require_record<Kind>(handle);
+        ensure_cpu_loaded(record);
 
         if (record.gpu) {
             return *record.gpu;
         }
-        logger()->debug("Mesh handle={} triggering first GPU upload.", handle.value);
-        record.gpu = std::make_unique<rhi::Mesh>(
-            rhi::Mesh::from_cpu_data(device, record.cpu)
-        );
-        return *record.gpu;
-    }
 
-    rhi::Image& require_texture_rhi(TextureHandle handle, rhi::Device* device) {
-        if (device == nullptr) {
-            logger()->error("require_texture_rhi failed for handle={}: device is null.", handle.value);
-            throw std::invalid_argument("ResourceManager require_texture_rhi requires non-null device.");
-        }
-
-        auto& record = require_texture_record(handle);
-        ensure_texture_cpu_loaded(record);
-
-        if (record.gpu) {
-            return *record.gpu;
-        }
-        logger()->debug("Texture handle={} triggering first GPU upload.", handle.value);
-        const auto& cpu = record.cpu;
-        record.gpu = std::make_unique<rhi::Image>(
-            rhi::Image::create_image_from_rgba8(
-                device,
-                cpu.width,
-                cpu.height,
-                cpu.pixels.data(),
-                cpu.pixels.size(),
-                record.use_srgb,
-                true
-            )
+        logger()->debug("Handle={} triggering first GPU upload.", handle.value);
+        record.gpu = std::make_unique<typename Kind::gpu_type>(
+            Kind::upload_to_gpu(device, record.cpu, record.options)
         );
         return *record.gpu;
     }
@@ -241,34 +195,26 @@ public:
     void tick(std::uint64_t frame_serial) {
         m_current_frame_serial = frame_serial;
 
-        std::erase_if(m_retired_meshes, [frame_serial](const RetiredMeshGpu& retired) {
-            return retired.retire_after_frame <= frame_serial;
-        });
-
-        std::erase_if(m_retired_textures, [frame_serial](const RetiredTextureGpu& retired) {
-            return retired.retire_after_frame <= frame_serial;
+        for_each_storage([frame_serial](auto& store) {
+            std::erase_if(store.retired, [frame_serial](const auto& retired) {
+                return retired.retire_after_frame <= frame_serial;
+            });
         });
     }
 
     void flush_after_wait_idle() {
         logger()->info(
-            "Flushing GPU caches after wait_idle (live_meshes={}, live_textures={}, retired_meshes={}, retired_textures={})",
-            m_mesh_records.size(),
-            m_texture_records.size(),
-            m_retired_meshes.size(),
-            m_retired_textures.size()
+            "Flushing GPU caches after wait_idle (live_resources={}, retired_resources={})",
+            live_resource_count(),
+            retired_resource_count()
         );
-        m_retired_meshes.clear();
-        m_retired_textures.clear();
 
-        // Release all live GPU-side caches while the VkDevice is guaranteed idle.
-        // CPU-side resource records remain so assets can be re-uploaded on demand.
-        for (auto& [_, mesh_record] : m_mesh_records) {
-            mesh_record.gpu.reset();
-        }
-        for (auto& [_, texture_record] : m_texture_records) {
-            texture_record.gpu.reset();
-        }
+        for_each_storage([](auto& store) {
+            store.retired.clear();
+            for (auto& [_, record] : store.records) {
+                record.gpu.reset();
+            }
+        });
     }
 
 private:
@@ -276,74 +222,22 @@ private:
         return utils::get_logger("resource.manager");
     }
 
-    static void validate_mesh_data(const utils::ObjMeshData& mesh) {
-        if (mesh.vertices.empty() || mesh.indices.empty()) {
-            logger()->error("validate_mesh_data failed: mesh vertices/indices are empty.");
-            throw std::invalid_argument("ObjMeshData must not be empty.");
-        }
+    template <ResourceKind Kind>
+    ResourceStorage<Kind>& storage() {
+        static_assert(
+            detail::contains_kind_v<Kind, Kind0, Kind1, Kinds...>,
+            "Kind is not registered in this ResourceManager instance."
+        );
+        return std::get<ResourceStorage<Kind>>(m_storages);
     }
 
-    static void validate_texture_data(const utils::ImageData& image) {
-        if (image.width == 0 || image.height == 0) {
-            logger()->error("validate_texture_data failed: width/height must be positive.");
-            throw std::invalid_argument("ImageData width/height must be positive.");
-        }
-        if (image.channels == 0 || image.channels > 4) {
-            logger()->error("validate_texture_data failed: channels={} not in [1,4].", image.channels);
-            throw std::invalid_argument("ImageData channels must be in [1, 4].");
-        }
-        const std::size_t expected_size =
-            static_cast<std::size_t>(image.width) *
-            static_cast<std::size_t>(image.height) *
-            static_cast<std::size_t>(image.channels);
-        if (image.pixels.size() < expected_size) {
-            logger()->error(
-                "validate_texture_data failed: pixel buffer too small (expected_at_least={}, actual={}).",
-                expected_size,
-                image.pixels.size()
-            );
-            throw std::invalid_argument("ImageData pixels size is insufficient.");
-        }
-    }
-
-    static utils::ImageData normalize_to_rgba8(utils::ImageData image) {
-        if (image.channels == 4) {
-            return image;
-        }
-
-        const std::size_t pixel_count =
-            static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height);
-
-        utils::ImageData rgba{};
-        rgba.width = image.width;
-        rgba.height = image.height;
-        rgba.channels = 4;
-        rgba.pixels.resize(pixel_count * 4u);
-
-        for (std::size_t px = 0; px < pixel_count; ++px) {
-            const std::size_t src = px * image.channels;
-            const std::size_t dst = px * 4u;
-
-            if (image.channels == 1u) {
-                const std::uint8_t v = image.pixels[src];
-                rgba.pixels[dst + 0u] = v;
-                rgba.pixels[dst + 1u] = v;
-                rgba.pixels[dst + 2u] = v;
-                rgba.pixels[dst + 3u] = 255u;
-            } else if (image.channels == 2u) {
-                rgba.pixels[dst + 0u] = image.pixels[src + 0u];
-                rgba.pixels[dst + 1u] = image.pixels[src + 1u];
-                rgba.pixels[dst + 2u] = 0u;
-                rgba.pixels[dst + 3u] = 255u;
-            } else {
-                rgba.pixels[dst + 0u] = image.pixels[src + 0u];
-                rgba.pixels[dst + 1u] = image.pixels[src + 1u];
-                rgba.pixels[dst + 2u] = image.pixels[src + 2u];
-                rgba.pixels[dst + 3u] = 255u;
-            }
-        }
-
-        return rgba;
+    template <ResourceKind Kind>
+    const ResourceStorage<Kind>& storage() const {
+        static_assert(
+            detail::contains_kind_v<Kind, Kind0, Kind1, Kinds...>,
+            "Kind is not registered in this ResourceManager instance."
+        );
+        return std::get<ResourceStorage<Kind>>(m_storages);
     }
 
     std::filesystem::path resolve_resource_path(const std::string& rel_path) const {
@@ -365,62 +259,81 @@ private:
         return m_current_frame_serial + static_cast<std::uint64_t>(m_frames_in_flight);
     }
 
-    void ensure_mesh_cpu_loaded(const MeshRecord& record) const {
-        if (record.cpu.vertices.empty() || record.cpu.indices.empty()) {
-            logger()->error("ensure_mesh_cpu_loaded failed: mesh CPU payload missing.");
-            throw std::runtime_error("Mesh CPU data is missing for live handle.");
+    template <ResourceKind Kind>
+    void ensure_cpu_loaded(const ResourceRecord<Kind>& record) const {
+        try {
+            Kind::validate_cpu(record.cpu);
+        } catch (const std::exception&) {
+            logger()->error("ensure_cpu_loaded failed: CPU payload missing for live handle.");
+            throw std::runtime_error("Resource CPU data is missing for live handle.");
         }
     }
 
-    void ensure_texture_cpu_loaded(const TextureRecord& record) const {
-        if (record.cpu.pixels.empty()) {
-            logger()->error("ensure_texture_cpu_loaded failed: texture CPU payload missing.");
-            throw std::runtime_error("Texture CPU data is missing for live handle.");
-        }
-    }
-
-    void retire_mesh_gpu(MeshRecord& record) {
+    template <ResourceKind Kind>
+    void retire_gpu(ResourceRecord<Kind>& record) {
         if (!record.gpu) {
             return;
         }
 
+        auto& store = storage<Kind>();
         const auto retire_frame = retire_after_frame();
-        m_retired_meshes.emplace_back(RetiredMeshGpu{
+        store.retired.emplace_back(RetiredGpu<Kind>{
             .retire_after_frame = retire_frame,
-            .mesh = std::move(record.gpu)
+            .gpu = std::move(record.gpu)
         });
-        logger()->debug("Retired mesh GPU allocation (release_after_frame={})", retire_frame);
+        logger()->debug("Retired GPU allocation (release_after_frame={})", retire_frame);
     }
 
-    void retire_texture_gpu(TextureRecord& record) {
-        if (!record.gpu) {
-            return;
-        }
-
-        const auto retire_frame = retire_after_frame();
-        m_retired_textures.emplace_back(RetiredTextureGpu{
-            .retire_after_frame = retire_frame,
-            .image = std::move(record.gpu)
-        });
-        logger()->debug("Retired texture GPU allocation (release_after_frame={})", retire_frame);
-    }
-
-    MeshRecord& require_mesh_record(MeshHandle handle) {
-        const auto it = m_mesh_records.find(handle);
-        if (it == m_mesh_records.end()) {
-            logger()->error("Invalid/unloaded mesh handle requested: {}", handle.value);
-            throw std::runtime_error("Mesh handle is invalid or unloaded.");
+    template <ResourceKind Kind>
+    ResourceRecord<Kind>& require_record(ResourceHandle<Kind> handle) {
+        auto& store = storage<Kind>();
+        const auto it = store.records.find(handle);
+        if (it == store.records.end()) {
+            logger()->error("Invalid/unloaded resource handle requested: {}", handle.value);
+            throw std::runtime_error("Resource handle is invalid or unloaded.");
         }
         return it->second;
     }
 
-    TextureRecord& require_texture_record(TextureHandle handle) {
-        const auto it = m_texture_records.find(handle);
-        if (it == m_texture_records.end()) {
-            logger()->error("Invalid/unloaded texture handle requested: {}", handle.value);
-            throw std::runtime_error("Texture handle is invalid or unloaded.");
+    template <ResourceKind Kind>
+    const ResourceRecord<Kind>& require_record(ResourceHandle<Kind> handle) const {
+        const auto& store = storage<Kind>();
+        const auto it = store.records.find(handle);
+        if (it == store.records.end()) {
+            logger()->error("Invalid/unloaded resource handle requested: {}", handle.value);
+            throw std::runtime_error("Resource handle is invalid or unloaded.");
         }
         return it->second;
+    }
+
+    template <class Fn>
+    void for_each_storage(Fn&& fn) {
+        std::apply([&](auto&... stores) {
+            (fn(stores), ...);
+        }, m_storages);
+    }
+
+    template <class Fn>
+    void for_each_storage(Fn&& fn) const {
+        std::apply([&](const auto&... stores) {
+            (fn(stores), ...);
+        }, m_storages);
+    }
+
+    std::size_t live_resource_count() const {
+        std::size_t total = 0;
+        for_each_storage([&total](const auto& store) {
+            total += store.records.size();
+        });
+        return total;
+    }
+
+    std::size_t retired_resource_count() const {
+        std::size_t total = 0;
+        for_each_storage([&total](const auto& store) {
+            total += store.retired.size();
+        });
+        return total;
     }
 };
 

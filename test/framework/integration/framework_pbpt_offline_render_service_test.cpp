@@ -56,7 +56,7 @@ resource::MeshHandle create_test_mesh(resource::ResourceManager& resources) {
         {{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
     };
     mesh.indices = {0, 1, 2};
-    return resources.create_mesh(std::move(mesh));
+    return resources.create<rtr::resource::MeshResourceKind>(std::move(mesh));
 }
 
 void setup_scene_with_camera(core::Scene& scene) {

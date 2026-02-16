@@ -185,3 +185,8 @@ rtr_add_test(
     resource/resource_manager_lifecycle_test.cpp
     rtr
 )
+rtr_add_test(
+    test_resource_manager_generic_kinds
+    resource/resource_manager_generic_kinds_test.cpp
+    rtr
+)

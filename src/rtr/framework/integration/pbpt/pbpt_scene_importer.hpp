@@ -648,7 +648,7 @@ inline PbptImportResult import_pbpt_scene_xml_to_scene(
         const auto mesh_rel_to_resource_root =
             (std::filesystem::path(location.scene_root_rel_to_resource_dir) / mesh_path).lexically_normal();
         const resource::MeshHandle mesh_handle =
-            resources.create_mesh_from_obj_relative_path(mesh_rel_to_resource_root.generic_string());
+            resources.create_from_relative_path<rtr::resource::MeshResourceKind>(mesh_rel_to_resource_root.generic_string());
         const component::PbptRgb base_rgb = reflectance_by_bsdf_id.at(bsdf_id);
         (void)go.add_component<component::MeshRenderer>(
             mesh_handle,
