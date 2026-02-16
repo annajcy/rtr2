@@ -8,7 +8,6 @@ endif()
 
 find_package(VulkanLoader   CONFIG REQUIRED)
 find_package(glfw3          CONFIG REQUIRED)
-find_package(imgui          CONFIG REQUIRED)
 find_package(TinyGLTF       CONFIG REQUIRED)
 find_package(stb            CONFIG REQUIRED)
 find_package(spdlog         CONFIG REQUIRED)
@@ -16,57 +15,61 @@ find_package(slang          CONFIG REQUIRED)
 find_package(tinyobjloader  CONFIG REQUIRED)
 find_package(pugixml        CONFIG REQUIRED)
 
-# build imgui with Vulkan and GLFW backends
-add_library(imgui_vk STATIC)
+if (RTR_BUILD_EDITOR)
+  find_package(imgui CONFIG REQUIRED)
 
-set(_IMGUI_PKG_ROOT "")
-if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND DEFINED imgui_PACKAGE_FOLDER_DEBUG)
-  set(_IMGUI_PKG_ROOT "${imgui_PACKAGE_FOLDER_DEBUG}")
-elseif (CMAKE_BUILD_TYPE STREQUAL "Release" AND DEFINED imgui_PACKAGE_FOLDER_RELEASE)
-  set(_IMGUI_PKG_ROOT "${imgui_PACKAGE_FOLDER_RELEASE}")
-elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" AND DEFINED imgui_PACKAGE_FOLDER_RELWITHDEBINFO)
-  set(_IMGUI_PKG_ROOT "${imgui_PACKAGE_FOLDER_RELWITHDEBINFO}")
-elseif (CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" AND DEFINED imgui_PACKAGE_FOLDER_MINSIZEREL)
-  set(_IMGUI_PKG_ROOT "${imgui_PACKAGE_FOLDER_MINSIZEREL}")
+  # build imgui with Vulkan and GLFW backends
+  add_library(imgui_vk STATIC)
+
+  set(_IMGUI_PKG_ROOT "")
+  if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND DEFINED imgui_PACKAGE_FOLDER_DEBUG)
+    set(_IMGUI_PKG_ROOT "${imgui_PACKAGE_FOLDER_DEBUG}")
+  elseif (CMAKE_BUILD_TYPE STREQUAL "Release" AND DEFINED imgui_PACKAGE_FOLDER_RELEASE)
+    set(_IMGUI_PKG_ROOT "${imgui_PACKAGE_FOLDER_RELEASE}")
+  elseif (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" AND DEFINED imgui_PACKAGE_FOLDER_RELWITHDEBINFO)
+    set(_IMGUI_PKG_ROOT "${imgui_PACKAGE_FOLDER_RELWITHDEBINFO}")
+  elseif (CMAKE_BUILD_TYPE STREQUAL "MinSizeRel" AND DEFINED imgui_PACKAGE_FOLDER_MINSIZEREL)
+    set(_IMGUI_PKG_ROOT "${imgui_PACKAGE_FOLDER_MINSIZEREL}")
+  endif()
+  message(STATUS "_IMGUI_PKG_ROOT: ${_IMGUI_PKG_ROOT}")
+
+  if (_IMGUI_PKG_ROOT STREQUAL "")
+    message(FATAL_ERROR "Cannot resolve ImGui package folder; ensure you're using Conan's CMakeDeps & toolchain and set CMAKE_BUILD_TYPE correctly.")
+  endif()
+
+  set(IMGUI_INC_DIR      "${_IMGUI_PKG_ROOT}/include")
+  set(IMGUI_BACKENDS_DIR "${_IMGUI_PKG_ROOT}/res/bindings")
+  set(IMGUI_HEADER_PATH  "${IMGUI_INC_DIR}/imgui.h")
+
+  if (NOT EXISTS "${IMGUI_HEADER_PATH}")
+    message(FATAL_ERROR "ImGui header not found at ${IMGUI_HEADER_PATH}")
+  endif()
+
+  file(READ "${IMGUI_HEADER_PATH}" _IMGUI_HEADER_CONTENT)
+  string(FIND "${_IMGUI_HEADER_CONTENT}" "ImGuiConfigFlags_DockingEnable" _IMGUI_DOCKING_SYMBOL_POS)
+  if (_IMGUI_DOCKING_SYMBOL_POS EQUAL -1)
+    message(FATAL_ERROR "ImGui package does not expose docking symbols. Require imgui/*-docking package.")
+  endif()
+
+  message(STATUS "ImGui include dir  : ${IMGUI_INC_DIR}")
+  message(STATUS "ImGui backends dir : ${IMGUI_BACKENDS_DIR}")
+
+  target_sources(imgui_vk PRIVATE
+    "${IMGUI_BACKENDS_DIR}/imgui_impl_glfw.cpp"
+    "${IMGUI_BACKENDS_DIR}/imgui_impl_vulkan.cpp"
+  )
+
+  target_include_directories(imgui_vk PUBLIC
+    "${IMGUI_INC_DIR}"
+    "${IMGUI_BACKENDS_DIR}"
+  )
+
+  target_link_libraries(imgui_vk PUBLIC
+    imgui::imgui
+    glfw
+    Vulkan::Loader
+  )
 endif()
-message(STATUS "_IMGUI_PKG_ROOT: ${_IMGUI_PKG_ROOT}")
-
-if (_IMGUI_PKG_ROOT STREQUAL "")
-  message(FATAL_ERROR "Cannot resolve ImGui package folder; ensure you're using Conan's CMakeDeps & toolchain and set CMAKE_BUILD_TYPE correctly.")
-endif()
-
-set(IMGUI_INC_DIR      "${_IMGUI_PKG_ROOT}/include")
-set(IMGUI_BACKENDS_DIR "${_IMGUI_PKG_ROOT}/res/bindings")  
-set(IMGUI_HEADER_PATH  "${IMGUI_INC_DIR}/imgui.h")
-
-if (NOT EXISTS "${IMGUI_HEADER_PATH}")
-  message(FATAL_ERROR "ImGui header not found at ${IMGUI_HEADER_PATH}")
-endif()
-
-file(READ "${IMGUI_HEADER_PATH}" _IMGUI_HEADER_CONTENT)
-string(FIND "${_IMGUI_HEADER_CONTENT}" "ImGuiConfigFlags_DockingEnable" _IMGUI_DOCKING_SYMBOL_POS)
-if (_IMGUI_DOCKING_SYMBOL_POS EQUAL -1)
-  message(FATAL_ERROR "ImGui package does not expose docking symbols. Require imgui/*-docking package.")
-endif()
-
-message(STATUS "ImGui include dir  : ${IMGUI_INC_DIR}")
-message(STATUS "ImGui backends dir : ${IMGUI_BACKENDS_DIR}")
-
-target_sources(imgui_vk PRIVATE
-  "${IMGUI_BACKENDS_DIR}/imgui_impl_glfw.cpp"
-  "${IMGUI_BACKENDS_DIR}/imgui_impl_vulkan.cpp"
-)
-
-target_include_directories(imgui_vk PUBLIC
-  "${IMGUI_INC_DIR}"
-  "${IMGUI_BACKENDS_DIR}"
-)
-
-target_link_libraries(imgui_vk PUBLIC
-  imgui::imgui
-  glfw
-  Vulkan::Loader
-)
 
 # build stb implementation
 set(STB_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated")

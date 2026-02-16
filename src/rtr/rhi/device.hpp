@@ -250,7 +250,8 @@ private:
         "VK_EXT_swapchain_maintenance1",
 #if defined(__APPLE__)
         "VK_KHR_portability_subset",
-        "VK_KHR_dynamic_rendering"
+        "VK_KHR_dynamic_rendering",
+        "VK_KHR_copy_commands2"
 #endif
     };
 

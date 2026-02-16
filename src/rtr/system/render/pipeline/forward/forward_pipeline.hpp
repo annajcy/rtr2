@@ -19,6 +19,7 @@
 #include "rtr/rhi/descriptor.hpp"
 #include "rtr/rhi/mesh.hpp"
 #include "rtr/rhi/shader_module.hpp"
+#include "rtr/system/render/frame_color_source.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 #include "rtr/system/render/pipeline.hpp"
@@ -66,7 +67,10 @@ public:
     };
 
     struct RenderPassResources {
+        rhi::Image* color_image{};
+        vk::ImageLayout* color_layout{};
         rhi::Image* depth_image{};
+        vk::Extent2D extent{};
         std::vector<DrawItem> draw_items{};
     };
 
@@ -77,7 +81,7 @@ private:
 
     std::vector<render::ResourceDependency> m_dependencies{
         {"forward.per_object", render::ResourceAccess::eRead},
-        {"swapchain_color", render::ResourceAccess::eReadWrite},
+        {"offscreen_color", render::ResourceAccess::eReadWrite},
         {"depth", render::ResourceAccess::eReadWrite}
     };
 
@@ -96,12 +100,15 @@ public:
     }
 
     void bind_render_pass_resources(RenderPassResources resources) {
-        if (resources.depth_image == nullptr) {
+        if (resources.color_image == nullptr ||
+            resources.color_layout == nullptr ||
+            resources.depth_image == nullptr ||
+            resources.extent.width == 0 ||
+            resources.extent.height == 0) {
             throw std::runtime_error("ForwardPass frame resources are incomplete.");
         }
         for (const auto& item : resources.draw_items) {
-            if (item.mesh == nullptr ||
-                item.per_object_set == nullptr) {
+            if (item.mesh == nullptr || item.per_object_set == nullptr) {
                 throw std::runtime_error("ForwardPass draw item resources are incomplete.");
             }
         }
@@ -109,16 +116,59 @@ public:
     }
 
     void execute(render::FrameContext& ctx) override {
-        if (m_render_pass_resources.depth_image == nullptr) {
+        if (m_render_pass_resources.color_image == nullptr ||
+            m_render_pass_resources.color_layout == nullptr ||
+            m_render_pass_resources.depth_image == nullptr) {
             throw std::runtime_error("ForwardPass frame resources are not bound.");
         }
 
         auto& cmd = ctx.cmd().command_buffer();
+        rhi::Image& color_image = *m_render_pass_resources.color_image;
         rhi::Image& depth_image = *m_render_pass_resources.depth_image;
+
+        vk::ImageMemoryBarrier2 to_color{};
+        to_color.srcStageMask =
+            (*m_render_pass_resources.color_layout == vk::ImageLayout::eUndefined)
+                ? vk::PipelineStageFlagBits2::eTopOfPipe
+                : vk::PipelineStageFlagBits2::eAllCommands;
+        to_color.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+        to_color.srcAccessMask =
+            (*m_render_pass_resources.color_layout == vk::ImageLayout::eUndefined)
+                ? vk::AccessFlagBits2::eNone
+                : vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite;
+        to_color.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+        to_color.oldLayout = *m_render_pass_resources.color_layout;
+        to_color.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        to_color.image = *color_image.image();
+        to_color.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+        to_color.subresourceRange.baseMipLevel = 0;
+        to_color.subresourceRange.levelCount = 1;
+        to_color.subresourceRange.baseArrayLayer = 0;
+        to_color.subresourceRange.layerCount = 1;
+
+        vk::ImageMemoryBarrier2 to_depth{};
+        to_depth.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe;
+        to_depth.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
+        to_depth.srcAccessMask = vk::AccessFlagBits2::eNone;
+        to_depth.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
+        to_depth.oldLayout = vk::ImageLayout::eUndefined;
+        to_depth.newLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+        to_depth.image = *depth_image.image();
+        to_depth.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
+        to_depth.subresourceRange.baseMipLevel = 0;
+        to_depth.subresourceRange.levelCount = 1;
+        to_depth.subresourceRange.baseArrayLayer = 0;
+        to_depth.subresourceRange.layerCount = 1;
+
+        std::array<vk::ImageMemoryBarrier2, 2> to_render_barriers = {to_color, to_depth};
+        vk::DependencyInfo to_render_dep{};
+        to_render_dep.imageMemoryBarrierCount = static_cast<uint32_t>(to_render_barriers.size());
+        to_render_dep.pImageMemoryBarriers = to_render_barriers.data();
+        cmd.pipelineBarrier2(to_render_dep);
 
         vk::ClearValue clear_value = vk::ClearValue{vk::ClearColorValue{0.0f, 0.0f, 0.0f, 1.0f}};
         vk::RenderingAttachmentInfo color_attachment_info{};
-        color_attachment_info.imageView = *ctx.swapchain_image_view();
+        color_attachment_info.imageView = *color_image.image_view();
         color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
         color_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
         color_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
@@ -134,45 +184,11 @@ public:
 
         vk::RenderingInfo rendering_info{};
         rendering_info.renderArea.offset = vk::Offset2D{0, 0};
-        rendering_info.renderArea.extent = ctx.render_extent();
+        rendering_info.renderArea.extent = m_render_pass_resources.extent;
         rendering_info.layerCount = 1;
         rendering_info.colorAttachmentCount = 1;
         rendering_info.pColorAttachments = &color_attachment_info;
         rendering_info.pDepthAttachment = &depth_attachment_info;
-
-        vk::ImageMemoryBarrier2 to_color{};
-        to_color.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe;
-        to_color.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-        to_color.srcAccessMask = vk::AccessFlagBits2::eNone;
-        to_color.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
-        to_color.oldLayout = vk::ImageLayout::eUndefined;
-        to_color.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
-        to_color.image = ctx.swapchain_image();
-        to_color.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
-        to_color.subresourceRange.baseMipLevel = 0;
-        to_color.subresourceRange.levelCount = 1;
-        to_color.subresourceRange.baseArrayLayer = 0;
-        to_color.subresourceRange.layerCount = 1;
-
-        vk::ImageMemoryBarrier2 to_depth{};
-        to_depth.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
-        to_depth.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
-        to_depth.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
-        to_depth.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
-        to_depth.oldLayout = vk::ImageLayout::eUndefined;
-        to_depth.newLayout = vk::ImageLayout::eDepthAttachmentOptimal;
-        to_depth.image = *depth_image.image();
-        to_depth.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eDepth;
-        to_depth.subresourceRange.baseMipLevel = 0;
-        to_depth.subresourceRange.levelCount = 1;
-        to_depth.subresourceRange.baseArrayLayer = 0;
-        to_depth.subresourceRange.layerCount = 1;
-
-        std::array<vk::ImageMemoryBarrier2, 2> barriers = {to_color, to_depth};
-        vk::DependencyInfo to_depth_color_dep{};
-        to_depth_color_dep.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
-        to_depth_color_dep.pImageMemoryBarriers = barriers.data();
-        cmd.pipelineBarrier2(to_depth_color_dep);
 
         cmd.beginRendering(rendering_info);
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
@@ -180,15 +196,15 @@ public:
         vk::Viewport viewport{};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
-        viewport.width = static_cast<float>(ctx.render_extent().width);
-        viewport.height = static_cast<float>(ctx.render_extent().height);
+        viewport.width = static_cast<float>(m_render_pass_resources.extent.width);
+        viewport.height = static_cast<float>(m_render_pass_resources.extent.height);
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         cmd.setViewport(0, viewport);
 
         vk::Rect2D scissor{};
         scissor.offset = vk::Offset2D{0, 0};
-        scissor.extent = ctx.render_extent();
+        scissor.extent = m_render_pass_resources.extent;
         cmd.setScissor(0, scissor);
 
         for (const auto& item : m_render_pass_resources.draw_items) {
@@ -209,13 +225,15 @@ public:
         }
 
         cmd.endRendering();
+        *m_render_pass_resources.color_layout = vk::ImageLayout::eColorAttachmentOptimal;
     }
 };
 
 class ForwardPipeline : public RenderPipelineBase,
                         public IFramePreparePipeline,
                         public IResourceAwarePipeline,
-                        public IImGuiOverlayPipeline {
+                        public IFrameColorSource,
+                        public ISceneViewportSink {
 private:
     static constexpr uint32_t kMaxRenderables = 256;
 
@@ -230,7 +248,13 @@ private:
     vk::DeviceSize m_uniform_buffer_size{0};
     std::vector<std::vector<std::unique_ptr<rhi::Buffer>>> m_object_uniform_buffers{};
     std::vector<std::vector<vk::raii::DescriptorSet>> m_object_sets{};
+
+    std::vector<std::unique_ptr<rhi::Image>> m_color_images{};
+    std::vector<vk::ImageLayout> m_color_image_layouts{};
     std::vector<std::unique_ptr<rhi::Image>> m_depth_images{};
+    vk::Extent2D m_scene_target_extent{};
+    vk::Extent2D m_requested_scene_extent{};
+    bool m_scene_extent_dirty{false};
 
     std::unique_ptr<rhi::DescriptorSetLayout> m_per_object_layout{nullptr};
     std::unique_ptr<rhi::DescriptorPool> m_descriptor_pool{nullptr};
@@ -238,7 +262,6 @@ private:
     resource::ResourceManager* m_resource_manager{};
 
     std::unique_ptr<render::ForwardPass> m_forward_pass{nullptr};
-    std::unique_ptr<render::ImGUIPass> m_imgui_pass{nullptr};
 
 public:
     ForwardPipeline(
@@ -296,21 +319,10 @@ public:
             &m_pipeline_layout,
             &m_pipeline
         );
-
-        m_imgui_pass = std::make_unique<render::ImGUIPass>(
-            m_device,
-            m_context,
-            m_window,
-            m_image_count,
-            m_color_format,
-            m_depth_format
-        );
     }
 
     ~ForwardPipeline() override {
-        // Descriptor sets must be destroyed before the descriptor pool.
         m_forward_pass.reset();
-        m_imgui_pass.reset();
         m_object_sets.clear();
         m_descriptor_pool.reset();
     }
@@ -331,46 +343,33 @@ public:
         m_scene_view = std::move(scene_view);
     }
 
-    ImGUIPass& imgui_pass() {
-        if (!m_imgui_pass) {
-            throw std::runtime_error("ForwardPipeline imgui pass is not initialized.");
-        }
-        return *m_imgui_pass;
-    }
-
-    const ImGUIPass& imgui_pass() const {
-        if (!m_imgui_pass) {
-            throw std::runtime_error("ForwardPipeline imgui pass is not initialized.");
-        }
-        return *m_imgui_pass;
-    }
-
-    void set_imgui_overlay(std::shared_ptr<IImGuiOverlay> overlay) override {
-        if (!m_imgui_pass) {
-            throw std::runtime_error("ForwardPipeline imgui pass is not initialized.");
-        }
-        m_imgui_pass->set_overlay(std::move(overlay));
-    }
-
-    void clear_imgui_overlay() override {
-        if (!m_imgui_pass) {
+    void set_scene_viewport_extent(vk::Extent2D extent) override {
+        if (extent.width == 0 || extent.height == 0) {
             return;
         }
-        m_imgui_pass->clear_overlay();
+        if (m_requested_scene_extent.width == extent.width &&
+            m_requested_scene_extent.height == extent.height) {
+            return;
+        }
+        m_requested_scene_extent = extent;
+        m_scene_extent_dirty = true;
     }
 
-    bool wants_imgui_capture_mouse() const override {
-        if (!m_imgui_pass) {
-            return false;
+    FrameColorSourceView frame_color_source_view(uint32_t frame_index) const override {
+        if (frame_index >= m_color_images.size() ||
+            frame_index >= m_color_image_layouts.size() ||
+            m_color_images[frame_index] == nullptr) {
+            return {};
         }
-        return m_imgui_pass->wants_capture_mouse();
-    }
 
-    bool wants_imgui_capture_keyboard() const override {
-        if (!m_imgui_pass) {
-            return false;
-        }
-        return m_imgui_pass->wants_capture_keyboard();
+        return FrameColorSourceView{
+            .image_view = *m_color_images[frame_index]->image_view(),
+            .image_layout = m_color_image_layouts[frame_index],
+            .extent = vk::Extent2D{
+                m_color_images[frame_index]->width(),
+                m_color_images[frame_index]->height()
+            }
+        };
     }
 
     void on_resize(int /*width*/, int /*height*/) override {}
@@ -379,15 +378,11 @@ public:
         const FrameScheduler::SwapchainState& /*state*/,
         const SwapchainChangeSummary& diff
     ) override {
-        if (diff.extent_or_depth_changed()) {
-            create_depth_images();
-        }
         if (diff.color_or_depth_changed()) {
             create_graphics_pipeline();
         }
-
-        if (m_imgui_pass) {
-            m_imgui_pass->on_swapchain_recreated(m_image_count, m_color_format, m_depth_format);
+        if (diff.extent_or_depth_changed()) {
+            m_scene_extent_dirty = true;
         }
     }
 
@@ -403,15 +398,19 @@ public:
             throw std::runtime_error("ForwardPipeline requires scene view before render().");
         }
 
+        ensure_scene_targets(extent);
+
         const uint32_t frame_index = ctx.frame_index();
         if (frame_index >= m_object_uniform_buffers.size() ||
             frame_index >= m_object_sets.size() ||
-            frame_index >= m_depth_images.size()) {
+            frame_index >= m_depth_images.size() ||
+            frame_index >= m_color_images.size() ||
+            frame_index >= m_color_image_layouts.size()) {
             throw std::runtime_error("ForwardPipeline frame resources are not ready.");
         }
 
-        if (!m_forward_pass || !m_imgui_pass) {
-            throw std::runtime_error("Forward pipeline passes are not initialized.");
+        if (!m_forward_pass) {
+            throw std::runtime_error("Forward pipeline pass is not initialized.");
         }
 
         const auto& scene_view = m_scene_view.value();
@@ -420,8 +419,6 @@ public:
         }
 
         pbpt::math::mat4 proj = scene_view.camera.proj;
-        proj[1][1] *= -1;
-
         auto& frame_uniform_buffers = m_object_uniform_buffers[frame_index];
         auto& frame_sets = m_object_sets[frame_index];
 
@@ -453,15 +450,15 @@ public:
         }
 
         m_forward_pass->bind_render_pass_resources(ForwardPass::RenderPassResources{
+            .color_image = m_color_images[frame_index].get(),
+            .color_layout = &m_color_image_layouts[frame_index],
             .depth_image = m_depth_images[frame_index].get(),
+            .extent = m_scene_target_extent,
             .draw_items = std::move(draw_items)
         });
         m_forward_pass->execute(ctx);
 
-        m_imgui_pass->bind_render_pass_resources(ImGUIPass::RenderPassResources{
-            .depth_image = m_depth_images[frame_index].get()
-        });
-        m_imgui_pass->execute(ctx);
+        present_offscreen_to_swapchain(ctx, frame_index);
     }
 
 private:
@@ -472,10 +469,147 @@ private:
             throw std::runtime_error("Renderable mesh handle is invalid.");
         }
         if (m_resource_manager == nullptr) {
-            logger->error("ForwardPipeline missing resource manager while requesting mesh handle={}.", mesh_handle.value);
+            logger->error("ForwardPipeline missing resource manager while requesting mesh handle={}", mesh_handle.value);
             throw std::runtime_error("ForwardPipeline missing resource manager.");
         }
         return m_resource_manager->require_gpu<rtr::resource::MeshResourceKind>(mesh_handle, m_device);
+    }
+
+    void ensure_scene_targets(vk::Extent2D fallback_extent) {
+        vk::Extent2D desired_extent = fallback_extent;
+        if (m_requested_scene_extent.width > 0 && m_requested_scene_extent.height > 0) {
+            desired_extent = m_requested_scene_extent;
+        }
+
+        const bool need_recreate =
+            m_scene_extent_dirty ||
+            m_scene_target_extent.width != desired_extent.width ||
+            m_scene_target_extent.height != desired_extent.height ||
+            m_color_images.empty() ||
+            m_depth_images.empty();
+        if (!need_recreate) {
+            return;
+        }
+
+        m_device->wait_idle();
+        m_scene_target_extent = desired_extent;
+        create_color_images();
+        create_depth_images();
+        m_scene_extent_dirty = false;
+    }
+
+    void present_offscreen_to_swapchain(FrameContext& ctx, uint32_t frame_index) {
+        auto& cmd = ctx.cmd().command_buffer();
+        auto& color_image = *m_color_images[frame_index];
+        auto& color_layout = m_color_image_layouts[frame_index];
+
+        vk::ImageMemoryBarrier2 offscreen_to_src{};
+        offscreen_to_src.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+        offscreen_to_src.dstStageMask = vk::PipelineStageFlagBits2::eTransfer;
+        offscreen_to_src.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+        offscreen_to_src.dstAccessMask = vk::AccessFlagBits2::eTransferRead;
+        offscreen_to_src.oldLayout = color_layout;
+        offscreen_to_src.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+        offscreen_to_src.image = *color_image.image();
+        offscreen_to_src.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+        offscreen_to_src.subresourceRange.baseMipLevel = 0;
+        offscreen_to_src.subresourceRange.levelCount = 1;
+        offscreen_to_src.subresourceRange.baseArrayLayer = 0;
+        offscreen_to_src.subresourceRange.layerCount = 1;
+
+        vk::ImageMemoryBarrier2 swapchain_to_dst{};
+        swapchain_to_dst.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe;
+        swapchain_to_dst.dstStageMask = vk::PipelineStageFlagBits2::eTransfer;
+        swapchain_to_dst.srcAccessMask = vk::AccessFlagBits2::eNone;
+        swapchain_to_dst.dstAccessMask = vk::AccessFlagBits2::eTransferWrite;
+        swapchain_to_dst.oldLayout = vk::ImageLayout::eUndefined;
+        swapchain_to_dst.newLayout = vk::ImageLayout::eTransferDstOptimal;
+        swapchain_to_dst.image = ctx.swapchain_image();
+        swapchain_to_dst.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+        swapchain_to_dst.subresourceRange.baseMipLevel = 0;
+        swapchain_to_dst.subresourceRange.levelCount = 1;
+        swapchain_to_dst.subresourceRange.baseArrayLayer = 0;
+        swapchain_to_dst.subresourceRange.layerCount = 1;
+
+        std::array<vk::ImageMemoryBarrier2, 2> to_blit_barriers = {
+            offscreen_to_src,
+            swapchain_to_dst
+        };
+        vk::DependencyInfo to_blit_dep{};
+        to_blit_dep.imageMemoryBarrierCount = static_cast<uint32_t>(to_blit_barriers.size());
+        to_blit_dep.pImageMemoryBarriers = to_blit_barriers.data();
+        cmd.pipelineBarrier2(to_blit_dep);
+
+        vk::ImageBlit2 blit{};
+        blit.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+        blit.srcSubresource.mipLevel = 0;
+        blit.srcSubresource.baseArrayLayer = 0;
+        blit.srcSubresource.layerCount = 1;
+        blit.srcOffsets[0] = vk::Offset3D{0, 0, 0};
+        blit.srcOffsets[1] = vk::Offset3D{
+            static_cast<int32_t>(m_scene_target_extent.width),
+            static_cast<int32_t>(m_scene_target_extent.height),
+            1
+        };
+        blit.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+        blit.dstSubresource.mipLevel = 0;
+        blit.dstSubresource.baseArrayLayer = 0;
+        blit.dstSubresource.layerCount = 1;
+        blit.dstOffsets[0] = vk::Offset3D{0, 0, 0};
+        blit.dstOffsets[1] = vk::Offset3D{
+            static_cast<int32_t>(ctx.render_extent().width),
+            static_cast<int32_t>(ctx.render_extent().height),
+            1
+        };
+
+        vk::BlitImageInfo2 blit_info{};
+        blit_info.srcImage = *color_image.image();
+        blit_info.srcImageLayout = vk::ImageLayout::eTransferSrcOptimal;
+        blit_info.dstImage = ctx.swapchain_image();
+        blit_info.dstImageLayout = vk::ImageLayout::eTransferDstOptimal;
+        blit_info.filter = vk::Filter::eLinear;
+        blit_info.regionCount = 1;
+        blit_info.pRegions = &blit;
+        cmd.blitImage2(blit_info);
+
+        vk::ImageMemoryBarrier2 swapchain_to_color{};
+        swapchain_to_color.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
+        swapchain_to_color.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+        swapchain_to_color.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
+        swapchain_to_color.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+        swapchain_to_color.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+        swapchain_to_color.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        swapchain_to_color.image = ctx.swapchain_image();
+        swapchain_to_color.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+        swapchain_to_color.subresourceRange.baseMipLevel = 0;
+        swapchain_to_color.subresourceRange.levelCount = 1;
+        swapchain_to_color.subresourceRange.baseArrayLayer = 0;
+        swapchain_to_color.subresourceRange.layerCount = 1;
+
+        vk::ImageMemoryBarrier2 offscreen_to_sampled{};
+        offscreen_to_sampled.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
+        offscreen_to_sampled.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader;
+        offscreen_to_sampled.srcAccessMask = vk::AccessFlagBits2::eTransferRead;
+        offscreen_to_sampled.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
+        offscreen_to_sampled.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+        offscreen_to_sampled.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        offscreen_to_sampled.image = *color_image.image();
+        offscreen_to_sampled.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+        offscreen_to_sampled.subresourceRange.baseMipLevel = 0;
+        offscreen_to_sampled.subresourceRange.levelCount = 1;
+        offscreen_to_sampled.subresourceRange.baseArrayLayer = 0;
+        offscreen_to_sampled.subresourceRange.layerCount = 1;
+
+        std::array<vk::ImageMemoryBarrier2, 2> to_final_barriers = {
+            swapchain_to_color,
+            offscreen_to_sampled
+        };
+        vk::DependencyInfo to_final_dep{};
+        to_final_dep.imageMemoryBarrierCount = static_cast<uint32_t>(to_final_barriers.size());
+        to_final_dep.pImageMemoryBarriers = to_final_barriers.data();
+        cmd.pipelineBarrier2(to_final_dep);
+
+        color_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
     }
 
     void create_per_object_resources() {
@@ -513,11 +647,38 @@ private:
         }
     }
 
+    void create_color_images() {
+        m_color_images.clear();
+        m_color_images.reserve(m_frame_count);
+        m_color_image_layouts.assign(m_frame_count, vk::ImageLayout::eUndefined);
+
+        const vk::ImageUsageFlags usage =
+            vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eSampled |
+            vk::ImageUsageFlagBits::eTransferSrc;
+
+        for (uint32_t i = 0; i < m_frame_count; ++i) {
+            m_color_images.emplace_back(std::make_unique<rhi::Image>(
+                rhi::Image(
+                    m_device,
+                    m_scene_target_extent.width,
+                    m_scene_target_extent.height,
+                    m_color_format,
+                    vk::ImageTiling::eOptimal,
+                    usage,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal,
+                    vk::ImageAspectFlagBits::eColor,
+                    false
+                )
+            ));
+        }
+    }
+
     void create_depth_images() {
-        if (!has_valid_extent()) {
+        if (m_scene_target_extent.width == 0 || m_scene_target_extent.height == 0) {
             return;
         }
-        m_depth_images = make_per_frame_depth_images(m_swapchain_extent, m_depth_format);
+        m_depth_images = make_per_frame_depth_images(m_scene_target_extent, m_depth_format);
     }
 
     void create_graphics_pipeline() {

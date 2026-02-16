@@ -12,6 +12,7 @@
 #include "rtr/editor/hierarchy_panel.hpp"
 #include "rtr/editor/inspector_panel.hpp"
 #include "rtr/editor/logger_panel.hpp"
+#include "rtr/editor/scene_view_panel.hpp"
 #include "rtr/editor/stats_panel.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
@@ -32,11 +33,10 @@ int main() {
             .max_frames_in_flight = kMaxFramesInFlight
         });
 
-        auto pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
+        auto runtime_pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
             runtime.renderer().build_pipeline_runtime(),
             rtr::system::render::ForwardPipelineConfig{}
         );
-        auto* forward_pipeline = pipeline.get();
 
         auto editor_host = std::make_shared<rtr::editor::EditorHost>();
         editor_host->bind_runtime(
@@ -45,15 +45,19 @@ int main() {
             &runtime.renderer(),
             &runtime.input_system()
         );
+        editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
-        rtr::editor::attach_editor_host(*forward_pipeline, editor_host);
 
-        rtr::editor::bind_input_capture_to_pipeline(runtime.input_system(), *forward_pipeline);
-
-        runtime.set_pipeline(std::move(pipeline));
+        auto editor_pipeline = rtr::editor::create_editor_pipeline(
+            runtime.renderer().build_pipeline_runtime(),
+            std::move(runtime_pipeline),
+            editor_host
+        );
+        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), *editor_pipeline);
+        runtime.set_pipeline(std::move(editor_pipeline));
 
         auto& scene = runtime.world().create_scene("main_scene");
 

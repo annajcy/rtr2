@@ -58,7 +58,9 @@ public:
         create_info.imageColorSpace = surface_format.colorSpace;
         create_info.imageExtent = extent;
         create_info.imageArrayLayers = 1;
-        create_info.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
+        create_info.imageUsage =
+            vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransferDst;
 
         create_info.imageSharingMode = vk::SharingMode::eExclusive;
         create_info.preTransform = capabilities.currentTransform;

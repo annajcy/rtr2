@@ -7,6 +7,7 @@
 #include "rtr/editor/hierarchy_panel.hpp"
 #include "rtr/editor/inspector_panel.hpp"
 #include "rtr/editor/logger_panel.hpp"
+#include "rtr/editor/scene_view_panel.hpp"
 #include "rtr/editor/stats_panel.hpp"
 #include "rtr/framework/core/world.hpp"
 #include "rtr/resource/resource_manager.hpp"
@@ -28,11 +29,10 @@ int main() {
             kMaxFramesInFlight
         );
 
-        auto pipeline = std::make_unique<rtr::system::render::ShaderToyPipeline>(
+        auto runtime_pipeline = std::make_unique<rtr::system::render::ShaderToyPipeline>(
             renderer->build_pipeline_runtime(),
             rtr::system::render::ShaderToyPipelineConfig{}
         );
-        auto* shadertoy_pipeline = pipeline.get();
 
         auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
 
@@ -48,14 +48,19 @@ int main() {
             renderer.get(),
             input_system.get()
         );
+        editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
-        rtr::editor::attach_editor_host(*shadertoy_pipeline, editor_host);
-        rtr::editor::bind_input_capture_to_pipeline(*input_system, *shadertoy_pipeline);
+        auto editor_pipeline = rtr::editor::create_editor_pipeline(
+            renderer->build_pipeline_runtime(),
+            std::move(runtime_pipeline),
+            editor_host
+        );
+        rtr::editor::bind_input_capture_to_editor(*input_system, *editor_pipeline);
 
-        renderer->set_pipeline(std::move(pipeline));
+        renderer->set_pipeline(std::move(editor_pipeline));
 
         std::uint64_t frame_serial = 0;
         while (!renderer->window().is_should_close()) {

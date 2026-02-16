@@ -14,6 +14,7 @@ class RTRConan(ConanFile):
     options = {
         "with_tests": [True, False],
         "with_examples": [True, False],
+        "with_editor": [True, False],
         "compile_shaders": [True, False],
         "slang_version": ["ANY"],
     }
@@ -21,6 +22,7 @@ class RTRConan(ConanFile):
     default_options = {
         "with_tests": True,
         "with_examples": True,
+        "with_editor": True,
         "compile_shaders": True,
         "slang_version": "2025.10.4",
         "embree/*:shared": True,
@@ -63,7 +65,8 @@ class RTRConan(ConanFile):
     def requirements(self):
         self.requires("glfw/3.4", transitive_headers=True)
         self.requires("tinygltf/[>=2.8 <3]")
-        self.requires("imgui/1.92.2b-docking", transitive_headers=True)
+        if self.options.with_editor:
+            self.requires("imgui/1.92.2b-docking", transitive_headers=True)
         self.requires("stb/cci.20240531", transitive_headers=True)
         self.requires("spdlog/[>=1.13 <2]", transitive_headers=True)
         self.requires("vulkan-loader/[>=1.3]", transitive_headers=True)
@@ -90,6 +93,7 @@ class RTRConan(ConanFile):
         tc.cache_variables["CMAKE_EXPORT_COMPILE_COMMANDS"] = True
         tc.cache_variables["RTR_BUILD_TESTS"] = "ON" if self.options.with_tests else "OFF"
         tc.cache_variables["RTR_BUILD_EXAMPLES"] = "ON" if self.options.with_examples else "OFF"
+        tc.cache_variables["RTR_BUILD_EDITOR"] = "ON" if self.options.with_editor else "OFF"
         tc.cache_variables["RTR_COMPILE_SHADERS"] = "ON" if self.options.compile_shaders else "OFF"
         tc.generate()
 
@@ -105,23 +109,25 @@ class RTRConan(ConanFile):
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "rtr")
 
-        imgui_vk_component = self.cpp_info.components["imgui_vk"]
-        imgui_vk_component.libs = ["imgui_vk"]
-        imgui_vk_component.requires = [
-            "imgui::imgui",
-            "glfw::glfw",
-            "vulkan-loader::vulkan-loader",
-        ]
+        if self.options.with_editor:
+            imgui_vk_component = self.cpp_info.components["imgui_vk"]
+            imgui_vk_component.libs = ["imgui_vk"]
+            imgui_vk_component.requires = [
+                "imgui::imgui",
+                "glfw::glfw",
+                "vulkan-loader::vulkan-loader",
+            ]
 
         stb_impl_component = self.cpp_info.components["stb_impl"]
         stb_impl_component.libs = ["stb_impl"]
         stb_impl_component.requires = ["stb::stb"]
 
-        core_component = self.cpp_info.components["rtr"]
-        core_component.set_property("cmake_target_name", "rtr::rtr")
-        core_component.requires = [
-            "imgui_vk",
+        runtime_component = self.cpp_info.components["runtime"]
+        runtime_component.set_property("cmake_target_name", "rtr::runtime")
+        runtime_component.requires = [
             "stb_impl",
+            "glfw::glfw",
+            "vulkan-loader::vulkan-loader",
             "spdlog::spdlog",
             "tinygltf::tinygltf",
             "slang::slang",
@@ -132,7 +138,15 @@ class RTRConan(ConanFile):
             "onetbb::onetbb",
             "stb::stb",
         ]
-        core_component.libs.extend([
+        runtime_component.libs.extend([
             "pbpt_rgb_spectrum_lut",
             "pbpt_stb_impl",
         ])
+
+        if self.options.with_editor:
+            editor_component = self.cpp_info.components["editor"]
+            editor_component.set_property("cmake_target_name", "rtr::editor")
+            editor_component.requires = [
+                "runtime",
+                "imgui_vk",
+            ]

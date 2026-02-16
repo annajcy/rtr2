@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <functional>
 
+#include "imgui.h"
+
 #include "rtr/framework/core/types.hpp"
 
 namespace rtr::editor {
@@ -30,7 +32,11 @@ struct EditorFrameData {
 
 struct EditorServices {
     std::function<void(framework::core::GameObjectId)> request_focus_game_object{};
+    std::function<ImTextureID()> get_scene_texture_id{};
+    std::function<ImVec2()> get_scene_texture_size{};
+    std::function<void(std::uint32_t, std::uint32_t)> set_scene_viewport_size{};
+    std::function<void(bool)> set_scene_hovered{};
+    std::function<void(bool)> set_scene_focused{};
 };
 
 } // namespace rtr::editor
-

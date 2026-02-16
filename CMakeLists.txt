@@ -34,9 +34,11 @@ include(CMakePackageConfigHelpers)
 
 set(RTR_DEFAULT_BUILD_TESTS ${PROJECT_IS_TOP_LEVEL})
 set(RTR_DEFAULT_BUILD_EXAMPLES ${PROJECT_IS_TOP_LEVEL})
+set(RTR_DEFAULT_BUILD_EDITOR ON)
 
 option(RTR_BUILD_TESTS "Build the project's tests" ${RTR_DEFAULT_BUILD_TESTS})
 option(RTR_BUILD_EXAMPLES "Build the project's examples" ${RTR_DEFAULT_BUILD_EXAMPLES})
+option(RTR_BUILD_EDITOR "Build editor module (ImGui integration)" ${RTR_DEFAULT_BUILD_EDITOR})
 option(RTR_COMPILE_SHADERS "Build the project's shaders" ON)
 
 set(PBPT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -48,9 +50,18 @@ include(third_party)
 add_subdirectory(src)
 
 set(RTR_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/rtr")
+set(RTR_CONFIG_BUILD_EDITOR ${RTR_BUILD_EDITOR})
+
+set(RTR_INSTALL_TARGETS rtr_runtime stb_impl)
+if (TARGET rtr_editor)
+  list(APPEND RTR_INSTALL_TARGETS rtr_editor)
+endif()
+if (TARGET imgui_vk)
+  list(APPEND RTR_INSTALL_TARGETS imgui_vk)
+endif()
 
 install(
-  TARGETS rtr imgui_vk stb_impl
+  TARGETS ${RTR_INSTALL_TARGETS}
   EXPORT rtrTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -120,4 +131,3 @@ if(RTR_BUILD_TESTS)
 else()
   message(STATUS "RTR_BUILD_TESTS is OFF; tests will NOT be built.")
 endif()
-

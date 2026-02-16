@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "rtr/system/render/frame_color_source.hpp"
 #include "rtr/system/render/pipeline.hpp"
 #include "rtr/system/render/render_pass.hpp"
 #include "rtr/rhi/buffer.hpp"
@@ -81,7 +82,11 @@ public:
             throw std::runtime_error("ShaderToyComputePass frame resources are not bound.");
         }
 
-        update_uniform_buffer(*m_render_pass_resources.uniform_buffer, ctx.render_extent());
+        const vk::Extent2D offscreen_extent{
+            m_render_pass_resources.offscreen_image->width(),
+            m_render_pass_resources.offscreen_image->height()
+        };
+        update_uniform_buffer(*m_render_pass_resources.uniform_buffer, offscreen_extent);
 
         auto& cmd = ctx.cmd().command_buffer();
         rhi::Image& offscreen = *m_render_pass_resources.offscreen_image;
@@ -127,7 +132,10 @@ public:
             {}
         );
 
-        const vk::Extent2D extent = ctx.render_extent();
+        const vk::Extent2D extent{
+            m_render_pass_resources.offscreen_image->width(),
+            m_render_pass_resources.offscreen_image->height()
+        };
         const uint32_t group_count_x = (extent.width + 7) / 8;
         const uint32_t group_count_y = (extent.height + 7) / 8;
         cmd.dispatch(group_count_x, group_count_y, 1);
@@ -313,7 +321,8 @@ public:
 };
 
 class ShaderToyPipeline final : public RenderPipelineBase,
-                                public IImGuiOverlayPipeline {
+                                public IFrameColorSource,
+                                public ISceneViewportSink {
 private:
     struct OffscreenFrameResources {
         std::unique_ptr<rhi::Image> image{};
@@ -339,11 +348,13 @@ private:
     std::vector<std::unique_ptr<rhi::Buffer>> m_uniform_buffers{};
     std::vector<OffscreenFrameResources> m_offscreen_frame_resources{};
     std::vector<std::unique_ptr<rhi::Image>> m_depth_images{};
+    vk::Extent2D m_scene_target_extent{};
+    vk::Extent2D m_requested_scene_extent{};
+    bool m_scene_extent_dirty{false};
     std::unique_ptr<rhi::Sampler> m_offscreen_sampler{nullptr};
 
     std::unique_ptr<ComputePass> m_compute_pass{nullptr};
     std::unique_ptr<PresentImagePass> m_present_pass{nullptr};
-    std::unique_ptr<ImGUIPass> m_imgui_pass{nullptr};
 
 public:
     ShaderToyPipeline(
@@ -429,82 +440,50 @@ public:
             &m_pipeline_layout,
             &m_present_pipeline
         );
-        m_imgui_pass = std::make_unique<ImGUIPass>(
-            m_device,
-            m_context,
-            m_window,
-            m_image_count,
-            m_color_format,
-            m_depth_format
-        );
     }
 
     ~ShaderToyPipeline() override = default;
 
-    ImGUIPass& imgui_pass() {
-        if (!m_imgui_pass) {
-            throw std::runtime_error("ShaderToyPipeline imgui pass is not initialized.");
-        }
-        return *m_imgui_pass;
-    }
+    void on_resize(int /*width*/, int /*height*/) override {}
 
-    const ImGUIPass& imgui_pass() const {
-        if (!m_imgui_pass) {
-            throw std::runtime_error("ShaderToyPipeline imgui pass is not initialized.");
-        }
-        return *m_imgui_pass;
-    }
-
-    void set_imgui_overlay(std::shared_ptr<IImGuiOverlay> overlay) override {
-        if (!m_imgui_pass) {
-            throw std::runtime_error("ShaderToyPipeline imgui pass is not initialized.");
-        }
-        m_imgui_pass->set_overlay(std::move(overlay));
-    }
-
-    void clear_imgui_overlay() override {
-        if (!m_imgui_pass) {
+    void set_scene_viewport_extent(vk::Extent2D extent) override {
+        if (extent.width == 0 || extent.height == 0) {
             return;
         }
-        m_imgui_pass->clear_overlay();
-    }
-
-    bool wants_imgui_capture_mouse() const override {
-        if (!m_imgui_pass) {
-            return false;
+        if (m_requested_scene_extent.width == extent.width &&
+            m_requested_scene_extent.height == extent.height) {
+            return;
         }
-        return m_imgui_pass->wants_capture_mouse();
+        m_requested_scene_extent = extent;
+        m_scene_extent_dirty = true;
     }
 
-    bool wants_imgui_capture_keyboard() const override {
-        if (!m_imgui_pass) {
-            return false;
+    FrameColorSourceView frame_color_source_view(uint32_t frame_index) const override {
+        if (frame_index >= m_offscreen_frame_resources.size() ||
+            m_offscreen_frame_resources[frame_index].image == nullptr) {
+            return {};
         }
-        return m_imgui_pass->wants_capture_keyboard();
+        const auto& frame = m_offscreen_frame_resources[frame_index];
+        return FrameColorSourceView{
+            .image_view = *frame.image->image_view(),
+            .image_layout = frame.layout,
+            .extent = vk::Extent2D{
+                frame.image->width(),
+                frame.image->height()
+            }
+        };
     }
-
-    void on_resize(int /*width*/, int /*height*/) override {}
 
     void handle_swapchain_state_change(
         const FrameScheduler::SwapchainState& /*state*/,
         const SwapchainChangeSummary& diff
     ) override {
-        if (!has_valid_extent()) {
-            return;
-        }
-
-        if (diff.extent_or_depth_changed() || m_offscreen_frame_resources.empty() || m_depth_images.empty()) {
-            create_offscreen_images();
-            create_depth_images();
-            refresh_descriptor_sets();
+        if (diff.extent_or_depth_changed()) {
+            m_scene_extent_dirty = true;
         }
 
         if (diff.color_or_depth_changed() || m_present_pipeline == nullptr) {
             create_present_graphics_pipeline();
-        }
-
-        if (m_imgui_pass) {
-            m_imgui_pass->on_swapchain_recreated(m_image_count, m_color_format, m_depth_format);
         }
     }
 
@@ -513,13 +492,16 @@ public:
         if (extent.width == 0 || extent.height == 0) {
             return;
         }
+
+        ensure_scene_targets(extent);
+
         const uint32_t frame_index = ctx.frame_index();
         if (frame_index >= m_uniform_buffers.size() ||
             frame_index >= m_offscreen_frame_resources.size() ||
             frame_index >= m_depth_images.size()) {
             throw std::runtime_error("ShaderToyPipeline frame resources are not ready.");
         }
-        if (!m_compute_pass || !m_present_pass || !m_imgui_pass) {
+        if (!m_compute_pass || !m_present_pass) {
             throw std::runtime_error("ShaderToyPipeline passes are not initialized.");
         }
 
@@ -540,14 +522,33 @@ public:
             .present_set = &m_present_sets[frame_index]
         });
         m_present_pass->execute(ctx);
-
-        m_imgui_pass->bind_render_pass_resources(ImGUIPass::RenderPassResources{
-            .depth_image = m_depth_images[frame_index].get()
-        });
-        m_imgui_pass->execute(ctx);
     }
 
 private:
+    void ensure_scene_targets(vk::Extent2D fallback_extent) {
+        vk::Extent2D desired_extent = fallback_extent;
+        if (m_requested_scene_extent.width > 0 && m_requested_scene_extent.height > 0) {
+            desired_extent = m_requested_scene_extent;
+        }
+
+        const bool need_recreate =
+            m_scene_extent_dirty ||
+            m_scene_target_extent.width != desired_extent.width ||
+            m_scene_target_extent.height != desired_extent.height ||
+            m_offscreen_frame_resources.empty() ||
+            m_depth_images.empty();
+        if (!need_recreate) {
+            return;
+        }
+
+        m_device->wait_idle();
+        m_scene_target_extent = desired_extent;
+        create_offscreen_images();
+        create_depth_images();
+        refresh_descriptor_sets();
+        m_scene_extent_dirty = false;
+    }
+
     vk::Format pick_offscreen_format() const {
         auto supports_storage_and_sampled = [this](vk::Format format) {
             const auto props = m_device->physical_device().getFormatProperties(format);
@@ -679,8 +680,8 @@ private:
             resources.image = std::make_unique<rhi::Image>(
                 rhi::Image(
                     m_device,
-                    m_swapchain_extent.width,
-                    m_swapchain_extent.height,
+                    m_scene_target_extent.width,
+                    m_scene_target_extent.height,
                     m_offscreen_format,
                     vk::ImageTiling::eOptimal,
                     usage,
@@ -695,7 +696,7 @@ private:
     }
 
     void create_depth_images() {
-        m_depth_images = make_per_frame_depth_images(m_swapchain_extent, m_depth_format);
+        m_depth_images = make_per_frame_depth_images(m_scene_target_extent, m_depth_format);
     }
 
     void refresh_descriptor_sets() {
