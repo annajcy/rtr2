@@ -4,7 +4,6 @@ include(CMakeFindDependencyMacro)
 
 find_dependency(VulkanLoader CONFIG REQUIRED)
 find_dependency(glfw3 CONFIG REQUIRED)
-find_dependency(imgui CONFIG REQUIRED)
 find_dependency(TinyGLTF CONFIG REQUIRED)
 find_dependency(stb CONFIG REQUIRED)
 find_dependency(spdlog CONFIG REQUIRED)
@@ -12,5 +11,9 @@ find_dependency(slang CONFIG REQUIRED)
 find_dependency(tinyobjloader CONFIG REQUIRED)
 find_dependency(pugixml CONFIG REQUIRED)
 find_dependency(pbpt CONFIG REQUIRED)
+
+if("@RTR_CONFIG_BUILD_EDITOR@" STREQUAL "ON")
+  find_dependency(imgui CONFIG REQUIRED)
+endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/rtrTargets.cmake")

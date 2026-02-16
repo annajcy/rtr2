@@ -117,6 +117,34 @@ TEST(EditorHostTest, RejectsDuplicatePanelId) {
     );
 }
 
+TEST(EditorHostTest, CanTogglePanelVisibilityById) {
+    EditorHost host;
+    std::vector<std::string> log{};
+    host.register_panel(std::make_unique<ProbePanel>("inspector", 0, &log, true));
+
+    ASSERT_TRUE(host.panel_visible("inspector").has_value());
+    EXPECT_TRUE(host.panel_visible("inspector").value());
+
+    EXPECT_TRUE(host.set_panel_visible("inspector", false));
+    ASSERT_TRUE(host.panel_visible("inspector").has_value());
+    EXPECT_FALSE(host.panel_visible("inspector").value());
+
+    EXPECT_TRUE(host.set_panel_visible("inspector", true));
+    ASSERT_TRUE(host.panel_visible("inspector").has_value());
+    EXPECT_TRUE(host.panel_visible("inspector").value());
+}
+
+TEST(EditorHostTest, ReturnsMissingForUnknownPanelVisibility) {
+    EditorHost host;
+    std::vector<std::string> log{};
+    host.register_panel(std::make_unique<ProbePanel>("known", 0, &log, true));
+
+    EXPECT_FALSE(host.panel_visible("missing").has_value());
+    EXPECT_FALSE(host.set_panel_visible("missing", true));
+
+    host.reset_layout();
+}
+
 } // namespace rtr::editor::test
 
 int main(int argc, char** argv) {

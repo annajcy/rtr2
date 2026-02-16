@@ -16,6 +16,7 @@
 #include "rtr/editor/hierarchy_panel.hpp"
 #include "rtr/editor/inspector_panel.hpp"
 #include "rtr/editor/logger_panel.hpp"
+#include "rtr/editor/scene_view_panel.hpp"
 #include "rtr/editor/stats_panel.hpp"
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/engine.hpp"
@@ -328,19 +329,17 @@ int main() {
             kMaxFramesInFlight
         );
 
-        auto pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
+        auto runtime_pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
             renderer->build_pipeline_runtime(),
             rtr::system::render::ForwardPipelineConfig{}
         );
-        auto* forward_pipeline = pipeline.get();
+        auto* forward_pipeline = runtime_pipeline.get();
         forward_pipeline->set_resource_manager(&resource_manager);
 
         auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
 
         rtr::framework::integration::PbptImportOptions import_options{};
         import_options.free_look_input_state = &input_system->state();
-
-        renderer->set_pipeline(std::move(pipeline));
 
         rtr::framework::core::Engine engine(rtr::framework::core::EngineConfig{
             .window_width = scene_width,
@@ -383,6 +382,7 @@ int main() {
             renderer.get(),
             input_system.get()
         );
+        editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
@@ -399,8 +399,13 @@ int main() {
             (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputExrPath).string(),
             (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputSceneXmlFilename).string()
         ));
-        rtr::editor::attach_editor_host(*forward_pipeline, editor_host);
-        rtr::editor::bind_input_capture_to_pipeline(*input_system, *forward_pipeline);
+        auto editor_pipeline = rtr::editor::create_editor_pipeline(
+            renderer->build_pipeline_runtime(),
+            std::move(runtime_pipeline),
+            editor_host
+        );
+        rtr::editor::bind_input_capture_to_editor(*input_system, *editor_pipeline);
+        renderer->set_pipeline(std::move(editor_pipeline));
 
         engine.set_loop_hooks(rtr::framework::core::Engine::LoopHooks{
             .input_begin = [&]() { input_system->begin_frame(); },

@@ -51,7 +51,7 @@ rtr_add_test(
 rtr_add_test(
     test_log_system
     utils/log_system_test.cpp
-    rtr
+    rtr::runtime
 )
 
 # system
@@ -64,22 +64,22 @@ rtr_add_test(
 rtr_add_test(
     test_framework_forward_scene_view_builder
     system/render/framework_forward_scene_view_builder_test.cpp
-    rtr
+    rtr::runtime
 )
 rtr_add_test(
     test_pipeline_base
     system/render/pipeline_base_test.cpp
-    rtr
+    rtr::runtime
 )
 rtr_add_integration_test(
     test_frame_scheduler_integration
     system/render/frame_scheduler_integration_test.cpp
-    rtr
+    rtr::runtime
 )
 rtr_add_integration_test(
     test_renderer_integration
     system/render/renderer_integration_test.cpp
-    rtr
+    rtr::runtime
 )
 
 # framework/core
@@ -131,62 +131,64 @@ rtr_add_test(
 )
 
 # editor
-rtr_add_test(
-    test_editor_host
-    editor/editor_host_test.cpp
-    rtr
-)
-rtr_add_test(
-    test_editor_selection
-    editor/editor_selection_test.cpp
-    rtr
-)
-rtr_add_test(
-    test_editor_pipeline_bridge
-    editor/editor_pipeline_bridge_test.cpp
-    rtr
-    glfw
-    Vulkan::Loader
-)
-rtr_add_test(
-    test_logger_panel
-    editor/logger_panel_test.cpp
-    rtr
-)
+if (TARGET rtr_editor)
+    rtr_add_test(
+        test_editor_host
+        editor/editor_host_test.cpp
+        rtr::editor
+    )
+    rtr_add_test(
+        test_editor_selection
+        editor/editor_selection_test.cpp
+        rtr::editor
+    )
+    rtr_add_test(
+        test_editor_pipeline_bridge
+        editor/editor_pipeline_bridge_test.cpp
+        rtr::editor
+        glfw
+        Vulkan::Loader
+    )
+    rtr_add_test(
+        test_logger_panel
+        editor/logger_panel_test.cpp
+        rtr::editor
+    )
+endif()
 
 # framework/integration
 rtr_add_test(
     test_framework_pbpt_scene_export_builder
     framework/integration/framework_pbpt_scene_export_builder_test.cpp
-    rtr
+    rtr::runtime
 )
 rtr_add_test(
     test_framework_pbpt_scene_importer
     framework/integration/framework_pbpt_scene_importer_test.cpp
-    rtr
+    rtr::runtime
 )
 
 # rhi
 rtr_add_test(
     test_image_transition
     rhi/image_transition_test.cpp
-    rtr
+    rtr::runtime
 )
 
 rtr_add_test(
     test_framework_pbpt_offline_render_service
     framework/integration/framework_pbpt_offline_render_service_test.cpp
-    rtr
+    rtr::runtime
 )
 
 # resource
 rtr_add_test(
     test_resource_manager_lifecycle
     resource/resource_manager_lifecycle_test.cpp
-    rtr
+    rtr::runtime
 )
 rtr_add_test(
     test_resource_manager_generic_kinds
     resource/resource_manager_generic_kinds_test.cpp
-    rtr
+    rtr::runtime
 )
