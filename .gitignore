@@ -65,4 +65,4 @@ merged_sources.txt
 vkt.cpp
 
 .VSCodeCounter/
-*.log
+output/logs/
