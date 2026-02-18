@@ -1,0 +1,16 @@
+PROJECT_NAME           = "rtr2"
+PROJECT_BRIEF          = "Real-time 3D rendering engine"
+OUTPUT_DIRECTORY       = "docs/api/doxygen"
+CREATE_SUBDIRS         = YES
+
+INPUT                  = "src/rtr"
+RECURSIVE              = YES
+FILE_PATTERNS          = *.hpp *.h *.cpp
+EXCLUDE_PATTERNS       = */build/* */external/* */test/*
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+GENERATE_LATEX         = NO
+
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = NO
