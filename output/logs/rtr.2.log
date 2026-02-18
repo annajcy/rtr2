@@ -1,329 +1,139 @@
-[2026-02-16 21:30:07.982] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
-[2026-02-16 21:30:07.982] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
-[2026-02-16 21:30:07.982] [info] [framework.integration.pbpt.offline_service] PbptOfflineRenderService initialized.
-[2026-02-16 21:30:08.223] [info] [rhi.context] Vulkan instance created (app='RTR Framework Offline CBox', validation_layers=true)
-[2026-02-16 21:30:08.226] [info] [rhi.context] Vulkan surface created.
-[2026-02-16 21:30:08.226] [info] [rhi.context] Vulkan debug messenger created.
-[2026-02-16 21:30:08.228] [info] [rhi.device] Physical device selected: 'Apple M1 Pro' (queue_family_index=0)
-[2026-02-16 21:30:08.237] [info] [rhi.device] Logical device created.
-[2026-02-16 21:30:08.238] [info] [rhi.device] Graphics queue created.
-[2026-02-16 21:30:08.238] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(1024,1024)
-[2026-02-16 21:30:08.239] [info] [rhi.swapchain] Swapchain created with 3 images.
-[2026-02-16 21:30:08.241] [info] [render.frame_scheduler] FrameScheduler initialized (max_frames_in_flight=2, image_count=3)
-[2026-02-16 21:30:08.260] [info] [framework.core.world] ResourceManager bound to World (bound=true).
-[2026-02-16 21:30:08.260] [info] [framework.core.world] Scene created (scene_id=1, name='cbox_scene', scene_count=1, active_scene_id=1)
-[2026-02-16 21:30:08.260] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from './assets/pbpt_scene/cbox/cbox.xml'.
-[2026-02-16 21:30:08.262] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='pbpt_camera', count=1)
-[2026-02-16 21:30:08.262] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
-[2026-02-16 21:30:08.262] [info] [framework.core.camera_manager] Active camera owner changed to 1.
-[2026-02-16 21:30:08.262] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
-[2026-02-16 21:30:08.262] [debug] [framework.core.game_object] Component added (game_object_id=1, name='pbpt_camera', component_type='N3rtr9framework9component24FreeLookCameraControllerE', component_count=1)
-[2026-02-16 21:30:08.262] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='cbox_luminaire', count=2)
-[2026-02-16 21:30:08.262] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_luminaire.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_luminaire.obj'
-[2026-02-16 21:30:08.263] [debug] [resource.manager] Resource created (handle=1)
-[2026-02-16 21:30:08.263] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-16 21:30:08.263] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-16 21:30:08.263] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component9PbptLightE', component_count=3)
-[2026-02-16 21:30:08.263] [debug] [framework.component.pbpt_light] PbptLight radiance_spectrum updated.
-[2026-02-16 21:30:08.263] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=3, name='cbox_floor', count=3)
-[2026-02-16 21:30:08.263] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_floor.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_floor.obj'
-[2026-02-16 21:30:08.263] [debug] [resource.manager] Resource created (handle=2)
-[2026-02-16 21:30:08.263] [debug] [framework.core.game_object] Component added (game_object_id=3, name='cbox_floor', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-16 21:30:08.263] [debug] [framework.core.game_object] Component added (game_object_id=3, name='cbox_floor', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-16 21:30:08.263] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=4, name='cbox_ceiling', count=4)
-[2026-02-16 21:30:08.263] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_ceiling.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_ceiling.obj'
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Resource created (handle=3)
-[2026-02-16 21:30:08.264] [debug] [framework.core.game_object] Component added (game_object_id=4, name='cbox_ceiling', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-16 21:30:08.264] [debug] [framework.core.game_object] Component added (game_object_id=4, name='cbox_ceiling', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-16 21:30:08.264] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=5, name='cbox_back', count=5)
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_back.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_back.obj'
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Resource created (handle=4)
-[2026-02-16 21:30:08.264] [debug] [framework.core.game_object] Component added (game_object_id=5, name='cbox_back', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-16 21:30:08.264] [debug] [framework.core.game_object] Component added (game_object_id=5, name='cbox_back', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-16 21:30:08.264] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=6, name='cbox_greenwall', count=6)
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_greenwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_greenwall.obj'
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Resource created (handle=5)
-[2026-02-16 21:30:08.264] [debug] [framework.core.game_object] Component added (game_object_id=6, name='cbox_greenwall', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-16 21:30:08.264] [debug] [framework.core.game_object] Component added (game_object_id=6, name='cbox_greenwall', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-16 21:30:08.264] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=7, name='cbox_redwall', count=7)
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_redwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_redwall.obj'
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Resource created (handle=6)
-[2026-02-16 21:30:08.264] [debug] [framework.core.game_object] Component added (game_object_id=7, name='cbox_redwall', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-16 21:30:08.264] [debug] [framework.core.game_object] Component added (game_object_id=7, name='cbox_redwall', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-16 21:30:08.264] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=8, name='cbox_smallbox', count=8)
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_smallbox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_smallbox.obj'
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Resource created (handle=7)
-[2026-02-16 21:30:08.264] [debug] [framework.core.game_object] Component added (game_object_id=8, name='cbox_smallbox', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-16 21:30:08.264] [debug] [framework.core.game_object] Component added (game_object_id=8, name='cbox_smallbox', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-16 21:30:08.264] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=9, name='cbox_largebox', count=9)
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_largebox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_largebox.obj'
-[2026-02-16 21:30:08.264] [debug] [resource.manager] Resource created (handle=8)
-[2026-02-16 21:30:08.265] [debug] [framework.core.game_object] Component added (game_object_id=9, name='cbox_largebox', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
-[2026-02-16 21:30:08.265] [debug] [framework.core.game_object] Component added (game_object_id=9, name='cbox_largebox', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
-[2026-02-16 21:30:08.265] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=8, lights=1, camera_imported=true).
-[2026-02-16 21:30:08.265] [debug] [editor.context] Runtime dependency bound (world=true, resources=true, renderer=true, input=true).
-[2026-02-16 21:30:08.265] [info] [editor.host] Editor runtime bound (world=true, resources=true, renderer=true, input=true).
-[2026-02-16 21:30:08.265] [debug] [editor.host] Panel registered (id='scene_view', order=5, visible=true, panel_count=1).
-[2026-02-16 21:30:08.265] [debug] [editor.host] Panel registered (id='hierarchy', order=100, visible=true, panel_count=2).
-[2026-02-16 21:30:08.265] [debug] [editor.host] Panel registered (id='inspector', order=200, visible=true, panel_count=3).
-[2026-02-16 21:30:08.265] [debug] [editor.host] Panel registered (id='stats', order=300, visible=true, panel_count=4).
-[2026-02-16 21:30:08.265] [debug] [editor.host] Panel registered (id='logger', order=350, visible=true, panel_count=5).
-[2026-02-16 21:30:08.265] [debug] [editor.host] Panel registered (id='offline_render', order=250, visible=true, panel_count=6).
-[2026-02-16 21:30:08.265] [info] [editor.attach] Editor overlay pipeline created.
-[2026-02-16 21:30:08.270] [debug] [editor.attach] Input capture hook bound to editor overlay pipeline.
-[2026-02-16 21:30:08.270] [info] [framework.core.engine] Engine run started (paused=false, fixed_dt=0.016666666666666666, max_fixed_steps_per_frame=4, max_frame_delta=0.1)
-[2026-02-16 21:30:08.365] [debug] [resource.manager] Handle=1 triggering first GPU upload.
-[2026-02-16 21:30:08.365] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
-[2026-02-16 21:30:08.365] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
-[2026-02-16 21:30:08.367] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
-[2026-02-16 21:30:08.367] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
-[2026-02-16 21:30:08.368] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
-[2026-02-16 21:30:08.368] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-16 21:30:08.368] [debug] [resource.manager] Handle=2 triggering first GPU upload.
-[2026-02-16 21:30:08.368] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
-[2026-02-16 21:30:08.368] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
-[2026-02-16 21:30:08.368] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
-[2026-02-16 21:30:08.368] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
-[2026-02-16 21:30:08.369] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
-[2026-02-16 21:30:08.369] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-16 21:30:08.369] [debug] [resource.manager] Handle=3 triggering first GPU upload.
-[2026-02-16 21:30:08.369] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=8, indices=12, vertex_bytes=256, index_bytes=48)
-[2026-02-16 21:30:08.369] [debug] [rhi.mesh] GPU buffer copy start (bytes=256)
-[2026-02-16 21:30:08.369] [debug] [rhi.mesh] GPU buffer copy finished (bytes=256)
-[2026-02-16 21:30:08.369] [debug] [rhi.mesh] GPU buffer copy start (bytes=48)
-[2026-02-16 21:30:08.369] [debug] [rhi.mesh] GPU buffer copy finished (bytes=48)
-[2026-02-16 21:30:08.369] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-16 21:30:08.369] [debug] [resource.manager] Handle=4 triggering first GPU upload.
-[2026-02-16 21:30:08.369] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
-[2026-02-16 21:30:08.369] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
-[2026-02-16 21:30:08.370] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
-[2026-02-16 21:30:08.370] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
-[2026-02-16 21:30:08.370] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
-[2026-02-16 21:30:08.370] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-16 21:30:08.370] [debug] [resource.manager] Handle=5 triggering first GPU upload.
-[2026-02-16 21:30:08.370] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
-[2026-02-16 21:30:08.370] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
-[2026-02-16 21:30:08.370] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-16 21:30:08.371] [debug] [resource.manager] Handle=6 triggering first GPU upload.
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-16 21:30:08.371] [debug] [resource.manager] Handle=7 triggering first GPU upload.
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=24, indices=36, vertex_bytes=768, index_bytes=144)
-[2026-02-16 21:30:08.371] [debug] [rhi.mesh] GPU buffer copy start (bytes=768)
-[2026-02-16 21:30:08.372] [debug] [rhi.mesh] GPU buffer copy finished (bytes=768)
-[2026-02-16 21:30:08.372] [debug] [rhi.mesh] GPU buffer copy start (bytes=144)
-[2026-02-16 21:30:08.372] [debug] [rhi.mesh] GPU buffer copy finished (bytes=144)
-[2026-02-16 21:30:08.372] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-16 21:30:08.372] [debug] [resource.manager] Handle=8 triggering first GPU upload.
-[2026-02-16 21:30:08.372] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=24, indices=36, vertex_bytes=768, index_bytes=144)
-[2026-02-16 21:30:08.372] [debug] [rhi.mesh] GPU buffer copy start (bytes=768)
-[2026-02-16 21:30:08.372] [debug] [rhi.mesh] GPU buffer copy finished (bytes=768)
-[2026-02-16 21:30:08.372] [debug] [rhi.mesh] GPU buffer copy start (bytes=144)
-[2026-02-16 21:30:08.373] [debug] [rhi.mesh] GPU buffer copy finished (bytes=144)
-[2026-02-16 21:30:08.373] [debug] [rhi.mesh] Mesh GPU upload completed.
-[2026-02-16 21:30:09.698] [info] [render.frame_scheduler] Window resized to (3024, 1898), scheduling swapchain recreation.
-[2026-02-16 21:30:09.711] [warning] [render.frame_scheduler] Swapchain suboptimal during presentation; scheduling recreation.
-[2026-02-16 21:30:09.711] [info] [render.frame_scheduler] Recreating swapchain resources after present/resize event.
-[2026-02-16 21:30:09.712] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(3024,1898)
-[2026-02-16 21:30:09.712] [info] [rhi.swapchain] Swapchain created with 3 images.
-[2026-02-16 21:30:09.712] [info] [render.frame_scheduler] Swapchain resources recreated (generation 1 -> 2).
-[2026-02-16 21:30:21.943] [info] [render.frame_scheduler] Window resized to (1024, 1024), scheduling swapchain recreation.
-[2026-02-16 21:30:21.951] [warning] [render.frame_scheduler] Swapchain suboptimal during presentation; scheduling recreation.
-[2026-02-16 21:30:21.951] [info] [render.frame_scheduler] Recreating swapchain resources after present/resize event.
-[2026-02-16 21:30:21.952] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(1024,1024)
-[2026-02-16 21:30:21.953] [info] [rhi.swapchain] Swapchain created with 3 images.
-[2026-02-16 21:30:21.953] [info] [render.frame_scheduler] Swapchain resources recreated (generation 2 -> 3).
-[2026-02-16 21:30:24.664] [info] [render.frame_scheduler] Window resized to (1046, 1046), scheduling swapchain recreation.
-[2026-02-16 21:30:24.670] [info] [render.frame_scheduler] Window resized to (1062, 1060), scheduling swapchain recreation.
-[2026-02-16 21:30:24.678] [info] [render.frame_scheduler] Window resized to (1086, 1074), scheduling swapchain recreation.
-[2026-02-16 21:30:24.687] [info] [render.frame_scheduler] Window resized to (1106, 1086), scheduling swapchain recreation.
-[2026-02-16 21:30:24.695] [info] [render.frame_scheduler] Window resized to (1162, 1122), scheduling swapchain recreation.
-[2026-02-16 21:30:24.712] [info] [render.frame_scheduler] Window resized to (1224, 1156), scheduling swapchain recreation.
-[2026-02-16 21:30:24.732] [info] [render.frame_scheduler] Window resized to (1280, 1188), scheduling swapchain recreation.
-[2026-02-16 21:30:24.745] [info] [render.frame_scheduler] Window resized to (1310, 1204), scheduling swapchain recreation.
-[2026-02-16 21:30:24.753] [info] [render.frame_scheduler] Window resized to (1534, 1328), scheduling swapchain recreation.
-[2026-02-16 21:30:24.761] [info] [render.frame_scheduler] Window resized to (1598, 1360), scheduling swapchain recreation.
-[2026-02-16 21:30:24.770] [info] [render.frame_scheduler] Window resized to (1646, 1382), scheduling swapchain recreation.
-[2026-02-16 21:30:24.778] [info] [render.frame_scheduler] Window resized to (1722, 1418), scheduling swapchain recreation.
-[2026-02-16 21:30:24.786] [info] [render.frame_scheduler] Window resized to (1742, 1426), scheduling swapchain recreation.
-[2026-02-16 21:30:24.795] [info] [render.frame_scheduler] Window resized to (1772, 1436), scheduling swapchain recreation.
-[2026-02-16 21:30:24.803] [info] [render.frame_scheduler] Window resized to (1792, 1444), scheduling swapchain recreation.
-[2026-02-16 21:30:24.815] [info] [render.frame_scheduler] Window resized to (1810, 1450), scheduling swapchain recreation.
-[2026-02-16 21:30:24.820] [info] [render.frame_scheduler] Window resized to (1826, 1456), scheduling swapchain recreation.
-[2026-02-16 21:30:24.828] [info] [render.frame_scheduler] Window resized to (1832, 1458), scheduling swapchain recreation.
-[2026-02-16 21:30:24.837] [info] [render.frame_scheduler] Window resized to (1840, 1462), scheduling swapchain recreation.
-[2026-02-16 21:30:24.845] [info] [render.frame_scheduler] Window resized to (1856, 1466), scheduling swapchain recreation.
-[2026-02-16 21:30:24.853] [info] [render.frame_scheduler] Window resized to (1862, 1468), scheduling swapchain recreation.
-[2026-02-16 21:30:24.861] [info] [render.frame_scheduler] Window resized to (1868, 1472), scheduling swapchain recreation.
-[2026-02-16 21:30:24.870] [info] [render.frame_scheduler] Window resized to (1874, 1476), scheduling swapchain recreation.
-[2026-02-16 21:30:24.878] [info] [render.frame_scheduler] Window resized to (1886, 1480), scheduling swapchain recreation.
-[2026-02-16 21:30:24.886] [info] [render.frame_scheduler] Window resized to (1898, 1488), scheduling swapchain recreation.
-[2026-02-16 21:30:24.895] [info] [render.frame_scheduler] Window resized to (1908, 1490), scheduling swapchain recreation.
-[2026-02-16 21:30:24.903] [info] [render.frame_scheduler] Window resized to (1914, 1494), scheduling swapchain recreation.
-[2026-02-16 21:30:24.911] [info] [render.frame_scheduler] Window resized to (1922, 1496), scheduling swapchain recreation.
-[2026-02-16 21:30:24.920] [info] [render.frame_scheduler] Window resized to (1934, 1500), scheduling swapchain recreation.
-[2026-02-16 21:30:24.928] [info] [render.frame_scheduler] Window resized to (1940, 1502), scheduling swapchain recreation.
-[2026-02-16 21:30:24.936] [info] [render.frame_scheduler] Window resized to (1944, 1504), scheduling swapchain recreation.
-[2026-02-16 21:30:24.953] [info] [render.frame_scheduler] Window resized to (1946, 1504), scheduling swapchain recreation.
-[2026-02-16 21:30:25.017] [info] [render.frame_scheduler] Window resized to (1944, 1504), scheduling swapchain recreation.
-[2026-02-16 21:30:25.040] [warning] [render.frame_scheduler] Swapchain suboptimal during presentation; scheduling recreation.
-[2026-02-16 21:30:25.040] [info] [render.frame_scheduler] Recreating swapchain resources after present/resize event.
-[2026-02-16 21:30:25.041] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(1944,1504)
-[2026-02-16 21:30:25.041] [info] [rhi.swapchain] Swapchain created with 3 images.
-[2026-02-16 21:30:25.041] [info] [render.frame_scheduler] Swapchain resources recreated (generation 3 -> 4).
-[2026-02-16 21:30:27.373] [info] [render.frame_scheduler] Window resized to (1960, 1508), scheduling swapchain recreation.
-[2026-02-16 21:30:27.378] [info] [render.frame_scheduler] Window resized to (1974, 1512), scheduling swapchain recreation.
-[2026-02-16 21:30:27.387] [info] [render.frame_scheduler] Window resized to (1986, 1514), scheduling swapchain recreation.
-[2026-02-16 21:30:27.395] [info] [render.frame_scheduler] Window resized to (2000, 1518), scheduling swapchain recreation.
-[2026-02-16 21:30:27.403] [info] [render.frame_scheduler] Window resized to (2028, 1524), scheduling swapchain recreation.
-[2026-02-16 21:30:27.412] [info] [render.frame_scheduler] Window resized to (2078, 1538), scheduling swapchain recreation.
-[2026-02-16 21:30:27.420] [info] [render.frame_scheduler] Window resized to (2104, 1544), scheduling swapchain recreation.
-[2026-02-16 21:30:27.428] [info] [render.frame_scheduler] Window resized to (2118, 1548), scheduling swapchain recreation.
-[2026-02-16 21:30:27.436] [info] [render.frame_scheduler] Window resized to (2148, 1556), scheduling swapchain recreation.
-[2026-02-16 21:30:27.445] [info] [render.frame_scheduler] Window resized to (2176, 1564), scheduling swapchain recreation.
-[2026-02-16 21:30:27.453] [info] [render.frame_scheduler] Window resized to (2206, 1572), scheduling swapchain recreation.
-[2026-02-16 21:30:27.461] [info] [render.frame_scheduler] Window resized to (2234, 1580), scheduling swapchain recreation.
-[2026-02-16 21:30:27.470] [info] [render.frame_scheduler] Window resized to (2246, 1582), scheduling swapchain recreation.
-[2026-02-16 21:30:27.478] [info] [render.frame_scheduler] Window resized to (2298, 1596), scheduling swapchain recreation.
-[2026-02-16 21:30:27.486] [info] [render.frame_scheduler] Window resized to (2324, 1604), scheduling swapchain recreation.
-[2026-02-16 21:30:27.494] [info] [render.frame_scheduler] Window resized to (2338, 1606), scheduling swapchain recreation.
-[2026-02-16 21:30:27.503] [info] [render.frame_scheduler] Window resized to (2362, 1614), scheduling swapchain recreation.
-[2026-02-16 21:30:27.511] [info] [render.frame_scheduler] Window resized to (2388, 1620), scheduling swapchain recreation.
-[2026-02-16 21:30:27.520] [info] [render.frame_scheduler] Window resized to (2398, 1622), scheduling swapchain recreation.
-[2026-02-16 21:30:27.528] [info] [render.frame_scheduler] Window resized to (2418, 1626), scheduling swapchain recreation.
-[2026-02-16 21:30:27.536] [info] [render.frame_scheduler] Window resized to (2432, 1630), scheduling swapchain recreation.
-[2026-02-16 21:30:27.544] [info] [render.frame_scheduler] Window resized to (2444, 1630), scheduling swapchain recreation.
-[2026-02-16 21:30:27.553] [info] [render.frame_scheduler] Window resized to (2466, 1636), scheduling swapchain recreation.
-[2026-02-16 21:30:27.561] [info] [render.frame_scheduler] Window resized to (2470, 1636), scheduling swapchain recreation.
-[2026-02-16 21:30:27.570] [info] [render.frame_scheduler] Window resized to (2476, 1638), scheduling swapchain recreation.
-[2026-02-16 21:30:27.578] [info] [render.frame_scheduler] Window resized to (2480, 1638), scheduling swapchain recreation.
-[2026-02-16 21:30:27.586] [info] [render.frame_scheduler] Window resized to (2484, 1638), scheduling swapchain recreation.
-[2026-02-16 21:30:27.603] [info] [render.frame_scheduler] Window resized to (2490, 1638), scheduling swapchain recreation.
-[2026-02-16 21:30:27.620] [info] [render.frame_scheduler] Window resized to (2494, 1638), scheduling swapchain recreation.
-[2026-02-16 21:30:27.628] [info] [render.frame_scheduler] Window resized to (2496, 1638), scheduling swapchain recreation.
-[2026-02-16 21:30:27.636] [info] [render.frame_scheduler] Window resized to (2500, 1638), scheduling swapchain recreation.
-[2026-02-16 21:30:27.645] [info] [render.frame_scheduler] Window resized to (2506, 1638), scheduling swapchain recreation.
-[2026-02-16 21:30:27.653] [info] [render.frame_scheduler] Window resized to (2512, 1640), scheduling swapchain recreation.
-[2026-02-16 21:30:27.662] [info] [render.frame_scheduler] Window resized to (2514, 1640), scheduling swapchain recreation.
-[2026-02-16 21:30:27.670] [info] [render.frame_scheduler] Window resized to (2522, 1642), scheduling swapchain recreation.
-[2026-02-16 21:30:27.678] [info] [render.frame_scheduler] Window resized to (2524, 1642), scheduling swapchain recreation.
-[2026-02-16 21:30:27.687] [info] [render.frame_scheduler] Window resized to (2534, 1644), scheduling swapchain recreation.
-[2026-02-16 21:30:27.695] [info] [render.frame_scheduler] Window resized to (2538, 1644), scheduling swapchain recreation.
-[2026-02-16 21:30:27.703] [info] [render.frame_scheduler] Window resized to (2540, 1644), scheduling swapchain recreation.
-[2026-02-16 21:30:27.712] [info] [render.frame_scheduler] Window resized to (2556, 1648), scheduling swapchain recreation.
-[2026-02-16 21:30:27.720] [info] [render.frame_scheduler] Window resized to (2568, 1652), scheduling swapchain recreation.
-[2026-02-16 21:30:27.728] [info] [render.frame_scheduler] Window resized to (2572, 1652), scheduling swapchain recreation.
-[2026-02-16 21:30:27.737] [info] [render.frame_scheduler] Window resized to (2574, 1652), scheduling swapchain recreation.
-[2026-02-16 21:30:27.745] [info] [render.frame_scheduler] Window resized to (2578, 1654), scheduling swapchain recreation.
-[2026-02-16 21:30:27.753] [info] [render.frame_scheduler] Window resized to (2584, 1654), scheduling swapchain recreation.
-[2026-02-16 21:30:27.762] [info] [render.frame_scheduler] Window resized to (2586, 1656), scheduling swapchain recreation.
-[2026-02-16 21:30:27.787] [info] [render.frame_scheduler] Window resized to (2592, 1656), scheduling swapchain recreation.
-[2026-02-16 21:30:27.795] [info] [render.frame_scheduler] Window resized to (2596, 1658), scheduling swapchain recreation.
-[2026-02-16 21:30:27.812] [info] [render.frame_scheduler] Window resized to (2598, 1658), scheduling swapchain recreation.
-[2026-02-16 21:30:27.916] [warning] [render.frame_scheduler] Swapchain suboptimal during presentation; scheduling recreation.
-[2026-02-16 21:30:27.916] [info] [render.frame_scheduler] Recreating swapchain resources after present/resize event.
-[2026-02-16 21:30:27.918] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(2598,1658)
-[2026-02-16 21:30:27.918] [info] [rhi.swapchain] Swapchain created with 3 images.
-[2026-02-16 21:30:27.918] [info] [render.frame_scheduler] Swapchain resources recreated (generation 4 -> 5).
-[2026-02-16 21:30:30.021] [info] [render.frame_scheduler] Window resized to (2630, 1656), scheduling swapchain recreation.
-[2026-02-16 21:30:30.028] [info] [render.frame_scheduler] Window resized to (2646, 1656), scheduling swapchain recreation.
-[2026-02-16 21:30:30.037] [info] [render.frame_scheduler] Window resized to (2690, 1660), scheduling swapchain recreation.
-[2026-02-16 21:30:30.055] [info] [render.frame_scheduler] Window resized to (2738, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.061] [info] [render.frame_scheduler] Window resized to (2752, 1668), scheduling swapchain recreation.
-[2026-02-16 21:30:30.070] [info] [render.frame_scheduler] Window resized to (2780, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.078] [info] [render.frame_scheduler] Window resized to (2798, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.087] [info] [render.frame_scheduler] Window resized to (2824, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.095] [info] [render.frame_scheduler] Window resized to (2840, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.103] [info] [render.frame_scheduler] Window resized to (2868, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.113] [info] [render.frame_scheduler] Window resized to (2880, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.120] [info] [render.frame_scheduler] Window resized to (2890, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.128] [info] [render.frame_scheduler] Window resized to (2896, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.136] [info] [render.frame_scheduler] Window resized to (2900, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.145] [info] [render.frame_scheduler] Window resized to (2904, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.153] [info] [render.frame_scheduler] Window resized to (2908, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.334] [info] [render.frame_scheduler] Window resized to (2910, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.345] [info] [render.frame_scheduler] Window resized to (2912, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.378] [info] [render.frame_scheduler] Window resized to (2914, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.489] [info] [render.frame_scheduler] Window resized to (2912, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.503] [info] [render.frame_scheduler] Window resized to (2908, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.512] [info] [render.frame_scheduler] Window resized to (2906, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.520] [info] [render.frame_scheduler] Window resized to (2896, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.528] [info] [render.frame_scheduler] Window resized to (2894, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.536] [info] [render.frame_scheduler] Window resized to (2888, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.545] [info] [render.frame_scheduler] Window resized to (2874, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.553] [info] [render.frame_scheduler] Window resized to (2870, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.562] [info] [render.frame_scheduler] Window resized to (2862, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.570] [info] [render.frame_scheduler] Window resized to (2852, 1670), scheduling swapchain recreation.
-[2026-02-16 21:30:30.578] [info] [render.frame_scheduler] Window resized to (2844, 1668), scheduling swapchain recreation.
-[2026-02-16 21:30:30.587] [info] [render.frame_scheduler] Window resized to (2834, 1666), scheduling swapchain recreation.
-[2026-02-16 21:30:30.595] [info] [render.frame_scheduler] Window resized to (2828, 1666), scheduling swapchain recreation.
-[2026-02-16 21:30:30.603] [info] [render.frame_scheduler] Window resized to (2822, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.613] [info] [render.frame_scheduler] Window resized to (2818, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.807] [info] [render.frame_scheduler] Window resized to (2822, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.812] [info] [render.frame_scheduler] Window resized to (2824, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.821] [info] [render.frame_scheduler] Window resized to (2828, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.828] [info] [render.frame_scheduler] Window resized to (2832, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.846] [info] [render.frame_scheduler] Window resized to (2838, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.856] [info] [render.frame_scheduler] Window resized to (2840, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.857] [info] [render.frame_scheduler] Window resized to (2844, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.874] [info] [render.frame_scheduler] Window resized to (2846, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:30.882] [info] [render.frame_scheduler] Window resized to (2848, 1666), scheduling swapchain recreation.
-[2026-02-16 21:30:31.194] [info] [render.frame_scheduler] Window resized to (2848, 1664), scheduling swapchain recreation.
-[2026-02-16 21:30:31.207] [info] [render.frame_scheduler] Window resized to (2848, 1662), scheduling swapchain recreation.
-[2026-02-16 21:30:31.225] [info] [render.frame_scheduler] Window resized to (2850, 1660), scheduling swapchain recreation.
-[2026-02-16 21:30:31.245] [info] [render.frame_scheduler] Window resized to (2850, 1658), scheduling swapchain recreation.
-[2026-02-16 21:30:31.286] [info] [render.frame_scheduler] Window resized to (2850, 1656), scheduling swapchain recreation.
-[2026-02-16 21:30:31.347] [info] [render.frame_scheduler] Window resized to (2850, 1654), scheduling swapchain recreation.
-[2026-02-16 21:30:31.361] [info] [render.frame_scheduler] Window resized to (2850, 1652), scheduling swapchain recreation.
-[2026-02-16 21:30:31.378] [info] [render.frame_scheduler] Window resized to (2850, 1650), scheduling swapchain recreation.
-[2026-02-16 21:30:31.395] [info] [render.frame_scheduler] Window resized to (2850, 1646), scheduling swapchain recreation.
-[2026-02-16 21:30:31.403] [info] [render.frame_scheduler] Window resized to (2848, 1642), scheduling swapchain recreation.
-[2026-02-16 21:30:31.411] [info] [render.frame_scheduler] Window resized to (2848, 1640), scheduling swapchain recreation.
-[2026-02-16 21:30:31.420] [info] [render.frame_scheduler] Window resized to (2846, 1636), scheduling swapchain recreation.
-[2026-02-16 21:30:31.428] [info] [render.frame_scheduler] Window resized to (2846, 1634), scheduling swapchain recreation.
-[2026-02-16 21:30:31.436] [info] [render.frame_scheduler] Window resized to (2846, 1632), scheduling swapchain recreation.
-[2026-02-16 21:30:31.444] [info] [render.frame_scheduler] Window resized to (2846, 1630), scheduling swapchain recreation.
-[2026-02-16 21:30:31.461] [info] [render.frame_scheduler] Window resized to (2846, 1628), scheduling swapchain recreation.
-[2026-02-16 21:30:31.477] [info] [render.frame_scheduler] Window resized to (2846, 1626), scheduling swapchain recreation.
-[2026-02-16 21:30:31.503] [info] [render.frame_scheduler] Window resized to (2846, 1622), scheduling swapchain recreation.
-[2026-02-16 21:30:31.511] [info] [render.frame_scheduler] Window resized to (2846, 1620), scheduling swapchain recreation.
-[2026-02-16 21:30:31.520] [info] [render.frame_scheduler] Window resized to (2848, 1616), scheduling swapchain recreation.
-[2026-02-16 21:30:31.536] [info] [render.frame_scheduler] Window resized to (2850, 1610), scheduling swapchain recreation.
-[2026-02-16 21:30:31.545] [info] [render.frame_scheduler] Window resized to (2852, 1604), scheduling swapchain recreation.
-[2026-02-16 21:30:31.553] [info] [render.frame_scheduler] Window resized to (2852, 1602), scheduling swapchain recreation.
-[2026-02-16 21:30:31.561] [info] [render.frame_scheduler] Window resized to (2854, 1592), scheduling swapchain recreation.
-[2026-02-16 21:30:31.570] [info] [render.frame_scheduler] Window resized to (2856, 1590), scheduling swapchain recreation.
-[2026-02-16 21:30:31.578] [info] [render.frame_scheduler] Window resized to (2858, 1586), scheduling swapchain recreation.
-[2026-02-16 21:30:31.586] [info] [render.frame_scheduler] Window resized to (2858, 1584), scheduling swapchain recreation.
-[2026-02-16 21:30:31.595] [info] [render.frame_scheduler] Window resized to (2860, 1578), scheduling swapchain recreation.
-[2026-02-16 21:30:31.603] [info] [render.frame_scheduler] Window resized to (2860, 1576), scheduling swapchain recreation.
-[2026-02-16 21:30:31.611] [info] [render.frame_scheduler] Window resized to (2860, 1574), scheduling swapchain recreation.
-[2026-02-16 21:30:31.628] [info] [render.frame_scheduler] Window resized to (2862, 1572), scheduling swapchain recreation.
-[2026-02-16 21:30:31.636] [info] [render.frame_scheduler] Window resized to (2862, 1570), scheduling swapchain recreation.
-[2026-02-16 21:30:31.661] [info] [render.frame_scheduler] Window resized to (2862, 1568), scheduling swapchain recreation.
-[2026-02-16 21:30:31.678] [info] [render.frame_scheduler] Window resized to (2864, 1566), scheduling swapchain recreation.
-[2026-02-16 21:30:31.695] [info] [render.frame_scheduler] Window resized to (2866, 1562), scheduling swapchain recreation.
-[2026-02-16 21:30:31.703] [info] [render.frame_scheduler] Window resized to (2868, 1560), scheduling swapchain recreation.
-[2026-02-16 21:30:31.711] [info] [render.frame_scheduler] Window resized to (2870, 1556), scheduling swapchain recreation.
-[2026-02-16 21:30:31.728] [info] [render.frame_scheduler] Window resized to (2870, 1554), scheduling swapchain recreation.
-[2026-02-16 21:30:31.737] [info] [render.frame_scheduler] Window resized to (2872, 1552), scheduling swapchain recreation.
-[2026-02-16 21:30:31.745] [info] [render.frame_scheduler] Window resized to (2872, 1550), scheduling swapchain recreation.
-[2026-02-16 21:30:31.754] [info] [render.frame_scheduler] Window resized to (2874, 1546), scheduling swapchain recreation.
-[2026-02-16 21:30:31.762] [info] [render.frame_scheduler] Window resized to (2876, 1540), scheduling swapchain recreation.
-[2026-02-16 21:30:31.770] [info] [render.frame_scheduler] Window resized to (2878, 1540), scheduling swapchain recreation.
-[2026-02-16 21:30:31.787] [info] [render.frame_scheduler] Window resized to (2878, 1538), scheduling swapchain recreation.
-[2026-02-16 21:30:31.868] [warning] [render.frame_scheduler] Swapchain suboptimal during presentation; scheduling recreation.
-[2026-02-16 21:30:31.868] [info] [render.frame_scheduler] Recreating swapchain resources after present/resize event.
-[2026-02-16 21:30:31.873] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(2878,1538)
-[2026-02-16 21:30:31.873] [info] [rhi.swapchain] Swapchain created with 3 images.
-[2026-02-16 21:30:31.873] [info] [render.frame_scheduler] Swapchain resources recreated (generation 5 -> 6).
-[2026-02-16 21:30:42.431] [info] [framework.core.engine] Engine run finished (frames=3586, fixed_ticks=1767, stop_requested=false, should_close=true)
-[2026-02-16 21:30:42.433] [info] [resource.manager] Flushing GPU caches after wait_idle (live_resources=8, retired_resources=0)
-[2026-02-16 21:30:42.452] [info] [framework.integration.pbpt.offline_service] Offline render cancel requested while not running.
+[2026-02-16 21:43:22.121] [info] [core] Logging initialized (console=true, file=true, path='./output/logs/rtr.log', level=debug)
+[2026-02-16 21:43:22.121] [info] [resource.manager] ResourceManager initialized (frames_in_flight=2, root='./assets/')
+[2026-02-16 21:43:22.122] [info] [framework.integration.pbpt.offline_service] PbptOfflineRenderService initialized.
+[2026-02-16 21:43:22.381] [info] [rhi.context] Vulkan instance created (app='RTR Framework Offline CBox', validation_layers=true)
+[2026-02-16 21:43:22.385] [info] [rhi.context] Vulkan surface created.
+[2026-02-16 21:43:22.385] [info] [rhi.context] Vulkan debug messenger created.
+[2026-02-16 21:43:22.387] [info] [rhi.device] Physical device selected: 'Apple M1 Pro' (queue_family_index=0)
+[2026-02-16 21:43:22.395] [info] [rhi.device] Logical device created.
+[2026-02-16 21:43:22.395] [info] [rhi.device] Graphics queue created.
+[2026-02-16 21:43:22.395] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(1024,1024)
+[2026-02-16 21:43:22.396] [info] [rhi.swapchain] Swapchain created with 3 images.
+[2026-02-16 21:43:22.398] [info] [render.frame_scheduler] FrameScheduler initialized (max_frames_in_flight=2, image_count=3)
+[2026-02-16 21:43:22.417] [info] [framework.core.world] ResourceManager bound to World (bound=true).
+[2026-02-16 21:43:22.417] [info] [framework.core.world] Scene created (scene_id=1, name='cbox_scene', scene_count=1, active_scene_id=1)
+[2026-02-16 21:43:22.417] [info] [framework.integration.pbpt.import] Importing PBPT scene XML from './assets/pbpt_scene/cbox/cbox.xml'.
+[2026-02-16 21:43:22.419] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=1, name='pbpt_camera', count=1)
+[2026-02-16 21:43:22.419] [info] [framework.core.camera_manager] Camera created (owner_id=1, camera_count=1, active_owner_id=1)
+[2026-02-16 21:43:22.419] [info] [framework.core.camera_manager] Active camera owner changed to 1.
+[2026-02-16 21:43:22.419] [info] [framework.core.scene] Scene 1 active camera set to owner 1.
+[2026-02-16 21:43:22.419] [debug] [framework.core.game_object] Component added (game_object_id=1, name='pbpt_camera', component_type='N3rtr9framework9component24FreeLookCameraControllerE', component_count=1)
+[2026-02-16 21:43:22.419] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=2, name='cbox_luminaire', count=2)
+[2026-02-16 21:43:22.419] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_luminaire.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_luminaire.obj'
+[2026-02-16 21:43:22.419] [debug] [resource.manager] Resource created (handle=1)
+[2026-02-16 21:43:22.419] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 21:43:22.419] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-16 21:43:22.419] [debug] [framework.core.game_object] Component added (game_object_id=2, name='cbox_luminaire', component_type='N3rtr9framework9component9PbptLightE', component_count=3)
+[2026-02-16 21:43:22.419] [debug] [framework.component.pbpt_light] PbptLight radiance_spectrum updated.
+[2026-02-16 21:43:22.419] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=3, name='cbox_floor', count=3)
+[2026-02-16 21:43:22.419] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_floor.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_floor.obj'
+[2026-02-16 21:43:22.420] [debug] [resource.manager] Resource created (handle=2)
+[2026-02-16 21:43:22.420] [debug] [framework.core.game_object] Component added (game_object_id=3, name='cbox_floor', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 21:43:22.420] [debug] [framework.core.game_object] Component added (game_object_id=3, name='cbox_floor', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-16 21:43:22.420] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=4, name='cbox_ceiling', count=4)
+[2026-02-16 21:43:22.420] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_ceiling.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_ceiling.obj'
+[2026-02-16 21:43:22.420] [debug] [resource.manager] Resource created (handle=3)
+[2026-02-16 21:43:22.420] [debug] [framework.core.game_object] Component added (game_object_id=4, name='cbox_ceiling', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 21:43:22.420] [debug] [framework.core.game_object] Component added (game_object_id=4, name='cbox_ceiling', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-16 21:43:22.420] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=5, name='cbox_back', count=5)
+[2026-02-16 21:43:22.420] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_back.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_back.obj'
+[2026-02-16 21:43:22.420] [debug] [resource.manager] Resource created (handle=4)
+[2026-02-16 21:43:22.421] [debug] [framework.core.game_object] Component added (game_object_id=5, name='cbox_back', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 21:43:22.421] [debug] [framework.core.game_object] Component added (game_object_id=5, name='cbox_back', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-16 21:43:22.421] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=6, name='cbox_greenwall', count=6)
+[2026-02-16 21:43:22.421] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_greenwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_greenwall.obj'
+[2026-02-16 21:43:22.421] [debug] [resource.manager] Resource created (handle=5)
+[2026-02-16 21:43:22.421] [debug] [framework.core.game_object] Component added (game_object_id=6, name='cbox_greenwall', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 21:43:22.421] [debug] [framework.core.game_object] Component added (game_object_id=6, name='cbox_greenwall', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-16 21:43:22.421] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=7, name='cbox_redwall', count=7)
+[2026-02-16 21:43:22.421] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_redwall.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_redwall.obj'
+[2026-02-16 21:43:22.421] [debug] [resource.manager] Resource created (handle=6)
+[2026-02-16 21:43:22.421] [debug] [framework.core.game_object] Component added (game_object_id=7, name='cbox_redwall', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 21:43:22.421] [debug] [framework.core.game_object] Component added (game_object_id=7, name='cbox_redwall', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-16 21:43:22.421] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=8, name='cbox_smallbox', count=8)
+[2026-02-16 21:43:22.421] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_smallbox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_smallbox.obj'
+[2026-02-16 21:43:22.421] [debug] [resource.manager] Resource created (handle=7)
+[2026-02-16 21:43:22.421] [debug] [framework.core.game_object] Component added (game_object_id=8, name='cbox_smallbox', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 21:43:22.421] [debug] [framework.core.game_object] Component added (game_object_id=8, name='cbox_smallbox', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-16 21:43:22.421] [debug] [framework.core.scene] GameObject created (scene_id=1, game_object_id=9, name='cbox_largebox', count=9)
+[2026-02-16 21:43:22.421] [debug] [resource.manager] Loading resource from relative path 'pbpt_scene/cbox/meshes/cbox_largebox.obj' -> 'assets/pbpt_scene/cbox/meshes/cbox_largebox.obj'
+[2026-02-16 21:43:22.421] [debug] [resource.manager] Resource created (handle=8)
+[2026-02-16 21:43:22.421] [debug] [framework.core.game_object] Component added (game_object_id=9, name='cbox_largebox', component_type='N3rtr9framework9component12MeshRendererE', component_count=1)
+[2026-02-16 21:43:22.421] [debug] [framework.core.game_object] Component added (game_object_id=9, name='cbox_largebox', component_type='N3rtr9framework9component8PbptMeshE', component_count=2)
+[2026-02-16 21:43:22.421] [info] [framework.integration.pbpt.import] PBPT XML import completed (shapes=8, lights=1, camera_imported=true).
+[2026-02-16 21:43:22.421] [debug] [editor.context] Runtime dependency bound (world=true, resources=true, renderer=true, input=true).
+[2026-02-16 21:43:22.421] [info] [editor.host] Editor runtime bound (world=true, resources=true, renderer=true, input=true).
+[2026-02-16 21:43:22.422] [debug] [editor.host] Panel registered (id='scene_view', order=5, visible=true, panel_count=1).
+[2026-02-16 21:43:22.422] [debug] [editor.host] Panel registered (id='hierarchy', order=100, visible=true, panel_count=2).
+[2026-02-16 21:43:22.422] [debug] [editor.host] Panel registered (id='inspector', order=200, visible=true, panel_count=3).
+[2026-02-16 21:43:22.422] [debug] [editor.host] Panel registered (id='stats', order=300, visible=true, panel_count=4).
+[2026-02-16 21:43:22.422] [debug] [editor.host] Panel registered (id='logger', order=350, visible=true, panel_count=5).
+[2026-02-16 21:43:22.422] [debug] [editor.host] Panel registered (id='offline_render', order=250, visible=true, panel_count=6).
+[2026-02-16 21:43:22.422] [info] [editor.attach] Editor overlay pipeline created.
+[2026-02-16 21:43:22.426] [debug] [editor.attach] Input capture hook bound to editor overlay pipeline.
+[2026-02-16 21:43:22.426] [info] [framework.core.engine] Engine run started (paused=false, fixed_dt=0.016666666666666666, max_fixed_steps_per_frame=4, max_frame_delta=0.1)
+[2026-02-16 21:43:22.522] [debug] [resource.manager] Handle=1 triggering first GPU upload.
+[2026-02-16 21:43:22.522] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
+[2026-02-16 21:43:22.522] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
+[2026-02-16 21:43:22.524] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
+[2026-02-16 21:43:22.524] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
+[2026-02-16 21:43:22.525] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
+[2026-02-16 21:43:22.525] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 21:43:22.525] [debug] [resource.manager] Handle=2 triggering first GPU upload.
+[2026-02-16 21:43:22.525] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
+[2026-02-16 21:43:22.525] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
+[2026-02-16 21:43:22.525] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
+[2026-02-16 21:43:22.525] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
+[2026-02-16 21:43:22.526] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
+[2026-02-16 21:43:22.526] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 21:43:22.526] [debug] [resource.manager] Handle=3 triggering first GPU upload.
+[2026-02-16 21:43:22.526] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=8, indices=12, vertex_bytes=256, index_bytes=48)
+[2026-02-16 21:43:22.526] [debug] [rhi.mesh] GPU buffer copy start (bytes=256)
+[2026-02-16 21:43:22.526] [debug] [rhi.mesh] GPU buffer copy finished (bytes=256)
+[2026-02-16 21:43:22.526] [debug] [rhi.mesh] GPU buffer copy start (bytes=48)
+[2026-02-16 21:43:22.526] [debug] [rhi.mesh] GPU buffer copy finished (bytes=48)
+[2026-02-16 21:43:22.527] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 21:43:22.527] [debug] [resource.manager] Handle=4 triggering first GPU upload.
+[2026-02-16 21:43:22.527] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
+[2026-02-16 21:43:22.527] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
+[2026-02-16 21:43:22.527] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
+[2026-02-16 21:43:22.527] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
+[2026-02-16 21:43:22.527] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
+[2026-02-16 21:43:22.527] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 21:43:22.527] [debug] [resource.manager] Handle=5 triggering first GPU upload.
+[2026-02-16 21:43:22.527] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
+[2026-02-16 21:43:22.527] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
+[2026-02-16 21:43:22.528] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
+[2026-02-16 21:43:22.528] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
+[2026-02-16 21:43:22.528] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
+[2026-02-16 21:43:22.528] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 21:43:22.528] [debug] [resource.manager] Handle=6 triggering first GPU upload.
+[2026-02-16 21:43:22.528] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=4, indices=6, vertex_bytes=128, index_bytes=24)
+[2026-02-16 21:43:22.528] [debug] [rhi.mesh] GPU buffer copy start (bytes=128)
+[2026-02-16 21:43:22.528] [debug] [rhi.mesh] GPU buffer copy finished (bytes=128)
+[2026-02-16 21:43:22.529] [debug] [rhi.mesh] GPU buffer copy start (bytes=24)
+[2026-02-16 21:43:22.529] [debug] [rhi.mesh] GPU buffer copy finished (bytes=24)
+[2026-02-16 21:43:22.529] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 21:43:22.529] [debug] [resource.manager] Handle=7 triggering first GPU upload.
+[2026-02-16 21:43:22.529] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=24, indices=36, vertex_bytes=768, index_bytes=144)
+[2026-02-16 21:43:22.529] [debug] [rhi.mesh] GPU buffer copy start (bytes=768)
+[2026-02-16 21:43:22.529] [debug] [rhi.mesh] GPU buffer copy finished (bytes=768)
+[2026-02-16 21:43:22.529] [debug] [rhi.mesh] GPU buffer copy start (bytes=144)
+[2026-02-16 21:43:22.530] [debug] [rhi.mesh] GPU buffer copy finished (bytes=144)
+[2026-02-16 21:43:22.530] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 21:43:22.530] [debug] [resource.manager] Handle=8 triggering first GPU upload.
+[2026-02-16 21:43:22.530] [debug] [rhi.mesh] Uploading mesh to GPU (vertices=24, indices=36, vertex_bytes=768, index_bytes=144)
+[2026-02-16 21:43:22.530] [debug] [rhi.mesh] GPU buffer copy start (bytes=768)
+[2026-02-16 21:43:22.530] [debug] [rhi.mesh] GPU buffer copy finished (bytes=768)
+[2026-02-16 21:43:22.530] [debug] [rhi.mesh] GPU buffer copy start (bytes=144)
+[2026-02-16 21:43:22.530] [debug] [rhi.mesh] GPU buffer copy finished (bytes=144)
+[2026-02-16 21:43:22.530] [debug] [rhi.mesh] Mesh GPU upload completed.
+[2026-02-16 21:43:26.264] [info] [render.frame_scheduler] Window resized to (3024, 1898), scheduling swapchain recreation.
+[2026-02-16 21:43:26.275] [warning] [render.frame_scheduler] Swapchain suboptimal during presentation; scheduling recreation.
+[2026-02-16 21:43:26.275] [info] [render.frame_scheduler] Recreating swapchain resources after present/resize event.
+[2026-02-16 21:43:26.277] [info] [rhi.swapchain] Creating swapchain: image_count=3, extent=(3024,1898)
+[2026-02-16 21:43:26.277] [info] [rhi.swapchain] Swapchain created with 3 images.
+[2026-02-16 21:43:26.277] [info] [render.frame_scheduler] Swapchain resources recreated (generation 1 -> 2).
+[2026-02-16 21:43:59.650] [info] [framework.core.engine] Engine run finished (frames=4192, fixed_ticks=2175, stop_requested=false, should_close=true)
+[2026-02-16 21:43:59.652] [info] [resource.manager] Flushing GPU caches after wait_idle (live_resources=8, retired_resources=0)
+[2026-02-16 21:43:59.687] [info] [framework.integration.pbpt.offline_service] Offline render cancel requested while not running.

@@ -1,9 +1,7 @@
 #pragma once
 
 #include <pbpt/math/math.h>
-
 #include <stdexcept>
-
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
