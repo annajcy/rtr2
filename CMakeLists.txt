@@ -22,6 +22,10 @@ endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(MSVC)
+  add_compile_options(/bigobj)
+endif()
+
 # Suppress duplicate library warnings on macOS
 if(APPLE)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-no_warn_duplicate_libraries")
