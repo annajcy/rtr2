@@ -44,23 +44,6 @@ constexpr const char* kOutputSceneXmlFilename =
 
 constexpr std::size_t kPathBufferSize = 1024;
 
-const char* to_state_label(rtr::framework::integration::OfflineRenderState state) {
-    using rtr::framework::integration::OfflineRenderState;
-    switch (state) {
-        case OfflineRenderState::Idle:
-            return "Idle";
-        case OfflineRenderState::Running:
-            return "Running";
-        case OfflineRenderState::Succeeded:
-            return "Succeeded";
-        case OfflineRenderState::Failed:
-            return "Failed";
-        case OfflineRenderState::Canceled:
-            return "Canceled";
-    }
-    return "Unknown";
-}
-
 void set_path_buffer(std::array<char, kPathBufferSize>& buffer, const std::string& value) {
     std::fill(buffer.begin(), buffer.end(), '\0');
     if (value.empty()) {
@@ -69,13 +52,6 @@ void set_path_buffer(std::array<char, kPathBufferSize>& buffer, const std::strin
     std::strncpy(buffer.data(), value.c_str(), buffer.size() - 1);
 }
 
-bool is_render_start_allowed(rtr::framework::integration::OfflineRenderState state) {
-    using rtr::framework::integration::OfflineRenderState;
-    return state == OfflineRenderState::Idle ||
-        state == OfflineRenderState::Succeeded ||
-        state == OfflineRenderState::Failed ||
-        state == OfflineRenderState::Canceled;
-}
 
 struct ExportResolutionInfo {
     int window_w{0};
@@ -399,6 +375,8 @@ int main() {
             (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputExrPath).string(),
             (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputSceneXmlFilename).string()
         ));
+
+        
         auto editor_pipeline = rtr::editor::create_editor_pipeline(
             renderer->build_pipeline_runtime(),
             std::move(runtime_pipeline),
