@@ -26,6 +26,7 @@ class RTRConan(ConanFile):
         "compile_shaders": True,
         "slang_version": "2025.10.4",
         "embree/*:shared": True,
+        "hwloc/*:shared": True,
     }
 
     generators = "CMakeDeps", "VirtualBuildEnv", "VirtualRunEnv"
