@@ -1,11 +1,42 @@
 site_name: RTR2
 site_description: Real-time 3D rendering engine with Vulkan and Slang
-repo_url: https://github.com/your-org/rtr2
+repo_url: https://github.com/annajcy/rtr2
+edit_uri: edit/main/docs/
 
 theme:
-  name: readthedocs
+  name: material
+  icon:
+    logo: material/cube-outline
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+repo_name: annajcy/rtr2
+
+plugins:
+  - i18n:
+      reconfigure_material: true
+      languages:
+        - locale: en
+          name: English
+          default: true
+          build: true
+        - locale: zh
+          name: 中文
+          build: true
 
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Architecture: architecture.md 
+  - Utils: utils.md
   - API: api/index.md
