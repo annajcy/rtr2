@@ -1,13 +1,13 @@
-# Getting Started
+# 快速上手
 
-## Prerequisites
+## 前置依赖
 
 - CMake 3.27+
 - Conan 2+
 - Ninja
-- Python with `uv`
+- Python（需安装 `uv`）
 
-## Build (Debug)
+## 构建（Debug 模式）
 
 ```bash
 uv sync
@@ -18,20 +18,20 @@ cmake --preset conan-debug
 cmake --build --preset conan-debug
 ```
 
-## Run unit tests
+## 运行单元测试
 
 ```bash
 ctest --test-dir build/Debug -C Debug -LE integration
 ```
 
-## Run GPU integration tests
+## 运行 GPU 集成测试
 
 ```bash
 RTR_RUN_GPU_TESTS=1 ctest --test-dir build/Debug -C Debug -L integration
 ```
 
-## Build Documentation
+## 构建文档
 
 ```bash
 uv run mkdocs build
-``` 
+```
