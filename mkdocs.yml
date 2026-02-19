@@ -30,9 +30,11 @@ plugins:
           name: English
           default: true
           build: true
+          link: !ENV [RTR2_DOCS_EN_LINK, "/"]
         - locale: zh
           name: 中文
           build: true
+          link: !ENV [RTR2_DOCS_ZH_LINK, "/zh/"]
 
 nav:
   - Home: index.md
