@@ -14,9 +14,6 @@ build:
     - graphviz
   jobs:
     pre_build:
-      - export RTR2_DOCS_EN_LINK="/${READTHEDOCS_LANGUAGE}/${READTHEDOCS_VERSION}/"
-      - export RTR2_DOCS_ZH_LINK="/${READTHEDOCS_LANGUAGE}/${READTHEDOCS_VERSION}/zh/"
-
       - mkdir -p docs/api/doxygen
       - doxygen Doxyfile
 
