@@ -14,7 +14,7 @@
 
 #include "pbpt/integrator/integrator.hpp"
 #include "pbpt/integrator/plugin/integrator/path_integrator.hpp"
-#include "pbpt/loader/scene_loader.hpp"
+#include "pbpt/serde/scene_loader.hpp"
 
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_scene_export_builder.hpp"
@@ -108,14 +108,15 @@ public:
             m_backend = [](const OfflineRenderConfig& config,
                         const ProgressCallback& on_progress,
                         const CancelQuery& is_cancel_requested) {
-                auto pbpt_scene = pbpt::loader::load_scene<float>(config.scene_xml_path);
+                auto pbpt_scene_result = pbpt::serde::load_scene<float>(config.scene_xml_path);
+                auto& pbpt_scene = pbpt_scene_result.scene;
                 pbpt::integrator::PathIntegrator<float, 4> integrator(-1, 0.9f);
 
                 pbpt::integrator::RenderObserver observer{};
                 observer.on_progress = on_progress;
                 observer.is_cancel_requested = is_cancel_requested;
                 try {
-                    integrator.render(pbpt_scene, config.spp, config.output_exr_path, false, observer);
+                    integrator.render(pbpt_scene, config.output_exr_path, false, observer, config.spp);
                 } catch (const pbpt::integrator::RenderCanceled& e) {
                     throw RenderCanceled(e.what());
                 }
