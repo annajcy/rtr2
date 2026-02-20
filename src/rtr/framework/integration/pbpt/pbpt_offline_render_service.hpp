@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -17,6 +18,7 @@
 #include "pbpt/serde/scene_loader.hpp"
 
 #include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/integration/pbpt/pbpt_compatible_info.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_scene_export_builder.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/utils/log.hpp"
@@ -68,6 +70,7 @@ struct OfflineRenderConfig {
     // Optional override. <= 0 means using exporter defaults.
     int film_width{0};
     int film_height{0};
+    const PbptCompatibleInfo* compatible_info{nullptr};
 };
 
 class PbptOfflineRenderService {
@@ -198,33 +201,25 @@ public:
                 throw std::runtime_error("Offline render requires an active camera.");
             }
 
-            auto record = build_pbpt_scene_record(scene, resources);
-            if (!record.sensor.has_value()) {
-                throw std::runtime_error("Failed to export PBPT sensor from current active camera.");
-            }
-            if (record.shapes.empty()) {
+            auto pbpt_result = build_pbpt_xml_result_from_scene(
+                scene,
+                resources,
+                config.compatible_info,
+                config.film_width,
+                config.film_height,
+                config.spp
+            );
+            if (pbpt_result.scene.resources.shape_instances.empty()) {
                 throw std::runtime_error("Current scene has no exportable PBPT shapes.");
             }
             const bool has_emitter = std::any_of(
-                record.shapes.begin(),
-                record.shapes.end(),
-                [](const auto& shape) { return shape.has_area_emitter; }
+                pbpt_result.scene.resources.shape_instances.begin(),
+                pbpt_result.scene.resources.shape_instances.end(),
+                [](const auto& shape) { return shape.emission_spectrum_name.has_value(); }
             );
             if (!has_emitter) {
                 throw std::runtime_error("Current scene has no PBPT area emitter; output would be black.");
             }
-            if (record.sensor.has_value()) {
-                record.sensor->sample_count = config.spp;
-                if (config.film_width > 0 && config.film_height > 0) {
-                    record.sensor->film_width = config.film_width;
-                    record.sensor->film_height = config.film_height;
-                }
-            }
-            const std::string scene_xml = serialize_pbpt_scene_xml(
-                record,
-                resources,
-                config.scene_xml_path
-            );
 
             std::filesystem::path scene_xml_path(config.scene_xml_path);
             if (scene_xml_path.has_parent_path()) {
@@ -235,18 +230,7 @@ public:
                 std::filesystem::create_directories(output_exr_path.parent_path());
             }
 
-            std::ofstream out(scene_xml_path);
-            if (!out) {
-                log->error("Failed to open scene XML path for writing: '{}'.", config.scene_xml_path);
-                throw std::runtime_error(
-                    "Failed to open scene XML path for writing: " + config.scene_xml_path
-                );
-            }
-            out << scene_xml;
-            if (!out.good()) {
-                log->error("Failed to write scene XML to '{}'.", config.scene_xml_path);
-                throw std::runtime_error("Failed to write scene XML to: " + config.scene_xml_path);
-            }
+            write_pbpt_xml_result_to_path(pbpt_result, config.scene_xml_path);
         } catch (const std::exception& e) {
             m_state.store(OfflineRenderState::Failed);
             set_message(e.what());

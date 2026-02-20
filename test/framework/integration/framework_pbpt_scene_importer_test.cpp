@@ -582,6 +582,75 @@ TEST(FrameworkPbptSceneImporterTest, ThrowsWhenMeshFilenameIsAbsolutePath) {
     );
 }
 
+TEST(FrameworkPbptSceneImporterTest, ImportWithCompatibleInfoMapsSubsetAndPreservesUnmappedShapes) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_compatible_test");
+    const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
+    const auto mesh2_path = temp_dir.path / "meshes" / "tri_unmapped.obj";
+    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+    write_text_file(mesh2_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+
+    const auto xml_path = temp_dir.path / "scene.xml";
+    write_text_file(
+        xml_path,
+        R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <integrator type="path">
+    <integer name="maxDepth" value="-1"/>
+  </integrator>
+  <sensor type="perspective">
+    <float name="fov" value="45"/>
+    <film type="hdrfilm">
+      <integer name="width" value="64"/>
+      <integer name="height" value="64"/>
+    </film>
+  </sensor>
+  <bsdf type="diffuse" id="mat_diffuse">
+    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
+  </bsdf>
+  <bsdf type="conductor" id="mat_conductor">
+    <float name="eta" value="1.5"/>
+    <float name="k" value="1.0"/>
+  </bsdf>
+  <shape type="obj" id="mapped_light">
+    <string name="filename" value="meshes/tri.obj"/>
+    <ref id="mat_diffuse"/>
+    <emitter type="area">
+      <spectrum name="radiance" value="400:0, 500:8, 600:15.6, 700:18.4"/>
+    </emitter>
+  </shape>
+  <shape type="obj" id="unmapped_conductor">
+    <string name="filename" value="meshes/tri_unmapped.obj"/>
+    <ref id="mat_conductor"/>
+  </shape>
+</scene>)XML"
+    );
+
+    core::Scene scene(1, "scene");
+    resource::ResourceManager resources(2, temp_dir.path);
+    const auto package = import_pbpt_scene_xml_to_scene_with_compatible(
+        xml_path.string(),
+        scene,
+        resources
+    );
+
+    EXPECT_EQ(package.result.imported_shape_count, 1u);
+    EXPECT_EQ(package.result.imported_light_shape_count, 1u);
+    EXPECT_TRUE(package.compatible_info.passthrough_shape_ids.contains("unmapped_conductor"));
+    ASSERT_EQ(package.compatible_info.mapped_shape_info_by_game_object.size(), 1u);
+
+    const auto mapped_pair = *package.compatible_info.mapped_shape_info_by_game_object.begin();
+    EXPECT_EQ(mapped_pair.second.source_shape_id, "mapped_light");
+
+    const auto* mapped_go = scene.find_game_object(mapped_pair.first);
+    ASSERT_NE(mapped_go, nullptr);
+    const auto* pbpt_light = mapped_go->get_component<component::PbptLight>();
+    ASSERT_NE(pbpt_light, nullptr);
+    const auto& radiance = pbpt_light->area_emitter().radiance_spectrum;
+    ASSERT_EQ(radiance.size(), 4u);
+    EXPECT_FLOAT_EQ(radiance[1].lambda_nm, 500.0f);
+    EXPECT_FLOAT_EQ(radiance[1].value, 8.0f);
+}
+
 } // namespace rtr::framework::integration::test
 
 int main(int argc, char** argv) {
