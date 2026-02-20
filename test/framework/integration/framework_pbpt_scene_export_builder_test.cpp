@@ -346,6 +346,187 @@ TEST(FrameworkPbptSceneExportBuilderTest, SerializerThrowsWhenShapeMeshHandleIsI
     );
 }
 
+TEST(FrameworkPbptSceneExportBuilderTest, BuildXmlResultUsesPbptLightSpectrumAndKeepsPassthroughShapes) {
+    core::Scene scene(1, "scene");
+    resource::ResourceManager resources{};
+
+    auto& camera_go = scene.create_game_object("camera");
+    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
+    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+
+    auto& mapped_go = scene.create_game_object("mapped_light_go");
+    (void)mapped_go.add_component<component::MeshRenderer>(create_test_mesh(resources));
+    (void)mapped_go.add_component<component::PbptMesh>();
+    auto& light = mapped_go.add_component<component::PbptLight>();
+    light.set_radiance_spectrum({
+        component::PbptSpectrumPoint{400.0f, 0.0f},
+        component::PbptSpectrumPoint{500.0f, 8.0f},
+        component::PbptSpectrumPoint{600.0f, 15.6f},
+        component::PbptSpectrumPoint{700.0f, 18.4f},
+    });
+
+    PbptCompatibleInfo compatible{};
+    compatible.passthrough_shape_ids.insert("legacy_shape");
+    compatible.passthrough_spp = 5;
+
+    const auto identity = pbpt::geometry::Transform<float>::identity();
+    const auto render_transform = pbpt::camera::RenderTransform<float>::from_camera_to_world(
+        identity,
+        pbpt::camera::RenderSpace::World
+    );
+    std::vector<int> indices{0, 1, 2};
+    std::vector<pbpt::math::Point<float, 3>> positions{
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    };
+    std::vector<pbpt::math::Normal<float, 3>> normals{
+        {0.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f},
+    };
+    std::vector<pbpt::math::Point<float, 2>> uvs{
+        {0.0f, 0.0f},
+        {1.0f, 0.0f},
+        {0.0f, 1.0f},
+    };
+    (void)compatible.passthrough_resources.mesh_library.add_item(
+        "legacy_mesh",
+        pbpt::shape::TriangleMesh<float>(render_transform, indices, positions, normals, uvs, false, identity)
+    );
+    const int legacy_material_id = compatible.passthrough_resources.any_material_library.add_item(
+        "legacy_mat",
+        pbpt::material::LambertianMaterial<float>(
+            pbpt::radiometry::PiecewiseLinearSpectrumDistribution<float>({
+                {400.0f, 0.5f},
+                {500.0f, 0.5f},
+                {600.0f, 0.5f},
+                {700.0f, 0.5f},
+            })
+        )
+    );
+    compatible.passthrough_resources.mesh_material_map["legacy_mesh"] = legacy_material_id;
+    compatible.passthrough_resources.reflectance_spectrum_library.add_item(
+        "legacy_emission",
+        pbpt::radiometry::PiecewiseLinearSpectrumDistribution<float>({
+            {400.0f, 1.0f},
+            {500.0f, 2.0f},
+            {600.0f, 3.0f},
+            {700.0f, 4.0f},
+        })
+    );
+    compatible.passthrough_resources.shape_instances.emplace_back(pbpt::scene::ShapeInstanceRecord<float>{
+        .shape_id = "legacy_shape",
+        .shape_type = "obj",
+        .mesh_name = "legacy_mesh",
+        .material_ref_name = "legacy_mat",
+        .object_to_world = identity,
+        .emission_spectrum_name = std::optional<std::string>{"legacy_emission"},
+    });
+
+    const auto pbpt_result = build_pbpt_xml_result_from_scene(
+        scene,
+        resources,
+        &compatible,
+        320,
+        200,
+        12
+    );
+
+    EXPECT_EQ(pbpt_result.spp, 12);
+    EXPECT_GE(pbpt_result.scene.resources.shape_instances.size(), 2u);
+
+    const auto legacy_it = std::find_if(
+        pbpt_result.scene.resources.shape_instances.begin(),
+        pbpt_result.scene.resources.shape_instances.end(),
+        [](const auto& shape) { return shape.shape_id == "legacy_shape"; }
+    );
+    ASSERT_NE(legacy_it, pbpt_result.scene.resources.shape_instances.end());
+    ASSERT_TRUE(legacy_it->emission_spectrum_name.has_value());
+    const auto& legacy_emission =
+        pbpt_result.scene.resources.reflectance_spectrum_library.get(legacy_it->emission_spectrum_name.value());
+    EXPECT_NEAR(legacy_emission.at(700.0f), 4.0f, 1e-5f);
+
+    const auto mapped_it = std::find_if(
+        pbpt_result.scene.resources.shape_instances.begin(),
+        pbpt_result.scene.resources.shape_instances.end(),
+        [](const auto& shape) { return shape.shape_id == "mapped_light_go"; }
+    );
+    ASSERT_NE(mapped_it, pbpt_result.scene.resources.shape_instances.end());
+    ASSERT_TRUE(mapped_it->emission_spectrum_name.has_value());
+    const auto& mapped_emission =
+        pbpt_result.scene.resources.reflectance_spectrum_library.get(mapped_it->emission_spectrum_name.value());
+    EXPECT_NEAR(mapped_emission.at(500.0f), 8.0f, 1e-5f);
+    EXPECT_NEAR(mapped_emission.at(700.0f), 18.4f, 1e-5f);
+}
+
+TEST(FrameworkPbptSceneExportBuilderTest, BuildXmlResultThrowsWhenMappedShapeIdAlsoInPassthroughSet) {
+    core::Scene scene(1, "scene");
+    resource::ResourceManager resources{};
+
+    PbptCompatibleInfo compatible{};
+    compatible.mapped_shape_info_by_game_object.emplace(
+        1,
+        PbptMappedShapeInfo{
+            .source_shape_id = "dup_shape",
+            .source_mesh_name = "m",
+            .source_material_ref_name = "mat",
+        }
+    );
+    compatible.passthrough_shape_ids.insert("dup_shape");
+
+    const auto identity = pbpt::geometry::Transform<float>::identity();
+    const auto render_transform = pbpt::camera::RenderTransform<float>::from_camera_to_world(
+        identity,
+        pbpt::camera::RenderSpace::World
+    );
+    std::vector<int> indices{0, 1, 2};
+    std::vector<pbpt::math::Point<float, 3>> positions{
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    };
+    std::vector<pbpt::math::Normal<float, 3>> normals{
+        {0.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f},
+    };
+    std::vector<pbpt::math::Point<float, 2>> uvs{
+        {0.0f, 0.0f},
+        {1.0f, 0.0f},
+        {0.0f, 1.0f},
+    };
+    (void)compatible.passthrough_resources.mesh_library.add_item(
+        "legacy_mesh",
+        pbpt::shape::TriangleMesh<float>(render_transform, indices, positions, normals, uvs, false, identity)
+    );
+    const int legacy_material_id = compatible.passthrough_resources.any_material_library.add_item(
+        "legacy_mat",
+        pbpt::material::LambertianMaterial<float>(
+            pbpt::radiometry::PiecewiseLinearSpectrumDistribution<float>({
+                {400.0f, 0.5f},
+                {500.0f, 0.5f},
+                {600.0f, 0.5f},
+                {700.0f, 0.5f},
+            })
+        )
+    );
+    compatible.passthrough_resources.mesh_material_map["legacy_mesh"] = legacy_material_id;
+    compatible.passthrough_resources.shape_instances.emplace_back(pbpt::scene::ShapeInstanceRecord<float>{
+        .shape_id = "dup_shape",
+        .shape_type = "obj",
+        .mesh_name = "legacy_mesh",
+        .material_ref_name = "legacy_mat",
+        .object_to_world = identity,
+        .emission_spectrum_name = std::nullopt,
+    });
+
+    EXPECT_THROW(
+        (void)build_pbpt_xml_result_from_scene(scene, resources, &compatible),
+        std::runtime_error
+    );
+}
+
 } // namespace rtr::framework::integration::test
 
 int main(int argc, char** argv) {
