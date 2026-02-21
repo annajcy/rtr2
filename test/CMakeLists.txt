@@ -158,18 +158,18 @@ endif()
 
 # framework/integration
 rtr_add_test(
-    test_framework_pbpt_scene_export_builder
-    framework/integration/framework_pbpt_scene_export_builder_test.cpp
+    test_framework_pbpt_scene_writer
+    framework/integration/framework_pbpt_scene_writer_test.cpp
     rtr::runtime
 )
 rtr_add_test(
-    test_framework_pbpt_scene_importer
-    framework/integration/framework_pbpt_scene_importer_test.cpp
+    test_framework_pbpt_scene_loader
+    framework/integration/framework_pbpt_scene_loader_test.cpp
     rtr::runtime
 )
 rtr_add_test(
-    test_framework_pbpt_bridge_dispatch
-    framework/integration/framework_pbpt_bridge_dispatch_test.cpp
+    test_framework_pbpt_serde_dispatch
+    framework/integration/framework_pbpt_serde_dispatch_test.cpp
     rtr::runtime
 )
 

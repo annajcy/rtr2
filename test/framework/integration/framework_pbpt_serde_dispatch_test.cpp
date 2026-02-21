@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "rtr/framework/integration/pbpt/bridge/dispatch.hpp"
+#include "rtr/framework/integration/pbpt/serde/dispatch.hpp"
 #include <string_view>
 #include <tuple>
 #include <stdexcept>
@@ -41,7 +41,7 @@ struct MapperC {
 
 using TestMapperList = std::tuple<MapperA, MapperC, MapperB>;
 
-TEST(PbptBridgeDispatchTest, FirstMatchWins) {
+TEST(PbptSerdeDispatchTest, FirstMatchWins) {
     DummyContext ctx;
     DummyPackage pkg;
 
@@ -51,7 +51,7 @@ TEST(PbptBridgeDispatchTest, FirstMatchWins) {
     EXPECT_EQ(res1.mapper_name, "MapperA");
 }
 
-TEST(PbptBridgeDispatchTest, NoMatchFallback) {
+TEST(PbptSerdeDispatchTest, NoMatchFallback) {
     DummyContext ctx;
     DummyPackage pkg;
 
@@ -60,7 +60,7 @@ TEST(PbptBridgeDispatchTest, NoMatchFallback) {
     EXPECT_EQ(res.mapper_name, "");
 }
 
-TEST(PbptBridgeDispatchTest, ExceptionLoggingWrapper) {
+TEST(PbptSerdeDispatchTest, ExceptionLoggingWrapper) {
     DummyContext ctx;
     DummyPackage pkg;
 
@@ -74,7 +74,7 @@ TEST(PbptBridgeDispatchTest, ExceptionLoggingWrapper) {
     }
 }
 
-TEST(PbptBridgeDispatchTest, MatchesExceptionLoggingWrapper) {
+TEST(PbptSerdeDispatchTest, MatchesExceptionLoggingWrapper) {
     DummyContext ctx;
     DummyPackage pkg;
 

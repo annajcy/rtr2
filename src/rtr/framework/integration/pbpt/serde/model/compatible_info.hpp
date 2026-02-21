@@ -12,23 +12,23 @@
 
 namespace rtr::framework::integration {
 
-struct PbptMappedShapeInfo {
+struct MappedShapeInfo {
     std::string source_shape_id{};
     std::string source_mesh_name{};
     std::string source_material_ref_name{};
 };
 
-struct PbptCompatibleInfo {
+struct CompatibleInfo {
     // Runtime mapping for RTR-owned objects that came from PBPT shapes.
-    std::unordered_map<core::GameObjectId, PbptMappedShapeInfo> mapped_shape_info_by_game_object{};
+    std::unordered_map<core::GameObjectId, MappedShapeInfo> mapped_shape_info_by_game_object{};
 
     // PBPT resources preserved for scene-level passthrough of unmapped content.
-    pbpt::scene::RenderResources<float> passthrough_resources{};
+    ::pbpt::scene::RenderResources<float> passthrough_resources{};
     std::unordered_set<std::string> passthrough_shape_ids{};
 
     // Optional passthrough integrator metadata for preserving import settings.
-    std::optional<pbpt::integrator::AnyIntegrator<float>> passthrough_integrator{};
+    std::optional<::pbpt::integrator::AnyIntegrator<float>> passthrough_integrator{};
     int passthrough_spp{4};
 };
 
-} // namespace rtr::framework::integration
+}  // namespace rtr::framework::integration

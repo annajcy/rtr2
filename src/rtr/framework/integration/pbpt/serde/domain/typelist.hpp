@@ -2,16 +2,16 @@
 
 #include <tuple>
 
-#include "rtr/framework/integration/pbpt/bridge/import_mappers.hpp"
-#include "rtr/framework/integration/pbpt/bridge/export_mappers.hpp"
+#include "rtr/framework/integration/pbpt/serde/load/mappers.hpp"
+#include "rtr/framework/integration/pbpt/serde/write/mappers.hpp"
 
 namespace rtr::framework::integration {
 
-using ImportShapeMapperList      = std::tuple<ObjLambertianShapeImportMapper>;
-using ImportCameraMapperList     = std::tuple<ThinLensPerspectiveImportMapper>;
-using ImportIntegratorMapperList = std::tuple<PathIntegratorImportMapper>;
+using ShapeLoaderList      = std::tuple<ObjLambertianShapeImportMapper>;
+using CameraLoaderList     = std::tuple<ThinLensPerspectiveImportMapper>;
+using IntegratorLoaderList = std::tuple<PathIntegratorImportMapper>;
 
-using ExportShapeMapperList = std::tuple<MeshRendererPbptMeshExportMapper>;
+using ShapeWriterList = std::tuple<MeshRendererPbptMeshExportMapper>;
 
 // compile-time verification
 static_assert(ImportShapeMapperConcept<ObjLambertianShapeImportMapper>,

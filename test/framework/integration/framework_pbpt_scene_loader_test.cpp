@@ -12,11 +12,15 @@
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_reflectance_convert.hpp"
-#include "rtr/framework/integration/pbpt/pbpt_scene_importer.hpp"
+#include "rtr/framework/integration/pbpt/serde/scene_loader.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/input/input_state.hpp"
 
 namespace rtr::framework::integration::test {
+
+namespace pbpt_bridge = rtr::framework::integration;
+using pbpt_bridge::LoadOptions;
+using pbpt_bridge::LoadSummary;
 
 namespace {
 
@@ -52,10 +56,15 @@ const core::GameObject* find_mesh_object(const core::Scene& scene) {
     return nullptr;
 }
 
+LoadSummary load_scene_summary(const std::string& scene_xml_path, core::Scene& scene,
+                               resource::ResourceManager& resources, const LoadOptions& options = {}) {
+    return pbpt_bridge::load_scene(scene_xml_path, scene, resources, options).result;
+}
+
 }  // namespace
 
-TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_test");
+TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
+    TempDir temp_dir("rtr_pbpt_scene_loader_test");
 
     const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
@@ -102,7 +111,7 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
 
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    const auto                result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
+    const auto                result = load_scene_summary(xml_path.string(), scene, resources);
 
     EXPECT_EQ(result.imported_shape_count, 1u);
     EXPECT_EQ(result.imported_light_shape_count, 1u);
@@ -158,8 +167,8 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
     ASSERT_NE(scene.active_camera(), nullptr);
 }
 
-TEST(FrameworkPbptSceneImporterTest, ImportsRgbReflectanceAndMapsToBaseColor) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_rgb_reflectance_test");
+TEST(FrameworkPbptSceneLoaderTest, ImportsRgbReflectanceAndMapsToBaseColor) {
+    TempDir temp_dir("rtr_pbpt_scene_loader_rgb_reflectance_test");
 
     const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
@@ -189,7 +198,7 @@ TEST(FrameworkPbptSceneImporterTest, ImportsRgbReflectanceAndMapsToBaseColor) {
 
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    const auto                result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
+    const auto                result = load_scene_summary(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
 
     const auto* mesh_go = find_mesh_object(scene);
@@ -204,8 +213,8 @@ TEST(FrameworkPbptSceneImporterTest, ImportsRgbReflectanceAndMapsToBaseColor) {
     EXPECT_NEAR(renderer->base_color().w(), 1.0f, 1e-6f);
 }
 
-TEST(FrameworkPbptSceneImporterTest, ThrowsForInvalidMatrixElementCount) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_invalid_matrix_test");
+TEST(FrameworkPbptSceneLoaderTest, ThrowsForInvalidMatrixElementCount) {
+    TempDir temp_dir("rtr_pbpt_scene_loader_invalid_matrix_test");
 
     const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
@@ -238,11 +247,11 @@ TEST(FrameworkPbptSceneImporterTest, ThrowsForInvalidMatrixElementCount) {
 
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    EXPECT_THROW((void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources), std::runtime_error);
+    EXPECT_THROW((void)load_scene_summary(xml_path.string(), scene, resources), std::runtime_error);
 }
 
-TEST(FrameworkPbptSceneImporterTest, DisambiguatesDuplicateImportedNameBetweenCameraAndShape) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_duplicate_name_test");
+TEST(FrameworkPbptSceneLoaderTest, DisambiguatesDuplicateImportedNameBetweenCameraAndShape) {
+    TempDir temp_dir("rtr_pbpt_scene_loader_duplicate_name_test");
 
     const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
@@ -272,14 +281,14 @@ TEST(FrameworkPbptSceneImporterTest, DisambiguatesDuplicateImportedNameBetweenCa
 
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    const auto                result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
+    const auto                result = load_scene_summary(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
     EXPECT_TRUE(result.imported_game_object_id_by_name.contains("pbpt_camera"));    // camera is usually pbpt_camera
     EXPECT_TRUE(result.imported_game_object_id_by_name.contains("pbpt_camera_1"));  // duplicate shape is renamed
 }
 
-TEST(FrameworkPbptSceneImporterTest, RecordsDefaultShapeNameWhenShapeIdMissing) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_default_name_test");
+TEST(FrameworkPbptSceneLoaderTest, RecordsDefaultShapeNameWhenShapeIdMissing) {
+    TempDir temp_dir("rtr_pbpt_scene_loader_default_name_test");
 
     const auto mesh_path = temp_dir.path / "meshes" / "tri_default.obj";
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
@@ -309,7 +318,7 @@ TEST(FrameworkPbptSceneImporterTest, RecordsDefaultShapeNameWhenShapeIdMissing) 
 
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    const auto                result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
+    const auto                result = load_scene_summary(xml_path.string(), scene, resources);
 
     EXPECT_EQ(result.imported_shape_count, 1u);
     ASSERT_TRUE(result.imported_game_object_id_by_name.contains("tri_default"));
@@ -319,8 +328,8 @@ TEST(FrameworkPbptSceneImporterTest, RecordsDefaultShapeNameWhenShapeIdMissing) 
     EXPECT_EQ(imported_go->name(), "tri_default");
 }
 
-TEST(FrameworkPbptSceneImporterTest, LookAtSensorAlignsWithRtrCameraFrontConvention) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_lookat_camera_test");
+TEST(FrameworkPbptSceneLoaderTest, LookAtSensorAlignsWithRtrCameraFrontConvention) {
+    TempDir temp_dir("rtr_pbpt_scene_loader_lookat_camera_test");
 
     const auto xml_path = temp_dir.path / "scene_lookat.xml";
     write_text_file(xml_path,
@@ -343,19 +352,19 @@ TEST(FrameworkPbptSceneImporterTest, LookAtSensorAlignsWithRtrCameraFrontConvent
 
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
+    (void)load_scene_summary(xml_path.string(), scene, resources);
 
     const auto* camera = dynamic_cast<const core::PerspectiveCamera*>(scene.active_camera());
     ASSERT_NE(camera, nullptr);
 
-    const pbpt::math::vec3 front = camera->front();
+    const ::pbpt::math::vec3 front = camera->front();
     EXPECT_NEAR(front.x(), 0.0f, 1e-5f);
     EXPECT_NEAR(front.y(), 0.0f, 1e-5f);
     EXPECT_NEAR(front.z(), 1.0f, 1e-5f);
 }
 
-TEST(FrameworkPbptSceneImporterTest, AttachesFreeLookControllerWhenInputStateProvided) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_freelook_test");
+TEST(FrameworkPbptSceneLoaderTest, AttachesFreeLookControllerWhenInputStateProvided) {
+    TempDir temp_dir("rtr_pbpt_scene_loader_freelook_test");
 
     const auto xml_path = temp_dir.path / "scene_with_sensor.xml";
     write_text_file(xml_path,
@@ -379,9 +388,9 @@ TEST(FrameworkPbptSceneImporterTest, AttachesFreeLookControllerWhenInputStatePro
     core::Scene               scene(1, "scene");
     system::input::InputState input_state{};
     resource::ResourceManager resources(2, temp_dir.path);
-    PbptImportOptions         options{};
+    LoadOptions         options{};
     options.free_look_input_state = &input_state;
-    (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources, options);
+    (void)load_scene_summary(xml_path.string(), scene, resources, options);
 
     const auto active_camera_owner = scene.camera_manager().active_camera_owner_id();
     ASSERT_NE(active_camera_owner, core::kInvalidGameObjectId);
@@ -390,8 +399,8 @@ TEST(FrameworkPbptSceneImporterTest, AttachesFreeLookControllerWhenInputStatePro
     EXPECT_NE(active_camera_go->get_component<component::FreeLookCameraController>(), nullptr);
 }
 
-TEST(FrameworkPbptSceneImporterTest, RelativeMeshFilenameResolvesFromXmlDirectoryWithinRoot) {
-    TempDir    temp_dir("rtr_pbpt_scene_importer_xml_dir_resolve_test");
+TEST(FrameworkPbptSceneLoaderTest, RelativeMeshFilenameResolvesFromXmlDirectoryWithinRoot) {
+    TempDir    temp_dir("rtr_pbpt_scene_loader_xml_dir_resolve_test");
     const auto resource_root = temp_dir.path / "assets";
     const auto scene_dir     = resource_root / "pbpt_scene" / "cbox";
     const auto mesh_path     = scene_dir / "meshes" / "tri.obj";
@@ -422,12 +431,12 @@ TEST(FrameworkPbptSceneImporterTest, RelativeMeshFilenameResolvesFromXmlDirector
 
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, resource_root);
-    const auto                result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
+    const auto                result = load_scene_summary(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
 }
 
-TEST(FrameworkPbptSceneImporterTest, ImportWithCompatibleInfoMapsSubsetAndPreservesUnmappedShapes) {
-    TempDir    temp_dir("rtr_pbpt_scene_importer_compatible_test");
+TEST(FrameworkPbptSceneLoaderTest, ImportWithCompatibleInfoMapsSubsetAndPreservesUnmappedShapes) {
+    TempDir    temp_dir("rtr_pbpt_scene_loader_compatible_test");
     const auto mesh_path  = temp_dir.path / "meshes" / "tri.obj";
     const auto mesh2_path = temp_dir.path / "meshes" / "tri_unmapped.obj";
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
@@ -469,7 +478,7 @@ TEST(FrameworkPbptSceneImporterTest, ImportWithCompatibleInfoMapsSubsetAndPreser
 
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    const auto package = import_pbpt_scene_xml_to_scene_with_compatible(xml_path.string(), scene, resources);
+    const auto package = pbpt_bridge::load_scene(xml_path.string(), scene, resources);
 
     EXPECT_EQ(package.result.imported_shape_count, 1u);
     EXPECT_EQ(package.result.imported_light_shape_count, 1u);
@@ -489,8 +498,8 @@ TEST(FrameworkPbptSceneImporterTest, ImportWithCompatibleInfoMapsSubsetAndPreser
     EXPECT_FLOAT_EQ(radiance[1].value, 8.0f);
 }
 
-TEST(FrameworkPbptSceneImporterTest, ThrowsWhenSensorIsMissing) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_missing_sensor_test");
+TEST(FrameworkPbptSceneLoaderTest, ThrowsWhenSensorIsMissing) {
+    TempDir temp_dir("rtr_pbpt_scene_loader_missing_sensor_test");
 
     const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
@@ -513,11 +522,11 @@ TEST(FrameworkPbptSceneImporterTest, ThrowsWhenSensorIsMissing) {
 
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    EXPECT_THROW((void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources), std::runtime_error);
+    EXPECT_THROW((void)load_scene_summary(xml_path.string(), scene, resources), std::runtime_error);
 }
 
-TEST(FrameworkPbptSceneImporterTest, ThrowsWhenIntegratorIsMissing) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_missing_integrator_test");
+TEST(FrameworkPbptSceneLoaderTest, ThrowsWhenIntegratorIsMissing) {
+    TempDir temp_dir("rtr_pbpt_scene_loader_missing_integrator_test");
 
     const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
@@ -544,7 +553,7 @@ TEST(FrameworkPbptSceneImporterTest, ThrowsWhenIntegratorIsMissing) {
 
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    EXPECT_THROW((void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources), std::runtime_error);
+    EXPECT_THROW((void)load_scene_summary(xml_path.string(), scene, resources), std::runtime_error);
 }
 
 }  // namespace rtr::framework::integration::test

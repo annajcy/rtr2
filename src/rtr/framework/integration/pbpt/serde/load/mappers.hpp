@@ -2,12 +2,13 @@
 
 #include <string_view>
 #include <algorithm>
-#include <variant>
+#include <limits>
 #include <stdexcept>
+#include <variant>
 
-#include "rtr/framework/integration/pbpt/bridge/trait_contracts.hpp"
-#include "rtr/framework/integration/pbpt/bridge/import_types.hpp"
-#include "rtr/framework/integration/pbpt/bridge/import_helpers.hpp"
+#include "rtr/framework/integration/pbpt/serde/domain/trait_contracts.hpp"
+#include "rtr/framework/integration/pbpt/serde/load/types.hpp"
+#include "rtr/framework/integration/pbpt/serde/load/helpers.hpp"
 
 #include "pbpt/camera/plugin/camera/projective_cameras.hpp"
 #include "pbpt/integrator/plugin/integrator/path_integrator.hpp"
@@ -23,8 +24,8 @@ namespace rtr::framework::integration {
 struct ObjLambertianShapeImportMapper {
     static constexpr std::string_view kName = "ObjLambertianShapeImportMapper";
 
-    static bool matches(const pbpt::scene::ShapeInstanceRecord<float>& record, const ImportGlobalContext& ctx,
-                        PbptImportPackage&) {
+    static bool matches(const ::pbpt::scene::ShapeInstanceRecord<float>& record, const ImportGlobalContext& ctx,
+                        LoadPackage&) {
         if (record.shape_type != "obj")
             return false;
 
@@ -39,7 +40,7 @@ struct ObjLambertianShapeImportMapper {
             return false;
 
         const auto& any_material = resources.any_material_library.get(material_id);
-        if (!std::holds_alternative<pbpt::material::LambertianMaterial<float>>(any_material))
+        if (!std::holds_alternative<::pbpt::material::LambertianMaterial<float>>(any_material))
             return false;
 
         if (record.emission_spectrum_name.has_value() &&
@@ -49,13 +50,13 @@ struct ObjLambertianShapeImportMapper {
         return true;
     }
 
-    static void map(const pbpt::scene::ShapeInstanceRecord<float>& record, const ImportGlobalContext& ctx,
-                    PbptImportPackage& pkg) {
+    static void map(const ::pbpt::scene::ShapeInstanceRecord<float>& record, const ImportGlobalContext& ctx,
+                    LoadPackage& pkg) {
         const auto& resources    = ctx.pbpt_scene_result.scene.resources;
         const auto& mesh         = resources.mesh_library.get(record.mesh_name);
         const auto  material_id  = resources.any_material_library.name_to_id().at(record.material_ref_name);
         const auto& any_material = resources.any_material_library.get(material_id);
-        const auto* lambertian   = std::get_if<pbpt::material::LambertianMaterial<float>>(&any_material);
+        const auto* lambertian   = std::get_if<::pbpt::material::LambertianMaterial<float>>(&any_material);
 
         component::PbptRgb reflectance{};
         try {
@@ -76,7 +77,7 @@ struct ObjLambertianShapeImportMapper {
 
         auto& go = ctx.scene.create_game_object(object_name);
         (void)go.add_component<component::MeshRenderer>(
-            mesh_handle, pbpt::math::vec4{reflectance.r, reflectance.g, reflectance.b, 1.0f});
+            mesh_handle, ::pbpt::math::vec4{reflectance.r, reflectance.g, reflectance.b, 1.0f});
         (void)go.add_component<component::PbptMesh>();
         go.node().set_local_model_matrix(compat_import_detail::to_mat4(record.object_to_world));
 
@@ -89,9 +90,9 @@ struct ObjLambertianShapeImportMapper {
 
         compat_import_detail::register_imported_game_object(pkg.result, go.name(), go.id());
         pkg.compatible_info.mapped_shape_info_by_game_object.emplace(
-            go.id(), PbptMappedShapeInfo{.source_shape_id          = record.shape_id,
-                                         .source_mesh_name         = record.mesh_name,
-                                         .source_material_ref_name = record.material_ref_name});
+            go.id(), MappedShapeInfo{.source_shape_id          = record.shape_id,
+                                     .source_mesh_name         = record.mesh_name,
+                                     .source_material_ref_name = record.material_ref_name});
         ++pkg.result.imported_shape_count;
     }
 };
@@ -99,19 +100,19 @@ struct ObjLambertianShapeImportMapper {
 struct ThinLensPerspectiveImportMapper {
     static constexpr std::string_view kName = "ThinLensPerspectiveImportMapper";
 
-    static bool matches(const pbpt::camera::AnyCamera<float>& camera_any, const ImportGlobalContext&,
-                        PbptImportPackage&) {
-        return std::holds_alternative<pbpt::camera::ThinLensPerspectiveCamera<float>>(camera_any);
+    static bool matches(const ::pbpt::camera::AnyCamera<float>& camera_any, const ImportGlobalContext&,
+                        LoadPackage&) {
+        return std::holds_alternative<::pbpt::camera::ThinLensPerspectiveCamera<float>>(camera_any);
     }
 
-    static void map(const pbpt::camera::AnyCamera<float>& camera_any, const ImportGlobalContext& ctx,
-                    PbptImportPackage& pkg) {
-        const auto& camera_pbpt = std::get<pbpt::camera::ThinLensPerspectiveCamera<float>>(camera_any);
+    static void map(const ::pbpt::camera::AnyCamera<float>& camera_any, const ImportGlobalContext& ctx,
+                    LoadPackage& pkg) {
+        const auto& camera_pbpt = std::get<::pbpt::camera::ThinLensPerspectiveCamera<float>>(camera_any);
 
-        PbptSensorRecord sensor{};
+        SensorRecord sensor{};
         sensor.to_world = compat_import_detail::to_mat4(ctx.pbpt_scene_result.scene.render_transform.camera_to_world());
         sensor.fov_degrees    = camera_pbpt.fov_degrees();
-        sensor.fov_axis       = pbpt::camera::fov_axis_to_string(camera_pbpt.fov_axis());
+        sensor.fov_axis       = ::pbpt::camera::fov_axis_to_string(camera_pbpt.fov_axis());
         sensor.near_clip      = -camera_pbpt.near_clip();
         sensor.far_clip       = -camera_pbpt.far_clip();
         sensor.focus_distance = camera_pbpt.focal_distance();
@@ -143,19 +144,19 @@ struct ThinLensPerspectiveImportMapper {
 struct PathIntegratorImportMapper {
     static constexpr std::string_view kName = "PathIntegratorImportMapper";
 
-    static bool matches(const pbpt::integrator::AnyIntegrator<float>& integrator, const ImportGlobalContext&,
-                        PbptImportPackage&) {
-        return std::holds_alternative<pbpt::integrator::PathIntegrator<float, 4>>(integrator);
+    static bool matches(const ::pbpt::integrator::AnyIntegrator<float>& integrator, const ImportGlobalContext&,
+                        LoadPackage&) {
+        return std::holds_alternative<::pbpt::integrator::PathIntegrator<float, 4>>(integrator);
     }
 
-    static void map(const pbpt::integrator::AnyIntegrator<float>& integrator, const ImportGlobalContext&,
-                    PbptImportPackage&                            pkg) {
-        const auto& path_integrator = std::get<pbpt::integrator::PathIntegrator<float, 4>>(integrator);
+    static void map(const ::pbpt::integrator::AnyIntegrator<float>& integrator, const ImportGlobalContext&,
+                    LoadPackage& pkg) {
+        const auto& path_integrator = std::get<::pbpt::integrator::PathIntegrator<float, 4>>(integrator);
         int         max_depth       = static_cast<int>(path_integrator.max_depth());
         if (path_integrator.max_depth() == std::numeric_limits<unsigned>::max()) {
             max_depth = -1;
         }
-        pkg.result.integrator = PbptIntegratorRecord{.type = "path", .max_depth = max_depth};
+        pkg.result.integrator = IntegratorRecord{.type = "path", .max_depth = max_depth};
     }
 };
 
