@@ -1,31 +1,31 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
+
 #include "pbpt/serde/scene_loader.hpp"
+#include "rtr/resource/resource_manager.hpp"
 
 namespace rtr::framework::core {
 class Scene;
 }
 
-#include "rtr/resource/resource_manager.hpp"
-#include <unordered_map>
-#include <string>
-
 namespace rtr::framework::integration {
 
-struct PbptImportOptions;
-struct PbptCompatibleInfo;
+struct LoadOptions;
+struct CompatibleInfo;
 
 struct ImportGlobalContext {
-    const pbpt::serde::PbptXmlResult<float>& pbpt_scene_result;
-    core::Scene&                             scene;
-    resource::ResourceManager&               resources;
-    const PbptImportOptions&                 options;
+    const ::pbpt::serde::PbptXmlResult<float>& pbpt_scene_result;
+    core::Scene&                              scene;
+    resource::ResourceManager&                resources;
+    const LoadOptions&                        options;
 };
 
 struct ExportGlobalContext {
     const core::Scene&                            scene;
     resource::ResourceManager&                    resources;
-    const PbptCompatibleInfo&                     compatible_info;
+    const CompatibleInfo&                         compatible_info;
     std::unordered_map<std::string, std::string>& material_name_by_reflectance;
 };
 

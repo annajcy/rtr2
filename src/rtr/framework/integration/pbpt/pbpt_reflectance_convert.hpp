@@ -18,7 +18,7 @@ namespace rtr::framework::integration {
 
 namespace detail {
 
-inline pbpt::radiometry::PiecewiseLinearSpectrumDistribution<double> to_piecewise_spectrum(
+inline ::pbpt::radiometry::PiecewiseLinearSpectrumDistribution<double> to_piecewise_spectrum(
     const component::PbptSpectrum& spectrum
 ) {
     component::validate_pbpt_spectrum(spectrum, "PbptReflectanceConvert.spectrum");
@@ -30,7 +30,7 @@ inline pbpt::radiometry::PiecewiseLinearSpectrumDistribution<double> to_piecewis
             static_cast<double>(point.value)
         );
     }
-    return pbpt::radiometry::PiecewiseLinearSpectrumDistribution<double>(points);
+    return ::pbpt::radiometry::PiecewiseLinearSpectrumDistribution<double>(points);
 }
 
 inline float clamp_unit(float value) {
@@ -41,11 +41,11 @@ inline float clamp_unit(float value) {
 
 inline component::PbptRgb pbpt_spectrum_to_rgb(const component::PbptSpectrum& spectrum) {
     const auto piecewise = detail::to_piecewise_spectrum(spectrum);
-    const auto xyz = pbpt::radiometry::XYZ<double>::from_reflectance(
+    const auto xyz = ::pbpt::radiometry::XYZ<double>::from_reflectance(
         piecewise,
-        pbpt::radiometry::constant::CIE_D65_ilum<double>
+        ::pbpt::radiometry::constant::CIE_D65_ilum<double>
     );
-    const auto linear_rgb = pbpt::radiometry::constant::sRGB<double>.to_rgb(xyz);
+    const auto linear_rgb = ::pbpt::radiometry::constant::sRGB<double>.to_rgb(xyz);
     return component::PbptRgb{
         .r = detail::clamp_unit(static_cast<float>(linear_rgb.r())),
         .g = detail::clamp_unit(static_cast<float>(linear_rgb.g())),
@@ -55,15 +55,15 @@ inline component::PbptRgb pbpt_spectrum_to_rgb(const component::PbptSpectrum& sp
 
 inline component::PbptSpectrum pbpt_rgb_to_spectrum(const component::PbptRgb& rgb) {
     component::validate_pbpt_rgb(rgb, "PbptReflectanceConvert.rgb");
-    const pbpt::radiometry::RGB<double> srgb_rgb{
+    const ::pbpt::radiometry::RGB<double> srgb_rgb{
         static_cast<double>(rgb.r),
         static_cast<double>(rgb.g),
         static_cast<double>(rgb.b)
     };
-    const auto rsp = pbpt::radiometry::lookup_srgb_to_rsp(srgb_rgb);
-    const pbpt::radiometry::RGBAlbedoSpectrumDistribution<
+    const auto rsp = ::pbpt::radiometry::lookup_srgb_to_rsp(srgb_rgb);
+    const ::pbpt::radiometry::RGBAlbedoSpectrumDistribution<
         double,
-        pbpt::radiometry::RGBSigmoidPolynomialNormalized
+        ::pbpt::radiometry::RGBSigmoidPolynomialNormalized
     > albedo_spectrum(rsp);
 
     component::PbptSpectrum piecewise{};

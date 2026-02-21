@@ -20,7 +20,7 @@
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/engine.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
-#include "rtr/framework/integration/pbpt/pbpt_scene_importer.hpp"
+#include "rtr/framework/integration/pbpt/serde/scene_loader.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/input/input_system.hpp"
 #include "rtr/system/input/input_types.hpp"
@@ -99,7 +99,7 @@ private:
     rtr::framework::core::Engine&                          m_engine;
     rtr::system::render::Renderer&                         m_renderer;
     rtr::resource::ResourceManager&                        m_resource_manager;
-    const rtr::framework::integration::PbptImportResult&   m_import_result;
+    const rtr::framework::integration::LoadSummary& m_import_result;
     uint32_t                                               m_scene_width{0};
     uint32_t                                               m_scene_height{0};
     bool                                                   m_visible{true};
@@ -109,7 +109,8 @@ public:
     OfflineRenderPanel(rtr::framework::integration::PbptOfflineRenderService& offline_render_service,
                        rtr::framework::core::Engine& engine, rtr::system::render::Renderer& renderer,
                        rtr::resource::ResourceManager&                      resource_manager,
-                       const rtr::framework::integration::PbptImportResult& import_result, uint32_t scene_width,
+                       const rtr::framework::integration::LoadSummary& import_result,
+                       uint32_t scene_width,
                        uint32_t scene_height, const std::string& scene_xml_path, const std::string& output_exr_path,
                        const std::string& output_scene_xml_path)
         : m_offline_render_service(offline_render_service),
@@ -219,7 +220,7 @@ int main() {
 
         auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
 
-        rtr::framework::integration::PbptImportOptions import_options{};
+        rtr::framework::integration::LoadOptions import_options{};
         import_options.free_look_input_state = &input_system->state();
 
         rtr::framework::core::Engine engine(
@@ -229,9 +230,10 @@ int main() {
                                                .max_frames_in_flight = kMaxFramesInFlight});
         engine.world().set_resource_manager(&resource_manager);
 
-        auto&      scene         = engine.world().create_scene("cbox_scene");
-        const auto import_result = rtr::framework::integration::import_pbpt_scene_xml_to_scene(
+        auto&      scene          = engine.world().create_scene("cbox_scene");
+        const auto import_package = rtr::framework::integration::load_scene(
             import_xml_path, scene, resource_manager, import_options);
+        const auto& import_result = import_package.result;
 
         const uint32_t scene_width  = import_result.sensor ? import_result.sensor->film_width : 1280;
         const uint32_t scene_height = import_result.sensor ? import_result.sensor->film_height : 720;

@@ -2,13 +2,14 @@
 
 #include <string_view>
 #include <algorithm>
-#include <stdexcept>
+#include <cstdint>
 #include <string>
+#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
 
-#include "rtr/framework/integration/pbpt/bridge/trait_contracts.hpp"
-#include "rtr/framework/integration/pbpt/bridge/export_helpers.hpp"
+#include "rtr/framework/integration/pbpt/serde/domain/trait_contracts.hpp"
+#include "rtr/framework/integration/pbpt/serde/write/helpers.hpp"
 
 #include "pbpt/aggregate/plugin/aggregate/embree_aggregate.hpp"
 #include "pbpt/light/plugin/light/area_light.hpp"
@@ -27,7 +28,7 @@ namespace rtr::framework::integration {
 struct MeshRendererPbptMeshExportMapper {
     static constexpr std::string_view kName = "MeshRendererPbptMeshExportMapper";
 
-    static bool matches(const core::GameObject& go, const ExportGlobalContext&, pbpt::serde::PbptXmlResult<float>&) {
+    static bool matches(const core::GameObject& go, const ExportGlobalContext&, ::pbpt::serde::PbptXmlResult<float>&) {
         const auto* mesh_renderer = go.get_component<component::MeshRenderer>();
         const auto* pbpt_mesh     = go.get_component<component::PbptMesh>();
         if (mesh_renderer == nullptr || pbpt_mesh == nullptr)
@@ -38,7 +39,7 @@ struct MeshRendererPbptMeshExportMapper {
     }
 
     static void map(const core::GameObject& go, const ExportGlobalContext& ctx,
-                    pbpt::serde::PbptXmlResult<float>& result) {
+                    ::pbpt::serde::PbptXmlResult<float>& result) {
         const auto* mesh_renderer = go.get_component<component::MeshRenderer>();
         const auto* pbpt_mesh     = go.get_component<component::PbptMesh>();
         const auto* pbpt_light    = go.get_component<component::PbptLight>();
@@ -57,7 +58,7 @@ struct MeshRendererPbptMeshExportMapper {
             compat_export_detail::to_pbpt_triangle_mesh(cpu_mesh, result.scene.render_transform, object_to_world);
         (void)result.scene.resources.mesh_library.add_item(mesh_name, std::move(mesh));
 
-        const pbpt::math::vec4   base_color = mesh_renderer->base_color();
+        const ::pbpt::math::vec4   base_color = mesh_renderer->base_color();
         const component::PbptRgb reflectance{.r = base_color.x(), .g = base_color.y(), .b = base_color.z()};
         component::validate_pbpt_rgb(reflectance, "MeshRenderer.base_color");
 
@@ -73,7 +74,7 @@ struct MeshRendererPbptMeshExportMapper {
             ctx.material_name_by_reflectance[material_key] = material_name;
 
             auto material =
-                pbpt::material::LambertianMaterial<float>(compat_export_detail::rgb_to_piecewise(reflectance));
+                ::pbpt::material::LambertianMaterial<float>(compat_export_detail::rgb_to_piecewise(reflectance));
             (void)result.scene.resources.any_material_library.add_item(material_name, std::move(material));
         }
         result.scene.resources.mesh_material_map[mesh_name] =
@@ -90,7 +91,7 @@ struct MeshRendererPbptMeshExportMapper {
         }
         const std::string shape_id = compat_export_detail::make_unique_shape_id(shape_base, used_shape_ids);
 
-        pbpt::scene::ShapeInstanceRecord<float> shape_record{};
+        ::pbpt::scene::ShapeInstanceRecord<float> shape_record{};
         shape_record.shape_id          = shape_id;
         shape_record.shape_type        = "obj";
         shape_record.mesh_name         = mesh_name;
@@ -114,18 +115,18 @@ struct MeshRendererPbptMeshExportMapper {
             const auto& mesh_ref = result.scene.resources.mesh_library.get(mesh_name);
             const auto& emission_spectrum =
                 result.scene.resources.reflectance_spectrum_library.get(shape_record.emission_spectrum_name.value());
-            auto light_spectrum = pbpt::radiometry::StandardEmissionSpectrum<float>(
-                emission_spectrum, pbpt::radiometry::constant::CIE_D65_ilum<float>);
+            auto light_spectrum = ::pbpt::radiometry::StandardEmissionSpectrum<float>(
+                emission_spectrum, ::pbpt::radiometry::constant::CIE_D65_ilum<float>);
             for (int triangle_index = 0; triangle_index < mesh_ref.triangle_count(); ++triangle_index) {
                 const std::string light_name = compat_export_detail::make_unique_name(
                     shape_id + "_light_" + std::to_string(triangle_index), [&](const std::string& name) {
                         return result.scene.resources.any_light_library.name_to_id().contains(name);
                     });
                 const int light_id = result.scene.resources.any_light_library.add_item(
-                    light_name, pbpt::light::AreaLight<float, pbpt::shape::Triangle<float>, decltype(light_spectrum)>(
-                                    pbpt::shape::Triangle<float>(mesh_ref, triangle_index), light_spectrum,
-                                    pbpt::light::AreaLightSamplingDomain::Shape));
-                result.scene.resources.mesh_light_map[pbpt::scene::make_mesh_triangle_key(mesh_name, triangle_index)] =
+                    light_name, ::pbpt::light::AreaLight<float, ::pbpt::shape::Triangle<float>, decltype(light_spectrum)>(
+                                    ::pbpt::shape::Triangle<float>(mesh_ref, triangle_index), light_spectrum,
+                                    ::pbpt::light::AreaLightSamplingDomain::Shape));
+                result.scene.resources.mesh_light_map[::pbpt::scene::make_mesh_triangle_key(mesh_name, triangle_index)] =
                     light_id;
             }
         }

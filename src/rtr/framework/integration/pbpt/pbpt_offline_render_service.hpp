@@ -18,8 +18,8 @@
 #include "pbpt/serde/scene_loader.hpp"
 
 #include "rtr/framework/core/scene.hpp"
-#include "rtr/framework/integration/pbpt/pbpt_compatible_info.hpp"
-#include "rtr/framework/integration/pbpt/pbpt_scene_export_builder.hpp"
+#include "rtr/framework/integration/pbpt/serde/model/compatible_info.hpp"
+#include "rtr/framework/integration/pbpt/serde/scene_writer.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/utils/log.hpp"
 
@@ -70,7 +70,7 @@ struct OfflineRenderConfig {
     // Optional override. <= 0 means using exporter defaults.
     int film_width{0};
     int film_height{0};
-    const PbptCompatibleInfo* compatible_info{nullptr};
+    const rtr::framework::integration::CompatibleInfo* compatible_info{nullptr};
 };
 
 class PbptOfflineRenderService {
@@ -111,16 +111,16 @@ public:
             m_backend = [](const OfflineRenderConfig& config,
                         const ProgressCallback& on_progress,
                         const CancelQuery& is_cancel_requested) {
-                auto pbpt_scene_result = pbpt::serde::load_scene<float>(config.scene_xml_path);
+                auto pbpt_scene_result = ::pbpt::serde::load_scene<float>(config.scene_xml_path);
                 auto& pbpt_scene = pbpt_scene_result.scene;
-                pbpt::integrator::PathIntegrator<float, 4> integrator(-1, 0.9f);
+                ::pbpt::integrator::PathIntegrator<float, 4> integrator(-1, 0.9f);
 
-                pbpt::integrator::RenderObserver observer{};
+                ::pbpt::integrator::RenderObserver observer{};
                 observer.on_progress = on_progress;
                 observer.is_cancel_requested = is_cancel_requested;
                 try {
                     integrator.render(pbpt_scene, config.output_exr_path, false, observer, config.spp);
-                } catch (const pbpt::integrator::RenderCanceled& e) {
+                } catch (const ::pbpt::integrator::RenderCanceled& e) {
                     throw RenderCanceled(e.what());
                 }
             };
@@ -201,7 +201,7 @@ public:
                 throw std::runtime_error("Offline render requires an active camera.");
             }
 
-            auto pbpt_result = build_pbpt_xml_result_from_scene(
+            auto pbpt_result = rtr::framework::integration::build_scene_result(
                 scene,
                 resources,
                 config.compatible_info,
@@ -230,7 +230,7 @@ public:
                 std::filesystem::create_directories(output_exr_path.parent_path());
             }
 
-            write_pbpt_xml_result_to_path(pbpt_result, config.scene_xml_path);
+            rtr::framework::integration::write_scene_result(pbpt_result, config.scene_xml_path);
         } catch (const std::exception& e) {
             m_state.store(OfflineRenderState::Failed);
             set_message(e.what());
