@@ -16,7 +16,6 @@ target_link_libraries(rtr_runtime INTERFACE
   TinyGLTF::TinyGLTF
   slang::slang
   tinyobjloader::tinyobjloader
-  pugixml::pugixml
   pbpt::pbpt
 )
 
