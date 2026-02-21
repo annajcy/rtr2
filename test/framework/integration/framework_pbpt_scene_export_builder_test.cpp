@@ -134,7 +134,7 @@ TEST(FrameworkPbptSceneExportBuilderTest, BuildsXmlResultFromActiveNodesWithMesh
     const auto& shape = result.scene.resources.shape_instances.front();
     EXPECT_EQ(shape.shape_id, "go_" + std::to_string(static_cast<std::uint64_t>(go_ok.id())));
     EXPECT_FALSE(shape.emission_spectrum_name.has_value());
-    expect_mat4_near(detail::compat_detail::to_mat4(shape.object_to_world),
+    expect_mat4_near(compat_export_detail::to_mat4(shape.object_to_world),
                      scene.scene_graph().node(go_ok.id()).world_matrix());
 }
 
@@ -301,6 +301,35 @@ TEST(FrameworkPbptSceneExportBuilderTest, BuildXmlResultThrowsWhenMappedShapeIdA
     });
 
     EXPECT_THROW((void)build_pbpt_xml_result_from_scene(scene, resources, &compatible), std::runtime_error);
+}
+
+TEST(FrameworkPbptSceneExportBuilderTest, BuildXmlResultSuffixesMappedMaterialWhenNameCollidesWithPassthrough) {
+    core::Scene               scene(1, "scene");
+    resource::ResourceManager resources{};
+
+    auto& camera_go = scene.create_game_object("camera");
+    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
+    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+
+    auto&      mapped_go       = scene.create_game_object("mapped_go");
+    const auto expected_handle = create_test_mesh(resources);
+    auto&      renderer        = mapped_go.add_component<component::MeshRenderer>(expected_handle);
+    renderer.set_base_color(pbpt::math::vec4(0.5f, 0.5f, 0.5f, 1.0f));
+    (void)mapped_go.add_component<component::PbptMesh>();
+
+    PbptCompatibleInfo compatible{};
+    (void)compatible.passthrough_resources.any_material_library.add_item(
+        "rtr_mat_0",
+        pbpt::material::LambertianMaterial<float>(
+            pbpt::radiometry::PiecewiseLinearSpectrumDistribution<float>({{400.0f, 0.1f}, {700.0f, 0.1f}})));
+
+    const auto pbpt_result = build_pbpt_xml_result_from_scene(scene, resources, &compatible);
+
+    const auto mapped_it = std::find_if(pbpt_result.scene.resources.shape_instances.begin(),
+                                        pbpt_result.scene.resources.shape_instances.end(),
+                                        [](const auto& s) { return s.shape_id == "mapped_go"; });
+    ASSERT_NE(mapped_it, pbpt_result.scene.resources.shape_instances.end());
+    EXPECT_EQ(mapped_it->material_ref_name, "rtr_mat_0_1");
 }
 
 }  // namespace rtr::framework::integration::test

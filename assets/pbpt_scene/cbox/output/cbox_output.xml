@@ -14,8 +14,8 @@
       <matrix value="-1, 0, 0, 278, 0, 1, 0, 273, 0, 0, -1, -800, 0, 0, 0, 1" />
     </transform>
     <film type="hdrfilm">
-      <integer name="width" value="512" />
-      <integer name="height" value="512" />
+      <integer name="width" value="1280" />
+      <integer name="height" value="720" />
     </film>
     <sampler type="ldsampler">
       <integer name="sampleCount" value="16" />

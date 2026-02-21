@@ -167,6 +167,11 @@ rtr_add_test(
     framework/integration/framework_pbpt_scene_importer_test.cpp
     rtr::runtime
 )
+rtr_add_test(
+    test_framework_pbpt_bridge_dispatch
+    framework/integration/framework_pbpt_bridge_dispatch_test.cpp
+    rtr::runtime
+)
 
 # rhi
 rtr_add_test(
