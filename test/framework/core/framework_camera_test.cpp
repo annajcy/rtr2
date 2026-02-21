@@ -150,6 +150,43 @@ TEST(FrameworkCameraTest, CameraViewMatrixUsesNodeWorldTransform) {
     expect_mat4_near(camera.view_matrix(), expected);
 }
 
+TEST(FrameworkCameraTest, CameraLookAtDirectionLocalAndWorldDifferWithParentRotation) {
+    Scene scene(1, "scene");
+    auto& parent = scene.create_game_object("parent");
+    auto& camera_go = scene.create_game_object("camera_go");
+    auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
+    ASSERT_TRUE(scene.scene_graph().set_parent(camera_go.id(), parent.id(), false));
+
+    scene.scene_graph().node(parent.id()).set_local_rotation(
+        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::vec3(0.0f, 1.0f, 0.0f))
+    );
+    scene.scene_graph().node(camera_go.id()).set_local_rotation(pbpt::math::quat::identity());
+
+    camera.camera_look_at_direction_local({0.0f, 0.0f, -1.0f});
+    scene.scene_graph().update_world_transforms();
+    const pbpt::math::vec3 front_after_local = camera.camera_world_front();
+
+    scene.scene_graph().node(camera_go.id()).set_local_rotation(pbpt::math::quat::identity());
+    camera.camera_look_at_direction_world({0.0f, 0.0f, -1.0f});
+    scene.scene_graph().update_world_transforms();
+    const pbpt::math::vec3 front_after_world = camera.camera_world_front();
+
+    expect_vec3_near(front_after_local, {-1.0f, 0.0f, 0.0f});
+    expect_vec3_near(front_after_world, {0.0f, 0.0f, -1.0f});
+}
+
+TEST(FrameworkCameraTest, CameraLookAtPointWorldWorksWithoutManualWorldUpdate) {
+    Scene scene(1, "scene");
+    auto& camera_go = scene.create_game_object("camera_go");
+    auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
+
+    scene.scene_graph().node(camera_go.id()).set_local_position({0.0f, 1.0f, 6.0f});
+    camera.camera_look_at_point_world({0.0f, 0.0f, 0.0f});
+
+    const pbpt::math::vec3 expected_front = pbpt::math::normalize(pbpt::math::vec3{0.0f, -1.0f, -6.0f});
+    expect_vec3_near(camera.camera_world_front(), expected_front);
+}
+
 TEST(FrameworkCameraTest, PerspectiveAndOrthographicProjectionMatricesMatchGLM) {
     PerspectiveCamera perspective;
     perspective.fov_degrees() = 60.0f;
