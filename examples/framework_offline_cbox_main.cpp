@@ -9,7 +9,6 @@
 #include <string>
 
 #include "imgui.h"
-#include "pugixml.hpp"
 
 #include "rtr/editor/editor_attach.hpp"
 #include "rtr/editor/editor_host.hpp"
@@ -85,37 +84,6 @@ ExportResolutionInfo resolve_export_resolution(const rtr::rhi::Window& window, u
     }
 
     return info;
-}
-
-std::pair<uint32_t, uint32_t> resolve_resolution_from_pbpt_scene_xml(const char* xml_path) {
-    pugi::xml_document doc;
-    const auto         parse_result = doc.load_file(xml_path);
-    if (!parse_result) {
-        throw std::runtime_error(std::string("Failed to load scene XML for resolution: ") + parse_result.description());
-    }
-
-    const auto scene_node  = doc.child("scene");
-    const auto sensor_node = scene_node.child("sensor");
-    const auto film_node   = sensor_node.child("film");
-    if (!scene_node || !sensor_node || !film_node) {
-        throw std::runtime_error("scene/sensor/film node is missing in input cbox.xml.");
-    }
-
-    int width  = -1;
-    int height = -1;
-    for (const auto& integer_node : film_node.children("integer")) {
-        const std::string name = integer_node.attribute("name").value();
-        if (name == "width") {
-            width = integer_node.attribute("value").as_int(-1);
-        } else if (name == "height") {
-            height = integer_node.attribute("value").as_int(-1);
-        }
-    }
-
-    if (width <= 0 || height <= 0) {
-        throw std::runtime_error("Input cbox.xml film width/height must be positive.");
-    }
-    return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 }
 
 class OfflineRenderPanel final : public rtr::editor::IEditorPanel {
@@ -238,18 +206,11 @@ int main() {
         rtr::resource::ResourceManager                        resource_manager(kMaxFramesInFlight);
         rtr::framework::integration::PbptOfflineRenderService offline_render_service{};
 
-        const auto import_location =
-            rtr::framework::integration::make_pbpt_scene_location(kCboxSceneRootRel, kCboxSceneXmlFilename);
+        const auto import_xml_path =
+            (resource_manager.resource_root_dir() / kCboxSceneRootRel / kCboxSceneXmlFilename).string();
 
-        const auto [scene_width, scene_height] = resolve_resolution_from_pbpt_scene_xml(
-            (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir /
-             import_location.xml_filename)
-                .string()
-                .c_str());
-
-        auto renderer = std::make_unique<rtr::system::render::Renderer>(
-            static_cast<int>(scene_width), static_cast<int>(scene_height), "RTR Framework Offline CBox",
-            kMaxFramesInFlight);
+        auto renderer = std::make_unique<rtr::system::render::Renderer>(1280, 720, "RTR Framework Offline CBox",
+                                                                        kMaxFramesInFlight);
 
         auto runtime_pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
             renderer->build_pipeline_runtime(), rtr::system::render::ForwardPipelineConfig{});
@@ -262,15 +223,18 @@ int main() {
         import_options.free_look_input_state = &input_system->state();
 
         rtr::framework::core::Engine engine(
-            rtr::framework::core::EngineConfig{.window_width         = scene_width,
-                                               .window_height        = scene_height,
+            rtr::framework::core::EngineConfig{.window_width         = 1280,
+                                               .window_height        = 720,
                                                .window_title         = "RTR Framework Offline CBox",
                                                .max_frames_in_flight = kMaxFramesInFlight});
         engine.world().set_resource_manager(&resource_manager);
 
         auto&      scene         = engine.world().create_scene("cbox_scene");
         const auto import_result = rtr::framework::integration::import_pbpt_scene_xml_to_scene(
-            import_location, scene, resource_manager, import_options);
+            import_xml_path, scene, resource_manager, import_options);
+
+        const uint32_t scene_width  = import_result.sensor ? import_result.sensor->film_width : 1280;
+        const uint32_t scene_height = import_result.sensor ? import_result.sensor->film_height : 720;
 
         const auto remove_required_imported_game_object = [&](const char* name) {
             const auto it = import_result.imported_game_object_id_by_name.find(name);
@@ -299,14 +263,9 @@ int main() {
         editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
         editor_host->register_panel(std::make_unique<OfflineRenderPanel>(
             offline_render_service, engine, *renderer, resource_manager, import_result, scene_width, scene_height,
-            (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir /
-             import_location.xml_filename)
-                .string(),
-            (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir / kOutputExrPath)
-                .string(),
-            (resource_manager.resource_root_dir() / import_location.scene_root_rel_to_resource_dir /
-             kOutputSceneXmlFilename)
-                .string()));
+            (resource_manager.resource_root_dir() / kCboxSceneRootRel / kCboxSceneXmlFilename).string(),
+            (resource_manager.resource_root_dir() / kCboxSceneRootRel / kOutputExrPath).string(),
+            (resource_manager.resource_root_dir() / kCboxSceneRootRel / kOutputSceneXmlFilename).string()));
 
         auto editor_pipeline = rtr::editor::create_editor_pipeline(renderer->build_pipeline_runtime(),
                                                                    std::move(runtime_pipeline), editor_host);

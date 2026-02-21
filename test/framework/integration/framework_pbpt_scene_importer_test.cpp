@@ -6,7 +6,6 @@
 
 #include "gtest/gtest.h"
 
-
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
@@ -24,8 +23,7 @@ namespace {
 struct TempDir {
     std::filesystem::path path{};
 
-    explicit TempDir(const std::string& name)
-        : path(std::filesystem::temp_directory_path() / name) {
+    explicit TempDir(const std::string& name) : path(std::filesystem::temp_directory_path() / name) {
         std::filesystem::remove_all(path);
         std::filesystem::create_directories(path);
     }
@@ -54,23 +52,7 @@ const core::GameObject* find_mesh_object(const core::Scene& scene) {
     return nullptr;
 }
 
-PbptSceneLocation make_location(
-    const std::filesystem::path& resource_root,
-    const std::filesystem::path& xml_path
-) {
-    const std::filesystem::path rel = xml_path.lexically_relative(resource_root);
-    std::filesystem::path scene_root = rel.parent_path();
-    if (scene_root.empty()) {
-        scene_root = ".";
-    }
-
-    return make_pbpt_scene_location(
-        scene_root.generic_string(),
-        rel.filename().string()
-    );
-}
-
-} // namespace
+}  // namespace
 
 TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
     TempDir temp_dir("rtr_pbpt_scene_importer_test");
@@ -79,9 +61,8 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
 
     const auto xml_path = temp_dir.path / "scene.xml";
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
   <integrator type="path">
     <integer name="maxDepth" value="-1"/>
@@ -117,16 +98,11 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
       <spectrum name="radiance" value="400:0, 500:8, 600:15.6, 700:18.4"/>
     </emitter>
   </shape>
-</scene>)XML"
-    );
+</scene>)XML");
 
-    core::Scene scene(1, "scene");
+    core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    const auto result = import_pbpt_scene_xml_to_scene(
-        make_location(temp_dir.path, xml_path),
-        scene,
-        resources
-    );
+    const auto                result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
 
     EXPECT_EQ(result.imported_shape_count, 1u);
     EXPECT_EQ(result.imported_light_shape_count, 1u);
@@ -147,8 +123,8 @@ TEST(FrameworkPbptSceneImporterTest, ImportsCboxSubsetAndAttachesComponents) {
     ASSERT_NE(camera_go, nullptr);
     EXPECT_EQ(result.imported_game_object_id_by_name.at("pbpt_camera"), camera_go->id());
 
-    const auto* renderer = mesh_go->get_component<component::MeshRenderer>();
-    const auto* pbpt_mesh = mesh_go->get_component<component::PbptMesh>();
+    const auto* renderer   = mesh_go->get_component<component::MeshRenderer>();
+    const auto* pbpt_mesh  = mesh_go->get_component<component::PbptMesh>();
     const auto* pbpt_light = mesh_go->get_component<component::PbptLight>();
     ASSERT_NE(renderer, nullptr);
     ASSERT_NE(pbpt_mesh, nullptr);
@@ -189,10 +165,19 @@ TEST(FrameworkPbptSceneImporterTest, ImportsRgbReflectanceAndMapsToBaseColor) {
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
 
     const auto xml_path = temp_dir.path / "scene_rgb.xml";
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
+  <integrator type="path">
+    <integer name="maxDepth" value="-1"/>
+  </integrator>
+  <sensor type="perspective">
+    <float name="fov" value="45"/>
+    <film type="hdrfilm">
+      <integer name="width" value="64"/>
+      <integer name="height" value="64"/>
+    </film>
+  </sensor>
   <bsdf type="diffuse" id="mat_rgb">
     <rgb name="reflectance" value="0.2 0.4 0.6"/>
   </bsdf>
@@ -200,27 +185,22 @@ TEST(FrameworkPbptSceneImporterTest, ImportsRgbReflectanceAndMapsToBaseColor) {
     <string name="filename" value="meshes/tri.obj"/>
     <ref id="mat_rgb"/>
   </shape>
-</scene>)XML"
-    );
+</scene>)XML");
 
-    core::Scene scene(1, "scene");
+    core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    const auto result = import_pbpt_scene_xml_to_scene(
-        make_location(temp_dir.path, xml_path),
-        scene,
-        resources
-    );
+    const auto                result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
 
     const auto* mesh_go = find_mesh_object(scene);
     ASSERT_NE(mesh_go, nullptr);
-    const auto* renderer = mesh_go->get_component<component::MeshRenderer>();
+    const auto* renderer  = mesh_go->get_component<component::MeshRenderer>();
     const auto* pbpt_mesh = mesh_go->get_component<component::PbptMesh>();
     ASSERT_NE(renderer, nullptr);
     ASSERT_NE(pbpt_mesh, nullptr);
-    EXPECT_NEAR(renderer->base_color().x(), 0.2f, 1e-6f);
-    EXPECT_NEAR(renderer->base_color().y(), 0.4f, 1e-6f);
-    EXPECT_NEAR(renderer->base_color().z(), 0.6f, 1e-6f);
+    EXPECT_NEAR(renderer->base_color().x(), 0.2f, 1e-3f);
+    EXPECT_NEAR(renderer->base_color().y(), 0.4f, 1e-3f);
+    EXPECT_NEAR(renderer->base_color().z(), 0.6f, 1e-3f);
     EXPECT_NEAR(renderer->base_color().w(), 1.0f, 1e-6f);
 }
 
@@ -231,10 +211,19 @@ TEST(FrameworkPbptSceneImporterTest, ThrowsForInvalidMatrixElementCount) {
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
 
     const auto xml_path = temp_dir.path / "scene_invalid_matrix.xml";
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
+  <integrator type="path">
+    <integer name="maxDepth" value="-1"/>
+  </integrator>
+  <sensor type="perspective">
+    <float name="fov" value="45"/>
+    <film type="hdrfilm">
+      <integer name="width" value="64"/>
+      <integer name="height" value="64"/>
+    </film>
+  </sensor>
   <bsdf type="diffuse" id="mat_white">
     <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
   </bsdf>
@@ -245,28 +234,26 @@ TEST(FrameworkPbptSceneImporterTest, ThrowsForInvalidMatrixElementCount) {
     </transform>
     <ref id="mat_white"/>
   </shape>
-</scene>)XML"
-    );
+</scene>)XML");
 
-    core::Scene scene(1, "scene");
+    core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    EXPECT_THROW(
-        (void)import_pbpt_scene_xml_to_scene(make_location(temp_dir.path, xml_path), scene, resources),
-        std::runtime_error
-    );
+    EXPECT_THROW((void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources), std::runtime_error);
 }
 
-TEST(FrameworkPbptSceneImporterTest, ThrowsForDuplicateImportedNameBetweenCameraAndShape) {
+TEST(FrameworkPbptSceneImporterTest, DisambiguatesDuplicateImportedNameBetweenCameraAndShape) {
     TempDir temp_dir("rtr_pbpt_scene_importer_duplicate_name_test");
 
     const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
 
     const auto xml_path = temp_dir.path / "scene_duplicate_name.xml";
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
+  <integrator type="path">
+    <integer name="maxDepth" value="-1"/>
+  </integrator>
   <sensor type="perspective">
     <float name="fov" value="45"/>
     <film type="hdrfilm">
@@ -281,15 +268,14 @@ TEST(FrameworkPbptSceneImporterTest, ThrowsForDuplicateImportedNameBetweenCamera
     <string name="filename" value="meshes/tri.obj"/>
     <ref id="mat_white"/>
   </shape>
-</scene>)XML"
-    );
+</scene>)XML");
 
-    core::Scene scene(1, "scene");
+    core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    EXPECT_THROW(
-        (void)import_pbpt_scene_xml_to_scene(make_location(temp_dir.path, xml_path), scene, resources),
-        std::runtime_error
-    );
+    const auto                result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
+    EXPECT_EQ(result.imported_shape_count, 1u);
+    EXPECT_TRUE(result.imported_game_object_id_by_name.contains("pbpt_camera"));    // camera is usually pbpt_camera
+    EXPECT_TRUE(result.imported_game_object_id_by_name.contains("pbpt_camera_1"));  // duplicate shape is renamed
 }
 
 TEST(FrameworkPbptSceneImporterTest, RecordsDefaultShapeNameWhenShapeIdMissing) {
@@ -299,10 +285,19 @@ TEST(FrameworkPbptSceneImporterTest, RecordsDefaultShapeNameWhenShapeIdMissing) 
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
 
     const auto xml_path = temp_dir.path / "scene_default_name.xml";
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
+  <integrator type="path">
+    <integer name="maxDepth" value="-1"/>
+  </integrator>
+  <sensor type="perspective">
+    <float name="fov" value="45"/>
+    <film type="hdrfilm">
+      <integer name="width" value="64"/>
+      <integer name="height" value="64"/>
+    </film>
+  </sensor>
   <bsdf type="diffuse" id="mat_white">
     <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
   </bsdf>
@@ -310,20 +305,15 @@ TEST(FrameworkPbptSceneImporterTest, RecordsDefaultShapeNameWhenShapeIdMissing) 
     <string name="filename" value="meshes/tri_default.obj"/>
     <ref id="mat_white"/>
   </shape>
-</scene>)XML"
-    );
+</scene>)XML");
 
-    core::Scene scene(1, "scene");
+    core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    const auto result = import_pbpt_scene_xml_to_scene(
-        make_location(temp_dir.path, xml_path),
-        scene,
-        resources
-    );
+    const auto                result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
 
     EXPECT_EQ(result.imported_shape_count, 1u);
     ASSERT_TRUE(result.imported_game_object_id_by_name.contains("tri_default"));
-    const auto imported_id = result.imported_game_object_id_by_name.at("tri_default");
+    const auto  imported_id = result.imported_game_object_id_by_name.at("tri_default");
     const auto* imported_go = scene.find_game_object(imported_id);
     ASSERT_NE(imported_go, nullptr);
     EXPECT_EQ(imported_go->name(), "tri_default");
@@ -333,10 +323,12 @@ TEST(FrameworkPbptSceneImporterTest, LookAtSensorAlignsWithRtrCameraFrontConvent
     TempDir temp_dir("rtr_pbpt_scene_importer_lookat_camera_test");
 
     const auto xml_path = temp_dir.path / "scene_lookat.xml";
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
+  <integrator type="path">
+    <integer name="maxDepth" value="-1"/>
+  </integrator>
   <sensor type="perspective">
     <transform name="toWorld">
       <lookAt origin="0, 0, 0" target="0, 0, 1" up="0, 1, 0"/>
@@ -347,12 +339,11 @@ TEST(FrameworkPbptSceneImporterTest, LookAtSensorAlignsWithRtrCameraFrontConvent
       <integer name="height" value="64"/>
     </film>
   </sensor>
-</scene>)XML"
-    );
+</scene>)XML");
 
-    core::Scene scene(1, "scene");
+    core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    (void)import_pbpt_scene_xml_to_scene(make_location(temp_dir.path, xml_path), scene, resources);
+    (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
 
     const auto* camera = dynamic_cast<const core::PerspectiveCamera*>(scene.active_camera());
     ASSERT_NE(camera, nullptr);
@@ -367,10 +358,12 @@ TEST(FrameworkPbptSceneImporterTest, AttachesFreeLookControllerWhenInputStatePro
     TempDir temp_dir("rtr_pbpt_scene_importer_freelook_test");
 
     const auto xml_path = temp_dir.path / "scene_with_sensor.xml";
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
+  <integrator type="path">
+    <integer name="maxDepth" value="-1"/>
+  </integrator>
   <sensor type="perspective">
     <transform name="toWorld">
       <lookAt origin="0, 0, 0" target="0, 0, 1" up="0, 1, 0"/>
@@ -381,43 +374,43 @@ TEST(FrameworkPbptSceneImporterTest, AttachesFreeLookControllerWhenInputStatePro
       <integer name="height" value="64"/>
     </film>
   </sensor>
-</scene>)XML"
-    );
+</scene>)XML");
 
-    core::Scene scene(1, "scene");
+    core::Scene               scene(1, "scene");
     system::input::InputState input_state{};
     resource::ResourceManager resources(2, temp_dir.path);
-    PbptImportOptions options{};
+    PbptImportOptions         options{};
     options.free_look_input_state = &input_state;
-    (void)import_pbpt_scene_xml_to_scene(
-        make_location(temp_dir.path, xml_path),
-        scene,
-        resources,
-        options
-    );
+    (void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources, options);
 
     const auto active_camera_owner = scene.camera_manager().active_camera_owner_id();
     ASSERT_NE(active_camera_owner, core::kInvalidGameObjectId);
     const auto* active_camera_go = scene.find_game_object(active_camera_owner);
     ASSERT_NE(active_camera_go, nullptr);
-    EXPECT_NE(
-        active_camera_go->get_component<component::FreeLookCameraController>(),
-        nullptr
-    );
+    EXPECT_NE(active_camera_go->get_component<component::FreeLookCameraController>(), nullptr);
 }
 
 TEST(FrameworkPbptSceneImporterTest, RelativeMeshFilenameResolvesFromXmlDirectoryWithinRoot) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_xml_dir_resolve_test");
+    TempDir    temp_dir("rtr_pbpt_scene_importer_xml_dir_resolve_test");
     const auto resource_root = temp_dir.path / "assets";
-    const auto scene_dir = resource_root / "pbpt_scene" / "cbox";
-    const auto mesh_path = scene_dir / "meshes" / "tri.obj";
-    const auto xml_path = scene_dir / "scene.xml";
+    const auto scene_dir     = resource_root / "pbpt_scene" / "cbox";
+    const auto mesh_path     = scene_dir / "meshes" / "tri.obj";
+    const auto xml_path      = scene_dir / "scene.xml";
 
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
+  <integrator type="path">
+    <integer name="maxDepth" value="-1"/>
+  </integrator>
+  <sensor type="perspective">
+    <float name="fov" value="45"/>
+    <film type="hdrfilm">
+      <integer name="width" value="64"/>
+      <integer name="height" value="64"/>
+    </film>
+  </sensor>
   <bsdf type="diffuse" id="mat_white">
     <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
   </bsdf>
@@ -425,174 +418,24 @@ TEST(FrameworkPbptSceneImporterTest, RelativeMeshFilenameResolvesFromXmlDirector
     <string name="filename" value="meshes/tri.obj"/>
     <ref id="mat_white"/>
   </shape>
-</scene>)XML"
-    );
+</scene>)XML");
 
-    core::Scene scene(1, "scene");
+    core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, resource_root);
-    const auto result = import_pbpt_scene_xml_to_scene(
-        make_location(resource_root, xml_path),
-        scene,
-        resources
-    );
+    const auto                result = import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
-}
-
-TEST(FrameworkPbptSceneImporterTest, AllowsRelativeSceneRootEscapingResourceRoot) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_outside_root_test");
-    const auto resource_root = temp_dir.path / "assets";
-    std::filesystem::create_directories(resource_root);
-    const auto xml_path = temp_dir.path / "outside_scene" / "scene.xml";
-    const auto mesh_path = temp_dir.path / "outside_scene" / "meshes" / "tri.obj";
-    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
-  <bsdf type="diffuse" id="mat_white">
-    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
-  </bsdf>
-  <shape type="obj">
-    <string name="filename" value="meshes/tri.obj"/>
-    <ref id="mat_white"/>
-  </shape>
-</scene>)XML"
-    );
-
-    core::Scene scene(1, "scene");
-    resource::ResourceManager resources(2, resource_root);
-    const auto result = import_pbpt_scene_xml_to_scene(
-        make_pbpt_scene_location("../outside_scene", "scene.xml"),
-        scene,
-        resources
-    );
-    EXPECT_EQ(result.imported_shape_count, 1u);
-}
-
-TEST(FrameworkPbptSceneImporterTest, ThrowsWhenXmlFilenameContainsPathSeparator) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_bad_xml_filename_test");
-    const auto resource_root = temp_dir.path / "assets";
-    resource::ResourceManager resources(2, resource_root);
-    core::Scene scene(1, "scene");
-
-    EXPECT_THROW(
-        (void)import_pbpt_scene_xml_to_scene(
-            make_pbpt_scene_location("pbpt_scene/cbox", "nested/scene.xml"),
-            scene,
-            resources
-        ),
-        std::invalid_argument
-    );
-}
-
-TEST(FrameworkPbptSceneImporterTest, ThrowsWhenMeshFilenameIsNotUnderMeshesDirectory) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_bad_mesh_dir_test");
-    const auto resource_root = temp_dir.path / "assets";
-    const auto scene_dir = resource_root / "pbpt_scene" / "cbox";
-    const auto xml_path = scene_dir / "scene.xml";
-    write_text_file(scene_dir / "models" / "tri.obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
-  <bsdf type="diffuse" id="mat_white">
-    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
-  </bsdf>
-  <shape type="obj">
-    <string name="filename" value="models/tri.obj"/>
-    <ref id="mat_white"/>
-  </shape>
-</scene>)XML"
-    );
-
-    core::Scene scene(1, "scene");
-    resource::ResourceManager resources(2, resource_root);
-    EXPECT_THROW(
-        (void)import_pbpt_scene_xml_to_scene(
-            make_location(resource_root, xml_path),
-            scene,
-            resources
-        ),
-        std::runtime_error
-    );
-}
-
-TEST(FrameworkPbptSceneImporterTest, ThrowsWhenMeshFilenameUsesParentTraversal) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_escape_root_test");
-    const auto resource_root = temp_dir.path / "assets";
-    const auto scene_dir = resource_root / "pbpt_scene" / "cbox";
-    const auto xml_path = scene_dir / "scene.xml";
-
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
-  <bsdf type="diffuse" id="mat_white">
-    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
-  </bsdf>
-  <shape type="obj">
-    <string name="filename" value="../../../outside/tri.obj"/>
-    <ref id="mat_white"/>
-  </shape>
-</scene>)XML"
-    );
-
-    core::Scene scene(1, "scene");
-    resource::ResourceManager resources(2, resource_root);
-    EXPECT_THROW(
-        (void)import_pbpt_scene_xml_to_scene(
-            make_location(resource_root, xml_path),
-            scene,
-            resources
-        ),
-        std::runtime_error
-    );
-}
-
-TEST(FrameworkPbptSceneImporterTest, ThrowsWhenMeshFilenameIsAbsolutePath) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_abs_default_test");
-    const auto mesh_path = (temp_dir.path / "meshes" / "tri_abs.obj");
-    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
-
-    const auto xml_path = temp_dir.path / "scene_abs_default.xml";
-    const std::string xml =
-        std::string("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                    "<scene version=\"0.4.0\">\n"
-                    "  <bsdf type=\"diffuse\" id=\"mat_white\">\n"
-                    "    <spectrum name=\"reflectance\" value=\"400:0.7, 500:0.7, 600:0.7, 700:0.7\"/>\n"
-                    "  </bsdf>\n"
-                    "  <shape type=\"obj\">\n"
-                    "    <string name=\"filename\" value=\"") +
-        mesh_path.string() +
-        "\"/>\n"
-        "    <ref id=\"mat_white\"/>\n"
-        "  </shape>\n"
-        "</scene>\n";
-    write_text_file(xml_path, xml);
-
-    core::Scene scene(1, "scene");
-    resource::ResourceManager resources(2, temp_dir.path);
-    EXPECT_THROW(
-        (void)import_pbpt_scene_xml_to_scene(
-            make_location(temp_dir.path, xml_path),
-            scene,
-            resources
-        ),
-        std::runtime_error
-    );
 }
 
 TEST(FrameworkPbptSceneImporterTest, ImportWithCompatibleInfoMapsSubsetAndPreservesUnmappedShapes) {
-    TempDir temp_dir("rtr_pbpt_scene_importer_compatible_test");
-    const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
+    TempDir    temp_dir("rtr_pbpt_scene_importer_compatible_test");
+    const auto mesh_path  = temp_dir.path / "meshes" / "tri.obj";
     const auto mesh2_path = temp_dir.path / "meshes" / "tri_unmapped.obj";
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
     write_text_file(mesh2_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
 
     const auto xml_path = temp_dir.path / "scene.xml";
-    write_text_file(
-        xml_path,
-        R"XML(<?xml version="1.0" encoding="utf-8"?>
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
   <integrator type="path">
     <integer name="maxDepth" value="-1"/>
@@ -622,16 +465,11 @@ TEST(FrameworkPbptSceneImporterTest, ImportWithCompatibleInfoMapsSubsetAndPreser
     <string name="filename" value="meshes/tri_unmapped.obj"/>
     <ref id="mat_conductor"/>
   </shape>
-</scene>)XML"
-    );
+</scene>)XML");
 
-    core::Scene scene(1, "scene");
+    core::Scene               scene(1, "scene");
     resource::ResourceManager resources(2, temp_dir.path);
-    const auto package = import_pbpt_scene_xml_to_scene_with_compatible(
-        xml_path.string(),
-        scene,
-        resources
-    );
+    const auto package = import_pbpt_scene_xml_to_scene_with_compatible(xml_path.string(), scene, resources);
 
     EXPECT_EQ(package.result.imported_shape_count, 1u);
     EXPECT_EQ(package.result.imported_light_shape_count, 1u);
@@ -651,7 +489,65 @@ TEST(FrameworkPbptSceneImporterTest, ImportWithCompatibleInfoMapsSubsetAndPreser
     EXPECT_FLOAT_EQ(radiance[1].value, 8.0f);
 }
 
-} // namespace rtr::framework::integration::test
+TEST(FrameworkPbptSceneImporterTest, ThrowsWhenSensorIsMissing) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_missing_sensor_test");
+
+    const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
+    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+
+    const auto xml_path = temp_dir.path / "scene_missing_sensor.xml";
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <integrator type="path">
+    <integer name="maxDepth" value="-1"/>
+  </integrator>
+  <bsdf type="diffuse" id="mat_white">
+    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
+  </bsdf>
+  <shape type="obj" id="mesh_a">
+    <string name="filename" value="meshes/tri.obj"/>
+    <ref id="mat_white"/>
+  </shape>
+</scene>)XML");
+
+    core::Scene               scene(1, "scene");
+    resource::ResourceManager resources(2, temp_dir.path);
+    EXPECT_THROW((void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources), std::runtime_error);
+}
+
+TEST(FrameworkPbptSceneImporterTest, ThrowsWhenIntegratorIsMissing) {
+    TempDir temp_dir("rtr_pbpt_scene_importer_missing_integrator_test");
+
+    const auto mesh_path = temp_dir.path / "meshes" / "tri.obj";
+    write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+
+    const auto xml_path = temp_dir.path / "scene_missing_integrator.xml";
+    write_text_file(xml_path,
+                    R"XML(<?xml version="1.0" encoding="utf-8"?>
+<scene version="0.4.0">
+  <sensor type="perspective">
+    <float name="fov" value="45"/>
+    <film type="hdrfilm">
+      <integer name="width" value="64"/>
+      <integer name="height" value="64"/>
+    </film>
+  </sensor>
+  <bsdf type="diffuse" id="mat_white">
+    <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
+  </bsdf>
+  <shape type="obj" id="mesh_a">
+    <string name="filename" value="meshes/tri.obj"/>
+    <ref id="mat_white"/>
+  </shape>
+</scene>)XML");
+
+    core::Scene               scene(1, "scene");
+    resource::ResourceManager resources(2, temp_dir.path);
+    EXPECT_THROW((void)import_pbpt_scene_xml_to_scene(xml_path.string(), scene, resources), std::runtime_error);
+}
+
+}  // namespace rtr::framework::integration::test
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

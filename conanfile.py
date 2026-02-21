@@ -72,7 +72,6 @@ class RTRConan(ConanFile):
         self.requires("spdlog/[>=1.13 <2]", transitive_headers=True)
         self.requires("vulkan-loader/[>=1.3]", transitive_headers=True)
         self.requires("tinyobjloader/2.0.0-rc10", transitive_headers=True)
-        self.requires("pugixml/1.14", transitive_headers=True)
 
         self.requires("openexr/3.2.4", transitive_headers=True)
         self.requires("embree/4.4.0", transitive_headers=True)
@@ -133,7 +132,6 @@ class RTRConan(ConanFile):
             "tinygltf::tinygltf",
             "slang::slang",
             "tinyobjloader::tinyobjloader",
-            "pugixml::pugixml",
             "openexr::openexr",
             "embree::embree",
             "onetbb::onetbb",
