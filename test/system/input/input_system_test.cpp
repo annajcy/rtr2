@@ -116,12 +116,14 @@ TEST(InputSystemTest, InterceptCaptureBlocksStateMutationAndDispatch) {
 
     int key_dispatch_count = 0;
     int mouse_dispatch_count = 0;
-    input.on_key().add([&key_dispatch_count](KeyCode, KeyAction, KeyMod) {
+    auto key_subscription = input.on_key().subscribe([&key_dispatch_count](KeyCode, KeyAction, KeyMod) {
         ++key_dispatch_count;
     });
-    input.on_mouse_move().add([&mouse_dispatch_count](double, double) {
+    auto mouse_subscription = input.on_mouse_move().subscribe([&mouse_dispatch_count](double, double) {
         ++mouse_dispatch_count;
     });
+    (void)key_subscription;
+    (void)mouse_subscription;
 
     input.set_is_intercept_capture([](bool) { return true; });
 

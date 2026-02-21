@@ -111,7 +111,7 @@ private:
     std::unique_ptr<FrameScheduler> m_frame_scheduler{};
     std::unique_ptr<IRenderPipeline> m_active_pipeline{};
 
-    rhi::Window::WindowResizeEvent::ActionHandle m_window_resize_handle{0};
+    utils::SubscriptionToken m_window_resize_subscription{};
     uint64_t m_last_swapchain_generation{0};
 
 public:
@@ -122,7 +122,7 @@ public:
         uint32_t max_frames_in_flight = 2
     ) {
         m_window = std::make_unique<rhi::Window>(width, height, title);
-        m_window_resize_handle = m_window->window_resize_event().add([this](int resize_width, int resize_height) {
+        m_window_resize_subscription = m_window->window_resize_event().subscribe([this](int resize_width, int resize_height) {
             on_window_resized(
                 static_cast<uint32_t>(resize_width),
                 static_cast<uint32_t>(resize_height)
@@ -150,12 +150,7 @@ public:
         m_last_swapchain_generation = m_frame_scheduler->swapchain_state().generation;
     }
 
-    ~Renderer() {
-        if (m_window && m_window_resize_handle != 0) {
-            m_window->window_resize_event().remove(m_window_resize_handle);
-            m_window_resize_handle = 0;
-        }
-    }
+    ~Renderer() = default;
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
