@@ -34,10 +34,10 @@ private:
 
     RawEventSource m_source{};
 
-    utils::Event<int, int, int>::ActionHandle m_key_handle{};
-    utils::Event<int, int, int>::ActionHandle m_mouse_button_handle{};
-    utils::Event<double, double>::ActionHandle m_mouse_move_handle{};
-    utils::Event<double, double>::ActionHandle m_mouse_scroll_handle{};
+    utils::SubscriptionToken m_key_subscription{};
+    utils::SubscriptionToken m_mouse_button_subscription{};
+    utils::SubscriptionToken m_mouse_move_subscription{};
+    utils::SubscriptionToken m_mouse_scroll_subscription{};
 
 public:
     explicit InputSystem(rhi::Window* window)
@@ -93,7 +93,7 @@ public:
         if (mapped_action == KeyAction::UNKNOWN) {
             return;
         }
-        m_key_event.execute(mapped_key, mapped_action, mapped_mods);
+        m_key_event.publish(mapped_key, mapped_action, mapped_mods);
     }
 
     void handle_mouse_button_raw(int button, int action, int mods) {
@@ -109,7 +109,7 @@ public:
         if (mapped_action == KeyAction::UNKNOWN) {
             return;
         }
-        m_mouse_button_event.execute(mapped_button, mapped_action, mapped_mods);
+        m_mouse_button_event.publish(mapped_button, mapped_action, mapped_mods);
     }
 
     void handle_mouse_move_raw(double x, double y) {
@@ -118,7 +118,7 @@ public:
         }
 
         m_state.update_mouse_position(x, y);
-        m_mouse_move_event.execute(x, y);
+        m_mouse_move_event.publish(x, y);
     }
 
     void handle_mouse_scroll_raw(double x, double y) {
@@ -127,7 +127,7 @@ public:
         }
 
         m_state.update_mouse_scroll(x, y);
-        m_mouse_scroll_event.execute(x, y);
+        m_mouse_scroll_event.publish(x, y);
     }
 
 private:
@@ -153,49 +153,37 @@ private:
         m_source = source;
 
         if (m_source.key_event) {
-            m_key_handle = m_source.key_event->add([this](int key, int action, int mods) {
+            m_key_subscription = m_source.key_event->subscribe([this](int key, int action, int mods) {
                 handle_key_raw(key, action, mods);
             });
         }
 
         if (m_source.mouse_button_event) {
-            m_mouse_button_handle = m_source.mouse_button_event->add([this](int button, int action, int mods) {
+            m_mouse_button_subscription = m_source.mouse_button_event->subscribe([this](int button, int action, int mods) {
                 handle_mouse_button_raw(button, action, mods);
             });
         }
 
         if (m_source.mouse_move_event) {
-            m_mouse_move_handle = m_source.mouse_move_event->add([this](double x, double y) {
+            m_mouse_move_subscription = m_source.mouse_move_event->subscribe([this](double x, double y) {
                 handle_mouse_move_raw(x, y);
             });
         }
 
         if (m_source.mouse_scroll_event) {
-            m_mouse_scroll_handle = m_source.mouse_scroll_event->add([this](double x, double y) {
+            m_mouse_scroll_subscription = m_source.mouse_scroll_event->subscribe([this](double x, double y) {
                 handle_mouse_scroll_raw(x, y);
             });
         }
     }
 
     void detach() {
-        if (m_source.key_event && m_key_handle != 0) {
-            m_source.key_event->remove(m_key_handle);
-        }
-        if (m_source.mouse_button_event && m_mouse_button_handle != 0) {
-            m_source.mouse_button_event->remove(m_mouse_button_handle);
-        }
-        if (m_source.mouse_move_event && m_mouse_move_handle != 0) {
-            m_source.mouse_move_event->remove(m_mouse_move_handle);
-        }
-        if (m_source.mouse_scroll_event && m_mouse_scroll_handle != 0) {
-            m_source.mouse_scroll_event->remove(m_mouse_scroll_handle);
-        }
+        m_key_subscription.reset();
+        m_mouse_button_subscription.reset();
+        m_mouse_move_subscription.reset();
+        m_mouse_scroll_subscription.reset();
 
         m_source = RawEventSource{};
-        m_key_handle = 0;
-        m_mouse_button_handle = 0;
-        m_mouse_move_handle = 0;
-        m_mouse_scroll_handle = 0;
     }
 };
 
