@@ -6,6 +6,7 @@
 #include <string>
 
 
+#include "pbpt/math/vector.hpp"
 #include "rtr/app/app_runtime.hpp"
 #include "rtr/editor/editor_attach.hpp"
 #include "rtr/editor/editor_host.hpp"
@@ -64,12 +65,14 @@ int main() {
         auto& camera_go = scene.create_game_object("main_camera");
         auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
         camera.set_aspect_ratio(static_cast<float>(kWidth) / static_cast<float>(kHeight));
-        camera_go.node().set_local_position({0.0f, 1.0f, -6.0f});
+        camera_go.node().set_local_position({0.0f, 1.0f, 6.0f});
         camera_go.add_component<rtr::framework::component::FreeLookCameraController>(
             &runtime.input_system().state(),
             &scene.camera_manager()
         );
         (void)scene.set_active_camera(camera_go.id());
+        
+        scene.active_camera()->camera_look_at_point_world(pbpt::math::vec3{0.0, 3.0, 0.0});
 
         auto add_mesh_renderer = [&](rtr::framework::core::GameObject& go,
                                      const std::string& mesh_path,

@@ -128,6 +128,31 @@ TEST(SceneGraphTest, DirtyFlagPropagatesToSubtree) {
     EXPECT_TRUE(scene.scene_graph().node(grandchild.id()).dirty());
 }
 
+TEST(SceneGraphTest, LookAtDirectionLocalAndWorldHaveDifferentSemanticsWithParentRotation) {
+    Scene scene(1, "scene");
+    auto& parent = scene.create_game_object("parent");
+    auto& child = scene.create_game_object("child");
+    ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id(), false));
+
+    scene.scene_graph().node(parent.id()).set_local_rotation(
+        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::vec3(0.0f, 1.0f, 0.0f))
+    );
+
+    auto child_node = scene.scene_graph().node(child.id());
+    child_node.set_local_rotation(pbpt::math::quat::identity());
+    child_node.look_at_direction_local({0.0f, 0.0f, 1.0f});
+    scene.scene_graph().update_world_transforms();
+    const pbpt::math::vec3 world_front_after_local = scene.scene_graph().node(child.id()).world_front();
+
+    child_node.set_local_rotation(pbpt::math::quat::identity());
+    child_node.look_at_direction_world({0.0f, 0.0f, 1.0f});
+    scene.scene_graph().update_world_transforms();
+    const pbpt::math::vec3 world_front_after_world = scene.scene_graph().node(child.id()).world_front();
+
+    expect_vec3_near(world_front_after_local, {1.0f, 0.0f, 0.0f});
+    expect_vec3_near(world_front_after_world, {0.0f, 0.0f, 1.0f});
+}
+
 TEST(SceneGraphTest, DestroyGameObjectCascadesSubtreeDeletion) {
     Scene scene(1, "scene");
     auto& parent = scene.create_game_object("parent");

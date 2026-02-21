@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 
+#include "pbpt/math/vector.hpp"
 #include "rtr/framework/core/scene_graph.hpp"
 #include "rtr/framework/core/types.hpp"
 
@@ -61,6 +62,40 @@ public:
 
     CameraType camera_type() const {
         return m_camera_type;
+    }
+
+    pbpt::math::vec3 camera_world_front() const {
+        return node().world_back();
+    }
+
+    pbpt::math::vec3 camera_world_back() const {
+        return node().world_front();
+    }   
+
+    pbpt::math::vec3 camera_local_front() const {
+        return node().local_back();
+    }
+
+    pbpt::math::vec3 camera_local_back() const {
+        return node().local_front();
+    }
+
+    void camera_look_at_direction_local(const pbpt::math::vec3& target_dir_local) {
+        this->node().look_at_direction_local(-target_dir_local);
+    }
+
+    void camera_look_at_direction_world(const pbpt::math::vec3& target_dir_world) {
+        this->node().look_at_direction_world(-target_dir_world);
+    }
+
+    void camera_look_at_point_local(const pbpt::math::vec3& target_pos_local) {
+        const auto to_target_local = target_pos_local - this->node().local_position();
+        camera_look_at_direction_local(to_target_local);
+    }
+
+    void camera_look_at_point_world(const pbpt::math::vec3& target_pos_world) {
+        const auto to_target_world = target_pos_world - this->node().world_position();
+        camera_look_at_direction_world(to_target_world);
     }
 
     SceneGraph::NodeView node() {

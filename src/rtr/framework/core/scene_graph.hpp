@@ -89,6 +89,10 @@ public:
         }
 
         const pbpt::math::mat4& world_matrix() const {
+            if (graph().checked_record(m_id).dirty) {
+                auto& mutable_graph = const_cast<SceneGraph&>(graph());
+                mutable_graph.update_world_transforms();
+            }
             return graph().checked_record(m_id).world_matrix;
         }
 
@@ -235,12 +239,12 @@ public:
             graph().set_world_scale_internal(m_id, value);
         }
 
-        void look_at_direction(const pbpt::math::vec3& target_direction) {
-            if (pbpt::math::length(target_direction) < SceneGraph::kEpsilon) {
+        void look_at_direction_local(const pbpt::math::vec3& target_direction_local) {
+            if (pbpt::math::length(target_direction_local) < SceneGraph::kEpsilon) {
                 return;
             }
 
-            const pbpt::math::vec3 direction = pbpt::math::normalize(target_direction);
+            const pbpt::math::vec3 direction = pbpt::math::normalize(target_direction_local);
             const pbpt::math::vec3 current_front = local_front();
             const float cross_len = pbpt::math::length(pbpt::math::cross(current_front, direction));
             pbpt::math::quat rotation = local_rotation();
@@ -257,8 +261,32 @@ public:
             set_local_rotation(pbpt::math::normalize(delta * rotation));
         }
 
-        void look_at_point(const pbpt::math::vec3& target_point) {
-            look_at_direction(target_point - local_position());
+        void look_at_direction_world(const pbpt::math::vec3& target_direction_world) {
+            if (pbpt::math::length(target_direction_world) < SceneGraph::kEpsilon) {
+                return;
+            }
+
+            if (graph().checked_record(m_id).dirty) {
+                graph().update_world_transforms();
+            }
+
+            const auto& node_record = graph().checked_record(m_id);
+            const pbpt::math::quat parent_world_rotation =
+                (node_record.parent_id == SceneGraph::kVirtualRootId)
+                    ? pbpt::math::quat::identity()
+                    : SceneGraph::extract_world_rotation(graph().checked_record(node_record.parent_id).world_matrix);
+
+            const pbpt::math::vec3 target_direction_local =
+                parent_world_rotation.inversed() * target_direction_world;
+            look_at_direction_local(target_direction_local);
+        }
+
+        void look_at_point_local(const pbpt::math::vec3& target_point_local) {
+            look_at_direction_local(target_point_local - local_position());
+        }
+
+        void look_at_point_world(const pbpt::math::vec3& target_point_world) {
+            look_at_direction_world(target_point_world - world_position());
         }
 
         void translate(const pbpt::math::vec3& direction, float distance) {
