@@ -2,12 +2,6 @@
 #include <iostream>
 #include <memory>
 
-#include "rtr/editor/core/editor_host.hpp"
-#include "rtr/editor/panel/hierarchy_panel.hpp"
-#include "rtr/editor/panel/inspector_panel.hpp"
-#include "rtr/editor/panel/logger_panel.hpp"
-#include "rtr/editor/panel/scene_view_panel.hpp"
-#include "rtr/editor/panel/stats_panel.hpp"
 #include "rtr/framework/core/world.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/input/input_system.hpp"
@@ -34,26 +28,12 @@ int main() {
         world->set_resource_manager(resources.get());
         (void)world->create_scene("editor_scene");
 
-        auto editor_host = std::make_shared<rtr::editor::EditorHost>();
-        editor_host->bind_runtime(world.get(), resources.get(), renderer.get(), input_system.get());
-        editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
-        editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
-        editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
-        editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
-        editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
         renderer->set_pipeline(std::move(runtime_pipeline));
 
         std::uint64_t frame_serial = 0;
         while (!renderer->window().is_should_close()) {
             input_system->begin_frame();
             renderer->window().poll_events();
-
-            editor_host->begin_frame(rtr::editor::EditorFrameData{
-                .frame_serial  = frame_serial,
-                .delta_seconds = 0.0,
-                .paused        = false,
-            });
-
             renderer->draw_frame();
             if (input_system->state().key_down(rtr::system::input::KeyCode::Q)) {
                 renderer->window().close();
