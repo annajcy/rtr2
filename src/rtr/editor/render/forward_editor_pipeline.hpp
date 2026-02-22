@@ -1,19 +1,16 @@
 #pragma once
 
-#include <pbpt/math/math.h>
-
 #include <array>
-#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <optional>
 #include <stdexcept>
-#include <string>
-#include <utility>
 #include <vector>
 
-#include "rtr/framework/core/world.hpp"
+#include "rtr/editor/core/editor_capture.hpp"
+#include "rtr/editor/core/editor_host.hpp"
+#include "rtr/editor/render/editor_imgui_pass.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/descriptor.hpp"
@@ -21,59 +18,38 @@
 #include "rtr/rhi/shader_module.hpp"
 #include "rtr/rhi/texture.hpp"
 #include "rtr/system/render/frame_color_source.hpp"
-#include "rtr/system/render/pass/present_pass.hpp"
 #include "rtr/system/render/pipeline.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pass.hpp"
+#include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"  // GpuMat4, pack_mat4_row_major, ForwardSceneView types
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
 #include "rtr/system/render/render_pass.hpp"
 #include "rtr/utils/log.hpp"
 #include "vulkan/vulkan.hpp"
 
-namespace rtr::system::render {
+// ============================================================================
+// ForwardEditorPipeline (self-contained, composition-based)
+//
+// Sequence:
+//   1. ForwardPass   — renders 3D scene to an offscreen color image.
+//   2. Image barriers:
+//        offscreen  eColorAttachmentOptimal → eShaderReadOnlyOptimal
+//        swapchain  eUndefined              → eColorAttachmentOptimal
+//   3. EditorImGuiPass — renders editor UI onto the swapchain;
+//                        the scene view panel samples the offscreen image.
+// ============================================================================
 
-// ---------------------------------------------------------------------------
-// Shared GPU data types (used by both ForwardPipeline and ForwardEditorPipeline)
-// ---------------------------------------------------------------------------
+namespace rtr::editor::render {
 
-struct GpuMat4 {
-    alignas(16) std::array<float, 16> values{};
-};
-
-struct UniformBufferObjectGpu {
-    alignas(16) GpuMat4 model{};
-    alignas(16) GpuMat4 view{};
-    alignas(16) GpuMat4 proj{};
-    alignas(16) GpuMat4 normal{};
-    alignas(16) std::array<float, 4> base_color{};
-};
-
-inline GpuMat4 pack_mat4_row_major(const pbpt::math::mat4& m) {
-    GpuMat4     out{};
-    std::size_t idx = 0;
-    for (int r = 0; r < 4; ++r)
-        for (int c = 0; c < 4; ++c)
-            out.values[idx++] = static_cast<float>(m[r][c]);
-    return out;
-}
-
-struct ForwardPipelineConfig {
-    std::string shader_output_dir{"/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/"};
-    std::string vertex_shader_filename{"vert_buffer_vert.spv"};
-    std::string fragment_shader_filename{"vert_buffer_frag.spv"};
-};
-
-// ---------------------------------------------------------------------------
-// ForwardPipeline
-// Sequence: ForwardPass (offscreen) → PresentPass (blit to swapchain).
-// ---------------------------------------------------------------------------
-class ForwardPipeline final : public RenderPipelineBase,
-                              public IFramePreparePipeline,
-                              public IResourceAwarePipeline,
-                              public IFrameColorSource,
-                              public ISceneViewportSink {
+class ForwardEditorPipeline final : public system::render::RenderPipelineBase,
+                                    public system::render::IFramePreparePipeline,
+                                    public system::render::IResourceAwarePipeline,
+                                    public system::render::IFrameColorSource,
+                                    public system::render::ISceneViewportSink,
+                                    public IEditorInputCaptureSource {
     static constexpr uint32_t kMaxRenderables = 256;
 
+    // ---- Vulkan pipeline resources ----
     vk::raii::PipelineLayout m_pipeline_layout{nullptr};
     vk::raii::Pipeline       m_pipeline{nullptr};
 
@@ -83,6 +59,7 @@ class ForwardPipeline final : public RenderPipelineBase,
     std::unique_ptr<rhi::DescriptorSetLayout> m_per_object_layout{nullptr};
     std::unique_ptr<rhi::DescriptorPool>      m_descriptor_pool{nullptr};
 
+    // ---- Per-frame GPU resource arrays ----
     vk::DeviceSize                                         m_uniform_buffer_size{0};
     std::vector<std::vector<std::unique_ptr<rhi::Buffer>>> m_object_uniform_buffers{};
     std::vector<std::vector<vk::raii::DescriptorSet>>      m_object_sets{};
@@ -91,25 +68,35 @@ class ForwardPipeline final : public RenderPipelineBase,
     std::vector<std::unique_ptr<rhi::Image>> m_color_images{};
     std::vector<vk::ImageLayout>             m_color_image_layouts{};
 
+    // ---- Scene target management ----
     vk::Extent2D m_scene_target_extent{};
     vk::Extent2D m_requested_scene_extent{};
     bool         m_scene_extent_dirty{false};
 
-    std::optional<ForwardSceneView> m_scene_view{};
-    resource::ResourceManager*      m_resource_manager{};
+    std::optional<system::render::ForwardSceneView> m_scene_view{};
+    resource::ResourceManager*                      m_resource_manager{};
 
-    std::unique_ptr<render::ForwardPass> m_forward_pass{nullptr};
-    std::unique_ptr<render::PresentPass> m_present_pass{nullptr};
+    // ---- Passes ----
+    std::unique_ptr<system::render::ForwardPass> m_forward_pass{nullptr};
+    std::unique_ptr<EditorImGuiPass>             m_editor_pass{nullptr};
 
 public:
-    ForwardPipeline(const render::PipelineRuntime& runtime, const ForwardPipelineConfig& config = {})
-        : RenderPipelineBase(runtime) {
+    ForwardEditorPipeline(const system::render::PipelineRuntime& runtime, std::shared_ptr<EditorHost> editor_host)
+        : system::render::RenderPipelineBase(runtime) {
+        using namespace system::render;
+
         m_uniform_buffer_size = sizeof(UniformBufferObjectGpu);
 
-        m_vertex_shader_module   = std::make_unique<rhi::ShaderModule>(rhi::ShaderModule::from_file(
-            m_device, config.shader_output_dir + config.vertex_shader_filename, vk::ShaderStageFlagBits::eVertex));
-        m_fragment_shader_module = std::make_unique<rhi::ShaderModule>(rhi::ShaderModule::from_file(
-            m_device, config.shader_output_dir + config.fragment_shader_filename, vk::ShaderStageFlagBits::eFragment));
+        m_vertex_shader_module = std::make_unique<rhi::ShaderModule>(
+            rhi::ShaderModule::from_file(m_device,
+                                         "/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/"
+                                         "vert_buffer_vert.spv",
+                                         vk::ShaderStageFlagBits::eVertex));
+        m_fragment_shader_module = std::make_unique<rhi::ShaderModule>(
+            rhi::ShaderModule::from_file(m_device,
+                                         "/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/"
+                                         "vert_buffer_frag.spv",
+                                         vk::ShaderStageFlagBits::eFragment));
 
         rhi::DescriptorSetLayout::Builder layout_builder;
         layout_builder.add_binding(0, vk::DescriptorType::eUniformBuffer,
@@ -131,25 +118,53 @@ public:
 
         create_graphics_pipeline();
 
-        m_forward_pass = std::make_unique<render::ForwardPass>(&m_pipeline_layout, &m_pipeline);
-        m_present_pass = std::make_unique<render::PresentPass>();
+        m_forward_pass = std::make_unique<system::render::ForwardPass>(&m_pipeline_layout, &m_pipeline);
+        m_editor_pass  = std::make_unique<EditorImGuiPass>(runtime, std::move(editor_host), this);
     }
 
-    ~ForwardPipeline() override {
+    ~ForwardEditorPipeline() override {
         m_forward_pass.reset();
+        m_editor_pass.reset();
         m_object_sets.clear();
         m_descriptor_pool.reset();
     }
 
-    void set_resource_manager(resource::ResourceManager* manager) override { m_resource_manager = manager; }
+    // -----------------------------------------------------------------------
+    // IEditorInputCaptureSource
+    // -----------------------------------------------------------------------
+    bool wants_imgui_capture_mouse() const override { return m_editor_pass->wants_capture_mouse(); }
+    bool wants_imgui_capture_keyboard() const override { return m_editor_pass->wants_capture_keyboard(); }
 
-    void prepare_frame(const FramePrepareContext& ctx) override {
-        auto* active_scene = ctx.world.active_scene();
-        if (!active_scene)
-            throw std::runtime_error("ForwardPipeline::prepare_frame: no active scene.");
-        m_scene_view = build_forward_scene_view(*active_scene, ctx.resources);
+    // -----------------------------------------------------------------------
+    // IFramePreparePipeline
+    // -----------------------------------------------------------------------
+    void prepare_frame(const system::render::FramePrepareContext& ctx) override {
+        auto* scene = ctx.world.active_scene();
+        if (!scene)
+            throw std::runtime_error("ForwardEditorPipeline::prepare_frame: no active scene.");
+        m_scene_view = system::render::build_forward_scene_view(*scene, ctx.resources);
     }
 
+    // -----------------------------------------------------------------------
+    // IResourceAwarePipeline
+    // -----------------------------------------------------------------------
+    void set_resource_manager(resource::ResourceManager* manager) override { m_resource_manager = manager; }
+
+    // -----------------------------------------------------------------------
+    // IFrameColorSource
+    // -----------------------------------------------------------------------
+    system::render::FrameColorSourceView frame_color_source_view(uint32_t frame_index) const override {
+        if (frame_index >= m_color_images.size() || !m_color_images[frame_index])
+            return {};
+        return system::render::FrameColorSourceView{
+            .image_view   = *m_color_images[frame_index]->image_view(),
+            .image_layout = m_color_image_layouts[frame_index],
+            .extent       = {m_color_images[frame_index]->width(), m_color_images[frame_index]->height()}};
+    }
+
+    // -----------------------------------------------------------------------
+    // ISceneViewportSink
+    // -----------------------------------------------------------------------
     void set_scene_viewport_extent(vk::Extent2D extent) override {
         if (extent.width == 0 || extent.height == 0)
             return;
@@ -159,40 +174,39 @@ public:
         m_scene_extent_dirty     = true;
     }
 
-    FrameColorSourceView frame_color_source_view(uint32_t frame_index) const override {
-        if (frame_index >= m_color_images.size() || !m_color_images[frame_index])
-            return {};
-        return FrameColorSourceView{
-            .image_view   = *m_color_images[frame_index]->image_view(),
-            .image_layout = m_color_image_layouts[frame_index],
-            .extent       = {m_color_images[frame_index]->width(), m_color_images[frame_index]->height()}};
-    }
-
+    // -----------------------------------------------------------------------
+    // RenderPipelineBase
+    // -----------------------------------------------------------------------
     void on_resize(int /*w*/, int /*h*/) override {}
 
-    void handle_swapchain_state_change(const FrameScheduler::SwapchainState& /*state*/,
-                                       const SwapchainChangeSummary& diff) override {
+    void handle_swapchain_state_change(const system::render::FrameScheduler::SwapchainState& state,
+                                       const system::render::SwapchainChangeSummary&         diff) override {
         if (diff.color_or_depth_changed())
             create_graphics_pipeline();
         if (diff.extent_or_depth_changed())
             m_scene_extent_dirty = true;
+        m_editor_pass->on_swapchain_recreated(state.image_count, state.color_format, state.depth_format);
     }
 
-    void render(FrameContext& ctx) override {
+    // -----------------------------------------------------------------------
+    // IRenderPipeline
+    // -----------------------------------------------------------------------
+    void render(system::render::FrameContext& ctx) override {
+        using namespace system::render;
+
         // --- 1. Guard ---
         const auto extent = ctx.render_extent();
         if (extent.width == 0 || extent.height == 0)
             return;
         if (!m_resource_manager)
-            throw std::runtime_error("ForwardPipeline: resource manager not set.");
+            throw std::runtime_error("ForwardEditorPipeline: resource manager not set.");
         if (!m_scene_view)
-            throw std::runtime_error("ForwardPipeline: scene view not set.");
+            throw std::runtime_error("ForwardEditorPipeline: scene view not set.");
 
         ensure_scene_targets(extent);
         const uint32_t frame_index = ctx.frame_index();
-        check_frame_resources(frame_index);
 
-        // --- 2. ForwardPass: render scene to offscreen color image ---
+        // --- 2. ForwardPass: render scene to offscreen ---
         m_forward_pass->bind_render_pass_resources(
             ForwardPass::RenderPassResources{.color_image  = m_color_images[frame_index].get(),
                                              .color_layout = &m_color_image_layouts[frame_index],
@@ -201,54 +215,78 @@ public:
                                              .draw_items   = build_draw_items(frame_index)});
         m_forward_pass->execute(ctx);
 
-        // --- 3. PresentPass: blit offscreen → swapchain ---
-        m_present_pass->bind_render_pass_resources(
-            PresentPass::RenderPassResources{.src_color_image  = m_color_images[frame_index].get(),
-                                             .src_color_layout = &m_color_image_layouts[frame_index],
-                                             .src_extent       = m_scene_target_extent});
-        m_present_pass->execute(ctx);
+        // --- 3. Image barriers ---
+        auto& cmd = ctx.cmd().command_buffer();
+
+        // offscreen: eColorAttachmentOptimal → eShaderReadOnlyOptimal
+        vk::ImageMemoryBarrier2 offscreen_to_sampled{};
+        offscreen_to_sampled.srcStageMask     = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+        offscreen_to_sampled.dstStageMask     = vk::PipelineStageFlagBits2::eFragmentShader;
+        offscreen_to_sampled.srcAccessMask    = vk::AccessFlagBits2::eColorAttachmentWrite;
+        offscreen_to_sampled.dstAccessMask    = vk::AccessFlagBits2::eShaderRead;
+        offscreen_to_sampled.oldLayout        = m_color_image_layouts[frame_index];
+        offscreen_to_sampled.newLayout        = vk::ImageLayout::eShaderReadOnlyOptimal;
+        offscreen_to_sampled.image            = *m_color_images[frame_index]->image();
+        offscreen_to_sampled.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+
+        // swapchain: eUndefined → eColorAttachmentOptimal
+        vk::ImageMemoryBarrier2 swapchain_to_color{};
+        swapchain_to_color.srcStageMask     = vk::PipelineStageFlagBits2::eTopOfPipe;
+        swapchain_to_color.dstStageMask     = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+        swapchain_to_color.srcAccessMask    = vk::AccessFlagBits2::eNone;
+        swapchain_to_color.dstAccessMask    = vk::AccessFlagBits2::eColorAttachmentWrite;
+        swapchain_to_color.oldLayout        = vk::ImageLayout::eUndefined;
+        swapchain_to_color.newLayout        = vk::ImageLayout::eColorAttachmentOptimal;
+        swapchain_to_color.image            = ctx.swapchain_image();
+        swapchain_to_color.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+
+        std::array<vk::ImageMemoryBarrier2, 2> barriers{offscreen_to_sampled, swapchain_to_color};
+        vk::DependencyInfo                     dep{};
+        dep.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+        dep.pImageMemoryBarriers    = barriers.data();
+        cmd.pipelineBarrier2(dep);
+
+        m_color_image_layouts[frame_index] = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+        // --- 4. EditorImGuiPass: render editor UI onto swapchain ---
+        auto src = frame_color_source_view(frame_index);
+        m_editor_pass->bind_render_pass_resources(EditorImGuiPass::RenderPassResources{
+            .scene_image_view = src.image_view, .scene_image_layout = src.image_layout, .scene_extent = src.extent});
+        m_editor_pass->execute(ctx);
     }
 
 private:
-    void check_frame_resources(uint32_t frame_index) const {
-        if (frame_index >= m_object_uniform_buffers.size() || frame_index >= m_object_sets.size() ||
-            frame_index >= m_depth_images.size() || frame_index >= m_color_images.size() ||
-            frame_index >= m_color_image_layouts.size()) {
-            throw std::runtime_error("ForwardPipeline frame resources not ready.");
-        }
-    }
+    std::vector<system::render::ForwardPass::DrawItem> build_draw_items(uint32_t frame_index) {
+        using namespace system::render;
+        const auto& sv = m_scene_view.value();
+        if (sv.renderables.size() > kMaxRenderables)
+            throw std::runtime_error("Renderable count exceeds ForwardEditorPipeline capacity.");
 
-    std::vector<ForwardPass::DrawItem> build_draw_items(uint32_t frame_index) {
-        const auto& scene_view = m_scene_view.value();
-        if (scene_view.renderables.size() > kMaxRenderables)
-            throw std::runtime_error("Renderable count exceeds ForwardPipeline capacity.");
-
-        auto& frame_ubos = m_object_uniform_buffers[frame_index];
-        auto& frame_sets = m_object_sets[frame_index];
+        auto& ubos = m_object_uniform_buffers[frame_index];
+        auto& sets = m_object_sets[frame_index];
 
         std::vector<ForwardPass::DrawItem> items;
-        items.reserve(scene_view.renderables.size());
-        for (std::size_t i = 0; i < scene_view.renderables.size(); ++i) {
-            const auto& r    = scene_view.renderables[i];
+        items.reserve(sv.renderables.size());
+        for (std::size_t i = 0; i < sv.renderables.size(); ++i) {
+            const auto& r    = sv.renderables[i];
             auto&       mesh = require_mesh(r.mesh);
 
             UniformBufferObjectGpu ubo{};
             ubo.model      = pack_mat4_row_major(r.model);
-            ubo.view       = pack_mat4_row_major(scene_view.camera.view);
-            ubo.proj       = pack_mat4_row_major(scene_view.camera.proj);
+            ubo.view       = pack_mat4_row_major(sv.camera.view);
+            ubo.proj       = pack_mat4_row_major(sv.camera.proj);
             ubo.normal     = pack_mat4_row_major(r.normal);
             ubo.base_color = {static_cast<float>(r.base_color.x()), static_cast<float>(r.base_color.y()),
                               static_cast<float>(r.base_color.z()), static_cast<float>(r.base_color.w())};
-            std::memcpy(frame_ubos[i]->mapped_data(), &ubo, sizeof(ubo));
-
-            items.push_back({.mesh = &mesh, .per_object_set = &frame_sets[i]});
+            std::memcpy(ubos[i]->mapped_data(), &ubo, sizeof(ubo));
+            items.push_back({.mesh = &mesh, .per_object_set = &sets[i]});
         }
         return items;
     }
 
     rhi::Mesh& require_mesh(resource::MeshHandle handle) {
         if (!handle.is_valid())
-            throw std::runtime_error("ForwardPipeline: invalid mesh handle.");
+            throw std::runtime_error("ForwardEditorPipeline: invalid mesh handle.");
         return m_resource_manager->require_gpu<resource::MeshResourceKind>(handle, m_device);
     }
 
@@ -322,9 +360,9 @@ private:
         vk::PipelineInputAssemblyStateCreateInfo ia{};
         ia.topology = vk::PrimitiveTopology::eTriangleList;
 
-        vk::PipelineViewportStateCreateInfo vp{};
-        vp.viewportCount = 1;
-        vp.scissorCount  = 1;
+        vk::PipelineViewportStateCreateInfo vps{};
+        vps.viewportCount = 1;
+        vps.scissorCount  = 1;
 
         vk::PipelineRasterizationStateCreateInfo rs{};
         rs.polygonMode = vk::PolygonMode::eFill;
@@ -358,7 +396,7 @@ private:
         info.pStages             = stages.data();
         info.pVertexInputState   = &vi;
         info.pInputAssemblyState = &ia;
-        info.pViewportState      = &vp;
+        info.pViewportState      = &vps;
         info.pRasterizationState = &rs;
         info.pMultisampleState   = &ms;
         info.pDepthStencilState  = &ds;
@@ -378,4 +416,4 @@ private:
     }
 };
 
-}  // namespace rtr::system::render
+}  // namespace rtr::editor::render
