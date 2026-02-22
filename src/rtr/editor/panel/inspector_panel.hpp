@@ -9,7 +9,7 @@
 
 #include "imgui.h"
 
-#include "rtr/editor/editor_panel.hpp"
+#include "rtr/editor/core/editor_panel.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/camera_control/trackball_camera_controller.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"

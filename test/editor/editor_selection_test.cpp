@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 
-#include "rtr/editor/editor_context.hpp"
+#include "rtr/editor/core/editor_context.hpp"
 #include "rtr/framework/core/world.hpp"
 
 namespace rtr::editor::test {

@@ -2,7 +2,7 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/editor/logger_panel.hpp"
+#include "rtr/editor/panel/logger_panel.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::editor::test {

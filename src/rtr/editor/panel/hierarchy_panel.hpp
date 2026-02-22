@@ -6,7 +6,7 @@
 
 #include "imgui.h"
 
-#include "rtr/editor/editor_panel.hpp"
+#include "rtr/editor/core/editor_panel.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/scene_graph.hpp"
 #include "rtr/framework/core/types.hpp"
