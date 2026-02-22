@@ -17,6 +17,7 @@
 #include "rtr/editor/render/forward_editor_pipeline.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/system/input/input_types.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
@@ -57,7 +58,14 @@ int main() {
                                                                                      &scene.camera_manager());
         (void)scene.set_active_camera(camera_go.id());
 
-        scene.active_camera()->camera_look_at_point_world(pbpt::math::vec3{0.0, 3.0, 0.0});
+        scene.active_camera()->camera_look_at_point_world(pbpt::math::vec3{0.0, 0.0, 0.0});
+
+        auto& light_go = scene.create_game_object("main_light");
+        light_go.node().set_local_position({2.0f, 4.0f, 4.0f});
+        auto& point_light = light_go.add_component<rtr::framework::component::light::PointLight>();
+        point_light.set_color({1.0f, 0.9f, 0.8f});
+        point_light.set_intensity(50.0f);
+        point_light.set_range(20.0f);
 
         auto add_mesh_renderer = [&](rtr::framework::core::GameObject& go, const std::string& mesh_path,
                                      const pbpt::math::vec4& base_color) {
@@ -81,7 +89,6 @@ int main() {
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{
             .on_post_update =
                 [editor_host](rtr::app::RuntimeContext& ctx) {
-                    
                     editor_host->begin_frame(rtr::editor::EditorFrameData{
                         .frame_serial  = ctx.frame_serial,
                         .delta_seconds = ctx.delta_seconds,

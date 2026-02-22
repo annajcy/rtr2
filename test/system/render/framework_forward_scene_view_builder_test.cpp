@@ -10,6 +10,7 @@
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
+#include "rtr/framework/component/light/point_light.hpp"
 
 namespace rtr::framework::integration::test {
 
@@ -56,6 +57,50 @@ pbpt::math::vec4 multiply_packed(const system::render::GpuMat4& matrix, const pb
 }
 
 }  // namespace
+
+TEST(FrameworkForwardSceneViewBuilderTest, CollectsPointLightsAndCameraPos) {
+    core::Scene               scene(1, "scene");
+    resource::ResourceManager resources{};
+    auto&                     camera_go = scene.create_game_object("camera");
+    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
+    camera_go.node().set_world_position({10.0f, 20.0f, 30.0f});
+    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+
+    auto& light_go1 = scene.create_game_object("light1");
+    light_go1.node().set_world_position({1.0f, 0.0f, 0.0f});
+    light_go1.add_component<component::light::PointLight>().set_intensity(10.0f);
+
+    auto& light_go_disabled = scene.create_game_object("light_disabled");
+    auto& disabled_pl       = light_go_disabled.add_component<component::light::PointLight>();
+    disabled_pl.set_enabled(false);
+
+    auto& light_go2 = scene.create_game_object("light2");
+    light_go2.node().set_world_position({2.0f, 0.0f, 0.0f});
+    light_go2.add_component<component::light::PointLight>().set_intensity(20.0f);
+
+    auto& light_go3 = scene.create_game_object("light3");
+    light_go3.add_component<component::light::PointLight>();
+    auto& light_go4 = scene.create_game_object("light4");
+    light_go4.add_component<component::light::PointLight>();
+
+    // 5th light should be ignored
+    auto& light_go5 = scene.create_game_object("light5");
+    light_go5.add_component<component::light::PointLight>().set_intensity(50.0f);
+
+    scene.scene_graph().update_world_transforms();
+    const auto view = system::render::build_forward_scene_view(scene, resources);
+
+    EXPECT_FLOAT_EQ(view.camera.world_pos.x(), 10.0f);
+    EXPECT_FLOAT_EQ(view.camera.world_pos.y(), 20.0f);
+    EXPECT_FLOAT_EQ(view.camera.world_pos.z(), 30.0f);
+
+    ASSERT_EQ(view.point_lights.size(), 4u);
+    EXPECT_FLOAT_EQ(view.point_lights[0].intensity, 10.0f);
+    EXPECT_FLOAT_EQ(view.point_lights[0].position.x(), 1.0f);
+
+    EXPECT_FLOAT_EQ(view.point_lights[1].intensity, 20.0f);
+    EXPECT_FLOAT_EQ(view.point_lights[1].position.x(), 2.0f);
+}
 
 TEST(FrameworkForwardSceneViewBuilderTest, ThrowsWhenNoActiveCamera) {
     core::Scene               scene(1, "scene");

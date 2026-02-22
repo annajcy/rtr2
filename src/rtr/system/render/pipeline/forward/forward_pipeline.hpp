@@ -40,12 +40,25 @@ struct GpuMat4 {
     alignas(16) std::array<float, 16> values{};
 };
 
+struct GpuPointLight {
+    alignas(16) std::array<float, 3> position{};
+    alignas(4) float intensity{0.0f};
+    alignas(16) std::array<float, 3> color{};
+    alignas(4) float range{0.0f};
+    alignas(4) float specular_strength{0.0f};
+    alignas(4) float shininess{0.0f};
+    alignas(8) std::array<float, 2> padding{};
+};
+
 struct UniformBufferObjectGpu {
     alignas(16) GpuMat4 model{};
     alignas(16) GpuMat4 view{};
     alignas(16) GpuMat4 proj{};
     alignas(16) GpuMat4 normal{};
     alignas(16) std::array<float, 4> base_color{};
+    alignas(16) std::array<GpuPointLight, 4> point_lights{};
+    alignas(16) std::array<float, 3> camera_world_pos{};
+    alignas(4) uint32_t point_light_count{0};
 };
 
 inline GpuMat4 pack_mat4_row_major(const pbpt::math::mat4& m) {
@@ -239,6 +252,25 @@ private:
             ubo.normal     = pack_mat4_row_major(r.normal);
             ubo.base_color = {static_cast<float>(r.base_color.x()), static_cast<float>(r.base_color.y()),
                               static_cast<float>(r.base_color.z()), static_cast<float>(r.base_color.w())};
+
+            ubo.point_light_count = static_cast<uint32_t>(scene_view.point_lights.size());
+            ubo.camera_world_pos  = {static_cast<float>(scene_view.camera.world_pos.x()),
+                                     static_cast<float>(scene_view.camera.world_pos.y()),
+                                     static_cast<float>(scene_view.camera.world_pos.z())};
+
+            for (std::size_t j = 0; j < ubo.point_light_count; ++j) {
+                const auto& pl                = scene_view.point_lights[j];
+                ubo.point_lights[j].position  = {static_cast<float>(pl.position.x()),
+                                                 static_cast<float>(pl.position.y()),
+                                                 static_cast<float>(pl.position.z())};
+                ubo.point_lights[j].intensity = pl.intensity;
+                ubo.point_lights[j].color     = {static_cast<float>(pl.color.x()), static_cast<float>(pl.color.y()),
+                                                 static_cast<float>(pl.color.z())};
+                ubo.point_lights[j].range     = pl.range;
+                ubo.point_lights[j].specular_strength = pl.specular_strength;
+                ubo.point_lights[j].shininess         = pl.shininess;
+            }
+
             std::memcpy(frame_ubos[i]->mapped_data(), &ubo, sizeof(ubo));
 
             items.push_back({.mesh = &mesh, .per_object_set = &frame_sets[i]});
