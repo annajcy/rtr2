@@ -102,6 +102,10 @@ rtr_add_test(
 
 # framework/component
 rtr_add_test(
+    test_framework_point_light
+    framework/component/framework_point_light_test.cpp
+)
+rtr_add_test(
     test_framework_mesh_renderer
     framework/component/framework_mesh_renderer_test.cpp
 )
