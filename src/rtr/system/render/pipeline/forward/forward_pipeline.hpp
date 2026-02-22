@@ -230,13 +230,10 @@ private:
     vk::DeviceSize                                         m_uniform_buffer_size{0};
     std::vector<std::vector<std::unique_ptr<rhi::Buffer>>> m_object_uniform_buffers{};
     std::vector<std::vector<vk::raii::DescriptorSet>>      m_object_sets{};
-
-    std::vector<std::unique_ptr<rhi::Image>> m_color_images{};
-    std::vector<vk::ImageLayout>             m_color_image_layouts{};
-    std::vector<std::unique_ptr<rhi::Image>> m_depth_images{};
-    vk::Extent2D                             m_scene_target_extent{};
-    vk::Extent2D                             m_requested_scene_extent{};
-    bool                                     m_scene_extent_dirty{false};
+    std::vector<std::unique_ptr<rhi::Image>>               m_depth_images{};
+    vk::Extent2D                                           m_scene_target_extent{};
+    vk::Extent2D                                           m_requested_scene_extent{};
+    bool                                                   m_scene_extent_dirty{false};
 
     std::unique_ptr<rhi::DescriptorSetLayout> m_per_object_layout{nullptr};
     std::unique_ptr<rhi::DescriptorPool>      m_descriptor_pool{nullptr};
@@ -245,6 +242,10 @@ private:
 
     std::unique_ptr<render::ForwardPass> m_forward_pass{nullptr};
     std::unique_ptr<render::PresentPass> m_present_pass{nullptr};
+
+protected:
+    std::vector<std::unique_ptr<rhi::Image>> m_color_images{};
+    std::vector<vk::ImageLayout>             m_color_image_layouts{};
 
 public:
     ForwardPipeline(const render::PipelineRuntime& runtime, const ForwardPipelineConfig& config = {})
@@ -334,9 +335,23 @@ public:
     }
 
     void render(FrameContext& ctx) override {
+        if (!render_forward_pass(ctx)) {
+            return;
+        }
+
+        const uint32_t frame_index = ctx.frame_index();
+        m_present_pass->bind_render_pass_resources(
+            PresentPass::RenderPassResources{.src_color_image  = m_color_images[frame_index].get(),
+                                             .src_color_layout = &m_color_image_layouts[frame_index],
+                                             .src_extent       = m_scene_target_extent});
+        m_present_pass->execute(ctx);
+    }
+
+protected:
+    bool render_forward_pass(FrameContext& ctx) {
         const auto extent = ctx.render_extent();
         if (extent.width == 0 || extent.height == 0) {
-            return;
+            return false;
         }
         if (m_resource_manager == nullptr) {
             throw std::runtime_error("ForwardPipeline requires resource manager before render().");
@@ -395,12 +410,7 @@ public:
                                              .extent       = m_scene_target_extent,
                                              .draw_items   = std::move(draw_items)});
         m_forward_pass->execute(ctx);
-
-        m_present_pass->bind_render_pass_resources(
-            PresentPass::RenderPassResources{.src_color_image  = m_color_images[frame_index].get(),
-                                             .src_color_layout = &m_color_image_layouts[frame_index],
-                                             .src_extent       = m_scene_target_extent});
-        m_present_pass->execute(ctx);
+        return true;
     }
 
 private:
@@ -477,6 +487,12 @@ private:
                            vk::ImageTiling::eOptimal, usage, vk::MemoryPropertyFlagBits::eDeviceLocal,
                            vk::ImageAspectFlagBits::eColor, false)));
         }
+    }
+
+    const vk::Extent2D& scene_target_extent() const { return m_scene_target_extent; }
+
+    const vk::ImageLayout& color_image_layout(std::uint32_t frame_index) const {
+        return m_color_image_layouts[frame_index];
     }
 
     void create_depth_images() {

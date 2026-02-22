@@ -4,8 +4,8 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/editor/editor_host.hpp"
-#include "rtr/editor/editor_types.hpp"
+#include "rtr/editor/core/editor_host.hpp"
+#include "rtr/editor/core/editor_types.hpp"
 
 namespace rtr::editor::test {
 

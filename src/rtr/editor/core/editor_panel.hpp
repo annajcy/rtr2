@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-#include "rtr/editor/editor_context.hpp"
+#include "rtr/editor/core/editor_context.hpp"
 
 namespace rtr::editor {
 

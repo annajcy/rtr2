@@ -4,7 +4,7 @@
 
 #include "imgui.h"
 
-#include "rtr/editor/editor_panel.hpp"
+#include "rtr/editor/core/editor_panel.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::editor {

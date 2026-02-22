@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-#include "rtr/editor/editor_types.hpp"
+#include "rtr/editor/core/editor_types.hpp"
 #include "rtr/framework/core/world.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/input/input_system.hpp"
