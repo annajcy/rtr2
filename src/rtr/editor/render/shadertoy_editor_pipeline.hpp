@@ -60,6 +60,8 @@ class ShaderToyEditorPipeline final : public system::render::RenderPipelineBase,
     vk::Extent2D                         m_requested_scene_extent{};
     bool                                 m_scene_extent_dirty{false};
 
+    std::array<float, 4> m_params{1.0f, 0.0f, 0.0f, 0.0f};
+
     std::unique_ptr<system::render::ComputePass> m_compute_pass{nullptr};
     std::unique_ptr<EditorImGuiPass>             m_editor_pass{nullptr};
 
@@ -105,6 +107,9 @@ public:
     }
 
     ~ShaderToyEditorPipeline() override = default;
+
+    std::array<float, 4>&       params() { return m_params; }
+    const std::array<float, 4>& params() const { return m_params; }
 
     // -----------------------------------------------------------------------
     // IEditorInputCaptureSource
@@ -167,7 +172,8 @@ public:
             ComputePass::RenderPassResources{.uniform_buffer   = m_uniform_buffers[frame_index].get(),
                                              .offscreen_image  = frame.image.get(),
                                              .offscreen_layout = &frame.layout,
-                                             .compute_set      = &m_compute_sets[frame_index]});
+                                             .compute_set      = &m_compute_sets[frame_index],
+                                             .i_params         = m_params});
         m_compute_pass->execute(ctx);
 
         // --- 2. Image barriers ---

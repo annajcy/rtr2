@@ -20,6 +20,7 @@ namespace rtr::system::render {
 struct ShaderToyUniformBufferObject {
     alignas(16) std::array<float, 4> i_resolution{};
     alignas(16) std::array<float, 4> i_time{};
+    alignas(16) std::array<float, 4> i_params{};
 };
 
 class ComputePass final : public IRenderPass {
@@ -29,6 +30,7 @@ public:
         rhi::Image*              offscreen_image{};
         vk::ImageLayout*         offscreen_layout{};
         vk::raii::DescriptorSet* compute_set{};
+        std::array<float, 4>     i_params{};
     };
 
 private:
@@ -64,7 +66,8 @@ public:
 
         const vk::Extent2D offscreen_extent{m_render_pass_resources.offscreen_image->width(),
                                             m_render_pass_resources.offscreen_image->height()};
-        update_uniform_buffer(*m_render_pass_resources.uniform_buffer, offscreen_extent);
+        update_uniform_buffer(*m_render_pass_resources.uniform_buffer, offscreen_extent,
+                              m_render_pass_resources.i_params);
 
         auto&                 cmd        = ctx.cmd().command_buffer();
         rhi::Image&           offscreen  = *m_render_pass_resources.offscreen_image;
@@ -113,13 +116,15 @@ public:
     }
 
 private:
-    void update_uniform_buffer(rhi::Buffer& uniform_buffer, const vk::Extent2D& extent) {
+    void update_uniform_buffer(rhi::Buffer& uniform_buffer, const vk::Extent2D& extent,
+                               const std::array<float, 4>& params) {
         const auto  now     = std::chrono::steady_clock::now();
         const float seconds = std::chrono::duration<float>(now - m_start_time).count();
 
         ShaderToyUniformBufferObject ubo{};
         ubo.i_resolution = {static_cast<float>(extent.width), static_cast<float>(extent.height), 1.0f, 0.0f};
         ubo.i_time       = {seconds, 0.0f, 0.0f, 0.0f};
+        ubo.i_params     = params;
 
         std::memcpy(uniform_buffer.mapped_data(), &ubo, sizeof(ubo));
     }
