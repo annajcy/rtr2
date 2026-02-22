@@ -14,7 +14,7 @@
 #include "rtr/editor/panel/logger_panel.hpp"
 #include "rtr/editor/panel/scene_view_panel.hpp"
 #include "rtr/editor/panel/stats_panel.hpp"
-#include "rtr/system/render/pipeline/forward/forward_editor_pipeline.hpp"
+#include "rtr/editor/render/forward_editor_pipeline.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/camera.hpp"
@@ -41,7 +41,7 @@ int main() {
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
 
-        auto editor_pipeline = std::make_unique<rtr::system::render::ForwardEditorPipeline>(
+        auto editor_pipeline = std::make_unique<rtr::editor::render::ForwardEditorPipeline>(
             runtime.renderer().build_pipeline_runtime(), editor_host);
         editor_pipeline->set_resource_manager(&runtime.resource_manager());
         rtr::editor::bind_input_capture_to_editor(runtime.input_system(), *editor_pipeline);

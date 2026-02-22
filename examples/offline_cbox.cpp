@@ -17,7 +17,7 @@
 #include "rtr/editor/panel/logger_panel.hpp"
 #include "rtr/editor/panel/scene_view_panel.hpp"
 #include "rtr/editor/panel/stats_panel.hpp"
-#include "rtr/system/render/pipeline/forward/forward_editor_pipeline.hpp"
+#include "rtr/editor/render/forward_editor_pipeline.hpp"
 #include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/engine.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
@@ -264,7 +264,7 @@ int main() {
             (resource_manager.resource_root_dir() / kCboxSceneRootRel / kOutputExrPath).string(),
             (resource_manager.resource_root_dir() / kCboxSceneRootRel / kOutputSceneXmlFilename).string()));
 
-        auto editor_pipeline = std::make_unique<rtr::system::render::ForwardEditorPipeline>(
+        auto editor_pipeline = std::make_unique<rtr::editor::render::ForwardEditorPipeline>(
             renderer->build_pipeline_runtime(), editor_host);
         editor_pipeline->set_resource_manager(&resource_manager);
         rtr::editor::bind_input_capture_to_editor(*input_system, *editor_pipeline);
