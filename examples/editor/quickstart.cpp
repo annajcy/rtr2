@@ -81,14 +81,13 @@ int main() {
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{
             .on_post_update =
                 [editor_host](rtr::app::RuntimeContext& ctx) {
+                    
                     editor_host->begin_frame(rtr::editor::EditorFrameData{
                         .frame_serial  = ctx.frame_serial,
                         .delta_seconds = ctx.delta_seconds,
                         .paused        = ctx.paused,
                     });
-                },
-            .on_pre_render =
-                [](rtr::app::RuntimeContext& ctx) {
+
                     auto* active_scene = ctx.world.active_scene();
                     if (active_scene == nullptr) {
                         throw std::runtime_error("No active scene.");
@@ -103,7 +102,9 @@ int main() {
                     if (fb_w > 0 && fb_h > 0) {
                         active_camera->set_aspect_ratio(static_cast<float>(fb_w) / static_cast<float>(fb_h));
                     }
-
+                },
+            .on_pre_render =
+                [](rtr::app::RuntimeContext& ctx) {
                     if (ctx.input.state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
                         ctx.renderer.window().close();
                     }
