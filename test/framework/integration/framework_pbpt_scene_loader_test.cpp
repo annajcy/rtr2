@@ -1,4 +1,5 @@
 #include <pbpt/math/math.h>
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
@@ -8,6 +9,7 @@
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
+#include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/scene.hpp"
@@ -135,9 +137,11 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
     const auto* renderer   = mesh_go->get_component<component::MeshRenderer>();
     const auto* pbpt_mesh  = mesh_go->get_component<component::PbptMesh>();
     const auto* pbpt_light = mesh_go->get_component<component::PbptLight>();
+    const auto* point_light = mesh_go->get_component<component::light::PointLight>();
     ASSERT_NE(renderer, nullptr);
     ASSERT_NE(pbpt_mesh, nullptr);
     ASSERT_NE(pbpt_light, nullptr);
+    ASSERT_NE(point_light, nullptr);
 
     EXPECT_TRUE(renderer->mesh_handle().is_valid());
     EXPECT_TRUE(resources.alive<rtr::resource::MeshResourceKind>(renderer->mesh_handle()));
@@ -157,6 +161,10 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
     ASSERT_EQ(radiance.size(), 4u);
     EXPECT_FLOAT_EQ(radiance[1].lambda_nm, 500.0f);
     EXPECT_FLOAT_EQ(radiance[1].value, 8.0f);
+
+    const float max_preview_color = std::max({point_light->color.x(), point_light->color.y(), point_light->color.z()});
+    EXPECT_NEAR(max_preview_color, 1.0f, 1e-5f);
+    EXPECT_GT(point_light->intensity, 0.0f);
 
     scene.scene_graph().update_world_transforms();
     const auto world_pos = mesh_go->node().world_position();
