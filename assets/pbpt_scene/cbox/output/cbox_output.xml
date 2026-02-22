@@ -36,7 +36,7 @@
   <shape type="obj" id="cbox_luminaire">
     <string name="filename" value="meshes/rtr_mesh_1.obj" />
     <transform name="toWorld">
-      <matrix value="1, 0, 0, 0, 0, 1, 0, -0.5, 0, 0, 1, 0, 0, 0, 0, 1" />
+      <matrix value="1, 0, 0, -88.3000031, 0, 1, 0, -352.649994, 0, 0, 1, 0, 0, 0, 0, 1" />
     </transform>
     <ref id="rtr_mat_0" />
     <emitter type="area">
@@ -88,7 +88,7 @@
   <shape type="obj" id="cbox_largebox">
     <string name="filename" value="meshes/rtr_mesh_8.obj" />
     <transform name="toWorld">
-      <matrix value="1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1" />
+      <matrix value="1, 0, 0, 24.1499996, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1" />
     </transform>
     <ref id="rtr_mat_1" />
   </shape>

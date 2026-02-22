@@ -9,6 +9,7 @@
 
 #include <string>
 #include <cstdint>
+#include <cmath>
 #include <limits>
 #include <unordered_map>
 #include <variant>
@@ -42,6 +43,32 @@ inline component::PbptSpectrum to_component_spectrum(
     }
     component::validate_pbpt_spectrum(out, "piecewise_spectrum");
     return out;
+}
+
+struct PreviewPointLightParams {
+    ::pbpt::math::vec3 color{1.0f, 1.0f, 1.0f};
+    float              intensity{0.0f};
+};
+
+inline PreviewPointLightParams area_emission_to_preview_point_light(
+    const ::pbpt::radiometry::PiecewiseLinearSpectrumDistribution<float>& spectrum) {
+    const auto xyz = ::pbpt::radiometry::XYZ<float>::from_emission(
+        spectrum, ::pbpt::radiometry::constant::CIE_D65_ilum<float>);
+    const auto linear_rgb = ::pbpt::radiometry::constant::sRGB<float>.to_rgb(xyz);
+
+    const float r = std::max(0.0f, static_cast<float>(linear_rgb.r()));
+    const float g = std::max(0.0f, static_cast<float>(linear_rgb.g()));
+    const float b = std::max(0.0f, static_cast<float>(linear_rgb.b()));
+
+    PreviewPointLightParams params{};
+    const float max_channel = std::max({r, g, b});
+    if (max_channel > 0.0f && std::isfinite(max_channel)) {
+        params.color = ::pbpt::math::vec3{r / max_channel, g / max_channel, b / max_channel};
+    }
+
+    const float luminance_like = std::max(0.0f, static_cast<float>(xyz.y()));
+    params.intensity           = std::isfinite(luminance_like) ? luminance_like : 0.0f;
+    return params;
 }
 
 inline component::PbptRgb lambertian_to_rgb(const ::pbpt::material::LambertianMaterial<float>& material) {

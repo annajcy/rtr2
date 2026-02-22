@@ -13,6 +13,7 @@
 #include "pbpt/camera/plugin/camera/projective_cameras.hpp"
 #include "pbpt/integrator/plugin/integrator/path_integrator.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
+#include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
@@ -83,8 +84,15 @@ struct ObjLambertianShapeImportMapper {
 
         if (record.emission_spectrum_name.has_value()) {
             const auto& emission = resources.reflectance_spectrum_library.get(record.emission_spectrum_name.value());
+            auto        preview  = compat_import_detail::area_emission_to_preview_point_light(emission);
+            auto        spectrum = compat_import_detail::to_component_spectrum(emission);
+
             auto&       light    = go.add_component<component::PbptLight>();
-            light.set_radiance_spectrum(compat_import_detail::to_component_spectrum(emission));
+            light.set_radiance_spectrum(std::move(spectrum));
+
+            auto& point_light = go.add_component<component::light::PointLight>();
+            point_light.set_color(preview.color);
+            point_light.set_intensity(preview.intensity);
             ++pkg.result.imported_light_shape_count;
         }
 
