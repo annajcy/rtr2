@@ -236,11 +236,6 @@ public:
                     m_callbacks.on_post_update(ctx);
                 }
 
-                if (m_callbacks.on_pre_render) {
-                    auto ctx = make_runtime_context(frame_delta);
-                    m_callbacks.on_pre_render(ctx);
-                }
-
                 if (auto* frame_prepare = dynamic_cast<system::render::IFramePreparePipeline*>(m_renderer->pipeline());
                     frame_prepare != nullptr) {
                     frame_prepare->prepare_frame(system::render::FramePrepareContext{
@@ -250,6 +245,11 @@ public:
                         .frame_serial  = m_frame_serial,
                         .delta_seconds = frame_delta,
                     });
+                }
+
+                if (m_callbacks.on_pre_render) {
+                    auto ctx = make_runtime_context(frame_delta);
+                    m_callbacks.on_pre_render(ctx);
                 }
 
                 m_renderer->draw_frame();
