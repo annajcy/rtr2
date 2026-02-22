@@ -11,6 +11,7 @@
 #include "rtr/editor/panel/logger_panel.hpp"
 #include "rtr/editor/panel/scene_view_panel.hpp"
 #include "rtr/editor/panel/stats_panel.hpp"
+#include "rtr/editor/panel/shadertoy_settings_panel.hpp"
 #include "rtr/editor/render/shadertoy_editor_pipeline.hpp"
 #include "rtr/framework/core/engine.hpp"
 #include "rtr/resource/resource_manager.hpp"
@@ -39,14 +40,20 @@ int main() {
         // Editor Setup
         auto editor_host = std::make_shared<rtr::editor::EditorHost>();
         editor_host->bind_runtime(&engine.world(), &resource_manager, renderer.get(), input_system.get());
+
+        auto editor_pipeline = std::make_unique<rtr::editor::render::ShaderToyEditorPipeline>(
+            renderer->build_pipeline_runtime(), editor_host);
+
         editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::ShaderToySettingsPanel>(editor_pipeline.get()));
 
-        auto editor_pipeline = std::make_unique<rtr::editor::render::ShaderToyEditorPipeline>(
-            renderer->build_pipeline_runtime(), editor_host);
+        // Hide panels by default as requested
+        editor_host->set_panel_visible("hierarchy", false);
+        editor_host->set_panel_visible("inspector", false);
 
         rtr::editor::bind_input_capture_to_editor(*input_system, *editor_pipeline);
 
@@ -65,14 +72,6 @@ int main() {
                         .frame_serial  = frame_serial,
                         .delta_seconds = 0.0,
                         .paused        = engine.paused(),
-                    });
-
-                    active_editor_pipeline->prepare_frame(rtr::system::render::FramePrepareContext{
-                        .world         = engine.world(),
-                        .resources     = resource_manager,
-                        .input         = *input_system,
-                        .frame_serial  = frame_serial,
-                        .delta_seconds = 0.0,
                     });
 
                     renderer->draw_frame();
