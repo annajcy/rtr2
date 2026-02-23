@@ -12,6 +12,7 @@
 
 #include "pbpt/camera/plugin/camera/projective_cameras.hpp"
 #include "pbpt/integrator/plugin/integrator/path_integrator.hpp"
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
@@ -131,20 +132,27 @@ struct ThinLensPerspectiveImportMapper {
 
         std::string camera_name =
             compat_import_detail::make_unique_name("pbpt_camera", pkg.result.imported_game_object_id_by_name);
-        auto& camera_go      = ctx.scene.create_game_object(camera_name);
-        auto& camera         = ctx.scene.camera_manager().create_perspective_camera(camera_go.id());
+        auto& camera_go = ctx.scene.create_game_object(camera_name);
+        auto& camera    = camera_go.add_component<component::PerspectiveCamera>();
         camera.near_bound()  = std::max(sensor.near_clip, 1e-4f);
         camera.far_bound()   = std::max(sensor.far_clip, camera.near_bound() + 1e-3f);
         camera.fov_degrees() = sensor.fov_degrees;
-        camera.set_aspect_ratio(static_cast<float>(sensor.film_width) /
-                                static_cast<float>(std::max(1, sensor.film_height)));
+        camera.aspect_ratio() =
+            static_cast<float>(sensor.film_width) / static_cast<float>(std::max(1, sensor.film_height));
+        for (const auto& go : ctx.scene.game_objects()) {
+            if (go == nullptr) {
+                continue;
+            }
+            if (auto* c = go->get_component<component::Camera>(); c != nullptr) {
+                c->set_active(false);
+            }
+        }
+        camera.set_active(true);
         camera_go.node().set_local_model_matrix(sensor.to_world);
-        (void)ctx.scene.set_active_camera(camera_go.id());
         compat_import_detail::register_imported_game_object(pkg.result, camera_go.name(), camera_go.id());
 
         if (ctx.options.free_look_input_state != nullptr) {
-            (void)camera_go.add_component<component::FreeLookCameraController>(ctx.options.free_look_input_state,
-                                                                               &ctx.scene.camera_manager());
+            (void)camera_go.add_component<component::FreeLookCameraController>(ctx.options.free_look_input_state);
         }
     }
 };

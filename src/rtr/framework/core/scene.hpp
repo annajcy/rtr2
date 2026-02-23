@@ -7,7 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "rtr/framework/core/camera_manager.hpp"
 #include "rtr/framework/core/game_object.hpp"
 #include "rtr/framework/core/scene_graph.hpp"
 #include "rtr/framework/core/tick_context.hpp"
@@ -16,48 +15,32 @@
 
 namespace rtr::framework::core {
 
-class Scene {
+class Scene final {
 private:
-    static std::shared_ptr<spdlog::logger> logger() {
-        return utils::get_logger("framework.core.scene");
-    }
+    static std::shared_ptr<spdlog::logger> logger() { return utils::get_logger("framework.core.scene"); }
 
-    SceneId m_id{core::kInvalidSceneId};
-    std::string m_name{"Scene"};
-    bool m_enabled{true};
+    SceneId      m_id{core::kInvalidSceneId};
+    std::string  m_name{"Scene"};
+    bool         m_enabled{true};
 
-    GameObjectId m_next_game_object_id{1};
+    GameObjectId                             m_next_game_object_id{1};
     std::vector<std::unique_ptr<GameObject>> m_game_objects{};
-    SceneGraph m_scene_graph{};
-    CameraManager m_camera_manager{};
+    SceneGraph                               m_scene_graph{};
 
 public:
-    explicit Scene(
-        SceneId id = core::kInvalidSceneId,
-        std::string name = "Scene"
-    )
-        : m_id(id), m_name(std::move(name)), m_camera_manager(&m_scene_graph) {}
+    explicit Scene(SceneId id = core::kInvalidSceneId, std::string name = "Scene")
+        : m_id(id), m_name(std::move(name)) {}
 
     Scene(const Scene&) = delete;
     Scene& operator=(const Scene&) = delete;
     Scene(Scene&&) noexcept = delete;
     Scene& operator=(Scene&&) noexcept = delete;
 
-    SceneId id() const {
-        return m_id;
-    }
+    SceneId id() const { return m_id; }
+    const std::string& name() const { return m_name; }
+    void set_name(std::string name) { m_name = std::move(name); }
 
-    const std::string& name() const {
-        return m_name;
-    }
-
-    void set_name(std::string name) {
-        m_name = std::move(name);
-    }
-
-    bool enabled() const {
-        return m_enabled;
-    }
+    bool enabled() const { return m_enabled; }
 
     void set_enabled(bool enabled) {
         m_enabled = enabled;
@@ -66,17 +49,12 @@ public:
 
     GameObject& create_game_object(std::string name = "GameObject") {
         auto game_object = std::make_unique<GameObject>(m_next_game_object_id++, std::move(name));
-        GameObject* ptr = game_object.get();
+        auto* ptr        = game_object.get();
         ptr->bind_scene_graph(&m_scene_graph);
         m_scene_graph.register_node(ptr->id());
         m_game_objects.emplace_back(std::move(game_object));
-        logger()->debug(
-            "GameObject created (scene_id={}, game_object_id={}, name='{}', count={})",
-            m_id,
-            ptr->id(),
-            ptr->name(),
-            m_game_objects.size()
-        );
+        logger()->debug("GameObject created (scene_id={}, game_object_id={}, name='{}', count={})", m_id, ptr->id(),
+                        ptr->name(), m_game_objects.size());
         return *ptr;
     }
 
@@ -98,9 +76,7 @@ public:
         return nullptr;
     }
 
-    bool has_game_object(GameObjectId id) const {
-        return find_game_object(id) != nullptr;
-    }
+    bool has_game_object(GameObjectId id) const { return find_game_object(id) != nullptr; }
 
     bool destroy_game_object(GameObjectId id) {
         if (!m_scene_graph.has_node(id)) {
@@ -113,87 +89,37 @@ public:
             return false;
         }
 
-        // First run destroy lifecycle hooks in subtree postorder. Any exception
-        // is propagated to caller without rollback.
         for (const auto victim_id : subtree_ids) {
-            GameObject* game_object = find_game_object(victim_id);
+            auto* game_object = find_game_object(victim_id);
             if (game_object != nullptr) {
                 game_object->destroy_components();
             }
         }
 
-        m_camera_manager.on_game_objects_destroyed(subtree_ids);
-
         for (const auto victim_id : subtree_ids) {
-            const auto it = std::find_if(
-                m_game_objects.begin(),
-                m_game_objects.end(),
-                [victim_id](const std::unique_ptr<GameObject>& game_object) {
-                    return game_object && game_object->id() == victim_id;
-                }
-            );
+            const auto it =
+                std::find_if(m_game_objects.begin(), m_game_objects.end(),
+                             [victim_id](const std::unique_ptr<GameObject>& game_object) {
+                                 return game_object && game_object->id() == victim_id;
+                             });
             if (it != m_game_objects.end()) {
-                m_game_objects.erase(it); // May throw; propagate by design.
+                m_game_objects.erase(it);
             }
         }
 
         const bool unregistered = m_scene_graph.unregister_subtree(id);
         logger()->info(
             "GameObject subtree destroyed (scene_id={}, root_game_object_id={}, removed_count={}, success={}, remaining={})",
-            m_id,
-            id,
-            subtree_ids.size(),
-            unregistered,
-            m_game_objects.size()
-        );
+            m_id, id, subtree_ids.size(), unregistered, m_game_objects.size());
         return unregistered;
     }
 
-    std::size_t game_object_count() const {
-        return m_game_objects.size();
-    }
+    std::size_t game_object_count() const { return m_game_objects.size(); }
 
-    CameraManager& camera_manager() {
-        return m_camera_manager;
-    }
+    const std::vector<std::unique_ptr<GameObject>>& game_objects() const { return m_game_objects; }
 
-    const CameraManager& camera_manager() const {
-        return m_camera_manager;
-    }
-
-    const CameraBase* active_camera() const {
-        return m_camera_manager.active_camera();
-    }
-
-    CameraBase* active_camera() {
-        return m_camera_manager.active_camera();
-    }
-
-    bool set_active_camera(GameObjectId camera_owner_id) {
-        const bool success = m_camera_manager.set_active_camera(camera_owner_id);
-        if (success) {
-            logger()->info("Scene {} active camera set to owner {}.", m_id, camera_owner_id);
-        } else {
-            logger()->warn(
-                "Scene {} failed to set active camera to owner {} (camera not found).",
-                m_id,
-                camera_owner_id
-            );
-        }
-        return success;
-    }
-
-    const std::vector<std::unique_ptr<GameObject>>& game_objects() const {
-        return m_game_objects;
-    }
-
-    SceneGraph& scene_graph() {
-        return m_scene_graph;
-    }
-
-    const SceneGraph& scene_graph() const {
-        return m_scene_graph;
-    }
+    SceneGraph& scene_graph() { return m_scene_graph; }
+    const SceneGraph& scene_graph() const { return m_scene_graph; }
 
     void fixed_tick(const FixedTickContext& ctx) {
         if (!m_enabled) {
@@ -231,4 +157,4 @@ public:
     }
 };
 
-} // namespace rtr::framework::core
+}  // namespace rtr::framework::core

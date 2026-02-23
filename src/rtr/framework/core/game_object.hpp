@@ -19,39 +19,28 @@ namespace rtr::framework::core {
 
 class GameObject {
 private:
-    static std::shared_ptr<spdlog::logger> logger() {
-        return utils::get_logger("framework.core.game_object");
-    }
+    static std::shared_ptr<spdlog::logger> logger() { return utils::get_logger("framework.core.game_object"); }
 
     GameObjectId m_id{core::kInvalidGameObjectId};
-    std::string m_name{"GameObject"};
-    bool m_components_destroyed{false};
-    SceneGraph* m_scene_graph{nullptr};
+    std::string  m_name{"GameObject"};
+    bool         m_components_destroyed{false};
+    SceneGraph*  m_scene_graph{nullptr};
     std::vector<std::unique_ptr<component::Component>> m_components{};
 
-    void bind_scene_graph(SceneGraph* scene_graph) {
-        m_scene_graph = scene_graph;
-    }
+    void bind_scene_graph(SceneGraph* scene_graph) { m_scene_graph = scene_graph; }
 
     friend class Scene;
 
 public:
-    explicit GameObject(
-        GameObjectId id = core::kInvalidGameObjectId,
-        std::string name = "GameObject"
-    )
+    explicit GameObject(GameObjectId id = core::kInvalidGameObjectId, std::string name = "GameObject")
         : m_id(id), m_name(std::move(name)) {}
 
     ~GameObject() {
         try {
             destroy_components();
         } catch (...) {
-            logger()->error(
-                "destroy_components threw during GameObject destructor (game_object_id={}, name='{}').",
-                m_id,
-                m_name
-            );
-            // Destructor must not throw.
+            logger()->error("destroy_components threw during GameObject destructor (game_object_id={}, name='{}').", m_id,
+                            m_name);
         }
     }
 
@@ -60,45 +49,25 @@ public:
     GameObject(GameObject&&) noexcept = default;
     GameObject& operator=(GameObject&&) noexcept = default;
 
-    GameObjectId id() const {
-        return m_id;
-    }
+    GameObjectId id() const { return m_id; }
+    const std::string& name() const { return m_name; }
+    void set_name(std::string name) { m_name = std::move(name); }
 
-    const std::string& name() const {
-        return m_name;
-    }
-
-    void set_name(std::string name) {
-        m_name = std::move(name);
-    }
-
-    bool enabled() const {
-        return node().is_enabled();
-    }
+    bool enabled() const { return node().is_enabled(); }
 
     void set_enabled(bool enabled) {
         if (m_scene_graph == nullptr) {
-            logger()->error(
-                "set_enabled failed: GameObject {} ('{}') is not attached to a SceneGraph.",
-                m_id,
-                m_name
-            );
+            logger()->error("set_enabled failed: GameObject {} ('{}') is not attached to a SceneGraph.", m_id, m_name);
             throw std::runtime_error("GameObject is not attached to a SceneGraph.");
         }
         m_scene_graph->set_enabled(m_id, enabled);
     }
 
-    bool has_scene_graph() const {
-        return m_scene_graph != nullptr;
-    }
+    bool has_scene_graph() const { return m_scene_graph != nullptr; }
 
     SceneGraph::NodeView node() {
         if (m_scene_graph == nullptr) {
-            logger()->error(
-                "node() failed: GameObject {} ('{}') is not attached to a SceneGraph.",
-                m_id,
-                m_name
-            );
+            logger()->error("node() failed: GameObject {} ('{}') is not attached to a SceneGraph.", m_id, m_name);
             throw std::runtime_error("GameObject is not attached to a SceneGraph.");
         }
         return m_scene_graph->node(m_id);
@@ -106,19 +75,13 @@ public:
 
     SceneGraph::ConstNodeView node() const {
         if (m_scene_graph == nullptr) {
-            logger()->error(
-                "node() const failed: GameObject {} ('{}') is not attached to a SceneGraph.",
-                m_id,
-                m_name
-            );
+            logger()->error("node() const failed: GameObject {} ('{}') is not attached to a SceneGraph.", m_id, m_name);
             throw std::runtime_error("GameObject is not attached to a SceneGraph.");
         }
         return m_scene_graph->node(m_id);
     }
 
-    std::size_t component_count() const {
-        return m_components.size();
-    }
+    std::size_t component_count() const { return m_components.size(); }
 
     void destroy_components() {
         if (m_components_destroyed) {
@@ -138,12 +101,8 @@ public:
     TComponent& add_component(TArgs&&... args) {
         static_assert(std::is_base_of_v<component::Component, TComponent>);
         if (has_component<TComponent>()) {
-            logger()->warn(
-                "add_component rejected: duplicate component type '{}' on GameObject {} ('{}').",
-                typeid(TComponent).name(),
-                m_id,
-                m_name
-            );
+            logger()->warn("add_component rejected: duplicate component type '{}' on GameObject {} ('{}').",
+                           typeid(TComponent).name(), m_id, m_name);
             throw std::runtime_error("GameObject already has this component type.");
         }
         auto component = std::make_unique<TComponent>(std::forward<TArgs>(args)...);
@@ -151,13 +110,8 @@ public:
         component->on_awake();
         TComponent* instance = component.get();
         m_components.emplace_back(std::move(component));
-        logger()->debug(
-            "Component added (game_object_id={}, name='{}', component_type='{}', component_count={})",
-            m_id,
-            m_name,
-            typeid(TComponent).name(),
-            m_components.size()
-        );
+        logger()->debug("Component added (game_object_id={}, name='{}', component_type='{}', component_count={})", m_id,
+                        m_name, typeid(TComponent).name(), m_components.size());
         return *instance;
     }
 
@@ -222,4 +176,4 @@ public:
     }
 };
 
-} // namespace rtr::framework::core
+}  // namespace rtr::framework::core

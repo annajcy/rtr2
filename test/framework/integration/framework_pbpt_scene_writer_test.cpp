@@ -10,6 +10,7 @@
 
 #include "gtest/gtest.h"
 
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
@@ -107,8 +108,8 @@ TEST(FrameworkPbptSceneWriterTest, BuildsXmlResultFromActiveNodesWithMeshAndPbpt
     resource::ResourceManager resources{};
 
     auto& camera_go = scene.create_game_object("camera");
-    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
-    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+    auto& camera    = camera_go.add_component<component::PerspectiveCamera>();
+    camera.set_active(true);
 
     auto&                    go_ok           = scene.create_game_object("");
     const auto               expected_handle = create_test_mesh(resources);
@@ -148,8 +149,8 @@ TEST(FrameworkPbptSceneWriterTest, ThrowsWhenPbptLightExistsWithoutPbptMesh) {
     resource::ResourceManager resources{};
 
     auto& camera_go = scene.create_game_object("camera");
-    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
-    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+    auto& camera    = camera_go.add_component<component::PerspectiveCamera>();
+    camera.set_active(true);
 
     auto& go = scene.create_game_object("light_only");
     (void)go.add_component<component::MeshRenderer>(create_test_mesh(resources));
@@ -163,8 +164,8 @@ TEST(FrameworkPbptSceneWriterTest, BuildXmlResultUsesPbptLightSpectrumAndKeepsPa
     resource::ResourceManager resources{};
 
     auto& camera_go = scene.create_game_object("camera");
-    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
-    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+    auto& camera    = camera_go.add_component<component::PerspectiveCamera>();
+    camera.set_active(true);
 
     auto& mapped_go = scene.create_game_object("mapped_light_go");
     (void)mapped_go.add_component<component::MeshRenderer>(create_test_mesh(resources));
@@ -313,8 +314,8 @@ TEST(FrameworkPbptSceneWriterTest, BuildXmlResultSuffixesMappedMaterialWhenNameC
     resource::ResourceManager resources{};
 
     auto& camera_go = scene.create_game_object("camera");
-    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
-    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+    auto& camera    = camera_go.add_component<component::PerspectiveCamera>();
+    camera.set_active(true);
 
     auto&      mapped_go       = scene.create_game_object("mapped_go");
     const auto expected_handle = create_test_mesh(resources);

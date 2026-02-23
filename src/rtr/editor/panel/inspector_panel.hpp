@@ -11,9 +11,9 @@
 #include "rtr/editor/core/editor_panel.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/camera_control/trackball_camera_controller.hpp"
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
-#include "rtr/framework/core/camera.hpp"
 #include "rtr/framework/core/game_object.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/types.hpp"
@@ -57,14 +57,34 @@ private:
     }
 
     static void draw_camera_editor(framework::core::Scene& scene, framework::core::GameObject& game_object) {
-        auto* camera = scene.camera_manager().camera(game_object.id());
+        auto* camera = game_object.get_component<framework::component::Camera>();
         if (camera == nullptr) {
             return;
         }
 
         if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::Text("Type: %s", camera->camera_type() == framework::core::CameraType::Perspective ? "Perspective"
-                                                                                                      : "Orthographic");
+            bool enabled = camera->enabled();
+            if (ImGui::Checkbox("Enabled##camera", &enabled)) {
+                camera->set_enabled(enabled);
+                logger()->debug("Camera enabled updated (game_object_id={}, enabled={}).", game_object.id(), enabled);
+            }
+
+            bool active = camera->active();
+            if (ImGui::Checkbox("Active", &active)) {
+                if (active) {
+                    for (const auto& go : scene.game_objects()) {
+                        if (go == nullptr || go->id() == game_object.id()) {
+                            continue;
+                        }
+                        if (auto* other_camera = go->get_component<framework::component::Camera>();
+                            other_camera != nullptr) {
+                            other_camera->set_active(false);
+                        }
+                    }
+                }
+                camera->set_active(active);
+                logger()->debug("Camera active updated (game_object_id={}, active={}).", game_object.id(), active);
+            }
 
             float near_bound = camera->near_bound();
             float far_bound  = camera->far_bound();
@@ -77,7 +97,9 @@ private:
                 logger()->debug("Camera far updated (game_object_id={}, far={:.4f}).", game_object.id(), far_bound);
             }
 
-            if (auto* perspective = dynamic_cast<framework::core::PerspectiveCamera*>(camera); perspective != nullptr) {
+            if (auto* perspective = dynamic_cast<framework::component::PerspectiveCamera*>(camera);
+                perspective != nullptr) {
+                ImGui::Text("Type: Perspective");
                 float fov = perspective->fov_degrees();
                 if (ImGui::DragFloat("FOV (deg)", &fov, 0.1f, 1.0f, 179.0f)) {
                     perspective->fov_degrees() = fov;
@@ -87,12 +109,13 @@ private:
 
                 float aspect = perspective->aspect_ratio();
                 if (ImGui::DragFloat("Aspect", &aspect, 0.01f, 0.1f, 10.0f)) {
-                    perspective->set_aspect_ratio(aspect);
+                    perspective->aspect_ratio() = aspect;
                     logger()->debug("Perspective aspect updated (game_object_id={}, aspect={:.4f}).", game_object.id(),
                                     aspect);
                 }
-            } else if (auto* orthographic = dynamic_cast<framework::core::OrthographicCamera*>(camera);
+            } else if (auto* orthographic = dynamic_cast<framework::component::OrthographicCamera*>(camera);
                        orthographic != nullptr) {
+                ImGui::Text("Type: Orthographic");
                 float left   = orthographic->left_bound();
                 float right  = orthographic->right_bound();
                 float bottom = orthographic->bottom_bound();
@@ -117,6 +140,8 @@ private:
                     orthographic->top_bound() = top;
                     logger()->debug("Orthographic top updated (game_object_id={}, top={:.4f}).", game_object.id(), top);
                 }
+            } else {
+                ImGui::TextDisabled("Unknown camera type.");
             }
         }
     }

@@ -1,10 +1,8 @@
 #include <pbpt/math/math.h>
+
 #include "gtest/gtest.h"
 
-#include <stdexcept>
-
-
-#include "rtr/framework/core/camera.hpp"
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
 
 namespace rtr::framework::core::test {
@@ -23,143 +21,56 @@ static void expect_mat4_near(const pbpt::math::mat4& lhs, const pbpt::math::mat4
     }
 }
 
-TEST(FrameworkCameraTest, CameraManagerSupportsMultipleCamerasAndActiveSelection) {
+TEST(FrameworkCameraTest, PerspectiveProjectionMatchesGlmHelper) {
     Scene scene(1, "scene");
-    auto& go_a = scene.create_game_object("camera_a");
-    auto& go_b = scene.create_game_object("camera_b");
+    auto& go     = scene.create_game_object("camera");
+    auto& camera = go.add_component<component::PerspectiveCamera>();
 
-    auto& camera_a = scene.camera_manager().create_perspective_camera(go_a.id());
-    auto& camera_b = scene.camera_manager().create_orthographic_camera(go_b.id());
+    camera.fov_degrees()  = 60.0f;
+    camera.aspect_ratio() = 2.0f;
+    camera.near_bound()   = 0.2f;
+    camera.far_bound()    = 200.0f;
 
-    EXPECT_EQ(scene.camera_manager().camera_count(), 2u);
-    ASSERT_NE(scene.active_camera(), nullptr);
-    EXPECT_EQ(scene.active_camera(), &camera_a);
-    EXPECT_EQ(scene.camera_manager().active_camera_owner_id(), go_a.id());
-    EXPECT_EQ(scene.camera_manager().camera(go_b.id()), &camera_b);
-
-    EXPECT_TRUE(scene.set_active_camera(go_b.id()));
-    EXPECT_EQ(scene.active_camera(), &camera_b);
-    EXPECT_EQ(scene.camera_manager().active_camera_owner_id(), go_b.id());
+    expect_mat4_near(camera.projection_matrix(), pbpt::math::perspective(pbpt::math::radians(60.0f), 2.0f, 0.2f, 200.0f));
 }
 
-TEST(FrameworkCameraTest, CameraManagerRejectsDuplicateCameraOwner) {
+TEST(FrameworkCameraTest, OrthographicProjectionMatchesGlmHelper) {
     Scene scene(1, "scene");
-    auto& go = scene.create_game_object("camera_go");
+    auto& go     = scene.create_game_object("camera");
+    auto& camera = go.add_component<component::OrthographicCamera>();
 
-    (void)scene.camera_manager().create_perspective_camera(go.id());
-    EXPECT_THROW(
-        (void)scene.camera_manager().create_orthographic_camera(go.id()),
-        std::runtime_error
-    );
+    camera.left_bound()   = -10.0f;
+    camera.right_bound()  = 10.0f;
+    camera.bottom_bound() = -4.0f;
+    camera.top_bound()    = 4.0f;
+    camera.near_bound()   = -20.0f;
+    camera.far_bound()    = 30.0f;
+
+    expect_mat4_near(camera.projection_matrix(), pbpt::math::ortho(-10.0f, 10.0f, -4.0f, 4.0f, -20.0f, 30.0f));
 }
 
-TEST(FrameworkCameraTest, SetActiveCameraFailsWhenOwnerHasNoCamera) {
+TEST(FrameworkCameraTest, ViewMatrixUsesNodeWorldTransform) {
     Scene scene(1, "scene");
-    auto& go = scene.create_game_object("go");
+    auto& go     = scene.create_game_object("camera");
+    auto& camera = go.add_component<component::PerspectiveCamera>();
 
-    EXPECT_FALSE(scene.set_active_camera(go.id()));
-}
-
-TEST(FrameworkCameraTest, CreateCameraThrowsForInvalidOwner) {
-    Scene scene(1, "scene");
-
-    EXPECT_THROW(
-        (void)scene.camera_manager().create_perspective_camera(core::kInvalidGameObjectId),
-        std::runtime_error
-    );
-    EXPECT_THROW(
-        (void)scene.camera_manager().create_orthographic_camera(9999),
-        std::runtime_error
-    );
-}
-
-TEST(FrameworkCameraTest, ActiveCameraRotatesToNextWhenDestroyed) {
-    Scene scene(1, "scene");
-    auto& go_a = scene.create_game_object("camera_a");
-    auto& go_b = scene.create_game_object("camera_b");
-    auto& go_c = scene.create_game_object("camera_c");
-
-    auto& camera_a = scene.camera_manager().create_perspective_camera(go_a.id());
-    auto& camera_b = scene.camera_manager().create_perspective_camera(go_b.id());
-    auto& camera_c = scene.camera_manager().create_perspective_camera(go_c.id());
-    (void)camera_a;
-    (void)camera_b;
-    (void)camera_c;
-
-    ASSERT_TRUE(scene.set_active_camera(go_b.id()));
-    EXPECT_EQ(scene.camera_manager().active_camera_owner_id(), go_b.id());
-
-    EXPECT_TRUE(scene.camera_manager().destroy_camera(go_b.id()));
-    EXPECT_EQ(scene.camera_manager().active_camera_owner_id(), go_c.id());
-
-    EXPECT_TRUE(scene.camera_manager().destroy_camera(go_c.id()));
-    EXPECT_EQ(scene.camera_manager().active_camera_owner_id(), go_a.id());
-
-    EXPECT_TRUE(scene.camera_manager().destroy_camera(go_a.id()));
-    EXPECT_EQ(scene.active_camera(), nullptr);
-    EXPECT_EQ(scene.camera_manager().active_camera_owner_id(), core::kInvalidGameObjectId);
-}
-
-TEST(FrameworkCameraTest, DestroySubtreeRemovesBoundCameras) {
-    Scene scene(1, "scene");
-    auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
-    auto& other = scene.create_game_object("other");
-    ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id(), false));
-
-    (void)scene.camera_manager().create_perspective_camera(parent.id());
-    (void)scene.camera_manager().create_orthographic_camera(child.id());
-    (void)scene.camera_manager().create_perspective_camera(other.id());
-    ASSERT_EQ(scene.camera_manager().camera_count(), 3u);
-
-    EXPECT_TRUE(scene.destroy_game_object(parent.id()));
-    EXPECT_EQ(scene.camera_manager().camera_count(), 1u);
-    EXPECT_TRUE(scene.camera_manager().has_camera(other.id()));
-    EXPECT_FALSE(scene.camera_manager().has_camera(parent.id()));
-    EXPECT_FALSE(scene.camera_manager().has_camera(child.id()));
-}
-
-TEST(FrameworkCameraTest, CameraFrontMatchesGameObjectWorldFront) {
-    Scene scene(1, "scene");
-    auto& parent = scene.create_game_object("parent");
-    auto& camera_go = scene.create_game_object("camera_go");
-    auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
-
-    ASSERT_TRUE(scene.scene_graph().set_parent(camera_go.id(), parent.id(), false));
-    scene.scene_graph().node(parent.id()).set_local_rotation(
-        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::vec3(0.0f, 1.0f, 0.0f))
-    );
+    go.node().set_local_position({1.0f, 2.0f, 3.0f});
     scene.scene_graph().update_world_transforms();
 
-    expect_vec3_near(camera.front(), scene.scene_graph().node(camera_go.id()).world_back());
-}
-
-TEST(FrameworkCameraTest, CameraViewMatrixUsesNodeWorldTransform) {
-    Scene scene(1, "scene");
-    auto& camera_go = scene.create_game_object("camera_go");
-    auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
-
-    scene.scene_graph().node(camera_go.id()).set_local_position({1.0f, 2.0f, 3.0f});
-    scene.scene_graph().update_world_transforms();
-
-    const pbpt::math::mat4 expected = pbpt::math::lookAt(
-        pbpt::math::vec3(1.0f, 2.0f, 3.0f),
-        pbpt::math::vec3(1.0f, 2.0f, 2.0f),
-        pbpt::math::vec3(0.0f, 1.0f, 0.0f)
-    );
+    const pbpt::math::mat4 expected = pbpt::math::lookAt(pbpt::math::vec3(1.0f, 2.0f, 3.0f), pbpt::math::vec3(1.0f, 2.0f, 2.0f),
+                                                          pbpt::math::vec3(0.0f, 1.0f, 0.0f));
     expect_mat4_near(camera.view_matrix(), expected);
 }
 
-TEST(FrameworkCameraTest, CameraLookAtDirectionLocalAndWorldDifferWithParentRotation) {
+TEST(FrameworkCameraTest, LookAtDirectionLocalAndWorldDifferWithParentRotation) {
     Scene scene(1, "scene");
-    auto& parent = scene.create_game_object("parent");
-    auto& camera_go = scene.create_game_object("camera_go");
-    auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
+    auto& parent    = scene.create_game_object("parent");
+    auto& camera_go = scene.create_game_object("camera");
+    auto& camera    = camera_go.add_component<component::PerspectiveCamera>();
     ASSERT_TRUE(scene.scene_graph().set_parent(camera_go.id(), parent.id(), false));
 
     scene.scene_graph().node(parent.id()).set_local_rotation(
-        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::vec3(0.0f, 1.0f, 0.0f))
-    );
+        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::vec3(0.0f, 1.0f, 0.0f)));
     scene.scene_graph().node(camera_go.id()).set_local_rotation(pbpt::math::quat::identity());
 
     camera.camera_look_at_direction_local({0.0f, 0.0f, -1.0f});
@@ -175,49 +86,52 @@ TEST(FrameworkCameraTest, CameraLookAtDirectionLocalAndWorldDifferWithParentRota
     expect_vec3_near(front_after_world, {0.0f, 0.0f, -1.0f});
 }
 
-TEST(FrameworkCameraTest, CameraLookAtPointWorldWorksWithoutManualWorldUpdate) {
+TEST(FrameworkCameraTest, PerspectiveAdjustZoomMovesAlongFront) {
     Scene scene(1, "scene");
-    auto& camera_go = scene.create_game_object("camera_go");
-    auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
+    auto& go     = scene.create_game_object("camera");
+    auto& camera = go.add_component<component::PerspectiveCamera>();
 
-    scene.scene_graph().node(camera_go.id()).set_local_position({0.0f, 1.0f, 6.0f});
-    camera.camera_look_at_point_world({0.0f, 0.0f, 0.0f});
+    go.node().set_world_position({0.0f, 0.0f, 0.0f});
+    scene.scene_graph().update_world_transforms();
+    camera.adjust_zoom(1.25f);
 
-    const pbpt::math::vec3 expected_front = pbpt::math::normalize(pbpt::math::vec3{0.0f, -1.0f, -6.0f});
-    expect_vec3_near(camera.camera_world_front(), expected_front);
+    const auto pos = go.node().world_position();
+    EXPECT_NEAR(pos.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(pos.y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(pos.z(), -1.25f, 1e-5f);
 }
 
-TEST(FrameworkCameraTest, PerspectiveAndOrthographicProjectionMatricesMatchGLM) {
-    PerspectiveCamera perspective;
-    perspective.fov_degrees() = 60.0f;
-    perspective.aspect_ratio() = 2.0f;
-    perspective.near_bound() = 0.2f;
-    perspective.far_bound() = 200.0f;
-    expect_mat4_near(
-        perspective.projection_matrix(),
-        pbpt::math::perspective(pbpt::math::radians(60.0f), 2.0f, 0.2f, 200.0f)
-    );
-
-    OrthographicCamera orthographic;
-    orthographic.left_bound() = -10.0f;
-    orthographic.right_bound() = 10.0f;
-    orthographic.bottom_bound() = -4.0f;
-    orthographic.top_bound() = 4.0f;
-    orthographic.near_bound() = -20.0f;
-    orthographic.far_bound() = 30.0f;
-    expect_mat4_near(
-        orthographic.projection_matrix(),
-        pbpt::math::ortho(-10.0f, 10.0f, -4.0f, 4.0f, -20.0f, 30.0f)
-    );
-}
-
-TEST(FrameworkCameraTest, ActiveCameraIsNullWhenNoCameraExists) {
+TEST(FrameworkCameraTest, OrthographicAdjustZoomExpandsBoundsAroundCenter) {
     Scene scene(1, "scene");
-    EXPECT_EQ(scene.active_camera(), nullptr);
-    EXPECT_EQ(scene.camera_manager().camera_count(), 0u);
+    auto& go     = scene.create_game_object("camera");
+    auto& camera = go.add_component<component::OrthographicCamera>();
+    camera.left_bound()   = -2.0f;
+    camera.right_bound()  = 2.0f;
+    camera.bottom_bound() = -1.0f;
+    camera.top_bound()    = 1.0f;
+
+    camera.adjust_zoom(0.5f);
+    EXPECT_NEAR(camera.left_bound(), -2.5f, 1e-5f);
+    EXPECT_NEAR(camera.right_bound(), 2.5f, 1e-5f);
+    EXPECT_NEAR(camera.bottom_bound(), -1.5f, 1e-5f);
+    EXPECT_NEAR(camera.top_bound(), 1.5f, 1e-5f);
 }
 
-} // namespace rtr::framework::core::test
+TEST(FrameworkCameraTest, CameraDefaultsToInactive) {
+    Scene scene(1, "scene");
+    auto& go     = scene.create_game_object("camera");
+    auto& camera = go.add_component<component::PerspectiveCamera>();
+    EXPECT_FALSE(camera.active());
+}
+
+TEST(FrameworkCameraTest, AddingSecondCameraComponentOnSameGameObjectThrows) {
+    Scene scene(1, "scene");
+    auto& go = scene.create_game_object("camera");
+    (void)go.add_component<component::PerspectiveCamera>();
+    EXPECT_THROW((void)go.add_component<component::OrthographicCamera>(), std::runtime_error);
+}
+
+}  // namespace rtr::framework::core::test
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

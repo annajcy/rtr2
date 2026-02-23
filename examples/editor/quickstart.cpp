@@ -14,13 +14,36 @@
 #include "rtr/editor/panel/logger_panel.hpp"
 #include "rtr/editor/panel/scene_view_panel.hpp"
 #include "rtr/editor/panel/stats_panel.hpp"
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/editor/render/forward_editor_pipeline.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
-#include "rtr/framework/core/camera.hpp"
 #include "rtr/system/input/input_types.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
+
+namespace {
+
+rtr::framework::component::Camera* find_unique_active_camera(rtr::framework::core::Scene& scene) {
+    rtr::framework::component::Camera* active_camera = nullptr;
+    for (const auto node_id : scene.scene_graph().active_nodes()) {
+        auto* go = scene.find_game_object(node_id);
+        if (go == nullptr || !go->enabled()) {
+            continue;
+        }
+        auto* camera = go->get_component<rtr::framework::component::Camera>();
+        if (camera == nullptr || !camera->enabled() || !camera->active()) {
+            continue;
+        }
+        if (active_camera != nullptr) {
+            return nullptr;
+        }
+        active_camera = camera;
+    }
+    return active_camera;
+}
+
+}  // namespace
 
 int main() {
     constexpr uint32_t kWidth             = 1280;
@@ -44,21 +67,19 @@ int main() {
 
         auto editor_pipeline = std::make_unique<rtr::editor::render::ForwardEditorPipeline>(
             runtime.renderer().build_pipeline_runtime(), editor_host);
-        editor_pipeline->set_resource_manager(&runtime.resource_manager());
         rtr::editor::bind_input_capture_to_editor(runtime.input_system(), *editor_pipeline);
         runtime.set_pipeline(std::move(editor_pipeline));
 
         auto& scene = runtime.world().create_scene("main_scene");
 
         auto& camera_go = scene.create_game_object("main_camera");
-        auto& camera    = scene.camera_manager().create_perspective_camera(camera_go.id());
-        camera.set_aspect_ratio(static_cast<float>(kWidth) / static_cast<float>(kHeight));
+        auto& camera    = camera_go.add_component<rtr::framework::component::PerspectiveCamera>();
+        camera.aspect_ratio() = static_cast<float>(kWidth) / static_cast<float>(kHeight);
+        camera.set_active(true);
         camera_go.node().set_local_position({0.0f, 1.0f, 6.0f});
-        camera_go.add_component<rtr::framework::component::FreeLookCameraController>(&runtime.input_system().state(),
-                                                                                     &scene.camera_manager());
-        (void)scene.set_active_camera(camera_go.id());
+        camera_go.add_component<rtr::framework::component::FreeLookCameraController>(&runtime.input_system().state());
 
-        scene.active_camera()->camera_look_at_point_world(pbpt::math::vec3{0.0, 0.0, 0.0});
+        camera.camera_look_at_point_world(pbpt::math::vec3{0.0, 0.0, 0.0});
 
         auto& light_go = scene.create_game_object("main_light");
         light_go.node().set_local_position({2.0f, 4.0f, 4.0f});
@@ -100,14 +121,16 @@ int main() {
                         throw std::runtime_error("No active scene.");
                     }
 
-                    auto* active_camera = active_scene->active_camera();
-                    if (active_camera == nullptr) {
-                        throw std::runtime_error("Active scene has no active camera.");
-                    }
-
-                    const auto [fb_w, fb_h] = ctx.renderer.window().framebuffer_size();
-                    if (fb_w > 0 && fb_h > 0) {
-                        active_camera->set_aspect_ratio(static_cast<float>(fb_w) / static_cast<float>(fb_h));
+                    auto* active_camera = find_unique_active_camera(*active_scene);
+                    if (active_camera != nullptr) {
+                        const auto [fb_w, fb_h] = ctx.renderer.window().framebuffer_size();
+                        if (fb_w > 0 && fb_h > 0) {
+                            if (auto* perspective =
+                                    dynamic_cast<rtr::framework::component::PerspectiveCamera*>(active_camera);
+                                perspective != nullptr) {
+                                perspective->aspect_ratio() = static_cast<float>(fb_w) / static_cast<float>(fb_h);
+                            }
+                        }
                     }
                 },
             .on_pre_render =
