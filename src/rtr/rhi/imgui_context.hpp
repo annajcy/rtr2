@@ -16,9 +16,9 @@ namespace rtr::rhi {
 
 class ImGuiContext {
 private:
-    Device* m_device{};
-    Context* m_context{};
-    Window* m_window{};
+    Device& m_device;
+    Context& m_context;
+    Window& m_window;
 
     uint32_t m_image_count{};
     vk::Format m_color_format{vk::Format::eUndefined};
@@ -32,9 +32,9 @@ private:
 
 public:
     ImGuiContext(
-        Device* device,
-        Context* context,
-        Window* window,
+        Device& device,
+        Context& context,
+        Window& window,
         uint32_t image_count,
         vk::Format color_format,
         vk::Format depth_format
@@ -45,9 +45,6 @@ public:
           m_image_count(image_count),
           m_color_format(color_format),
           m_depth_format(depth_format) {
-        if (!m_device || !m_context || !m_window) {
-            throw std::runtime_error("ImGuiContext requires valid runtime context.");
-        }
         if (m_image_count < 2) {
             throw std::runtime_error("ImGuiContext requires image_count >= 2.");
         }
@@ -64,7 +61,7 @@ public:
 
         create_descriptor_pool();
 
-        if (!ImGui_ImplGlfw_InitForVulkan(m_window->window(), true)) {
+        if (!ImGui_ImplGlfw_InitForVulkan(m_window.window(), true)) {
             throw std::runtime_error("ImGui_ImplGlfw_InitForVulkan failed.");
         }
         m_glfw_backend_initialized = true;
@@ -78,7 +75,7 @@ public:
             return;
         }
 
-        m_device->wait_idle();
+        m_device.wait_idle();
         if (m_vulkan_backend_initialized) {
             ImGui_ImplVulkan_Shutdown();
             m_vulkan_backend_initialized = false;
@@ -142,7 +139,7 @@ public:
         m_depth_format = depth_format;
 
         if (format_changed) {
-            m_device->wait_idle();
+            m_device.wait_idle();
             if (m_vulkan_backend_initialized) {
                 ImGui_ImplVulkan_Shutdown();
                 m_vulkan_backend_initialized = false;
@@ -172,11 +169,11 @@ private:
     void init_vulkan_backend() {
         ImGui_ImplVulkan_InitInfo init_info{};
         init_info.ApiVersion = VK_API_VERSION_1_3;
-        init_info.Instance = *m_context->instance();
-        init_info.PhysicalDevice = *m_device->physical_device();
-        init_info.Device = *m_device->device();
-        init_info.QueueFamily = m_device->queue_family_index();
-        init_info.Queue = *m_device->queue();
+        init_info.Instance = *m_context.instance();
+        init_info.PhysicalDevice = *m_device.physical_device();
+        init_info.Device = *m_device.device();
+        init_info.QueueFamily = m_device.queue_family_index();
+        init_info.Queue = *m_device.queue();
         init_info.PipelineCache = VK_NULL_HANDLE;
         init_info.DescriptorPool = *m_descriptor_pool;
         init_info.Subpass = 0;
@@ -232,7 +229,7 @@ private:
         pool_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
         pool_info.pPoolSizes = pool_sizes.data();
 
-        m_descriptor_pool = vk::raii::DescriptorPool(m_device->device(), pool_info);
+        m_descriptor_pool = vk::raii::DescriptorPool(m_device.device(), pool_info);
     }
 };
 

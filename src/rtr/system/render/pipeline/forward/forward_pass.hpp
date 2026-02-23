@@ -33,7 +33,6 @@ public:
 private:
     vk::raii::PipelineLayout* m_pipeline_layout{};
     vk::raii::Pipeline*       m_pipeline{};
-    RenderPassResources       m_render_pass_resources{};
 
     std::vector<render::ResourceDependency> m_dependencies{{"forward.per_object", render::ResourceAccess::eRead},
                                                            {"offscreen_color", render::ResourceAccess::eReadWrite},
@@ -47,7 +46,7 @@ public:
 
     const std::vector<render::ResourceDependency>& dependencies() const override { return m_dependencies; }
 
-    void bind_render_pass_resources(RenderPassResources resources) {
+    static void validate_resources(const RenderPassResources& resources) {
         if (resources.color_image == nullptr || resources.color_layout == nullptr || resources.depth_image == nullptr ||
             resources.extent.width == 0 || resources.extent.height == 0) {
             throw std::runtime_error("ForwardPass frame resources are incomplete.");
@@ -57,29 +56,25 @@ public:
                 throw std::runtime_error("ForwardPass draw item resources are incomplete.");
             }
         }
-        m_render_pass_resources = std::move(resources);
     }
 
-    void execute(render::FrameContext& ctx) override {
-        if (m_render_pass_resources.color_image == nullptr || m_render_pass_resources.color_layout == nullptr ||
-            m_render_pass_resources.depth_image == nullptr) {
-            throw std::runtime_error("ForwardPass frame resources are not bound.");
-        }
+    void execute(render::FrameContext& ctx, const RenderPassResources& resources) {
+        validate_resources(resources);
 
         auto&       cmd         = ctx.cmd().command_buffer();
-        rhi::Image& color_image = *m_render_pass_resources.color_image;
-        rhi::Image& depth_image = *m_render_pass_resources.depth_image;
+        rhi::Image& color_image = *resources.color_image;
+        rhi::Image& depth_image = *resources.depth_image;
 
         vk::ImageMemoryBarrier2 to_color{};
-        to_color.srcStageMask                  = (*m_render_pass_resources.color_layout == vk::ImageLayout::eUndefined)
+        to_color.srcStageMask                  = (*resources.color_layout == vk::ImageLayout::eUndefined)
                                                      ? vk::PipelineStageFlagBits2::eTopOfPipe
                                                      : vk::PipelineStageFlagBits2::eAllCommands;
         to_color.dstStageMask                  = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-        to_color.srcAccessMask                 = (*m_render_pass_resources.color_layout == vk::ImageLayout::eUndefined)
+        to_color.srcAccessMask                 = (*resources.color_layout == vk::ImageLayout::eUndefined)
                                                      ? vk::AccessFlagBits2::eNone
                                                      : vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite;
         to_color.dstAccessMask                 = vk::AccessFlagBits2::eColorAttachmentWrite;
-        to_color.oldLayout                     = *m_render_pass_resources.color_layout;
+        to_color.oldLayout                     = *resources.color_layout;
         to_color.newLayout                     = vk::ImageLayout::eColorAttachmentOptimal;
         to_color.image                         = *color_image.image();
         to_color.subresourceRange.aspectMask   = vk::ImageAspectFlagBits::eColor;
@@ -127,7 +122,7 @@ public:
 
         vk::RenderingInfo rendering_info{};
         rendering_info.renderArea.offset    = vk::Offset2D{0, 0};
-        rendering_info.renderArea.extent    = m_render_pass_resources.extent;
+        rendering_info.renderArea.extent    = resources.extent;
         rendering_info.layerCount           = 1;
         rendering_info.colorAttachmentCount = 1;
         rendering_info.pColorAttachments    = &color_attachment_info;
@@ -139,18 +134,18 @@ public:
         vk::Viewport viewport{};
         viewport.x        = 0.0f;
         viewport.y        = 0.0f;
-        viewport.width    = static_cast<float>(m_render_pass_resources.extent.width);
-        viewport.height   = static_cast<float>(m_render_pass_resources.extent.height);
+        viewport.width    = static_cast<float>(resources.extent.width);
+        viewport.height   = static_cast<float>(resources.extent.height);
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         cmd.setViewport(0, viewport);
 
         vk::Rect2D scissor{};
         scissor.offset = vk::Offset2D{0, 0};
-        scissor.extent = m_render_pass_resources.extent;
+        scissor.extent = resources.extent;
         cmd.setScissor(0, scissor);
 
-        for (const auto& item : m_render_pass_resources.draw_items) {
+        for (const auto& item : resources.draw_items) {
             std::vector<vk::Buffer>     vertex_buffers = {item.mesh->vertex_buffer()};
             std::vector<vk::DeviceSize> offsets        = {0};
             cmd.bindVertexBuffers(0, vertex_buffers, offsets);
@@ -162,7 +157,7 @@ public:
         }
 
         cmd.endRendering();
-        *m_render_pass_resources.color_layout = vk::ImageLayout::eColorAttachmentOptimal;
+        *resources.color_layout = vk::ImageLayout::eColorAttachmentOptimal;
     }
 };
 

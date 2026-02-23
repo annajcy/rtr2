@@ -13,6 +13,9 @@ namespace rtr::framework::core::test {
 
 class ThrowOnDestroyComponent final : public component::Component {
 public:
+    explicit ThrowOnDestroyComponent(core::GameObject& owner)
+        : Component(owner) {}
+
     void on_destroy() override {
         throw std::runtime_error("destroy failed");
     }

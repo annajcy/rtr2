@@ -16,7 +16,8 @@ public:
     float            specular_strength{1.0f};
     float            shininess{32.0f};
 
-    PointLight() = default;
+    explicit PointLight(core::GameObject& owner)
+        : Component(owner) {}
 
     void set_color(const pbpt::math::vec3& c) { color = c; }
 

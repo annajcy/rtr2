@@ -10,6 +10,7 @@
 #include "rtr/rhi/command.hpp"
 #include "rtr/rhi/context.hpp"
 #include "rtr/rhi/device.hpp"
+#include "rtr/rhi/frame_constants.hpp"
 #include "rtr/rhi/window.hpp"
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/frame_scheduler.hpp"
@@ -19,8 +20,9 @@ namespace rtr::system::render {
 
 class Renderer {
 public:
-    using PerFrameResources = FrameScheduler::PerFrameResources;
-    using PerImageResources = FrameScheduler::PerImageResources;
+    using ActiveFrameScheduler = FrameScheduler<rhi::kFramesInFlight>;
+    using PerFrameResources = ActiveFrameScheduler::PerFrameResources;
+    using PerImageResources = ActiveFrameScheduler::PerImageResources;
     using RenderCallback = std::function<void(FrameContext&)>;
     using ComputeRecordCallback = std::function<void(rhi::CommandBuffer&)>;
 
@@ -103,12 +105,22 @@ public:
     };
 
 private:
-    std::unique_ptr<rhi::Window> m_window{};
-    std::unique_ptr<rhi::Context> m_context{};
-    std::unique_ptr<rhi::Device> m_device{};
+    static rhi::ContextCreateInfo make_context_create_info(rhi::Window& window) {
+        rhi::ContextCreateInfo context_info{};
+        context_info.app_name = window.title();
+        context_info.instance_extensions = window.required_extensions();
+        context_info.surface_creator = [&window](const vk::raii::Instance& instance) {
+            return window.create_vk_surface(instance);
+        };
+        return context_info;
+    }
 
-    std::unique_ptr<rhi::CommandPool> m_compute_command_pool{};
-    std::unique_ptr<FrameScheduler> m_frame_scheduler{};
+    rhi::Window m_window;
+    rhi::Context m_context;
+    rhi::Device m_device;
+
+    rhi::CommandPool m_compute_command_pool;
+    ActiveFrameScheduler m_frame_scheduler;
     std::unique_ptr<IRenderPipeline> m_active_pipeline{};
 
     utils::SubscriptionToken m_window_resize_subscription{};
@@ -118,36 +130,22 @@ public:
     Renderer(
         int width,
         int height,
-        std::string title,
-        uint32_t max_frames_in_flight = 2
-    ) {
-        m_window = std::make_unique<rhi::Window>(width, height, title);
-        m_window_resize_subscription = m_window->window_resize_event().subscribe([this](int resize_width, int resize_height) {
+        std::string title
+    )
+        : m_window(width, height, title),
+          m_context(make_context_create_info(m_window)),
+          m_device(m_context),
+          m_compute_command_pool(m_device,
+                                 vk::CommandPoolCreateFlagBits::eTransient |
+                                     vk::CommandPoolCreateFlagBits::eResetCommandBuffer),
+          m_frame_scheduler(m_window, m_context, m_device) {
+        m_window_resize_subscription = m_window.window_resize_event().subscribe([this](int resize_width, int resize_height) {
             on_window_resized(
                 static_cast<uint32_t>(resize_width),
                 static_cast<uint32_t>(resize_height)
             );
         });
-
-        rhi::ContextCreateInfo context_info{};
-        context_info.app_name = m_window->title();
-        context_info.instance_extensions = m_window->required_extensions();
-        context_info.surface_creator = [this](const vk::raii::Instance& instance) {
-            return m_window->create_vk_surface(instance);
-        };
-        m_context = std::make_unique<rhi::Context>(std::move(context_info));
-        m_device = std::make_unique<rhi::Device>(m_context.get());
-        m_frame_scheduler = std::make_unique<FrameScheduler>(
-            m_window.get(),
-            m_context.get(),
-            m_device.get(),
-            max_frames_in_flight
-        );
-        m_compute_command_pool = std::make_unique<rhi::CommandPool>(
-            m_device.get(),
-            vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer
-        );
-        m_last_swapchain_generation = m_frame_scheduler->swapchain_state().generation;
+        m_last_swapchain_generation = m_frame_scheduler.swapchain_state().generation;
     }
 
     ~Renderer() = default;
@@ -155,15 +153,15 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    PipelineRuntime build_pipeline_runtime() const {
+    PipelineRuntime build_pipeline_runtime() {
         return PipelineRuntime{
-            .device = m_device.get(),
-            .context = m_context.get(),
-            .window = m_window.get(),
-            .frame_count = m_frame_scheduler->max_frames_in_flight(),
-            .image_count = m_frame_scheduler->image_count(),
-            .color_format = m_frame_scheduler->render_format(),
-            .depth_format = m_frame_scheduler->depth_format()
+            .device = &m_device,
+            .context = &m_context,
+            .window = &m_window,
+            .frame_count = m_frame_scheduler.max_frames_in_flight(),
+            .image_count = m_frame_scheduler.image_count(),
+            .color_format = m_frame_scheduler.render_format(),
+            .depth_format = m_frame_scheduler.depth_format()
         };
     }
 
@@ -175,7 +173,7 @@ public:
             throw std::runtime_error("Renderer pipeline is immutable at runtime and cannot be replaced.");
         }
         m_active_pipeline = std::move(pipeline);
-        m_active_pipeline->on_swapchain_state_changed(m_frame_scheduler->swapchain_state());
+        m_active_pipeline->on_swapchain_state_changed(m_frame_scheduler.swapchain_state());
     }
 
     IRenderPipeline* pipeline() { return m_active_pipeline.get(); }
@@ -195,22 +193,19 @@ public:
         if (!record) {
             throw std::runtime_error("compute_async received empty callback.");
         }
-        if (!m_compute_command_pool) {
-            throw std::runtime_error("Compute command pool is not initialized.");
-        }
 
-        auto command_buffer = m_compute_command_pool->create_command_buffer();
+        auto command_buffer = m_compute_command_pool.create_command_buffer();
         command_buffer.record([&](rhi::CommandBuffer& cb) {
             record(cb);
         }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
-        vk::raii::Fence fence(m_device->device(), vk::FenceCreateInfo{});
+        vk::raii::Fence fence(m_device.device(), vk::FenceCreateInfo{});
         rhi::CommandBuffer::SubmitInfo submit_info{};
         submit_info.fence = *fence;
         command_buffer.submit(submit_info);
 
         return ComputeJob(
-            m_device.get(),
+            &m_device,
             std::move(command_buffer),
             std::move(fence)
         );
@@ -221,13 +216,13 @@ public:
             throw std::runtime_error("No active pipeline. Call set_pipeline(...) before draw_frame().");
         }
 
-        auto ticket_opt = m_frame_scheduler->begin_frame();
+        auto ticket_opt = m_frame_scheduler.begin_frame();
         if (!ticket_opt.has_value()) {
             return;
         }
 
         auto ticket = ticket_opt.value();
-        handle_swapchain_state_change(m_frame_scheduler->swapchain_state());
+        handle_swapchain_state_change(m_frame_scheduler.swapchain_state());
 
         FrameContext frame_ctx = build_frame_context(ticket);
         ticket.command_buffer->reset();
@@ -236,28 +231,28 @@ public:
             transition_swapchain_to_present(cb.command_buffer(), frame_ctx.swapchain_image());
         }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
-        m_frame_scheduler->submit_and_present(ticket);
+        m_frame_scheduler.submit_and_present(ticket);
     }
 
     void on_window_resized(uint32_t width, uint32_t height) {
-        m_frame_scheduler->on_window_resized(width, height);
+        m_frame_scheduler.on_window_resized(width, height);
         if (m_active_pipeline) {
             m_active_pipeline->on_resize(static_cast<int>(width), static_cast<int>(height));
         }
     }
 
-    const rhi::Device& device() const { return *m_device.get(); }
-    const rhi::Context& context() const { return *m_context.get(); }
-    const rhi::Window& window() const { return *m_window.get(); }
-    rhi::Device& device() { return *m_device.get(); }
-    rhi::Context& context() { return *m_context.get(); }
-    rhi::Window& window() { return *m_window.get(); }
+    const rhi::Device& device() const { return m_device; }
+    const rhi::Context& context() const { return m_context; }
+    const rhi::Window& window() const { return m_window; }
+    rhi::Device& device() { return m_device; }
+    rhi::Context& context() { return m_context; }
+    rhi::Window& window() { return m_window; }
 
-    const render::FrameScheduler& frame_scheduler() const { return *m_frame_scheduler.get(); }
-    render::FrameScheduler& frame_scheduler() { return *m_frame_scheduler.get(); }
+    const ActiveFrameScheduler& frame_scheduler() const { return m_frame_scheduler; }
+    ActiveFrameScheduler& frame_scheduler() { return m_frame_scheduler; }
 
 private:
-    void handle_swapchain_state_change(const FrameScheduler::SwapchainState& state) {
+    void handle_swapchain_state_change(const ActiveFrameScheduler::SwapchainState& state) {
         if (state.generation == m_last_swapchain_generation) {
             return;
         }
@@ -289,13 +284,13 @@ private:
         command_buffer.pipelineBarrier2(to_present_dep);
     }
 
-    FrameContext build_frame_context(const FrameScheduler::FrameTicket& ticket) {
+    FrameContext build_frame_context(const ActiveFrameScheduler::FrameTicket& ticket) {
         return FrameContext(
-            m_device.get(),
+            &m_device,
             ticket.command_buffer,
-            m_frame_scheduler->swapchain().image_views()[ticket.image_index],
-            m_frame_scheduler->swapchain().images()[ticket.image_index],
-            m_frame_scheduler->render_extent(),
+            m_frame_scheduler.swapchain().image_views()[ticket.image_index],
+            m_frame_scheduler.swapchain().images()[ticket.image_index],
+            m_frame_scheduler.render_extent(),
             ticket.frame_index
         );
     }

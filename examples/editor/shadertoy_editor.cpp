@@ -15,17 +15,12 @@
 #include "rtr/editor/render/shadertoy_editor_pipeline.hpp"
 #include "rtr/system/input/input_types.hpp"
 
-namespace {
-constexpr uint32_t kMaxFramesInFlight = 2;
-}
-
 int main() {
     try {
         rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
-            .window_width         = 1280,
-            .window_height        = 720,
-            .window_title         = "RTR ShaderToy Editor",
-            .max_frames_in_flight = kMaxFramesInFlight,
+            .window_width  = 1280,
+            .window_height = 720,
+            .window_title  = "RTR ShaderToy Editor",
         });
 
         auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);

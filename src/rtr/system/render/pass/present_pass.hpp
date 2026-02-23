@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <stdexcept>
 #include <string_view>
 #include <vector>
 
@@ -23,7 +24,6 @@ public:
 private:
     std::vector<render::ResourceDependency> m_dependencies{{"offscreen_color", render::ResourceAccess::eRead},
                                                            {"swapchain", render::ResourceAccess::eWrite}};
-    RenderPassResources                     m_resources{};
 
 public:
     PresentPass() = default;
@@ -32,16 +32,19 @@ public:
 
     const std::vector<render::ResourceDependency>& dependencies() const override { return m_dependencies; }
 
-    void bind_render_pass_resources(RenderPassResources resources) { m_resources = resources; }
-
-    void execute(render::FrameContext& ctx) override {
-        if (m_resources.src_color_image == nullptr || m_resources.src_color_layout == nullptr) {
-            return;
+    static void validate_resources(const RenderPassResources& resources) {
+        if (resources.src_color_image == nullptr || resources.src_color_layout == nullptr ||
+            resources.src_extent.width == 0 || resources.src_extent.height == 0) {
+            throw std::runtime_error("PresentPass frame resources are incomplete.");
         }
+    }
+
+    void execute(render::FrameContext& ctx, const RenderPassResources& resources) {
+        validate_resources(resources);
 
         auto& cmd          = ctx.cmd().command_buffer();
-        auto& color_image  = *m_resources.src_color_image;
-        auto& color_layout = *m_resources.src_color_layout;
+        auto& color_image  = *resources.src_color_image;
+        auto& color_layout = *resources.src_color_layout;
 
         vk::ImageMemoryBarrier2 offscreen_to_src{};
         offscreen_to_src.srcStageMask                    = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
@@ -83,8 +86,8 @@ public:
         blit.srcSubresource.baseArrayLayer = 0;
         blit.srcSubresource.layerCount     = 1;
         blit.srcOffsets[0]                 = vk::Offset3D{0, 0, 0};
-        blit.srcOffsets[1]                 = vk::Offset3D{static_cast<int32_t>(m_resources.src_extent.width),
-                                          static_cast<int32_t>(m_resources.src_extent.height), 1};
+        blit.srcOffsets[1]                 = vk::Offset3D{static_cast<int32_t>(resources.src_extent.width),
+                                          static_cast<int32_t>(resources.src_extent.height), 1};
         blit.dstSubresource.aspectMask     = vk::ImageAspectFlagBits::eColor;
         blit.dstSubresource.mipLevel       = 0;
         blit.dstSubresource.baseArrayLayer = 0;

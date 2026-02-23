@@ -24,7 +24,6 @@ public:
     virtual ~IRenderPass() = default;
     virtual std::string_view name() const = 0;
     virtual const std::vector<ResourceDependency>& dependencies() const = 0;
-    virtual void execute(render::FrameContext& ctx) = 0;
 };
 
 } // namespace rtr::system::render

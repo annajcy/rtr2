@@ -61,7 +61,7 @@ struct DummyKind {
         out << cpu.value;
     }
 
-    static gpu_type upload_to_gpu(rhi::Device*, const cpu_type& cpu, const options_type& options) {
+    static gpu_type upload_to_gpu(rhi::Device&, const cpu_type& cpu, const options_type& options) {
         return gpu_type{.value = cpu.value + options.scale};
     }
 };
@@ -84,7 +84,7 @@ struct TempDir {
 } // namespace
 
 TEST(ResourceManagerGenericKindsTest, SupportsCustomKindLifecycleInSameManager) {
-    ResourceManagerT<MeshResourceKind, TextureResourceKind, DummyKind> manager{};
+    ResourceManagerT<rhi::kFramesInFlight, MeshResourceKind, TextureResourceKind, DummyKind> manager{};
 
     const auto handle = manager.create<DummyKind>(DummyCpu{.value = 2}, DummyOptions{.scale = 3});
     EXPECT_TRUE(handle.is_valid());
@@ -93,7 +93,7 @@ TEST(ResourceManagerGenericKindsTest, SupportsCustomKindLifecycleInSameManager) 
     const auto& cpu = manager.cpu<DummyKind>(handle);
     EXPECT_EQ(cpu.value, 6);
 
-    auto& gpu = manager.require_gpu<DummyKind>(handle, reinterpret_cast<rhi::Device*>(0x1));
+    auto& gpu = manager.require_gpu<DummyKind>(handle, *reinterpret_cast<rhi::Device*>(0x1));
     EXPECT_EQ(gpu.value, 9);
 
     manager.unload<DummyKind>(handle);
@@ -111,7 +111,7 @@ TEST(ResourceManagerGenericKindsTest, RelativePathLoadAndSaveUseKindHooks) {
         out << 7;
     }
 
-    ResourceManagerT<MeshResourceKind, TextureResourceKind, DummyKind> manager(2, temp_dir.path);
+    ResourceManagerT<rhi::kFramesInFlight, MeshResourceKind, TextureResourceKind, DummyKind> manager(temp_dir.path);
     const auto handle = manager.create_from_relative_path<DummyKind>("in/value.txt", DummyOptions{.scale = 2});
 
     EXPECT_TRUE(handle.is_valid());

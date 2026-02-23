@@ -24,26 +24,12 @@ private:
 
     PbptAreaEmitter m_area_emitter{};
 
-    const MeshRenderer& require_mesh_renderer() const {
-        const auto* go = owner();
-        if (go == nullptr) {
-            logger()->error("PbptLight require_mesh_renderer failed: owner is null.");
-            throw std::runtime_error("PbptLight owner is null.");
-        }
-
-        const auto* renderer = go->get_component<MeshRenderer>();
-        if (renderer == nullptr) {
-            logger()->error(
-                "PbptLight require_mesh_renderer failed: owner {} missing MeshRenderer.",
-                go->id()
-            );
-            throw std::runtime_error("PbptLight requires MeshRenderer on the same GameObject.");
-        }
-
-        return *renderer;
-    }
+    const MeshRenderer& require_mesh_renderer() const { return owner().component_or_throw<MeshRenderer>(); }
 
 public:
+    explicit PbptLight(core::GameObject& owner)
+        : Component(owner) {}
+
     void on_awake() override {
         (void)require_mesh_renderer();
     }

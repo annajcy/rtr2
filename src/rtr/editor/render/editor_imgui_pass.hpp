@@ -51,11 +51,11 @@ private:
         ImVec2          texture_size{0.0f, 0.0f};
     };
 
-    std::unique_ptr<rtr::rhi::ImGuiContext>   m_imgui_context{};
+    rtr::rhi::ImGuiContext                    m_imgui_context;
     std::shared_ptr<EditorHost>               m_editor_host{};
     std::shared_ptr<EditorHostOverlayAdapter> m_overlay_adapter{};
 
-    std::unique_ptr<rtr::rhi::Sampler> m_scene_sampler{};
+    rtr::rhi::Sampler                m_scene_sampler;
     std::vector<SceneTextureEntry>     m_scene_texture_entries{};
     ImTextureID                        m_current_scene_texture{};
     ImVec2                             m_current_scene_texture_size{0.0f, 0.0f};
@@ -67,7 +67,6 @@ private:
         {"offscreen_color", system::render::ResourceAccess::eRead},
         {"swapchain", system::render::ResourceAccess::eReadWrite}};
 
-    RenderPassResources              m_resources{};
     system::render::IRenderPipeline* m_owner_pipeline{};
 
     static ImTextureID descriptor_set_to_texture_id(VkDescriptorSet descriptor_set) {
@@ -89,18 +88,16 @@ private:
 public:
     EditorImGuiPass(const system::render::PipelineRuntime& runtime, std::shared_ptr<EditorHost> editor_host,
                     system::render::IRenderPipeline* owner_pipeline)
-        : m_imgui_context(std::make_unique<rtr::rhi::ImGuiContext>(runtime.device, runtime.context, runtime.window,
-                                                                   runtime.image_count, runtime.color_format,
-                                                                   runtime.depth_format)),
+        : m_imgui_context(*runtime.device, *runtime.context, *runtime.window, runtime.image_count, runtime.color_format,
+                          runtime.depth_format),
           m_editor_host(std::move(editor_host)),
+          m_scene_sampler(rtr::rhi::Sampler::create_default(*runtime.device, 1)),
           m_owner_pipeline(owner_pipeline) {
         if (!m_editor_host) {
             throw std::invalid_argument("EditorImGuiPass requires non-null editor host.");
         }
 
         m_overlay_adapter = std::make_shared<EditorHostOverlayAdapter>(m_editor_host);
-
-        m_scene_sampler = std::make_unique<rtr::rhi::Sampler>(rtr::rhi::Sampler::create_default(runtime.device, 1));
         m_scene_texture_entries.resize(runtime.frame_count);
         bind_editor_services();
     }
@@ -115,7 +112,7 @@ public:
     const std::vector<system::render::ResourceDependency>& dependencies() const override { return m_dependencies; }
 
     void on_swapchain_recreated(uint32_t image_count, vk::Format color_format, vk::Format depth_format) {
-        m_imgui_context->on_swapchain_recreated(image_count, color_format, depth_format);
+        m_imgui_context.on_swapchain_recreated(image_count, color_format, depth_format);
         release_scene_textures();
     }
 
@@ -123,27 +120,34 @@ public:
         if (m_scene_hovered) {
             return false;
         }
-        return m_imgui_context->wants_capture_mouse();
+        return m_imgui_context.wants_capture_mouse();
     }
 
     bool wants_capture_keyboard() const {
         if (m_scene_focused) {
             return false;
         }
-        return m_imgui_context->wants_capture_keyboard();
+        return m_imgui_context.wants_capture_keyboard();
     }
 
-    void bind_render_pass_resources(RenderPassResources resources) { m_resources = resources; }
+    static void validate_resources(const RenderPassResources& resources) {
+        if (resources.scene_image_view == vk::ImageView{} ||
+            resources.scene_extent.width == 0 ||
+            resources.scene_extent.height == 0) {
+            throw std::runtime_error("EditorImGuiPass frame resources are incomplete.");
+        }
+    }
 
-    void execute(system::render::FrameContext& ctx) override {
-        refresh_scene_texture(ctx.frame_index());
+    void execute(system::render::FrameContext& ctx, const RenderPassResources& resources) {
+        validate_resources(resources);
+        refresh_scene_texture(ctx.frame_index(), resources);
 
-        m_imgui_context->begin_frame();
+        m_imgui_context.begin_frame();
         if (m_overlay_adapter) {
             m_overlay_adapter->draw_imgui();
         }
 
-        ImDrawData* draw_data = m_imgui_context->prepare_draw_data();
+        ImDrawData* draw_data = m_imgui_context.prepare_draw_data();
         if (draw_data == nullptr) {
             return;
         }
@@ -164,7 +168,7 @@ public:
 
         auto& command_buffer = ctx.cmd().command_buffer();
         command_buffer.beginRendering(rendering_info);
-        m_imgui_context->render_draw_data(command_buffer, draw_data);
+        m_imgui_context.render_draw_data(command_buffer, draw_data);
         command_buffer.endRendering();
     }
 
@@ -211,16 +215,10 @@ private:
         m_current_scene_texture_size = ImVec2{0.0f, 0.0f};
     }
 
-    void refresh_scene_texture(std::uint32_t frame_index) {
-        if (m_resources.scene_image_view == vk::ImageView{}) {
-            m_current_scene_texture      = ImTextureID{};
-            m_current_scene_texture_size = ImVec2{0.0f, 0.0f};
-            return;
-        }
-
-        const vk::ImageView   view   = m_resources.scene_image_view;
-        const vk::ImageLayout layout = m_resources.scene_image_layout;
-        const vk::Extent2D    extent = m_resources.scene_extent;
+    void refresh_scene_texture(std::uint32_t frame_index, const RenderPassResources& resources) {
+        const vk::ImageView   view   = resources.scene_image_view;
+        const vk::ImageLayout layout = resources.scene_image_layout;
+        const vk::Extent2D    extent = resources.scene_extent;
 
         if (frame_index >= m_scene_texture_entries.size()) {
             m_scene_texture_entries.resize(frame_index + 1);
@@ -236,7 +234,7 @@ private:
             }
 
             const VkDescriptorSet descriptor_set =
-                ImGui_ImplVulkan_AddTexture(static_cast<VkSampler>(*m_scene_sampler->sampler()),
+                ImGui_ImplVulkan_AddTexture(static_cast<VkSampler>(*m_scene_sampler.sampler()),
                                             static_cast<VkImageView>(view), static_cast<VkImageLayout>(layout));
             entry.texture_id   = descriptor_set_to_texture_id(descriptor_set);
             entry.image_view   = view;

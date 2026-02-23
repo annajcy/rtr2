@@ -155,7 +155,7 @@ struct ThinLensPerspectiveImportMapper {
         compat_import_detail::register_imported_game_object(pkg.result, registered_name, camera_go.id());
 
         if (ctx.options.free_look_input_state != nullptr) {
-            (void)camera_go.add_component<component::FreeLookCameraController>(ctx.options.free_look_input_state);
+            (void)camera_go.add_component<component::FreeLookCameraController>(*ctx.options.free_look_input_state);
         } else {
             utils::get_logger("rtr.framework.integration.ThinLensPerspectiveImportMapper")->warn("No free look input state provided in import options; imported camera will not be controllable.");
         }

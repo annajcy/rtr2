@@ -115,7 +115,7 @@ TEST(ResourceManagerLifecycleTest, UnloadedHandleCannotAccessCpuOrGpu) {
     EXPECT_THROW(
         (void)manager.require_gpu<rtr::resource::MeshResourceKind>(
             mesh_handle,
-            reinterpret_cast<rhi::Device*>(0x1)
+            *reinterpret_cast<rhi::Device*>(0x1)
         ),
         std::runtime_error
     );
@@ -144,7 +144,7 @@ TEST(ResourceManagerLifecycleTest, CreateMeshAndTextureFromRelativePathUsesResou
     );
     write_binary_ppm_1x1_white(temp_dir.path / "textures" / "white.ppm");
 
-    ResourceManager manager(2, temp_dir.path);
+    ResourceManager manager(temp_dir.path);
     const auto mesh_handle = manager.create_from_relative_path<rtr::resource::MeshResourceKind>("meshes/tri.obj");
     const auto tex_handle = manager.create_from_relative_path<rtr::resource::TextureResourceKind>(
         "textures/white.ppm",
@@ -159,7 +159,7 @@ TEST(ResourceManagerLifecycleTest, CreateMeshAndTextureFromRelativePathUsesResou
 
 TEST(ResourceManagerLifecycleTest, RelativePathApiRejectsAbsolutePath) {
     TempDir temp_dir("rtr_resource_manager_relative_reject_abs_test");
-    ResourceManager manager(2, temp_dir.path);
+    ResourceManager manager(temp_dir.path);
     const auto abs_path = (temp_dir.path / "meshes" / "tri.obj").string();
 
     write_text_file(temp_dir.path / "meshes" / "tri.obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
@@ -177,7 +177,7 @@ TEST(ResourceManagerLifecycleTest, RelativePathApiRejectsAbsolutePath) {
 
 TEST(ResourceManagerLifecycleTest, RelativePathApiAllowsEscapeFromResourceRoot) {
     TempDir temp_dir("rtr_resource_manager_relative_escape_test");
-    ResourceManager manager(2, temp_dir.path / "assets");
+    ResourceManager manager(temp_dir.path / "assets");
     write_text_file(
         temp_dir.path / "outside" / "tri.obj",
         "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"

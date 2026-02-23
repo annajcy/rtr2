@@ -6,6 +6,7 @@
 
 #include "rtr/rhi/context.hpp"
 #include "rtr/rhi/device.hpp"
+#include "rtr/rhi/frame_constants.hpp"
 #include "rtr/rhi/window.hpp"
 #include "rtr/system/render/frame_scheduler.hpp"
 
@@ -39,13 +40,13 @@ struct Harness {
     rhi::Window window;
     rhi::Context context;
     rhi::Device device;
-    FrameScheduler scheduler;
+    FrameScheduler<rhi::kFramesInFlight> scheduler;
 
     Harness()
         : window(640, 480, "rtr_frame_scheduler_integration"),
           context(make_context_create_info(window)),
-          device(&context),
-          scheduler(&window, &context, &device, 2) {}
+          device(context),
+          scheduler(window, context, device) {}
 
     ~Harness() {
         try {

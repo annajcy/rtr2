@@ -10,6 +10,7 @@
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/context.hpp"
 #include "rtr/rhi/device.hpp"
+#include "rtr/rhi/frame_constants.hpp"
 #include "rtr/rhi/texture.hpp"
 #include "rtr/rhi/window.hpp"
 #include "vulkan/vulkan_enums.hpp"
@@ -24,6 +25,8 @@ class InputSystem;
 }
 
 namespace rtr::system::render {
+
+using ActiveFrameScheduler = FrameScheduler<rhi::kFramesInFlight>;
 
 struct PipelineRuntime {
     rhi::Device* device{};
@@ -44,7 +47,7 @@ public:
     virtual ~IRenderPipeline() = default;
 
     virtual void on_resize(int width, int height) {}
-    virtual void on_swapchain_state_changed(const FrameScheduler::SwapchainState& state) {}
+    virtual void on_swapchain_state_changed(const ActiveFrameScheduler::SwapchainState& state) {}
 
     // Renderer owns command buffer begin/end/reset/submit; pipeline only records draw commands.
     virtual void render(FrameContext& ctx) = 0;
@@ -104,7 +107,7 @@ public:
         }
     }
 
-    void on_swapchain_state_changed(const FrameScheduler::SwapchainState& state) final {
+    void on_swapchain_state_changed(const ActiveFrameScheduler::SwapchainState& state) final {
         SwapchainChangeSummary diff{
             .extent_changed =
                 (m_swapchain_extent.width != state.extent.width) ||
@@ -124,7 +127,7 @@ public:
 
 protected:
     virtual void handle_swapchain_state_change(
-        const FrameScheduler::SwapchainState& state,
+        const ActiveFrameScheduler::SwapchainState& state,
         const SwapchainChangeSummary& diff
     ) = 0;
 
@@ -141,7 +144,7 @@ protected:
         for (uint32_t i = 0; i < m_frame_count; ++i) {
             auto buffer = std::make_unique<rhi::Buffer>(
                 rhi::Buffer::create_host_visible_buffer(
-                    m_device,
+                    *m_device,
                     size,
                     usage
                 )
@@ -161,7 +164,7 @@ protected:
         for (uint32_t i = 0; i < m_frame_count; ++i) {
             depth_images.emplace_back(std::make_unique<rhi::Image>(
                 rhi::Image::create_depth_image(
-                    m_device,
+                    *m_device,
                     extent.width,
                     extent.height,
                     depth_format

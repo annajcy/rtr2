@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <stdexcept>
 #include <string_view>
 #include <vector>
 
@@ -24,7 +25,6 @@ public:
 private:
     vk::raii::PipelineLayout*       m_pipeline_layout{};
     vk::raii::Pipeline*             m_present_pipeline{};
-    RenderPassResources             m_render_pass_resources{};
     std::vector<ResourceDependency> m_dependencies{{"shadertoy.present", ResourceAccess::eRead},
                                                    {"shadertoy.offscreen", ResourceAccess::eRead},
                                                    {"swapchain_color", ResourceAccess::eReadWrite},
@@ -38,23 +38,19 @@ public:
 
     const std::vector<ResourceDependency>& dependencies() const override { return m_dependencies; }
 
-    void bind_render_pass_resources(const RenderPassResources& resources) {
+    static void validate_resources(const RenderPassResources& resources) {
         if (resources.offscreen_image == nullptr || resources.offscreen_layout == nullptr ||
             resources.depth_image == nullptr || resources.present_set == nullptr) {
             throw std::runtime_error("PresentImagePass frame resources are incomplete.");
         }
-        m_render_pass_resources = resources;
     }
 
-    void execute(render::FrameContext& ctx) override {
-        if (m_render_pass_resources.offscreen_image == nullptr || m_render_pass_resources.offscreen_layout == nullptr ||
-            m_render_pass_resources.depth_image == nullptr || m_render_pass_resources.present_set == nullptr) {
-            throw std::runtime_error("PresentImagePass frame resources are not bound.");
-        }
+    void execute(render::FrameContext& ctx, const RenderPassResources& resources) {
+        validate_resources(resources);
 
         auto&       cmd       = ctx.cmd().command_buffer();
-        rhi::Image& offscreen = *m_render_pass_resources.offscreen_image;
-        rhi::Image& depth     = *m_render_pass_resources.depth_image;
+        rhi::Image& offscreen = *resources.offscreen_image;
+        rhi::Image& depth     = *resources.depth_image;
 
         vk::ImageMemoryBarrier2 to_sampled{};
         to_sampled.srcStageMask                    = vk::PipelineStageFlagBits2::eComputeShader;
@@ -74,7 +70,7 @@ public:
         to_sampled_dep.imageMemoryBarrierCount = 1;
         to_sampled_dep.pImageMemoryBarriers    = &to_sampled;
         cmd.pipelineBarrier2(to_sampled_dep);
-        *m_render_pass_resources.offscreen_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        *resources.offscreen_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
         vk::ImageMemoryBarrier2 to_color{};
         to_color.srcStageMask                    = vk::PipelineStageFlagBits2::eTopOfPipe;
@@ -139,7 +135,7 @@ public:
         cmd.beginRendering(rendering_info);
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, **m_present_pipeline);
         cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, **m_pipeline_layout, 1,
-                               **m_render_pass_resources.present_set, {});
+                               **resources.present_set, {});
 
         vk::Viewport viewport{};
         viewport.x        = 0.0f;

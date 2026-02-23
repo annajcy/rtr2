@@ -4,6 +4,7 @@
 
 #include "gtest/gtest.h"
 
+#include "rtr/app/app_runtime.hpp"
 #include "rtr/editor/core/editor_host.hpp"
 #include "rtr/editor/core/editor_types.hpp"
 
@@ -48,7 +49,13 @@ public:
 } // namespace
 
 TEST(EditorHostTest, OrdersPanelsByOrderThenId) {
-    EditorHost host;
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_host_test",
+        .auto_init_logging = false,
+    });
+    EditorHost host(runtime);
     std::vector<std::string> log{};
 
     host.register_panel(std::make_unique<ProbePanel>("z", 20, &log));
@@ -65,7 +72,13 @@ TEST(EditorHostTest, OrdersPanelsByOrderThenId) {
 }
 
 TEST(EditorHostTest, SkipsInvisiblePanelsInImgui) {
-    EditorHost host;
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_host_test",
+        .auto_init_logging = false,
+    });
+    EditorHost host(runtime);
     std::vector<std::string> log{};
 
     host.register_panel(std::make_unique<ProbePanel>("visible", 0, &log, true));
@@ -79,7 +92,13 @@ TEST(EditorHostTest, SkipsInvisiblePanelsInImgui) {
 }
 
 TEST(EditorHostTest, CanRemovePanelById) {
-    EditorHost host;
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_host_test",
+        .auto_init_logging = false,
+    });
+    EditorHost host(runtime);
     std::vector<std::string> log{};
 
     host.register_panel(std::make_unique<ProbePanel>("alpha", 0, &log));
@@ -96,7 +115,13 @@ TEST(EditorHostTest, CanRemovePanelById) {
 }
 
 TEST(EditorHostTest, RejectsDuplicatePanelId) {
-    EditorHost host;
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_host_test",
+        .auto_init_logging = false,
+    });
+    EditorHost host(runtime);
     std::vector<std::string> log{};
     host.register_panel(std::make_unique<ProbePanel>("dup", 0, &log));
 
@@ -107,7 +132,13 @@ TEST(EditorHostTest, RejectsDuplicatePanelId) {
 }
 
 TEST(EditorHostTest, CanTogglePanelVisibilityById) {
-    EditorHost host;
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_host_test",
+        .auto_init_logging = false,
+    });
+    EditorHost host(runtime);
     std::vector<std::string> log{};
     host.register_panel(std::make_unique<ProbePanel>("inspector", 0, &log, true));
 
@@ -124,7 +155,13 @@ TEST(EditorHostTest, CanTogglePanelVisibilityById) {
 }
 
 TEST(EditorHostTest, ReturnsMissingForUnknownPanelVisibility) {
-    EditorHost host;
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_host_test",
+        .auto_init_logging = false,
+    });
+    EditorHost host(runtime);
     std::vector<std::string> log{};
     host.register_panel(std::make_unique<ProbePanel>("known", 0, &log, true));
 

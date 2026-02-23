@@ -20,9 +20,9 @@ namespace rtr::rhi {
 
 class SwapChain {
 private:
-    Window* m_window;
-    Context* m_context;
-    Device* m_device;
+    Window& m_window;
+    Context& m_context;
+    Device& m_device;
 
     vk::raii::SwapchainKHR m_swapchain{nullptr};
     std::vector<vk::Image> m_images;
@@ -31,51 +31,9 @@ private:
     vk::Extent2D m_extent;
 
 public:
-    SwapChain(Window* window, Context* context, Device* device) : m_window(window), m_context(context), m_device(device) {
-        auto logger = utils::get_logger("rhi.swapchain");
-        auto surface_formats = m_device->physical_device().getSurfaceFormatsKHR(*m_context->surface());
-        auto surface_format = choose_surface_format(surface_formats);
-        auto present_mode = choose_present_mode(m_device->physical_device().getSurfacePresentModesKHR(*m_context->surface()));
-        auto capabilities = m_device->physical_device().getSurfaceCapabilitiesKHR(*m_context->surface());
-        auto extent = choose_extent(capabilities);
-
-        uint32_t image_count = capabilities.minImageCount + 1;
-        if (capabilities.maxImageCount > 0 && image_count > capabilities.maxImageCount) {
-            image_count = capabilities.maxImageCount;
-        }
-
-        logger->info(
-            "Creating swapchain: image_count={}, extent=({},{})",
-            image_count,
-            extent.width,
-            extent.height
-        );
-
-        vk::SwapchainCreateInfoKHR create_info{};
-        create_info.surface = *m_context->surface();
-        create_info.minImageCount = image_count;
-        create_info.imageFormat = surface_format.format;
-        create_info.imageColorSpace = surface_format.colorSpace;
-        create_info.imageExtent = extent;
-        create_info.imageArrayLayers = 1;
-        create_info.imageUsage =
-            vk::ImageUsageFlagBits::eColorAttachment |
-            vk::ImageUsageFlagBits::eTransferDst;
-
-        create_info.imageSharingMode = vk::SharingMode::eExclusive;
-        create_info.preTransform = capabilities.currentTransform;
-        create_info.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-        create_info.presentMode = present_mode;
-        create_info.clipped = VK_TRUE;
-        create_info.oldSwapchain = VK_NULL_HANDLE;
-
-        m_swapchain = vk::raii::SwapchainKHR(m_device->device(), create_info);
-        m_images = m_swapchain.getImages();
-        m_image_format = surface_format.format;
-        m_extent = extent;
-        logger->info("Swapchain created with {} images.", m_images.size());
-
-        create_image_views();
+    SwapChain(Window& window, Context& context, Device& device)
+        : m_window(window), m_context(context), m_device(device) {
+        create_or_recreate();
     }
 
     ~SwapChain() {
@@ -116,7 +74,7 @@ public:
         };
 
         try {
-            return m_device->queue().presentKHR(present_info_chain.get<vk::PresentInfoKHR>());
+            return m_device.queue().presentKHR(present_info_chain.get<vk::PresentInfoKHR>());
         } catch (const vk::OutOfDateKHRError&) {
             return vk::Result::eErrorOutOfDateKHR;
         }
@@ -126,8 +84,56 @@ public:
     vk::Extent2D extent() const { return m_extent; }
     const std::vector<vk::raii::ImageView>& image_views() const { return m_image_views; }
     const std::vector<vk::Image>& images() const { return m_images; }
+    void recreate() { create_or_recreate(); }
 
 private:
+    void create_or_recreate() {
+        auto logger = utils::get_logger("rhi.swapchain");
+        auto surface_formats = m_device.physical_device().getSurfaceFormatsKHR(*m_context.surface());
+        auto surface_format = choose_surface_format(surface_formats);
+        auto present_mode = choose_present_mode(m_device.physical_device().getSurfacePresentModesKHR(*m_context.surface()));
+        auto capabilities = m_device.physical_device().getSurfaceCapabilitiesKHR(*m_context.surface());
+        auto extent = choose_extent(capabilities);
+
+        uint32_t image_count = capabilities.minImageCount + 1;
+        if (capabilities.maxImageCount > 0 && image_count > capabilities.maxImageCount) {
+            image_count = capabilities.maxImageCount;
+        }
+
+        logger->info(
+            "Creating swapchain: image_count={}, extent=({},{})",
+            image_count,
+            extent.width,
+            extent.height
+        );
+
+        vk::SwapchainCreateInfoKHR create_info{};
+        create_info.surface = *m_context.surface();
+        create_info.minImageCount = image_count;
+        create_info.imageFormat = surface_format.format;
+        create_info.imageColorSpace = surface_format.colorSpace;
+        create_info.imageExtent = extent;
+        create_info.imageArrayLayers = 1;
+        create_info.imageUsage =
+            vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eTransferDst;
+
+        create_info.imageSharingMode = vk::SharingMode::eExclusive;
+        create_info.preTransform = capabilities.currentTransform;
+        create_info.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+        create_info.presentMode = present_mode;
+        create_info.clipped = VK_TRUE;
+        create_info.oldSwapchain = static_cast<vk::SwapchainKHR>(m_swapchain);
+
+        m_swapchain = vk::raii::SwapchainKHR(m_device.device(), create_info);
+        m_images = m_swapchain.getImages();
+        m_image_format = surface_format.format;
+        m_extent = extent;
+        logger->info("Swapchain created with {} images.", m_images.size());
+
+        create_image_views();
+    }
+
 
     void create_image_views() {
         m_image_views.clear();
@@ -148,7 +154,7 @@ private:
             create_info.subresourceRange.baseArrayLayer = 0;
             create_info.subresourceRange.layerCount = 1;
 
-            m_image_views.emplace_back(m_device->device(), create_info);
+            m_image_views.emplace_back(m_device.device(), create_info);
         }
     }
 
@@ -175,7 +181,7 @@ private:
         if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
             return capabilities.currentExtent;
         } else {
-            auto [width, height] = m_window->framebuffer_size();
+            auto [width, height] = m_window.framebuffer_size();
 
             vk::Extent2D actual_extent = {
                 static_cast<uint32_t>(width),
@@ -189,7 +195,7 @@ private:
         }
     }
 
-    const Device* device() const {
+    const Device& device() const {
         return m_device;
     }
 };

@@ -137,7 +137,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
 </scene>)XML");
 
     core::Scene               scene(1, "scene");
-    resource::ResourceManager resources(2, temp_dir.path);
+    resource::ResourceManager resources(temp_dir.path);
     const auto                result = load_scene_summary(xml_path.string(), scene, resources);
 
     EXPECT_EQ(result.imported_shape_count, 1u);
@@ -231,7 +231,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsRgbReflectanceAndMapsToBaseColor) {
 </scene>)XML");
 
     core::Scene               scene(1, "scene");
-    resource::ResourceManager resources(2, temp_dir.path);
+    resource::ResourceManager resources(temp_dir.path);
     const auto                result = load_scene_summary(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
 
@@ -280,7 +280,7 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsForInvalidMatrixElementCount) {
 </scene>)XML");
 
     core::Scene               scene(1, "scene");
-    resource::ResourceManager resources(2, temp_dir.path);
+    resource::ResourceManager resources(temp_dir.path);
     EXPECT_THROW((void)load_scene_summary(xml_path.string(), scene, resources), std::runtime_error);
 }
 
@@ -314,7 +314,7 @@ TEST(FrameworkPbptSceneLoaderTest, DisambiguatesDuplicateImportedNameBetweenCame
 </scene>)XML");
 
     core::Scene               scene(1, "scene");
-    resource::ResourceManager resources(2, temp_dir.path);
+    resource::ResourceManager resources(temp_dir.path);
     const auto                result = load_scene_summary(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
     EXPECT_TRUE(result.imported_game_object_id_by_name.contains("pbpt_camera"));    // camera is usually pbpt_camera
@@ -351,7 +351,7 @@ TEST(FrameworkPbptSceneLoaderTest, RecordsDefaultShapeNameWhenShapeIdMissing) {
 </scene>)XML");
 
     core::Scene               scene(1, "scene");
-    resource::ResourceManager resources(2, temp_dir.path);
+    resource::ResourceManager resources(temp_dir.path);
     const auto                result = load_scene_summary(xml_path.string(), scene, resources);
 
     EXPECT_EQ(result.imported_shape_count, 1u);
@@ -385,7 +385,7 @@ TEST(FrameworkPbptSceneLoaderTest, LookAtSensorAlignsWithRtrCameraFrontConventio
 </scene>)XML");
 
     core::Scene               scene(1, "scene");
-    resource::ResourceManager resources(2, temp_dir.path);
+    resource::ResourceManager resources(temp_dir.path);
     (void)load_scene_summary(xml_path.string(), scene, resources);
 
     const auto* camera = find_unique_active_camera(scene);
@@ -421,7 +421,7 @@ TEST(FrameworkPbptSceneLoaderTest, AttachesFreeLookControllerWhenInputStateProvi
 
     core::Scene               scene(1, "scene");
     system::input::InputState input_state{};
-    resource::ResourceManager resources(2, temp_dir.path);
+    resource::ResourceManager resources(temp_dir.path);
     LoadOptions         options{};
     options.free_look_input_state = &input_state;
     (void)load_scene_summary(xml_path.string(), scene, resources, options);
@@ -463,7 +463,7 @@ TEST(FrameworkPbptSceneLoaderTest, RelativeMeshFilenameResolvesFromXmlDirectoryW
 </scene>)XML");
 
     core::Scene               scene(1, "scene");
-    resource::ResourceManager resources(2, resource_root);
+    resource::ResourceManager resources(resource_root);
     const auto                result = load_scene_summary(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
 }
@@ -510,7 +510,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportWithCompatibleInfoMapsSubsetAndPreserve
 </scene>)XML");
 
     core::Scene               scene(1, "scene");
-    resource::ResourceManager resources(2, temp_dir.path);
+    resource::ResourceManager resources(temp_dir.path);
     const auto package = pbpt_bridge::load_scene(xml_path.string(), scene, resources);
 
     EXPECT_EQ(package.result.imported_shape_count, 1u);
@@ -554,7 +554,7 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsWhenSensorIsMissing) {
 </scene>)XML");
 
     core::Scene               scene(1, "scene");
-    resource::ResourceManager resources(2, temp_dir.path);
+    resource::ResourceManager resources(temp_dir.path);
     EXPECT_THROW((void)load_scene_summary(xml_path.string(), scene, resources), std::runtime_error);
 }
 
@@ -585,7 +585,7 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsWhenIntegratorIsMissing) {
 </scene>)XML");
 
     core::Scene               scene(1, "scene");
-    resource::ResourceManager resources(2, temp_dir.path);
+    resource::ResourceManager resources(temp_dir.path);
     EXPECT_THROW((void)load_scene_summary(xml_path.string(), scene, resources), std::runtime_error);
 }
 

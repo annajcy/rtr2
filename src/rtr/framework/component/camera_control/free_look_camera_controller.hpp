@@ -7,9 +7,7 @@
 #include <stdexcept>
 
 #include "rtr/framework/component/camera/camera.hpp"
-#include "rtr/framework/component/component.hpp"
-#include "rtr/framework/core/game_object.hpp"
-#include "rtr/system/input/input_state.hpp"
+#include "rtr/framework/component/camera_control/camera_controller.hpp"
 #include "rtr/system/input/input_types.hpp"
 #include "rtr/utils/log.hpp"
 
@@ -24,16 +22,14 @@ struct FreeLookCameraControllerConfig {
     float pitch_max_degrees{89.0f};
 };
 
-class FreeLookCameraController final : public Component {
+class FreeLookCameraController final : public CameraController {
 private:
     static std::shared_ptr<spdlog::logger> logger() { return utils::get_logger("framework.component.free_look"); }
 
     static constexpr float kEpsilon = 1e-5f;
 
-    const system::input::InputState* m_input_state{nullptr};
     FreeLookCameraControllerConfig   m_config{};
 
-    bool  m_validated_once{false};
     bool  m_angles_initialized{false};
     float m_yaw_degrees{0.0f};
     float m_pitch_degrees{0.0f};
@@ -46,37 +42,8 @@ private:
         }
     }
 
-    Camera& require_camera_component() {
-        auto* go = owner();
-        if (go == nullptr) {
-            logger()->error("FreeLook camera lookup failed: owner is null.");
-            throw std::runtime_error("FreeLookCameraController owner is null.");
-        }
-        auto* camera = go->get_component<Camera>();
-        if (camera == nullptr) {
-            logger()->error("FreeLook camera lookup failed: owner {} has no Camera.", go->id());
-            throw std::runtime_error("FreeLookCameraController owner does not have a Camera.");
-        }
-        return *camera;
-    }
-
-    void validate_dependencies() {
-        if (owner() == nullptr) {
-            logger()->error("FreeLook validate_dependencies failed: owner is null.");
-            throw std::runtime_error("FreeLookCameraController owner is null.");
-        }
-        if (m_input_state == nullptr) {
-            logger()->error("FreeLook validate_dependencies failed: input_state is null.");
-            throw std::runtime_error("FreeLookCameraController input_state is null.");
-        }
-        (void)require_camera_component();
-        m_validated_once = true;
-    }
-
-    void ensure_validated() {
-        if (!m_validated_once) {
-            validate_dependencies();
-        }
+    void validate_controller_config() const override {
+        validate_config(m_config);
     }
 
     void initialize_angles_from_front() {
@@ -106,15 +73,11 @@ private:
     }
 
 public:
-    explicit FreeLookCameraController(const system::input::InputState* input_state,
+    explicit FreeLookCameraController(core::GameObject& owner,
+                                      const system::input::InputState& input_state,
                                       FreeLookCameraControllerConfig   config = {})
-        : m_input_state(input_state), m_config(config) {
+        : CameraController(owner, input_state), m_config(config) {
         validate_config(m_config);
-    }
-
-    void set_input_state(const system::input::InputState* input_state) {
-        m_input_state     = input_state;
-        m_validated_once  = false;
     }
 
     void set_config(const FreeLookCameraControllerConfig& config) {
@@ -124,28 +87,17 @@ public:
 
     const FreeLookCameraControllerConfig& config() const { return m_config; }
 
-    void on_awake() override { validate_dependencies(); }
-
-    void on_update(const core::FrameTickContext& ctx) override {
-        ensure_validated();
-
-        auto* go = owner();
-        if (go == nullptr) {
-            logger()->error("FreeLook on_update failed: owner is null.");
-            throw std::runtime_error("FreeLookCameraController owner is null.");
-        }
-        auto& camera = require_camera_component();
-        if (!camera.active()) {
-            return;
-        }
+    void on_update_active_camera(const core::FrameTickContext& ctx, Camera& camera) override {
+        auto& go = require_owner();
         if (!m_angles_initialized) {
             initialize_angles_from_front();
         }
 
-        auto node = go->node();
-        if (m_input_state->mouse_button_down(system::input::MouseButton::RIGHT)) {
-            m_yaw_degrees += static_cast<float>(m_input_state->mouse_dx()) * m_config.mouse_sensitivity;
-            m_pitch_degrees -= static_cast<float>(m_input_state->mouse_dy()) * m_config.mouse_sensitivity;
+        auto node = go.node();
+        const auto& input = input_state();
+        if (input.mouse_button_down(system::input::MouseButton::RIGHT)) {
+            m_yaw_degrees += static_cast<float>(input.mouse_dx()) * m_config.mouse_sensitivity;
+            m_pitch_degrees -= static_cast<float>(input.mouse_dy()) * m_config.mouse_sensitivity;
             m_pitch_degrees = pbpt::math::clamp(m_pitch_degrees, m_config.pitch_min_degrees, m_config.pitch_max_degrees);
 
             const float yaw_rad   = pbpt::math::radians(m_yaw_degrees);
@@ -159,7 +111,7 @@ public:
         }
 
         float speed = m_config.move_speed;
-        if (m_input_state->key_down(system::input::KeyCode::LEFT_SHIFT)) {
+        if (input.key_down(system::input::KeyCode::LEFT_SHIFT)) {
             speed *= m_config.sprint_multiplier;
         }
 
@@ -168,17 +120,17 @@ public:
         const pbpt::math::vec3 world_right = node.world_right();
         const pbpt::math::vec3 world_up    = node.world_up();
 
-        if (m_input_state->key_down(system::input::KeyCode::W))
+        if (input.key_down(system::input::KeyCode::W))
             move_direction += world_front;
-        if (m_input_state->key_down(system::input::KeyCode::S))
+        if (input.key_down(system::input::KeyCode::S))
             move_direction -= world_front;
-        if (m_input_state->key_down(system::input::KeyCode::D))
+        if (input.key_down(system::input::KeyCode::D))
             move_direction += world_right;
-        if (m_input_state->key_down(system::input::KeyCode::A))
+        if (input.key_down(system::input::KeyCode::A))
             move_direction -= world_right;
-        if (m_input_state->key_down(system::input::KeyCode::E))
+        if (input.key_down(system::input::KeyCode::E))
             move_direction += world_up;
-        if (m_input_state->key_down(system::input::KeyCode::Q))
+        if (input.key_down(system::input::KeyCode::Q))
             move_direction -= world_up;
 
         if (pbpt::math::length(move_direction) > 0.0f) {
@@ -188,10 +140,10 @@ public:
             const pbpt::math::vec3 new_position = node.world_position() + delta;
             node.set_world_position(new_position);
             logger()->trace("FreeLook node position updated (game_object_id={}, position=[{:.4f}, {:.4f}, {:.4f}]).",
-                            go->id(), new_position.x(), new_position.y(), new_position.z());
+                            go.id(), new_position.x(), new_position.y(), new_position.z());
         }
 
-        const float scroll_y = static_cast<float>(m_input_state->mouse_scroll_dy());
+        const float scroll_y = static_cast<float>(input.mouse_scroll_dy());
         if (scroll_y != 0.0f) {
             camera.adjust_zoom(scroll_y * m_config.zoom_speed);
         }

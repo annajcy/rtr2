@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <vector>
@@ -19,8 +18,11 @@ namespace rtr::system::render {
  * This class owns swapchain + per-frame/per-image synchronization and provides
  * a begin/submit-present API so higher layers can focus on recording commands.
  */
+template <std::uint32_t FramesInFlight>
 class FrameScheduler {
 public:
+    static_assert(FramesInFlight > 0, "FramesInFlight must be greater than zero.");
+
     struct PerFrameResources {
         rhi::CommandBuffer command_buffer;
         vk::raii::Semaphore image_available_semaphore{nullptr};
@@ -46,14 +48,13 @@ public:
     };
 
 private:
-    rhi::Window* m_window{};
-    rhi::Context* m_context{};
-    rhi::Device* m_device{};
+    rhi::Window& m_window;
+    rhi::Context& m_context;
+    rhi::Device& m_device;
 
-    std::unique_ptr<rhi::SwapChain> m_swapchain;
-    std::unique_ptr<rhi::CommandPool> m_command_pool;
+    rhi::SwapChain m_swapchain;
+    rhi::CommandPool m_command_pool;
 
-    uint32_t m_max_frames_in_flight{0};
     uint32_t m_current_frame_index{0};
     uint32_t m_current_image_index{0};
     bool m_framebuffer_resized{false};
@@ -65,18 +66,14 @@ private:
     vk::Format m_depth_format{vk::Format::eD32Sfloat};
 
 public:
-    explicit FrameScheduler(rhi::Window* window, rhi::Context* context, rhi::Device* device, uint32_t max_frames_in_flight = 2)
+    explicit FrameScheduler(rhi::Window& window, rhi::Context& context, rhi::Device& device)
         : m_window(window),
           m_context(context),
           m_device(device),
-          m_max_frames_in_flight(max_frames_in_flight) {
+          m_swapchain(window, context, device),
+          m_command_pool(device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer) {
         auto log = utils::get_logger("render.frame_scheduler");
 
-        m_swapchain = std::make_unique<rhi::SwapChain>(window, context, device);
-        m_command_pool = std::make_unique<rhi::CommandPool>(
-            device,
-            vk::CommandPoolCreateFlagBits::eResetCommandBuffer
-        );
         m_depth_format = find_supported_format(
             {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
             vk::ImageTiling::eOptimal,
@@ -87,8 +84,8 @@ public:
         init_per_frame_resources();
         log->info(
             "FrameScheduler initialized (max_frames_in_flight={}, image_count={})",
-            m_max_frames_in_flight,
-            m_swapchain->images().size()
+            FramesInFlight,
+            m_swapchain.images().size()
         );
     }
 
@@ -99,7 +96,7 @@ public:
         auto log = utils::get_logger("render.frame_scheduler");
         auto& frame_res = m_per_frame_resources[m_current_frame_index];
 
-        vk::Result wait_result = m_device->device().waitForFences(
+        vk::Result wait_result = m_device.device().waitForFences(
             *frame_res.in_flight_fence,
             VK_TRUE,
             UINT64_MAX
@@ -109,14 +106,14 @@ public:
             return std::nullopt;
         }
 
-        m_device->device().resetFences(*frame_res.in_flight_fence);
+        m_device.device().resetFences(*frame_res.in_flight_fence);
 
-        auto [result, image_index] = m_swapchain->acquire_next_image(
+        auto [result, image_index] = m_swapchain.acquire_next_image(
             frame_res.image_available_semaphore
         );
         if (result == vk::Result::eErrorOutOfDateKHR) {
             log->info("Swapchain acquire returned out-of-date; recreating swapchain resources.");
-            m_device->device().waitIdle();
+            m_device.device().waitIdle();
             recreate_swapchain_resources();
             return std::nullopt;
         }
@@ -145,7 +142,7 @@ public:
         submit_info.fence = *frame_res.in_flight_fence;
         ticket.command_buffer->submit(submit_info);
 
-        vk::Result present_result = m_swapchain->present(
+        vk::Result present_result = m_swapchain.present(
             ticket.image_index,
             image_res.render_finished_semaphore,
             nullptr
@@ -166,11 +163,11 @@ public:
         if (needs_recreation || m_framebuffer_resized) {
             m_framebuffer_resized = false;
             log->info("Recreating swapchain resources after present/resize event.");
-            m_device->device().waitIdle();
+            m_device.device().waitIdle();
             recreate_swapchain_resources();
         }
 
-        m_current_frame_index = (m_current_frame_index + 1) % m_max_frames_in_flight;
+        m_current_frame_index = (m_current_frame_index + 1) % FramesInFlight;
     }
 
     void on_window_resized(uint32_t width, uint32_t height) {
@@ -179,19 +176,19 @@ public:
         m_framebuffer_resized = true;
     }
 
-    vk::Extent2D render_extent() const { return m_swapchain->extent(); }
-    vk::Format render_format() const { return m_swapchain->image_format(); }
-    uint32_t image_count() const { return static_cast<uint32_t>(m_swapchain->images().size()); }
-    uint32_t max_frames_in_flight() const { return m_max_frames_in_flight; }
+    vk::Extent2D render_extent() const { return m_swapchain.extent(); }
+    vk::Format render_format() const { return m_swapchain.image_format(); }
+    uint32_t image_count() const { return static_cast<uint32_t>(m_swapchain.images().size()); }
+    uint32_t max_frames_in_flight() const { return FramesInFlight; }
     uint32_t current_frame_index() const { return m_current_frame_index; }
     uint32_t current_image_index() const { return m_current_image_index; }
     const vk::Format& depth_format() const { return m_depth_format; }
     SwapchainState swapchain_state() const {
         return SwapchainState{
             .generation = m_swapchain_generation,
-            .extent = m_swapchain->extent(),
-            .image_count = static_cast<uint32_t>(m_swapchain->images().size()),
-            .color_format = m_swapchain->image_format(),
+            .extent = m_swapchain.extent(),
+            .image_count = static_cast<uint32_t>(m_swapchain.images().size()),
+            .color_format = m_swapchain.image_format(),
             .depth_format = m_depth_format
         };
     }
@@ -199,7 +196,7 @@ public:
     const std::vector<PerImageResources>& per_image_resources() const { return m_per_image_resources; }
     std::vector<PerImageResources>& per_image_resources() { return m_per_image_resources; }
     const std::vector<PerFrameResources>& per_frame_resources() const { return m_per_frame_resources; }
-    const rhi::SwapChain& swapchain() const { return *m_swapchain; }
+    const rhi::SwapChain& swapchain() const { return m_swapchain; }
 
 private:
     void recreate_swapchain_resources() {
@@ -213,18 +210,17 @@ private:
     }
 
     void init_swapchain() {
-        m_swapchain.reset();
-        m_swapchain = std::make_unique<rhi::SwapChain>(m_window, m_context, m_device);
+        m_swapchain.recreate();
     }
 
     void init_per_image_resource() {
         m_per_image_resources.clear();
-        m_per_image_resources.reserve(m_swapchain->images().size());
+        m_per_image_resources.reserve(m_swapchain.images().size());
         vk::SemaphoreCreateInfo semaphore_info{};
 
-        for (size_t i = 0; i < m_swapchain->images().size(); ++i) {
+        for (size_t i = 0; i < m_swapchain.images().size(); ++i) {
             PerImageResources image_res{
-                .render_finished_semaphore = vk::raii::Semaphore(m_device->device(), semaphore_info)
+                .render_finished_semaphore = vk::raii::Semaphore(m_device.device(), semaphore_info)
             };
             m_per_image_resources.push_back(std::move(image_res));
         }
@@ -232,22 +228,22 @@ private:
 
     void init_per_frame_resources() {
         m_per_frame_resources.clear();
-        m_per_frame_resources.reserve(m_max_frames_in_flight);
+        m_per_frame_resources.reserve(FramesInFlight);
 
         vk::SemaphoreCreateInfo semaphore_info{};
         vk::FenceCreateInfo fence_info{};
         fence_info.flags = vk::FenceCreateFlagBits::eSignaled;
 
-        auto command_buffers = m_command_pool->create_command_buffers(m_max_frames_in_flight);
-        for (uint32_t i = 0; i < m_max_frames_in_flight; ++i) {
+        auto command_buffers = m_command_pool.create_command_buffers(FramesInFlight);
+        for (uint32_t i = 0; i < FramesInFlight; ++i) {
             PerFrameResources resources{
                 .command_buffer = std::move(command_buffers[i]),
                 .image_available_semaphore = vk::raii::Semaphore(
-                    m_device->device(),
+                    m_device.device(),
                     semaphore_info
                 ),
                 .in_flight_fence = vk::raii::Fence(
-                    m_device->device(),
+                    m_device.device(),
                     fence_info
                 )
             };
@@ -261,7 +257,7 @@ private:
         vk::FormatFeatureFlags features
     ) const {
         for (const auto format : candidates) {
-            vk::FormatProperties props = m_device->physical_device().getFormatProperties(format);
+            vk::FormatProperties props = m_device.physical_device().getFormatProperties(format);
             if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features) {
                 return format;
             }

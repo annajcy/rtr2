@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <functional>
 #include <utility>
 
 #include "rtr/rhi/common.hpp"
@@ -15,7 +16,7 @@ namespace rtr::rhi {
 
 class Buffer {
 private:
-    Device* m_device{};
+    std::reference_wrapper<Device> m_device;
     vk::raii::Buffer m_buffer{nullptr};
     vk::raii::DeviceMemory m_buffer_memory{nullptr};
     vk::DeviceSize m_size{0};
@@ -26,7 +27,7 @@ private:
 
 public:  
     static Buffer create_host_visible_buffer(
-        Device* device,
+        Device& device,
         vk::DeviceSize size,
         vk::BufferUsageFlags usage = {}
     ) {
@@ -39,7 +40,7 @@ public:
     }
 
     static Buffer create_device_local_buffer(
-        Device* device,
+        Device& device,
         vk::DeviceSize size,
         vk::BufferUsageFlags usage = {}
     ) {
@@ -53,14 +54,14 @@ public:
 
 public:
     Buffer(
-        Device* device,
+        Device& device,
         vk::DeviceSize size,
         vk::BufferUsageFlags usage = {},
         vk::MemoryPropertyFlags properties = {}
     ) : m_device(device), m_size(size), m_usage(usage), m_properties(properties) {
         auto buffer_with_memory_opt = make_buffer_with_memory(
-            device->device(),
-            device->physical_device(),
+            device.device(),
+            device.physical_device(),
             size,
             usage,
             properties
@@ -77,7 +78,7 @@ public:
 
     // 移动构造
     Buffer(Buffer&& other) noexcept 
-        : m_device(other.m_device),
+        : m_device(other.m_device.get()),
         m_buffer(std::move(other.m_buffer)),
         m_buffer_memory(std::move(other.m_buffer_memory)),
         m_size(other.m_size),
@@ -131,7 +132,7 @@ public:
     vk::DeviceSize size() const { return m_size; }
     vk::BufferUsageFlags usage() const { return m_usage; }
     vk::MemoryPropertyFlags properties() const { return m_properties; }
-    const Device* device() const { return m_device; }
+    const Device& device() const { return m_device.get(); }
 
     bool is_mapped() const { return m_is_mapped; }
 

@@ -79,32 +79,32 @@ public:
         m_offscreen_format    = pick_offscreen_format();
 
         m_compute_shader_module        = std::make_unique<rhi::ShaderModule>(rhi::ShaderModule::from_file(
-            m_device, config.shader_output_dir + config.compute_shader_filename, vk::ShaderStageFlagBits::eCompute));
+            *m_device, config.shader_output_dir + config.compute_shader_filename, vk::ShaderStageFlagBits::eCompute));
         m_present_vertex_shader_module = std::make_unique<rhi::ShaderModule>(
-            rhi::ShaderModule::from_file(m_device, config.shader_output_dir + config.present_vertex_shader_filename,
+            rhi::ShaderModule::from_file(*m_device, config.shader_output_dir + config.present_vertex_shader_filename,
                                          vk::ShaderStageFlagBits::eVertex));
         m_present_fragment_shader_module = std::make_unique<rhi::ShaderModule>(
-            rhi::ShaderModule::from_file(m_device, config.shader_output_dir + config.present_fragment_shader_filename,
+            rhi::ShaderModule::from_file(*m_device, config.shader_output_dir + config.present_fragment_shader_filename,
                                          vk::ShaderStageFlagBits::eFragment));
 
         m_uniform_buffers   = make_per_frame_mapped_uniform_buffers(m_uniform_buffer_size);
-        m_offscreen_sampler = std::make_unique<rhi::Sampler>(rhi::Sampler::create_default(m_device, 1));
+        m_offscreen_sampler = std::make_unique<rhi::Sampler>(rhi::Sampler::create_default(*m_device, 1));
 
         rhi::DescriptorSetLayout::Builder compute_layout_builder;
         compute_layout_builder.add_binding(0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eCompute)
             .add_binding(1, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
-        m_compute_layout = std::make_unique<rhi::DescriptorSetLayout>(compute_layout_builder.build(m_device));
+        m_compute_layout = std::make_unique<rhi::DescriptorSetLayout>(compute_layout_builder.build(*m_device));
 
         rhi::DescriptorSetLayout::Builder present_layout_builder;
         present_layout_builder.add_binding(0, vk::DescriptorType::eCombinedImageSampler,
                                            vk::ShaderStageFlagBits::eFragment);
-        m_present_layout = std::make_unique<rhi::DescriptorSetLayout>(present_layout_builder.build(m_device));
+        m_present_layout = std::make_unique<rhi::DescriptorSetLayout>(present_layout_builder.build(*m_device));
 
         rhi::DescriptorPool::Builder pool_builder;
         pool_builder.add_layout(*m_compute_layout, m_frame_count)
             .add_layout(*m_present_layout, m_frame_count)
             .set_flags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-        m_descriptor_pool = std::make_unique<rhi::DescriptorPool>(pool_builder.build(m_device));
+        m_descriptor_pool = std::make_unique<rhi::DescriptorPool>(pool_builder.build(*m_device));
 
         m_compute_sets = m_descriptor_pool->allocate_multiple(*m_compute_layout, m_frame_count);
         m_present_sets = m_descriptor_pool->allocate_multiple(*m_present_layout, m_frame_count);
@@ -155,7 +155,7 @@ public:
         m_scene_extent_dirty     = true;
     }
 
-    void handle_swapchain_state_change(const FrameScheduler::SwapchainState& /*state*/,
+    void handle_swapchain_state_change(const ActiveFrameScheduler::SwapchainState& /*state*/,
                                        const SwapchainChangeSummary& diff) override {
         if (diff.extent_or_depth_changed())
             m_scene_extent_dirty = true;
@@ -174,23 +174,23 @@ public:
 
         // --- 2. ComputePass: write to offscreen storage image ---
         auto& frame = m_offscreen_frame_resources[frame_index];
-        m_compute_pass->bind_render_pass_resources(
+        m_compute_pass->execute(
+            ctx,
             ComputePass::RenderPassResources{.uniform_buffer   = m_uniform_buffers[frame_index].get(),
                                              .offscreen_image  = frame.image.get(),
                                              .offscreen_layout = &frame.layout,
                                              .compute_set      = &m_compute_sets[frame_index]});
-        m_compute_pass->execute(ctx);
 
         // Update present descriptor so the sampler points to the (possibly recreated) offscreen image
         update_present_descriptor(frame_index);
 
         // --- 3. PresentImagePass: sample offscreen → swapchain ---
-        m_present_pass->bind_render_pass_resources(
+        m_present_pass->execute(
+            ctx,
             PresentImagePass::RenderPassResources{.offscreen_image  = frame.image.get(),
                                                   .offscreen_layout = &frame.layout,
                                                   .depth_image      = m_depth_images[frame_index].get(),
                                                   .present_set      = &m_present_sets[frame_index]});
-        m_present_pass->execute(ctx);
     }
 
 private:
@@ -201,7 +201,7 @@ private:
         rhi::DescriptorWriter w;
         w.write_combined_image(0, *img->image_view(), *m_offscreen_sampler->sampler(),
                                vk::ImageLayout::eShaderReadOnlyOptimal);
-        w.update(m_device, *m_present_sets[frame_index]);
+        w.update(*m_device, *m_present_sets[frame_index]);
     }
 
     void ensure_scene_targets(vk::Extent2D fallback) {
@@ -311,7 +311,7 @@ private:
         for (uint32_t i = 0; i < m_frame_count; ++i) {
             OffscreenFrameResources res{};
             res.image = std::make_unique<rhi::Image>(
-                rhi::Image(m_device, m_scene_target_extent.width, m_scene_target_extent.height, m_offscreen_format,
+                rhi::Image(*m_device, m_scene_target_extent.width, m_scene_target_extent.height, m_offscreen_format,
                            vk::ImageTiling::eOptimal, usage, vk::MemoryPropertyFlagBits::eDeviceLocal,
                            vk::ImageAspectFlagBits::eColor, false));
             res.layout = vk::ImageLayout::eUndefined;
@@ -326,7 +326,7 @@ private:
             rhi::DescriptorWriter w;
             w.write_buffer(0, *m_uniform_buffers[i]->buffer(), 0, m_uniform_buffer_size);
             w.write_storage_image(1, *m_offscreen_frame_resources[i].image->image_view(), vk::ImageLayout::eGeneral);
-            w.update(m_device, *m_compute_sets[i]);
+            w.update(*m_device, *m_compute_sets[i]);
         }
     }
 };

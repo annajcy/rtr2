@@ -26,7 +26,7 @@ TEST(FrameworkFreeLookCameraControllerTest, MovesWithWASDQE) {
     camera.set_active(true);
 
     system::input::InputState input{};
-    (void)go.add_component<FreeLookCameraController>(&input);
+    (void)go.add_component<FreeLookCameraController>(input);
 
     core::FrameTickContext ctx{.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0};
 
@@ -64,7 +64,7 @@ TEST(FrameworkFreeLookCameraControllerTest, ShiftAppliesSprintMultiplier) {
     camera.set_active(true);
 
     system::input::InputState input{};
-    (void)go.add_component<FreeLookCameraController>(&input);
+    (void)go.add_component<FreeLookCameraController>(input);
 
     core::FrameTickContext ctx{.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0};
 
@@ -92,7 +92,7 @@ TEST(FrameworkFreeLookCameraControllerTest, RightMouseRequiredForLook) {
     camera.set_active(true);
 
     system::input::InputState input{};
-    (void)go.add_component<FreeLookCameraController>(&input);
+    (void)go.add_component<FreeLookCameraController>(input);
 
     core::FrameTickContext ctx{.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0};
     const pbpt::math::vec3 before_front = scene.scene_graph().node(go.id()).world_front();
@@ -119,7 +119,7 @@ TEST(FrameworkFreeLookCameraControllerTest, PitchIsClamped) {
     camera.set_active(true);
 
     system::input::InputState input{};
-    (void)go.add_component<FreeLookCameraController>(&input);
+    (void)go.add_component<FreeLookCameraController>(input);
 
     core::FrameTickContext ctx{.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0};
 
@@ -142,7 +142,7 @@ TEST(FrameworkFreeLookCameraControllerTest, ScrollCallsAdjustZoom) {
     camera.set_active(true);
 
     system::input::InputState input{};
-    (void)go.add_component<FreeLookCameraController>(&input);
+    (void)go.add_component<FreeLookCameraController>(input);
 
     core::FrameTickContext ctx{.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0};
     input.update_mouse_scroll(0.0, 1.0);
@@ -162,8 +162,8 @@ TEST(FrameworkFreeLookCameraControllerTest, OnlyActiveCameraResponds) {
     camera_b.set_active(false);
 
     system::input::InputState input{};
-    (void)go_a.add_component<FreeLookCameraController>(&input);
-    (void)go_b.add_component<FreeLookCameraController>(&input);
+    (void)go_a.add_component<FreeLookCameraController>(input);
+    (void)go_b.add_component<FreeLookCameraController>(input);
 
     core::FrameTickContext ctx{.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0};
     input.update_key(system::input::KeyCode::W, system::input::KeyAction::PRESS, system::input::KeyMod::NONE);
@@ -184,12 +184,15 @@ TEST(FrameworkFreeLookCameraControllerTest, ThrowsWhenOwnerHasNoCameraComponent)
     auto&       go = scene.create_game_object("go");
 
     system::input::InputState input{};
-    EXPECT_THROW((void)go.add_component<FreeLookCameraController>(&input), std::runtime_error);
+    EXPECT_THROW((void)go.add_component<FreeLookCameraController>(input), std::runtime_error);
 }
 
 class MoveOnUpdateComponent final : public Component {
 public:
-    void on_update(const core::FrameTickContext& /*ctx*/) override { owner()->node().set_local_position({1.0f, 2.0f, 3.0f}); }
+    explicit MoveOnUpdateComponent(core::GameObject& owner)
+        : Component(owner) {}
+
+    void on_update(const core::FrameTickContext& /*ctx*/) override { owner().node().set_local_position({1.0f, 2.0f, 3.0f}); }
 };
 
 TEST(FrameworkFreeLookCameraControllerTest, SceneTickRefreshesWorldTransformAfterComponentUpdate) {

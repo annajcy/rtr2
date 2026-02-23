@@ -16,6 +16,7 @@
 #include "device.hpp"
 #include "buffer.hpp"
 
+#include <functional>
 namespace rtr::rhi {
 
 namespace detail {
@@ -196,7 +197,7 @@ public:
     }
 
     static Image create_depth_image(
-        Device* device,
+        Device& device,
         uint32_t width, uint32_t height,
         vk::Format format
     ) {
@@ -214,7 +215,7 @@ public:
     }
 
     static Image from_rgba8(
-        Device* device,
+        Device& device,
         uint32_t width,
         uint32_t height,
         const uint8_t* rgba_data,
@@ -222,9 +223,6 @@ public:
         bool use_srgb = true,
         bool generate_mipmaps = true
     ) {
-        if (device == nullptr) {
-            throw std::invalid_argument("Image::create_image_from_rgba8 requires non-null device.");
-        }
         if (width == 0 || height == 0) {
             throw std::invalid_argument("Image::create_image_from_rgba8 requires non-zero extent.");
         }
@@ -273,7 +271,7 @@ public:
     }
 
 private:
-    Device* m_device{nullptr};
+    std::reference_wrapper<Device> m_device;
     vk::raii::Image m_image{nullptr};
     vk::raii::ImageView m_image_view{nullptr};
     vk::raii::DeviceMemory m_image_memory{nullptr};
@@ -288,7 +286,7 @@ private:
 
 public:
     Image(
-        Device* device,
+        Device& device,
         uint32_t width, uint32_t height,
         vk::Format format, vk::ImageTiling tiling,
         vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::ImageAspectFlags aspect_mask,
@@ -302,8 +300,8 @@ public:
         }
 
         auto resources_opt = make_image_with_memory(
-            device->device(),
-            device->physical_device(),
+            device.device(),
+            device.physical_device(),
             width, height, 
             m_mip_levels,
             format, tiling, usage, properties
@@ -327,14 +325,14 @@ public:
         view_info.subresourceRange.baseArrayLayer = 0;
         view_info.subresourceRange.layerCount = 1;
 
-        m_image_view = vk::raii::ImageView(m_device->device(), view_info);
+        m_image_view = vk::raii::ImageView(m_device.get().device(), view_info);
     }
 
     Image(const Image&) = delete;
     Image& operator=(const Image&) = delete;
 
     Image(Image&& other) noexcept 
-    : m_device(other.m_device),
+    : m_device(other.m_device.get()),
         m_image(std::move(other.m_image)),
         m_image_view(std::move(other.m_image_view)),
         m_image_memory(std::move(other.m_image_memory)),
@@ -391,7 +389,7 @@ public:
 private:
     void generate_mipmaps(CommandBuffer& cb) {
         auto cmd = *cb.command_buffer();
-        auto format_properties = m_device->physical_device().getFormatProperties(m_format);
+        auto format_properties = m_device.get().physical_device().getFormatProperties(m_format);
         if (!(format_properties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear)) {
             throw std::runtime_error("Texture image format does not support linear blitting!");
         }
@@ -450,9 +448,9 @@ private:
     }
 
     void upload(Buffer& stage_buffer, vk::ImageLayout final_layout) {
-        CommandPool command_pool(m_device, vk::CommandPoolCreateFlagBits::eTransient);
+        CommandPool command_pool(m_device.get(), vk::CommandPoolCreateFlagBits::eTransient);
         auto cmd = command_pool.create_command_buffer();
-        vk::raii::Fence upload_fence(m_device->device(), vk::FenceCreateInfo{});
+        vk::raii::Fence upload_fence(m_device.get().device(), vk::FenceCreateInfo{});
         CommandBuffer::SubmitInfo submit_info{};
         submit_info.fence = *upload_fence;
         // Transition image layout and copy buffer to image
@@ -504,7 +502,7 @@ private:
         }, submit_info);
 
         
-        auto result = m_device->device().waitForFences(*upload_fence, VK_TRUE, UINT64_MAX);
+        auto result = m_device.get().device().waitForFences(*upload_fence, VK_TRUE, UINT64_MAX);
         if (result != vk::Result::eSuccess) {
             throw std::runtime_error("Failed to wait for image upload fence!");
         }
@@ -514,7 +512,7 @@ private:
 
 class Sampler {
 private:
-    Device* m_device{nullptr};
+    std::reference_wrapper<Device> m_device;
     vk::raii::Sampler m_sampler{nullptr};
 
 public:
@@ -522,9 +520,9 @@ public:
     // 静态工厂方法：创建一个标准的、高质量的采样器
     // 特性：线性过滤 (Linear), 重复平铺 (Repeat), 开启最大各向异性过滤 (Anisotropy)
     // =========================================================================
-    static Sampler create_default(Device* device, uint32_t mip_levels = 1) {
+    static Sampler create_default(Device& device, uint32_t mip_levels = 1) {
         // 1. 获取物理设备属性，用于查询支持的最大各向异性过滤级别
-        vk::PhysicalDeviceProperties properties = device->physical_device().getProperties();
+        vk::PhysicalDeviceProperties properties = device.physical_device().getProperties();
 
         vk::SamplerCreateInfo info{};
         
@@ -569,7 +567,7 @@ public:
     }
 
     // 工厂方法：创建一个像素风采样器 (Nearest, Clamp)
-    static Sampler create_pixel_art_style(Device* device) {
+    static Sampler create_pixel_art_style(Device& device) {
         vk::SamplerCreateInfo info{};
         info.magFilter = vk::Filter::eNearest; // 马赛克效果
         info.minFilter = vk::Filter::eNearest;
@@ -585,9 +583,9 @@ public:
 
 public:
     // 通用构造函数
-    Sampler(Device* device, const vk::SamplerCreateInfo& create_info) 
+    Sampler(Device& device, const vk::SamplerCreateInfo& create_info) 
         : m_device(device) {
-        m_sampler = vk::raii::Sampler(device->device(), create_info);
+        m_sampler = vk::raii::Sampler(device.device(), create_info);
     }
 
     // Rule of Five: 禁用拷贝，允许移动
@@ -595,7 +593,7 @@ public:
     Sampler& operator=(const Sampler&) = delete;
 
     Sampler(Sampler&& other) noexcept 
-        : m_device(other.m_device), m_sampler(std::move(other.m_sampler)) {}
+        : m_device(other.m_device.get()), m_sampler(std::move(other.m_sampler)) {}
 
     Sampler& operator=(Sampler&& other) noexcept {
         if (this != &other) {

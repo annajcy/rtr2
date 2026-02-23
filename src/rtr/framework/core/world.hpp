@@ -24,15 +24,16 @@ private:
     SceneId m_next_scene_id{1};
     SceneId m_active_scene_id{core::kInvalidSceneId};
     std::vector<std::unique_ptr<Scene>> m_scenes{};
-    resource::ResourceManager* m_resource_manager{};
+    resource::ResourceManager& m_resource_manager;
 
 public:
-    World() = default;
+    explicit World(resource::ResourceManager& resource_manager)
+        : m_resource_manager(resource_manager) {}
 
     World(const World&) = delete;
     World& operator=(const World&) = delete;
-    World(World&&) noexcept = default;
-    World& operator=(World&&) noexcept = default;
+    World(World&&) = delete;
+    World& operator=(World&&) = delete;
 
     Scene& create_scene(std::string name = "Scene") {
         auto log = logger();
@@ -124,25 +125,12 @@ public:
         return m_scenes.size();
     }
 
-    void set_resource_manager(resource::ResourceManager* resource_manager) {
-        m_resource_manager = resource_manager;
-        logger()->info("ResourceManager bound to World (bound={}).", m_resource_manager != nullptr);
-    }
-
     resource::ResourceManager& resource_manager() {
-        if (m_resource_manager == nullptr) {
-            logger()->error("World resource_manager() failed: ResourceManager is not bound.");
-            throw std::runtime_error("World resource manager is not bound.");
-        }
-        return *m_resource_manager;
+        return m_resource_manager;
     }
 
     const resource::ResourceManager& resource_manager() const {
-        if (m_resource_manager == nullptr) {
-            logger()->error("World resource_manager() const failed: ResourceManager is not bound.");
-            throw std::runtime_error("World resource manager is not bound.");
-        }
-        return *m_resource_manager;
+        return m_resource_manager;
     }
 
     void fixed_tick(const FixedTickContext& ctx) {

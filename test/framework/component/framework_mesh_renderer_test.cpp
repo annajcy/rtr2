@@ -10,28 +10,36 @@
 namespace rtr::framework::component::test {
 
 TEST(FrameworkMeshRendererTest, ConstructWithValidHandles) {
-    MeshRenderer renderer(resource::MeshHandle{1});
+    core::Scene scene(1, "scene");
+    auto& go = scene.create_game_object("mesh");
+    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{1});
     EXPECT_EQ(renderer.mesh_handle(), resource::MeshHandle{1});
     EXPECT_EQ(renderer.base_color(), pbpt::math::vec4(1.0f));
 }
 
 TEST(FrameworkMeshRendererTest, InvalidMeshHandleThrows) {
+    core::Scene scene(1, "scene");
+    auto& go = scene.create_game_object("mesh");
     EXPECT_THROW(
-        (void)MeshRenderer(resource::MeshHandle{}),
+        (void)go.add_component<MeshRenderer>(resource::MeshHandle{}),
         std::invalid_argument
     );
 
-    MeshRenderer renderer(resource::MeshHandle{1});
+    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{1});
     EXPECT_THROW((void)renderer.set_mesh_handle(resource::MeshHandle{}), std::invalid_argument);
 }
 
 TEST(FrameworkMeshRendererTest, AllowsCustomBaseColor) {
-    MeshRenderer renderer(resource::MeshHandle{1}, pbpt::math::vec4{0.2f, 0.3f, 0.4f, 1.0f});
+    core::Scene scene(1, "scene");
+    auto& go = scene.create_game_object("mesh");
+    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{1}, pbpt::math::vec4{0.2f, 0.3f, 0.4f, 1.0f});
     EXPECT_EQ(renderer.base_color(), pbpt::math::vec4(0.2f, 0.3f, 0.4f, 1.0f));
 }
 
 TEST(FrameworkMeshRendererTest, SettersUpdateState) {
-    MeshRenderer renderer(resource::MeshHandle{1});
+    core::Scene scene(1, "scene");
+    auto& go = scene.create_game_object("mesh");
+    auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{1});
 
     renderer.set_mesh_handle(resource::MeshHandle{3});
     renderer.set_base_color(pbpt::math::vec4{0.1f, 0.2f, 0.3f, 1.0f});

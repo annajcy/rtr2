@@ -12,6 +12,7 @@
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/world.hpp"
 #include "rtr/resource/resource_manager.hpp"
+#include "rtr/rhi/frame_constants.hpp"
 #include "rtr/system/input/input_system.hpp"
 #include "rtr/system/render/pipeline.hpp"
 #include "rtr/system/render/renderer.hpp"
@@ -23,7 +24,6 @@ struct AppRuntimeConfig {
     std::uint32_t window_width{800};
     std::uint32_t window_height{600};
     std::string   window_title{"RTR2 AppRuntime"};
-    std::uint32_t max_frames_in_flight{2};
     std::string   resource_root_dir{"./assets/"};
 
     double           fixed_delta_seconds{1.0 / 60.0};
@@ -77,10 +77,10 @@ private:
     AppRuntimeConfig m_config{};
     RuntimeCallbacks m_callbacks{};
 
-    std::unique_ptr<framework::core::World>     m_world{};
-    std::unique_ptr<resource::ResourceManager>  m_resources{};
-    std::unique_ptr<system::render::Renderer>   m_renderer{};
-    std::unique_ptr<system::input::InputSystem> m_input{};
+    resource::ResourceManager        m_resources;
+    framework::core::World           m_world;
+    system::render::Renderer         m_renderer;
+    system::input::InputSystem       m_input;
 
     bool          m_stop_requested{false};
     bool          m_paused{false};
@@ -90,36 +90,33 @@ private:
 public:
     explicit AppRuntime(AppRuntimeConfig config = {})
         : m_config(prepare_config(std::move(config))),
-          m_world(std::make_unique<framework::core::World>()),
-          m_resources(
-              std::make_unique<resource::ResourceManager>(m_config.max_frames_in_flight, m_config.resource_root_dir)),
-          m_renderer(std::make_unique<system::render::Renderer>(static_cast<int>(m_config.window_width),
-                                                                static_cast<int>(m_config.window_height),
-                                                                m_config.window_title, m_config.max_frames_in_flight)),
-          m_input(std::make_unique<system::input::InputSystem>(&m_renderer->window())),
+          m_resources(m_config.resource_root_dir),
+          m_world(m_resources),
+          m_renderer(static_cast<int>(m_config.window_width), static_cast<int>(m_config.window_height),
+                     m_config.window_title),
+          m_input(&m_renderer.window()),
           m_paused(m_config.start_paused) {
-        m_world->set_resource_manager(m_resources.get());
         logger()->info("AppRuntime initialized (window={}x{}, title='{}', frames_in_flight={}, paused={})",
                        m_config.window_width, m_config.window_height, m_config.window_title,
-                       m_config.max_frames_in_flight, m_paused);
+                       rhi::kFramesInFlight, m_paused);
     }
 
     const AppRuntimeConfig& config() const { return m_config; }
 
-    framework::core::World& world() { return *m_world; }
-    const framework::core::World& world() const { return *m_world; }
+    framework::core::World& world() { return m_world; }
+    const framework::core::World& world() const { return m_world; }
 
-    resource::ResourceManager& resource_manager() { return *m_resources; }
-    const resource::ResourceManager& resource_manager() const { return *m_resources; }
+    resource::ResourceManager& resource_manager() { return m_resources; }
+    const resource::ResourceManager& resource_manager() const { return m_resources; }
 
-    system::render::Renderer& renderer() { return *m_renderer; }
-    const system::render::Renderer& renderer() const { return *m_renderer; }
+    system::render::Renderer& renderer() { return m_renderer; }
+    const system::render::Renderer& renderer() const { return m_renderer; }
 
-    system::input::InputSystem& input_system() { return *m_input; }
-    const system::input::InputSystem& input_system() const { return *m_input; }
+    system::input::InputSystem& input_system() { return m_input; }
+    const system::input::InputSystem& input_system() const { return m_input; }
 
-    system::render::IRenderPipeline* pipeline() { return m_renderer->pipeline(); }
-    const system::render::IRenderPipeline* pipeline() const { return m_renderer->pipeline(); }
+    system::render::IRenderPipeline* pipeline() { return m_renderer.pipeline(); }
+    const system::render::IRenderPipeline* pipeline() const { return m_renderer.pipeline(); }
 
     void set_callbacks(RuntimeCallbacks callbacks) { m_callbacks = std::move(callbacks); }
     const RuntimeCallbacks& callbacks() const { return m_callbacks; }
@@ -131,7 +128,7 @@ public:
             throw std::runtime_error("AppRuntime set_pipeline received null pipeline.");
         }
 
-        m_renderer->set_pipeline(std::move(pipeline));
+        m_renderer.set_pipeline(std::move(pipeline));
         log->info("Pipeline bound to runtime.");
     }
 
@@ -144,7 +141,7 @@ public:
     RuntimeResult run() {
         auto          log = logger();
         RuntimeResult result{};
-        if (m_renderer->pipeline() == nullptr) {
+        if (m_renderer.pipeline() == nullptr) {
             result.ok            = false;
             result.error_message = "AppRuntime requires pipeline before run().";
             log->error("run() aborted: pipeline is not bound.");
@@ -168,9 +165,9 @@ public:
                 m_callbacks.on_startup(ctx);
             }
 
-            while (!m_stop_requested && !m_renderer->window().is_should_close()) {
-                m_input->begin_frame();
-                m_renderer->window().poll_events();
+            while (!m_stop_requested && !m_renderer.window().is_should_close()) {
+                m_input.begin_frame();
+                m_renderer.window().poll_events();
 
                 if (m_callbacks.on_input) {
                     auto ctx = make_runtime_context(0.0);
@@ -199,7 +196,7 @@ public:
                         std::uint32_t fixed_steps = 0;
                         while (accumulator >= m_config.fixed_delta_seconds &&
                                fixed_steps < m_config.max_fixed_steps_per_frame) {
-                            m_world->fixed_tick(framework::core::FixedTickContext{
+                            m_world.fixed_tick(framework::core::FixedTickContext{
                                 .fixed_delta_seconds = m_config.fixed_delta_seconds,
                                 .fixed_tick_index    = m_fixed_tick_index++,
                             });
@@ -213,8 +210,8 @@ public:
                         .unscaled_delta_seconds = frame_delta,
                         .frame_index            = m_frame_serial,
                     };
-                    m_world->tick(tick_ctx);
-                    m_world->late_tick(tick_ctx);
+                    m_world.tick(tick_ctx);
+                    m_world.late_tick(tick_ctx);
                 }
 
                 if (m_callbacks.on_post_update) {
@@ -222,12 +219,12 @@ public:
                     m_callbacks.on_post_update(ctx);
                 }
 
-                if (auto* frame_prepare = dynamic_cast<system::render::IFramePreparePipeline*>(m_renderer->pipeline());
+                if (auto* frame_prepare = dynamic_cast<system::render::IFramePreparePipeline*>(m_renderer.pipeline());
                     frame_prepare != nullptr) {
                     frame_prepare->prepare_frame(system::render::FramePrepareContext{
-                        .world         = *m_world,
-                        .resources     = *m_resources,
-                        .input         = *m_input,
+                        .world         = m_world,
+                        .resources     = m_resources,
+                        .input         = m_input,
                         .frame_serial  = m_frame_serial,
                         .delta_seconds = frame_delta,
                     });
@@ -238,7 +235,7 @@ public:
                     m_callbacks.on_pre_render(ctx);
                 }
 
-                m_renderer->draw_frame();
+                m_renderer.draw_frame();
 
                 if (m_callbacks.on_post_render) {
                     auto ctx = make_runtime_context(frame_delta);
@@ -247,9 +244,9 @@ public:
 
                 // Keep per-frame mouse deltas available through update/render,
                 // then clear them at frame tail.
-                m_input->end_frame();
+                m_input.end_frame();
 
-                m_resources->tick(m_frame_serial);
+                m_resources.tick(m_frame_serial);
                 ++m_frame_serial;
                 ++result.frames_rendered;
             }
@@ -275,8 +272,8 @@ public:
         }
 
         try {
-            m_renderer->device().wait_idle();
-            m_resources->flush_after_wait_idle();
+            m_renderer.device().wait_idle();
+            m_resources.flush_after_wait_idle();
         } catch (const std::exception& e) {
             log->error("wait_idle/flush_after_wait_idle failed: {}", e.what());
             if (result.ok) {
@@ -293,11 +290,11 @@ public:
 private:
     RuntimeContext make_runtime_context(double delta_seconds) {
         return RuntimeContext{
-            .world         = *m_world,
-            .resources     = *m_resources,
-            .renderer      = *m_renderer,
-            .input         = *m_input,
-            .pipeline      = m_renderer->pipeline(),
+            .world         = m_world,
+            .resources     = m_resources,
+            .renderer      = m_renderer,
+            .input         = m_input,
+            .pipeline      = m_renderer.pipeline(),
             .frame_serial  = m_frame_serial,
             .delta_seconds = delta_seconds,
             .request_stop  = [this]() { request_stop(); },

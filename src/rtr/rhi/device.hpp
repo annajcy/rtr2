@@ -236,7 +236,7 @@ private:
 
 class Device {
 private:
-    Context* m_context{}; 
+    Context& m_context;
     vk::raii::PhysicalDevice m_physical_device{nullptr};
     vk::raii::Device m_device{nullptr};
     vk::raii::Queue m_queue{nullptr};
@@ -388,8 +388,8 @@ private:
     }
 
 public:
-    Device(Context *context) : m_context(context) {
-        select_physical_device(context->instance(), context->surface());
+    explicit Device(Context& context) : m_context(context) {
+        select_physical_device(context.instance(), context.surface());
         create_logical_device();
         create_queue();
         utils::get_logger("rhi.device")->info("Graphics queue created.");
