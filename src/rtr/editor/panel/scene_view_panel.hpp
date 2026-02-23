@@ -7,7 +7,7 @@
 #include "imgui.h"
 
 #include "rtr/editor/core/editor_panel.hpp"
-#include "rtr/framework/core/camera.hpp"
+#include "rtr/framework/component/camera/camera.hpp"
 
 namespace rtr::editor {
 
@@ -72,21 +72,37 @@ private:
 
         const auto* active_scene = ctx.world().active_scene();
         if (active_scene != nullptr) {
-            const auto* active_camera = active_scene->active_camera();
+            const framework::component::Camera* active_camera = nullptr;
+            for (const auto node_id : active_scene->scene_graph().active_nodes()) {
+                const auto* go = active_scene->find_game_object(node_id);
+                if (go == nullptr || !go->enabled()) {
+                    continue;
+                }
+                const auto* camera = go->get_component<framework::component::Camera>();
+                if (camera == nullptr || !camera->enabled() || !camera->active()) {
+                    continue;
+                }
+                if (active_camera != nullptr) {
+                    active_camera = nullptr;
+                    break;
+                }
+                active_camera = camera;
+            }
+
             if (active_camera != nullptr) {
-                if (active_camera->camera_type() == framework::core::CameraType::Perspective) {
-                    const auto* perspective = dynamic_cast<const framework::core::PerspectiveCamera*>(active_camera);
-                    if (perspective != nullptr && perspective->aspect_ratio() > 0.0f) {
+                if (const auto* perspective =
+                        dynamic_cast<const framework::component::PerspectiveCamera*>(active_camera);
+                    perspective != nullptr) {
+                    if (perspective->aspect_ratio() > 0.0f) {
                         return perspective->aspect_ratio();
                     }
-                } else if (active_camera->camera_type() == framework::core::CameraType::Orthographic) {
-                    const auto* orthographic = dynamic_cast<const framework::core::OrthographicCamera*>(active_camera);
-                    if (orthographic != nullptr) {
-                        const float width = orthographic->right_bound() - orthographic->left_bound();
-                        const float height = orthographic->top_bound() - orthographic->bottom_bound();
-                        if (width > 0.0f && height > 0.0f) {
-                            return width / height;
-                        }
+                } else if (const auto* orthographic =
+                               dynamic_cast<const framework::component::OrthographicCamera*>(active_camera);
+                           orthographic != nullptr) {
+                    const float width = orthographic->right_bound() - orthographic->left_bound();
+                    const float height = orthographic->top_bound() - orthographic->bottom_bound();
+                    if (width > 0.0f && height > 0.0f) {
+                        return width / height;
                     }
                 }
             }

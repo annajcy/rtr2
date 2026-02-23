@@ -43,7 +43,6 @@ namespace rtr::editor::render {
 
 class ForwardEditorPipeline final : public system::render::RenderPipelineBase,
                                     public system::render::IFramePreparePipeline,
-                                    public system::render::IResourceAwarePipeline,
                                     public system::render::IFrameColorSource,
                                     public system::render::ISceneViewportSink,
                                     public IEditorInputCaptureSource {
@@ -142,13 +141,9 @@ public:
         auto* scene = ctx.world.active_scene();
         if (!scene)
             throw std::runtime_error("ForwardEditorPipeline::prepare_frame: no active scene.");
+        m_resource_manager = &ctx.resources;
         m_scene_view = system::render::build_forward_scene_view(*scene, ctx.resources);
     }
-
-    // -----------------------------------------------------------------------
-    // IResourceAwarePipeline
-    // -----------------------------------------------------------------------
-    void set_resource_manager(resource::ResourceManager* manager) override { m_resource_manager = manager; }
 
     // -----------------------------------------------------------------------
     // IFrameColorSource

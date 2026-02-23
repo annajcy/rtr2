@@ -137,11 +137,6 @@ public:
             throw std::runtime_error("AppRuntime set_pipeline received null pipeline.");
         }
 
-        if (auto* resource_aware = dynamic_cast<system::render::IResourceAwarePipeline*>(pipeline.get());
-            resource_aware != nullptr) {
-            resource_aware->set_resource_manager(m_resources.get());
-        }
-
         m_renderer->set_pipeline(std::move(pipeline));
         log->info("Pipeline bound to runtime.");
     }

@@ -17,6 +17,7 @@
 #include "pbpt/integrator/plugin/integrator/path_integrator.hpp"
 #include "pbpt/serde/scene_loader.hpp"
 
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/pbpt/serde/model/compatible_info.hpp"
 #include "rtr/framework/integration/pbpt/serde/scene_writer.hpp"
@@ -197,7 +198,22 @@ public:
         }
 
         try {
-            if (scene.active_camera() == nullptr) {
+            bool has_camera_data = false;
+            for (const auto node_id : scene.scene_graph().active_nodes()) {
+                const auto* go = scene.find_game_object(node_id);
+                if (go == nullptr || !go->enabled()) {
+                    continue;
+                }
+                const auto* camera = go->get_component<framework::component::Camera>();
+                if (camera == nullptr || !camera->enabled() || !camera->active()) {
+                    continue;
+                }
+                if (has_camera_data) {
+                    throw std::runtime_error("Offline render requires exactly one active camera, but found multiple.");
+                }
+                has_camera_data = true;
+            }
+            if (!has_camera_data) {
                 throw std::runtime_error("Offline render requires an active camera.");
             }
 

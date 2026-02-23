@@ -18,7 +18,7 @@
 #include "rtr/editor/panel/scene_view_panel.hpp"
 #include "rtr/editor/panel/stats_panel.hpp"
 #include "rtr/editor/render/forward_editor_pipeline.hpp"
-#include "rtr/framework/core/camera.hpp"
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/core/engine.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
 #include "rtr/framework/integration/pbpt/serde/scene_loader.hpp"
@@ -85,6 +85,25 @@ ExportResolutionInfo resolve_export_resolution(const rtr::rhi::Window& window, u
     }
 
     return info;
+}
+
+rtr::framework::component::Camera* find_unique_active_camera(rtr::framework::core::Scene& scene) {
+    rtr::framework::component::Camera* active_camera = nullptr;
+    for (const auto node_id : scene.scene_graph().active_nodes()) {
+        auto* go = scene.find_game_object(node_id);
+        if (go == nullptr || !go->enabled()) {
+            continue;
+        }
+        auto* camera = go->get_component<rtr::framework::component::Camera>();
+        if (camera == nullptr || !camera->enabled() || !camera->active()) {
+            continue;
+        }
+        if (active_camera != nullptr) {
+            return nullptr;
+        }
+        active_camera = camera;
+    }
+    return active_camera;
 }
 
 class OfflineRenderPanel final : public rtr::editor::IEditorPanel {
@@ -247,7 +266,7 @@ int main() {
         // remove_required_imported_game_object("cbox_floor");
         // remove_required_imported_game_object("cbox_redwall");
 
-        if (scene.active_camera() == nullptr) {
+        if (find_unique_active_camera(scene) == nullptr) {
             throw std::runtime_error("Imported cbox scene has no active camera.");
         }
 
@@ -266,7 +285,6 @@ int main() {
 
         auto editor_pipeline = std::make_unique<rtr::editor::render::ForwardEditorPipeline>(
             renderer->build_pipeline_runtime(), editor_host);
-        editor_pipeline->set_resource_manager(&resource_manager);
         rtr::editor::bind_input_capture_to_editor(*input_system, *editor_pipeline);
 
         auto* active_editor_pipeline = editor_pipeline.get();
@@ -285,14 +303,16 @@ int main() {
                         throw std::runtime_error("No active scene.");
                     }
 
-                    auto* active_camera = active_scene->active_camera();
-                    if (active_camera == nullptr) {
-                        throw std::runtime_error("Active scene has no active camera.");
-                    }
-
-                    const auto [fb_w, fb_h] = renderer->window().framebuffer_size();
-                    if (fb_w > 0 && fb_h > 0) {
-                        active_camera->set_aspect_ratio(static_cast<float>(fb_w) / static_cast<float>(fb_h));
+                    auto* active_camera = find_unique_active_camera(*active_scene);
+                    if (active_camera != nullptr) {
+                        const auto [fb_w, fb_h] = renderer->window().framebuffer_size();
+                        if (fb_w > 0 && fb_h > 0) {
+                            if (auto* perspective =
+                                    dynamic_cast<rtr::framework::component::PerspectiveCamera*>(active_camera);
+                                perspective != nullptr) {
+                                perspective->aspect_ratio() = static_cast<float>(fb_w) / static_cast<float>(fb_h);
+                            }
+                        }
                     }
 
                     editor_host->begin_frame(rtr::editor::EditorFrameData{

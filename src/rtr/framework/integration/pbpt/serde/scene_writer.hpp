@@ -20,7 +20,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "rtr/framework/core/camera.hpp"
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/pbpt/serde/context.hpp"
 #include "rtr/framework/integration/pbpt/serde/dispatch.hpp"
@@ -124,7 +124,7 @@ inline void apply_compatible_passthrough(const CompatibleInfo&          compatib
     }
 }
 
-inline ::pbpt::camera::AnyCamera<float> build_pbpt_camera(const core::PerspectiveCamera& camera, int film_width,
+inline ::pbpt::camera::AnyCamera<float> build_pbpt_camera(const component::PerspectiveCamera& camera, int film_width,
                                                           int film_height) {
     const int width  = std::max(film_width, 1);
     const int height = std::max(film_height, 1);
@@ -162,9 +162,33 @@ inline ::pbpt::serde::PbptXmlResult<float> build_scene_result(
         result.spp = spp_override;
     }
 
-    const auto* active_camera = dynamic_cast<const core::PerspectiveCamera*>(scene.active_camera());
+    bool has_camera_data = false;
+    const component::PerspectiveCamera* active_camera = nullptr;
+    const core::GameObject*             active_camera_go = nullptr;
+    for (const auto node_id : scene.scene_graph().active_nodes()) {
+        const auto* go = scene.find_game_object(node_id);
+        if (go == nullptr || !go->enabled()) {
+            continue;
+        }
+        const auto* camera = go->get_component<component::Camera>();
+        if (camera == nullptr || !camera->enabled() || !camera->active()) {
+            continue;
+        }
+        if (has_camera_data) {
+            throw std::runtime_error("PBPT export requires exactly one active camera, but found multiple.");
+        }
+        has_camera_data  = true;
+        active_camera_go = go;
+        active_camera    = dynamic_cast<const component::PerspectiveCamera*>(camera);
+    }
+    if (!has_camera_data) {
+        throw std::runtime_error("PBPT export requires an active camera.");
+    }
     if (active_camera == nullptr) {
         throw std::runtime_error("PBPT export requires an active perspective camera.");
+    }
+    if (active_camera_go == nullptr) {
+        throw std::runtime_error("PBPT export active camera owner is invalid.");
     }
 
     const int film_width          = film_width_override > 0 ? film_width_override : 512;
@@ -172,7 +196,7 @@ inline ::pbpt::serde::PbptXmlResult<float> build_scene_result(
     result.scene.camera           = compat_export_detail::build_pbpt_camera(*active_camera, film_width, film_height);
     result.scene.pixel_filter     = ::pbpt::camera::GaussianFilter<float>(1.5f, 0.5f);
     result.scene.render_transform = ::pbpt::camera::RenderTransform<float>::from_camera_to_world(
-        compat_export_detail::to_transform(active_camera->node().world_matrix()), ::pbpt::camera::RenderSpace::World);
+        compat_export_detail::to_transform(active_camera_go->node().world_matrix()), ::pbpt::camera::RenderSpace::World);
 
     CompatibleInfo                           empty_compatible_info{};
     std::unordered_map<std::string, std::string> material_name_by_reflectance{};

@@ -10,6 +10,7 @@
 
 #include "gtest/gtest.h"
 
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/camera_control/trackball_camera_controller.hpp"
 #include "rtr/framework/component/component.hpp"
@@ -294,8 +295,8 @@ TEST(LogSystemTest, FrameworkCoreLifecycleLogsAreWritten) {
 
     auto& camera_go = scene_a.create_game_object("camera_go");
     (void)camera_go.add_component<DummyFrameworkComponent>();
-    (void)scene_a.camera_manager().create_perspective_camera(camera_go.id());
-    EXPECT_TRUE(scene_a.set_active_camera(camera_go.id()));
+    auto& camera = camera_go.add_component<framework::component::PerspectiveCamera>();
+    camera.set_active(true);
     EXPECT_TRUE(scene_a.destroy_game_object(camera_go.id()));
 
     EXPECT_TRUE(world.set_active_scene(scene_b.id()));
@@ -304,12 +305,10 @@ TEST(LogSystemTest, FrameworkCoreLifecycleLogsAreWritten) {
     get_logger("framework.core.world")->flush();
     get_logger("framework.core.scene")->flush();
     get_logger("framework.core.game_object")->flush();
-    get_logger("framework.core.camera_manager")->flush();
 
     EXPECT_TRUE(file_contains(log_file, "[framework.core.world]"));
     EXPECT_TRUE(file_contains(log_file, "[framework.core.scene]"));
     EXPECT_TRUE(file_contains(log_file, "[framework.core.game_object]"));
-    EXPECT_TRUE(file_contains(log_file, "[framework.core.camera_manager]"));
 
     shutdown_logging();
 }
@@ -330,28 +329,22 @@ TEST(LogSystemTest, ControllerNodeChangeTraceLogsAppearAtTraceLevel) {
 
     system::input::InputState input{};
     auto& free_look_go = scene.create_game_object("free_look_camera");
-    (void)scene.camera_manager().create_perspective_camera(free_look_go.id());
-    (void)free_look_go.add_component<framework::component::FreeLookCameraController>(
-        &input,
-        &scene.camera_manager()
-    );
+    auto& free_look_camera = free_look_go.add_component<framework::component::PerspectiveCamera>();
+    free_look_camera.set_active(true);
+    (void)free_look_go.add_component<framework::component::FreeLookCameraController>(&input);
 
     auto& trackball_go = scene.create_game_object("trackball_camera");
-    (void)scene.camera_manager().create_perspective_camera(trackball_go.id());
+    auto& trackball_camera = trackball_go.add_component<framework::component::PerspectiveCamera>();
+    trackball_camera.set_active(false);
     trackball_go.node().set_world_position({0.0f, 0.0f, -5.0f});
-    (void)trackball_go.add_component<framework::component::TrackBallCameraController>(
-        &input,
-        &scene.camera_manager()
-    );
+    (void)trackball_go.add_component<framework::component::TrackBallCameraController>(&input);
 
-    scene.scene_graph().update_world_transforms();
-
-    EXPECT_TRUE(scene.set_active_camera(free_look_go.id()));
     input.update_key(system::input::KeyCode::W, system::input::KeyAction::PRESS, system::input::KeyMod::NONE);
     scene.tick({.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0});
     input.update_key(system::input::KeyCode::W, system::input::KeyAction::RELEASE, system::input::KeyMod::NONE);
 
-    EXPECT_TRUE(scene.set_active_camera(trackball_go.id()));
+    free_look_camera.set_active(false);
+    trackball_camera.set_active(true);
     input.reset_deltas();
     input.update_mouse_button(
         system::input::MouseButton::LEFT,

@@ -64,12 +64,6 @@ public:
     virtual void prepare_frame(const FramePrepareContext& ctx) = 0;
 };
 
-class IResourceAwarePipeline {
-public:
-    virtual ~IResourceAwarePipeline() = default;
-    virtual void set_resource_manager(resource::ResourceManager* manager) = 0;
-};
-
 struct SwapchainChangeSummary {
     bool extent_changed{false};
     bool image_count_changed{false};

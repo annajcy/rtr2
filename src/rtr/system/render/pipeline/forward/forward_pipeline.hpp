@@ -82,7 +82,6 @@ struct ForwardPipelineConfig {
 // ---------------------------------------------------------------------------
 class ForwardPipeline final : public RenderPipelineBase,
                               public IFramePreparePipeline,
-                              public IResourceAwarePipeline,
                               public IFrameColorSource,
                               public ISceneViewportSink {
     static constexpr uint32_t kMaxRenderables = 256;
@@ -154,12 +153,11 @@ public:
         m_descriptor_pool.reset();
     }
 
-    void set_resource_manager(resource::ResourceManager* manager) override { m_resource_manager = manager; }
-
     void prepare_frame(const FramePrepareContext& ctx) override {
         auto* active_scene = ctx.world.active_scene();
         if (!active_scene)
             throw std::runtime_error("ForwardPipeline::prepare_frame: no active scene.");
+        m_resource_manager = &ctx.resources;
         m_scene_view = build_forward_scene_view(*active_scene, ctx.resources);
     }
 

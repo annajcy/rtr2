@@ -8,7 +8,7 @@
 #include <string>
 #include <thread>
 
-#include "rtr/framework/core/camera.hpp"
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
@@ -61,9 +61,9 @@ resource::MeshHandle create_test_mesh(resource::ResourceManager& resources) {
 
 void setup_scene_with_camera(core::Scene& scene) {
     auto& camera_go = scene.create_game_object("camera");
-    auto& camera = scene.camera_manager().create_perspective_camera(camera_go.id());
-    camera.set_aspect_ratio(1.0f);
-    (void)scene.set_active_camera(camera_go.id());
+    auto& camera = camera_go.add_component<component::PerspectiveCamera>();
+    camera.aspect_ratio() = 1.0f;
+    camera.set_active(true);
     scene.scene_graph().update_world_transforms();
 }
 

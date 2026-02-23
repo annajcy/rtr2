@@ -1,16 +1,18 @@
 #include <pbpt/math/math.h>
+
 #include <algorithm>
 #include <stdexcept>
 #include <vector>
 
 #include "gtest/gtest.h"
 
+#include "rtr/framework/component/camera/camera.hpp"
+#include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
-#include "rtr/framework/component/light/point_light.hpp"
 
 namespace rtr::framework::integration::test {
 
@@ -34,6 +36,12 @@ void add_renderer(framework::core::GameObject& go, resource::ResourceManager& re
 void add_renderer_with_color(framework::core::GameObject& go, resource::ResourceManager& resources) {
     (void)go.add_component<component::MeshRenderer>(create_test_mesh(resources),
                                                     pbpt::math::vec4{0.3f, 0.4f, 0.5f, 1.0f});
+}
+
+void add_active_camera(core::Scene& scene, const std::string& name = "camera") {
+    auto& camera_go = scene.create_game_object(name);
+    auto& camera    = camera_go.add_component<component::PerspectiveCamera>();
+    camera.set_active(true);
 }
 
 void expect_mat4_near(const pbpt::math::mat4& lhs, const pbpt::math::mat4& rhs, float eps = 1e-5f) {
@@ -62,9 +70,9 @@ TEST(FrameworkForwardSceneViewBuilderTest, CollectsPointLightsAndCameraPos) {
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources{};
     auto&                     camera_go = scene.create_game_object("camera");
-    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
+    auto&                     camera    = camera_go.add_component<component::PerspectiveCamera>();
+    camera.set_active(true);
     camera_go.node().set_world_position({10.0f, 20.0f, 30.0f});
-    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
 
     auto& light_go1 = scene.create_game_object("light1");
     light_go1.node().set_world_position({1.0f, 0.0f, 0.0f});
@@ -83,11 +91,9 @@ TEST(FrameworkForwardSceneViewBuilderTest, CollectsPointLightsAndCameraPos) {
     auto& light_go4 = scene.create_game_object("light4");
     light_go4.add_component<component::light::PointLight>();
 
-    // 5th light should be ignored
     auto& light_go5 = scene.create_game_object("light5");
     light_go5.add_component<component::light::PointLight>().set_intensity(50.0f);
 
-    scene.scene_graph().update_world_transforms();
     const auto view = system::render::build_forward_scene_view(scene, resources);
 
     EXPECT_FLOAT_EQ(view.camera.world_pos.x(), 10.0f);
@@ -97,26 +103,40 @@ TEST(FrameworkForwardSceneViewBuilderTest, CollectsPointLightsAndCameraPos) {
     ASSERT_EQ(view.point_lights.size(), 4u);
     EXPECT_FLOAT_EQ(view.point_lights[0].intensity, 10.0f);
     EXPECT_FLOAT_EQ(view.point_lights[0].position.x(), 1.0f);
-
     EXPECT_FLOAT_EQ(view.point_lights[1].intensity, 20.0f);
     EXPECT_FLOAT_EQ(view.point_lights[1].position.x(), 2.0f);
 }
 
-TEST(FrameworkForwardSceneViewBuilderTest, ThrowsWhenNoActiveCamera) {
+TEST(FrameworkForwardSceneViewBuilderTest, ReturnsBlackFrameWhenNoActiveCamera) {
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources{};
     auto&                     go = scene.create_game_object("mesh");
     add_renderer(go, resources);
 
-    EXPECT_THROW((void)system::render::build_forward_scene_view(scene, resources), std::runtime_error);
+    const auto view = system::render::build_forward_scene_view(scene, resources);
+    EXPECT_TRUE(view.renderables.empty());
+    EXPECT_TRUE(view.point_lights.empty());
+}
+
+TEST(FrameworkForwardSceneViewBuilderTest, ReturnsBlackFrameWhenMultipleActiveCameras) {
+    core::Scene               scene(1, "scene");
+    resource::ResourceManager resources{};
+    add_active_camera(scene, "camera_a");
+    add_active_camera(scene, "camera_b");
+    auto& mesh_go = scene.create_game_object("mesh");
+    add_renderer(mesh_go, resources);
+    auto& light_go = scene.create_game_object("light");
+    (void)light_go.add_component<component::light::PointLight>();
+
+    const auto view = system::render::build_forward_scene_view(scene, resources);
+    EXPECT_TRUE(view.renderables.empty());
+    EXPECT_TRUE(view.point_lights.empty());
 }
 
 TEST(FrameworkForwardSceneViewBuilderTest, ExtractsOnlyActiveNodesWithMeshRenderer) {
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources{};
-    auto&                     camera_go = scene.create_game_object("camera");
-    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
-    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+    add_active_camera(scene);
 
     auto& parent  = scene.create_game_object("parent");
     auto& child   = scene.create_game_object("child");
@@ -147,9 +167,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ExtractsOnlyActiveNodesWithMeshRender
 TEST(FrameworkForwardSceneViewBuilderTest, DisabledMeshRendererIsExcludedFromRenderables) {
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources{};
-    auto&                     camera_go = scene.create_game_object("camera");
-    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
-    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+    add_active_camera(scene);
 
     auto& obj1 = scene.create_game_object("obj1");
     add_renderer(obj1, resources);
@@ -160,8 +178,6 @@ TEST(FrameworkForwardSceneViewBuilderTest, DisabledMeshRendererIsExcludedFromRen
     ASSERT_NE(renderer2, nullptr);
     renderer2->set_enabled(false);
 
-    scene.scene_graph().update_world_transforms();
-
     const auto view = system::render::build_forward_scene_view(scene, resources);
     ASSERT_EQ(view.renderables.size(), 1u);
     EXPECT_EQ(view.renderables[0].instance_id, static_cast<std::uint64_t>(obj1.id()));
@@ -170,9 +186,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, DisabledMeshRendererIsExcludedFromRen
 TEST(FrameworkForwardSceneViewBuilderTest, ComputesModelAndNormalFromWorldTransform) {
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources{};
-    auto&                     camera_go = scene.create_game_object("camera");
-    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
-    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+    add_active_camera(scene);
 
     auto& mesh_go = scene.create_game_object("mesh");
     add_renderer(mesh_go, resources);
@@ -181,13 +195,12 @@ TEST(FrameworkForwardSceneViewBuilderTest, ComputesModelAndNormalFromWorldTransf
     node.set_local_position({1.0f, 2.0f, 3.0f});
     node.set_local_rotation(pbpt::math::angleAxis(pbpt::math::radians(35.0f), pbpt::math::vec3(0.0f, 1.0f, 0.0f)));
     node.set_local_scale({2.0f, 1.5f, 0.5f});
-    scene.scene_graph().update_world_transforms();
 
     const auto view = system::render::build_forward_scene_view(scene, resources);
     auto       it   = std::find_if(view.renderables.begin(), view.renderables.end(),
                                    [&](const system::render::ForwardSceneRenderable& renderable) {
-                               return renderable.instance_id == static_cast<std::uint64_t>(mesh_go.id());
-                           });
+                                       return renderable.instance_id == static_cast<std::uint64_t>(mesh_go.id());
+                                   });
     ASSERT_TRUE(it != view.renderables.end());
 
     const pbpt::math::mat4 expected_model  = scene.scene_graph().node(mesh_go.id()).world_matrix();
@@ -199,9 +212,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ComputesModelAndNormalFromWorldTransf
 TEST(FrameworkForwardSceneViewBuilderTest, SupportsBaseColorPath) {
     core::Scene               scene(1, "scene");
     resource::ResourceManager resources{};
-    auto&                     camera_go = scene.create_game_object("camera");
-    (void)scene.camera_manager().create_perspective_camera(camera_go.id());
-    ASSERT_TRUE(scene.set_active_camera(camera_go.id()));
+    add_active_camera(scene);
 
     auto& mesh_go = scene.create_game_object("mesh");
     add_renderer_with_color(mesh_go, resources);

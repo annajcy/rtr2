@@ -9,6 +9,7 @@
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
+#include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
@@ -56,6 +57,30 @@ const core::GameObject* find_mesh_object(const core::Scene& scene) {
         }
     }
     return nullptr;
+}
+
+const component::Camera* find_unique_active_camera(const core::Scene& scene, const core::GameObject** owner = nullptr) {
+    const component::Camera* active_camera = nullptr;
+    const core::GameObject*  active_owner  = nullptr;
+    for (const auto node_id : scene.scene_graph().active_nodes()) {
+        const auto* go = scene.find_game_object(node_id);
+        if (go == nullptr || !go->enabled()) {
+            continue;
+        }
+        const auto* camera = go->get_component<component::Camera>();
+        if (camera == nullptr || !camera->enabled() || !camera->active()) {
+            continue;
+        }
+        if (active_camera != nullptr) {
+            throw std::runtime_error("Expected exactly one active camera, found multiple.");
+        }
+        active_camera = camera;
+        active_owner  = go;
+    }
+    if (owner != nullptr) {
+        *owner = active_owner;
+    }
+    return active_camera;
 }
 
 LoadSummary load_scene_summary(const std::string& scene_xml_path, core::Scene& scene,
@@ -130,7 +155,8 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
     ASSERT_TRUE(result.imported_game_object_id_by_name.contains("mesh_a"));
     EXPECT_EQ(result.imported_game_object_id_by_name.at("mesh_a"), mesh_go->id());
     ASSERT_TRUE(result.imported_game_object_id_by_name.contains("pbpt_camera"));
-    const auto* camera_go = scene.find_game_object(scene.camera_manager().active_camera_owner_id());
+    const core::GameObject* camera_go = nullptr;
+    ASSERT_NE(find_unique_active_camera(scene, &camera_go), nullptr);
     ASSERT_NE(camera_go, nullptr);
     EXPECT_EQ(result.imported_game_object_id_by_name.at("pbpt_camera"), camera_go->id());
 
@@ -172,7 +198,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
     EXPECT_NEAR(world_pos.y(), 2.0f, 1e-5f);
     EXPECT_NEAR(world_pos.z(), 3.0f, 1e-5f);
 
-    ASSERT_NE(scene.active_camera(), nullptr);
+    ASSERT_NE(find_unique_active_camera(scene), nullptr);
 }
 
 TEST(FrameworkPbptSceneLoaderTest, ImportsRgbReflectanceAndMapsToBaseColor) {
@@ -362,10 +388,10 @@ TEST(FrameworkPbptSceneLoaderTest, LookAtSensorAlignsWithRtrCameraFrontConventio
     resource::ResourceManager resources(2, temp_dir.path);
     (void)load_scene_summary(xml_path.string(), scene, resources);
 
-    const auto* camera = dynamic_cast<const core::PerspectiveCamera*>(scene.active_camera());
+    const auto* camera = find_unique_active_camera(scene);
     ASSERT_NE(camera, nullptr);
 
-    const ::pbpt::math::vec3 front = camera->front();
+    const ::pbpt::math::vec3 front = camera->camera_world_front();
     EXPECT_NEAR(front.x(), 0.0f, 1e-5f);
     EXPECT_NEAR(front.y(), 0.0f, 1e-5f);
     EXPECT_NEAR(front.z(), 1.0f, 1e-5f);
@@ -400,9 +426,8 @@ TEST(FrameworkPbptSceneLoaderTest, AttachesFreeLookControllerWhenInputStateProvi
     options.free_look_input_state = &input_state;
     (void)load_scene_summary(xml_path.string(), scene, resources, options);
 
-    const auto active_camera_owner = scene.camera_manager().active_camera_owner_id();
-    ASSERT_NE(active_camera_owner, core::kInvalidGameObjectId);
-    const auto* active_camera_go = scene.find_game_object(active_camera_owner);
+    const core::GameObject* active_camera_go = nullptr;
+    ASSERT_NE(find_unique_active_camera(scene, &active_camera_go), nullptr);
     ASSERT_NE(active_camera_go, nullptr);
     EXPECT_NE(active_camera_go->get_component<component::FreeLookCameraController>(), nullptr);
 }
