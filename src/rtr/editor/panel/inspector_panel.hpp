@@ -362,12 +362,16 @@ public:
 
         ImGui::Text("GameObject #%llu", static_cast<unsigned long long>(game_object->id()));
 
+        const std::string current_name = std::string(scene->game_object_name(game_object->id()).value_or("GameObject"));
         std::array<char, 256> name_buffer{};
-        std::snprintf(name_buffer.data(), name_buffer.size(), "%s", game_object->name().c_str());
+        std::snprintf(name_buffer.data(), name_buffer.size(), "%s", current_name.c_str());
         if (ImGui::InputText("Name", name_buffer.data(), name_buffer.size())) {
-            game_object->set_name(name_buffer.data());
-            logger()->debug("GameObject name updated (game_object_id={}, name='{}').", game_object->id(),
-                            game_object->name());
+            if (scene->rename_game_object(game_object->id(), name_buffer.data())) {
+                const std::string updated_name =
+                    std::string(scene->game_object_name(game_object->id()).value_or("GameObject"));
+                logger()->debug("GameObject name updated (game_object_id={}, name='{}').", game_object->id(),
+                                updated_name);
+            }
         }
 
         bool enabled = game_object->enabled();

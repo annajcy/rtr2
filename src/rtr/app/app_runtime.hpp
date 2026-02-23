@@ -107,27 +107,21 @@ public:
     const AppRuntimeConfig& config() const { return m_config; }
 
     framework::core::World& world() { return *m_world; }
-
     const framework::core::World& world() const { return *m_world; }
 
     resource::ResourceManager& resource_manager() { return *m_resources; }
-
     const resource::ResourceManager& resource_manager() const { return *m_resources; }
 
     system::render::Renderer& renderer() { return *m_renderer; }
-
     const system::render::Renderer& renderer() const { return *m_renderer; }
 
     system::input::InputSystem& input_system() { return *m_input; }
-
     const system::input::InputSystem& input_system() const { return *m_input; }
 
     system::render::IRenderPipeline* pipeline() { return m_renderer->pipeline(); }
-
     const system::render::IRenderPipeline* pipeline() const { return m_renderer->pipeline(); }
 
     void set_callbacks(RuntimeCallbacks callbacks) { m_callbacks = std::move(callbacks); }
-
     const RuntimeCallbacks& callbacks() const { return m_callbacks; }
 
     void set_pipeline(std::unique_ptr<system::render::IRenderPipeline> pipeline) {
@@ -142,11 +136,9 @@ public:
     }
 
     void request_stop() { m_stop_requested = true; }
-
     bool stop_requested() const { return m_stop_requested; }
 
     void set_paused(bool paused) { m_paused = paused; }
-
     bool paused() const { return m_paused; }
 
     RuntimeResult run() {
@@ -179,7 +171,6 @@ public:
             while (!m_stop_requested && !m_renderer->window().is_should_close()) {
                 m_input->begin_frame();
                 m_renderer->window().poll_events();
-                m_input->end_frame();
 
                 if (m_callbacks.on_input) {
                     auto ctx = make_runtime_context(0.0);
@@ -253,6 +244,10 @@ public:
                     auto ctx = make_runtime_context(frame_delta);
                     m_callbacks.on_post_render(ctx);
                 }
+
+                // Keep per-frame mouse deltas available through update/render,
+                // then clear them at frame tail.
+                m_input->end_frame();
 
                 m_resources->tick(m_frame_serial);
                 ++m_frame_serial;

@@ -150,7 +150,8 @@ public:
         names.reserve(scene->game_objects().size());
         for (const auto& game_object : scene->game_objects()) {
             if (game_object) {
-                names.emplace(game_object->id(), game_object->name());
+                names.emplace(game_object->id(),
+                              std::string(scene->game_object_name(game_object->id()).value_or("GameObject")));
             }
         }
 

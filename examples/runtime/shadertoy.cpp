@@ -1,12 +1,10 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 
-#include "rtr/framework/core/world.hpp"
-#include "rtr/resource/resource_manager.hpp"
-#include "rtr/system/input/input_system.hpp"
+#include "rtr/app/app_runtime.hpp"
 #include "rtr/system/input/input_types.hpp"
-#include "rtr/system/render/renderer.hpp"
 #include "rtr/system/render/pipeline/shadertoy/shadertoy_pipeline.hpp"
 
 int main() {
@@ -15,34 +13,32 @@ int main() {
     constexpr uint32_t kMaxFramesInFlight = 2;
 
     try {
-        auto renderer = std::make_unique<rtr::system::render::Renderer>(
-            static_cast<int>(kWidth), static_cast<int>(kHeight), "RTR ShaderToy", kMaxFramesInFlight);
+        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
+            .window_width         = kWidth,
+            .window_height        = kHeight,
+            .window_title         = "RTR ShaderToy",
+            .max_frames_in_flight = kMaxFramesInFlight,
+        });
 
         auto runtime_pipeline = std::make_unique<rtr::system::render::ShaderToyPipeline>(
-            renderer->build_pipeline_runtime(), rtr::system::render::ShaderToyPipelineConfig{});
+            runtime.renderer().build_pipeline_runtime(), rtr::system::render::ShaderToyPipelineConfig{});
+        runtime.set_pipeline(std::move(runtime_pipeline));
 
-        auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
+        (void)runtime.world().create_scene("runtime_scene");
 
-        auto world     = std::make_unique<rtr::framework::core::World>();
-        auto resources = std::make_unique<rtr::resource::ResourceManager>(kMaxFramesInFlight);
-        world->set_resource_manager(resources.get());
-        (void)world->create_scene("editor_scene");
+        runtime.set_callbacks(rtr::app::RuntimeCallbacks{
+            .on_pre_render =
+                [](rtr::app::RuntimeContext& ctx) {
+                    if (ctx.input.state().key_down(rtr::system::input::KeyCode::Q)) {
+                        ctx.renderer.window().close();
+                    }
+                },
+        });
 
-        renderer->set_pipeline(std::move(runtime_pipeline));
-
-        std::uint64_t frame_serial = 0;
-        while (!renderer->window().is_should_close()) {
-            input_system->begin_frame();
-            renderer->window().poll_events();
-            renderer->draw_frame();
-            if (input_system->state().key_down(rtr::system::input::KeyCode::Q)) {
-                renderer->window().close();
-            }
-            input_system->end_frame();
-            ++frame_serial;
+        const auto result = runtime.run();
+        if (!result.ok) {
+            throw std::runtime_error(result.error_message);
         }
-
-        renderer->device().wait_idle();
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;

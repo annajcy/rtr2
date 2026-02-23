@@ -359,7 +359,7 @@ TEST(FrameworkPbptSceneLoaderTest, RecordsDefaultShapeNameWhenShapeIdMissing) {
     const auto  imported_id = result.imported_game_object_id_by_name.at("tri_default");
     const auto* imported_go = scene.find_game_object(imported_id);
     ASSERT_NE(imported_go, nullptr);
-    EXPECT_EQ(imported_go->name(), "tri_default");
+    EXPECT_EQ(scene.game_object_name(imported_go->id()).value_or(""), "tri_default");
 }
 
 TEST(FrameworkPbptSceneLoaderTest, LookAtSensorAlignsWithRtrCameraFrontConvention) {

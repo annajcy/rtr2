@@ -56,9 +56,7 @@ int main() {
                                                                 .window_title         = "RTR Framework Quickstart",
                                                                 .max_frames_in_flight = kMaxFramesInFlight});
 
-        auto editor_host = std::make_shared<rtr::editor::EditorHost>();
-        editor_host->bind_runtime(&runtime.world(), &runtime.resource_manager(), &runtime.renderer(),
-                                  &runtime.input_system());
+        auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);
         editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());

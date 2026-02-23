@@ -38,12 +38,6 @@ public:
         m_visible = visible;
     }
 
-    void on_frame(EditorContext& /*ctx*/) override {
-        if (m_log) {
-            m_log->emplace_back("frame:" + m_id);
-        }
-    }
-
     void on_imgui(EditorContext& /*ctx*/) override {
         if (m_log) {
             m_log->emplace_back("imgui:" + m_id);
@@ -64,16 +58,13 @@ TEST(EditorHostTest, OrdersPanelsByOrderThenId) {
     host.begin_frame(EditorFrameData{});
     host.draw_imgui();
 
-    ASSERT_EQ(log.size(), 6u);
-    EXPECT_EQ(log[0], "frame:a");
-    EXPECT_EQ(log[1], "frame:b");
-    EXPECT_EQ(log[2], "frame:z");
-    EXPECT_EQ(log[3], "imgui:a");
-    EXPECT_EQ(log[4], "imgui:b");
-    EXPECT_EQ(log[5], "imgui:z");
+    ASSERT_EQ(log.size(), 3u);
+    EXPECT_EQ(log[0], "imgui:a");
+    EXPECT_EQ(log[1], "imgui:b");
+    EXPECT_EQ(log[2], "imgui:z");
 }
 
-TEST(EditorHostTest, SkipsInvisiblePanelsInFrameAndImgui) {
+TEST(EditorHostTest, SkipsInvisiblePanelsInImgui) {
     EditorHost host;
     std::vector<std::string> log{};
 
@@ -83,9 +74,8 @@ TEST(EditorHostTest, SkipsInvisiblePanelsInFrameAndImgui) {
     host.begin_frame(EditorFrameData{});
     host.draw_imgui();
 
-    ASSERT_EQ(log.size(), 2u);
-    EXPECT_EQ(log[0], "frame:visible");
-    EXPECT_EQ(log[1], "imgui:visible");
+    ASSERT_EQ(log.size(), 1u);
+    EXPECT_EQ(log[0], "imgui:visible");
 }
 
 TEST(EditorHostTest, CanRemovePanelById) {
@@ -101,9 +91,8 @@ TEST(EditorHostTest, CanRemovePanelById) {
     host.begin_frame(EditorFrameData{});
     host.draw_imgui();
 
-    ASSERT_EQ(log.size(), 2u);
-    EXPECT_EQ(log[0], "frame:beta");
-    EXPECT_EQ(log[1], "imgui:beta");
+    ASSERT_EQ(log.size(), 1u);
+    EXPECT_EQ(log[0], "imgui:beta");
 }
 
 TEST(EditorHostTest, RejectsDuplicatePanelId) {
@@ -151,4 +140,3 @@ int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-

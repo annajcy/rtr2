@@ -15,9 +15,7 @@ public:
     virtual bool visible() const { return true; }
     virtual void set_visible(bool /*visible*/) {}
 
-    virtual void on_frame(EditorContext& /*ctx*/) {}
     virtual void on_imgui(EditorContext& ctx) = 0;
 };
 
 } // namespace rtr::editor
-
