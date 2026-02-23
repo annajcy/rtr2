@@ -3,6 +3,7 @@
 #include "device.hpp"
 #include "vulkan/vulkan_raii.hpp"
 
+#include <functional>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -16,7 +17,7 @@ namespace rtr::rhi {
 
 class DescriptorSetLayout {
 private:
-    Device* m_device;
+    std::reference_wrapper<Device> m_device;
     vk::raii::DescriptorSetLayout m_layout{nullptr};
     std::vector<vk::DescriptorSetLayoutBinding> m_bindings;
 
@@ -43,21 +44,21 @@ public:
             return *this;
         }
 
-        DescriptorSetLayout build(Device* device) {
+        DescriptorSetLayout build(Device& device) {
             return DescriptorSetLayout(device, m_bindings);
         }
     };
 
-    DescriptorSetLayout(Device* device, const std::vector<vk::DescriptorSetLayoutBinding>& bindings)
+    DescriptorSetLayout(Device& device, const std::vector<vk::DescriptorSetLayoutBinding>& bindings)
         : m_device(device), m_bindings(bindings) {
         vk::DescriptorSetLayoutCreateInfo create_info{};
         create_info.bindingCount = static_cast<uint32_t>(bindings.size());
         create_info.pBindings = bindings.data();
 
-        m_layout = vk::raii::DescriptorSetLayout(device->device(), create_info);
+        m_layout = vk::raii::DescriptorSetLayout(device.device(), create_info);
     }
 
-    const Device* device() const { return m_device; }
+    const Device& device() const { return m_device.get(); }
     const vk::raii::DescriptorSetLayout& layout() const { return m_layout; }
     const std::vector<vk::DescriptorSetLayoutBinding>& bindings() const { return m_bindings; }
 };
@@ -84,7 +85,7 @@ inline std::string to_string(const DescriptorSetLayout& layout) {
 
 class DescriptorPool {
 private:
-    Device* m_device;
+    std::reference_wrapper<Device> m_device;
     vk::raii::DescriptorPool m_pool{nullptr};
     std::vector<vk::DescriptorPoolSize> m_pool_sizes;
     uint32_t m_max_sets = 0;
@@ -121,7 +122,7 @@ public:
             return *this;
         }
 
-        DescriptorPool build(Device* device) {
+        DescriptorPool build(Device& device) {
             std::vector<vk::DescriptorPoolSize> pool_sizes;
             pool_sizes.reserve(m_descriptor_counts.size());
             for (const auto& [type, count] : m_descriptor_counts) {
@@ -132,7 +133,7 @@ public:
     };
 
     DescriptorPool(
-        Device* device,
+        Device& device,
         const std::vector<vk::DescriptorPoolSize>& pool_sizes,
         uint32_t max_sets,
         vk::DescriptorPoolCreateFlags flags = {}
@@ -143,7 +144,7 @@ public:
         pool_info.maxSets = max_sets;
         pool_info.flags = flags;
 
-        m_pool = vk::raii::DescriptorPool(device->device(), pool_info);
+        m_pool = vk::raii::DescriptorPool(device.device(), pool_info);
     }
 
     vk::raii::DescriptorSet allocate(const DescriptorSetLayout& layout) {
@@ -152,7 +153,7 @@ public:
         alloc_info.descriptorSetCount = 1;
         alloc_info.pSetLayouts = &*layout.layout();
 
-        auto sets = m_device->device().allocateDescriptorSets(alloc_info);
+        auto sets = m_device.get().device().allocateDescriptorSets(alloc_info);
         return std::move(sets.front());
     }
 
@@ -164,7 +165,7 @@ public:
         alloc_info.descriptorSetCount = count;
         alloc_info.pSetLayouts = layouts.data();
 
-        return m_device->device().allocateDescriptorSets(alloc_info);
+        return m_device.get().device().allocateDescriptorSets(alloc_info);
     }
 
     const vk::raii::DescriptorPool& pool() const { return m_pool; }
@@ -480,7 +481,7 @@ public:
         return *this;
     }
 
-    void update(Device* device, vk::DescriptorSet set) {
+    void update(Device& device, vk::DescriptorSet set) {
         std::vector<vk::WriteDescriptorSet> writes;
         writes.reserve(m_pending_writes.size());
 
@@ -501,7 +502,7 @@ public:
             writes.push_back(write);
         }
 
-        device->device().updateDescriptorSets(writes, nullptr);
+        device.device().updateDescriptorSets(writes, nullptr);
         clear();
     }
 

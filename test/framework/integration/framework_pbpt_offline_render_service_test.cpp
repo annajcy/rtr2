@@ -95,7 +95,7 @@ bool wait_for_terminal_state(
 
 TEST(PbptOfflineRenderServiceTest, StartTransitionsToRunningAndThenSucceeded) {
     core::Scene scene(1, "offline_service_scene");
-    resource::ResourceManager resources(2, repo_assets_dir());
+    resource::ResourceManager resources(repo_assets_dir());
     setup_scene_with_camera(scene);
     add_minimal_pbpt_emitter_shape(scene, resources);
 
@@ -144,7 +144,7 @@ TEST(PbptOfflineRenderServiceTest, StartTransitionsToRunningAndThenSucceeded) {
 
 TEST(PbptOfflineRenderServiceTest, RequestCancelTransitionsToCanceled) {
     core::Scene scene(1, "offline_service_scene");
-    resource::ResourceManager resources(2, repo_assets_dir());
+    resource::ResourceManager resources(repo_assets_dir());
     setup_scene_with_camera(scene);
     add_minimal_pbpt_emitter_shape(scene, resources);
 
@@ -187,7 +187,7 @@ TEST(PbptOfflineRenderServiceTest, RequestCancelTransitionsToCanceled) {
 
 TEST(PbptOfflineRenderServiceTest, BackendFailureTransitionsToFailed) {
     core::Scene scene(1, "offline_service_scene");
-    resource::ResourceManager resources(2, repo_assets_dir());
+    resource::ResourceManager resources(repo_assets_dir());
     setup_scene_with_camera(scene);
     add_minimal_pbpt_emitter_shape(scene, resources);
 

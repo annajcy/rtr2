@@ -40,7 +40,7 @@ struct MeshResourceKind {
         utils::write_obj_to_path(mesh, abs_path.string());
     }
 
-    static gpu_type upload_to_gpu(rhi::Device* device, const cpu_type& mesh, const options_type&) {
+    static gpu_type upload_to_gpu(rhi::Device& device, const cpu_type& mesh, const options_type&) {
         return rhi::Mesh::from_cpu_data(device, mesh);
     }
 };
@@ -119,7 +119,7 @@ struct TextureResourceKind {
         utils::write_image_to_path(image, abs_path.string());
     }
 
-    static gpu_type upload_to_gpu(rhi::Device* device, const cpu_type& image, const options_type& options) {
+    static gpu_type upload_to_gpu(rhi::Device& device, const cpu_type& image, const options_type& options) {
         return rhi::Image::from_rgba8(
             device,
             image.width,
@@ -138,7 +138,7 @@ concept ResourceKind = requires(
     const typename Kind::cpu_type const_cpu,
     const typename Kind::options_type options,
     const std::filesystem::path& path,
-    rhi::Device* device
+    rhi::Device& device
 ) {
     typename Kind::cpu_type;
     typename Kind::gpu_type;

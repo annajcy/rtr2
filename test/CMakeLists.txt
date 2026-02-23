@@ -86,10 +86,12 @@ rtr_add_integration_test(
 rtr_add_test(
     test_framework_engine
     framework/core/framework_engine_test.cpp
+    rtr::runtime
 )
 rtr_add_test(
     test_framework_world_scene
     framework/core/framework_world_scene_test.cpp
+    rtr::runtime
 )
 rtr_add_test(
     test_framework_scene_graph
@@ -130,6 +132,12 @@ rtr_add_test(
 rtr_add_test(
     test_framework_trackball_camera_controller
     framework/component/framework_trackball_camera_controller_test.cpp
+    glfw
+    Vulkan::Loader
+)
+rtr_add_test(
+    test_framework_camera_controller
+    framework/component/framework_camera_controller_test.cpp
     glfw
     Vulkan::Loader
 )

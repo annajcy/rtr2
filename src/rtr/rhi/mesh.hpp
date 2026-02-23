@@ -3,7 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
-#include <memory>
+#include <functional>
 #include <stdexcept>
 #include <utility>
 
@@ -23,7 +23,7 @@ public:
     using Vertex = rtr::utils::ObjVertex;
 
     static void copy_buffer(
-        Device* device,
+        Device& device,
         vk::Buffer src,
         vk::Buffer dst,
         vk::DeviceSize size
@@ -41,12 +41,12 @@ public:
             cb.command_buffer().copyBuffer(src, dst, buffer_copy);
         });
 
-        device->queue().waitIdle();
+        device.queue().waitIdle();
         logger->debug("GPU buffer copy finished (bytes={})", static_cast<std::uint64_t>(size));
     }
 
     static Buffer create_device_local_with_data(
-        Device* device,
+        Device& device,
         const void* data,
         vk::DeviceSize size,
         vk::BufferUsageFlags usage = {}
@@ -72,7 +72,7 @@ public:
         return buffer;
     }
 
-    static Mesh from_cpu_data(Device* device, const utils::ObjMeshData& cpu_data) {
+    static Mesh from_cpu_data(Device& device, const utils::ObjMeshData& cpu_data) {
         auto logger = utils::get_logger("rhi.mesh");
         if (cpu_data.vertices.empty() || cpu_data.indices.empty()) {
             logger->error("Mesh upload failed: CPU mesh data is empty.");
@@ -86,22 +86,18 @@ public:
             sizeof(uint32_t) * cpu_data.indices.size()
         );
 
-        auto vertex_buffer = std::make_unique<Buffer>(
-            Mesh::create_device_local_with_data(
-                device,
-                cpu_data.vertices.data(),
-                sizeof(Vertex) * cpu_data.vertices.size(),
-                vk::BufferUsageFlagBits::eVertexBuffer
-            )
+        auto vertex_buffer = Mesh::create_device_local_with_data(
+            device,
+            cpu_data.vertices.data(),
+            sizeof(Vertex) * cpu_data.vertices.size(),
+            vk::BufferUsageFlagBits::eVertexBuffer
         );
 
-        auto index_buffer = std::make_unique<Buffer>(
-            Mesh::create_device_local_with_data(
-                device,
-                cpu_data.indices.data(),
-                sizeof(uint32_t) * cpu_data.indices.size(),
-                vk::BufferUsageFlagBits::eIndexBuffer
-            )
+        auto index_buffer = Mesh::create_device_local_with_data(
+            device,
+            cpu_data.indices.data(),
+            sizeof(uint32_t) * cpu_data.indices.size(),
+            vk::BufferUsageFlagBits::eIndexBuffer
         );
 
         logger->debug("Mesh GPU upload completed.");
@@ -157,19 +153,19 @@ public:
     }
 
 private:
-    Device* m_device{};
+    std::reference_wrapper<Device> m_device;
     uint32_t m_vertex_count{0};
     uint32_t m_index_count{0};
-    std::unique_ptr<Buffer> m_vertex_buffer{};
-    std::unique_ptr<Buffer> m_index_buffer{};
+    Buffer m_vertex_buffer;
+    Buffer m_index_buffer;
 
 public:
     Mesh(
-        Device* device,
+        Device& device,
         uint32_t vertex_count,
         uint32_t index_count,
-        std::unique_ptr<Buffer> vertex_buffer,
-        std::unique_ptr<Buffer> index_buffer
+        Buffer vertex_buffer,
+        Buffer index_buffer
     )
         : m_device(device),
           m_vertex_count(vertex_count),
@@ -183,8 +179,8 @@ public:
     Mesh& operator=(Mesh&&) noexcept = default;
     ~Mesh() = default;
 
-    vk::Buffer vertex_buffer() const { return *m_vertex_buffer->buffer(); }
-    vk::Buffer index_buffer() const { return *m_index_buffer->buffer(); }
+    vk::Buffer vertex_buffer() const { return *m_vertex_buffer.buffer(); }
+    vk::Buffer index_buffer() const { return *m_index_buffer.buffer(); }
     uint32_t index_count() const { return m_index_count; }
     uint32_t vertex_count() const { return m_vertex_count; }
 };

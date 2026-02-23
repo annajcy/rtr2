@@ -8,16 +8,14 @@
 #include "rtr/system/render/pipeline/shadertoy/shadertoy_pipeline.hpp"
 
 int main() {
-    constexpr uint32_t kWidth             = 800;
-    constexpr uint32_t kHeight            = 600;
-    constexpr uint32_t kMaxFramesInFlight = 2;
+    constexpr uint32_t kWidth  = 800;
+    constexpr uint32_t kHeight = 600;
 
     try {
         rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
-            .window_width         = kWidth,
-            .window_height        = kHeight,
-            .window_title         = "RTR ShaderToy",
-            .max_frames_in_flight = kMaxFramesInFlight,
+            .window_width  = kWidth,
+            .window_height = kHeight,
+            .window_title  = "RTR ShaderToy",
         });
 
         auto runtime_pipeline = std::make_unique<rtr::system::render::ShaderToyPipeline>(

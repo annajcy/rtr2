@@ -27,11 +27,11 @@ private:
     bool         m_enabled{true};
 
     GameObjectId                             m_next_game_object_id{1};
+    SceneGraph                               m_scene_graph{};
     std::vector<std::unique_ptr<GameObject>> m_game_objects{};
     std::unordered_map<GameObjectId, GameObject*> m_game_object_by_id{};
     std::unordered_map<GameObjectId, std::string> m_game_object_name_by_id{};
     std::unordered_map<std::string, GameObjectId> m_game_object_id_by_name{};
-    SceneGraph                               m_scene_graph{};
 
     bool is_name_occupied(std::string_view name, GameObjectId ignore_id = core::kInvalidGameObjectId) const {
         const auto it = m_game_object_id_by_name.find(std::string(name));
@@ -77,7 +77,7 @@ public:
 
     GameObject& create_game_object(std::string name = "GameObject") {
         std::string unique_name = make_unique_game_object_name(name);
-        auto game_object = std::make_unique<GameObject>(m_next_game_object_id++, &m_scene_graph);
+        auto game_object = std::make_unique<GameObject>(m_next_game_object_id++, m_scene_graph);
         auto* ptr        = game_object.get();
         m_scene_graph.register_node(ptr->id());
         m_game_objects.emplace_back(std::move(game_object));

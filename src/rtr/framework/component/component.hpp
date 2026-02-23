@@ -11,17 +11,17 @@ namespace rtr::framework::component {
 class Component {
 private:
     bool m_enabled{true};
-    core::GameObject* m_owner{nullptr};
-
-protected:
-    void bind_owner(core::GameObject* owner) {
-        m_owner = owner;
-    }
-
-    friend class rtr::framework::core::GameObject;
+    core::GameObject& m_owner;
 
 public:
+    explicit Component(core::GameObject& owner)
+        : m_owner(owner) {}
+
     virtual ~Component() = default;
+    Component(const Component&) = delete;
+    Component& operator=(const Component&) = delete;
+    Component(Component&&) = delete;
+    Component& operator=(Component&&) = delete;
 
     bool enabled() const {
         return m_enabled;
@@ -31,11 +31,11 @@ public:
         m_enabled = enabled;
     }
 
-    core::GameObject* owner() {
+    core::GameObject& owner() {
         return m_owner;
     }
 
-    const core::GameObject* owner() const {
+    const core::GameObject& owner() const {
         return m_owner;
     }
 

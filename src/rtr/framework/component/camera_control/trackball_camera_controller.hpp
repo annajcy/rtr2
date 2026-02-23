@@ -7,9 +7,7 @@
 #include <stdexcept>
 
 #include "rtr/framework/component/camera/camera.hpp"
-#include "rtr/framework/component/component.hpp"
-#include "rtr/framework/core/game_object.hpp"
-#include "rtr/system/input/input_state.hpp"
+#include "rtr/framework/component/camera_control/camera_controller.hpp"
 #include "rtr/system/input/input_types.hpp"
 #include "rtr/utils/log.hpp"
 
@@ -25,16 +23,14 @@ struct TrackBallCameraControllerConfig {
     pbpt::math::vec3 default_target{0.0f, 0.0f, 0.0f};
 };
 
-class TrackBallCameraController final : public Component {
+class TrackBallCameraController final : public CameraController {
 private:
     static std::shared_ptr<spdlog::logger> logger() { return utils::get_logger("framework.component.trackball"); }
 
     static constexpr float kEpsilon = 1e-5f;
 
-    const system::input::InputState* m_input_state{nullptr};
     TrackBallCameraControllerConfig  m_config{};
 
-    bool m_validated_once{false};
     bool m_orbit_initialized{false};
 
     pbpt::math::vec3 m_target_world{0.0f, 0.0f, 0.0f};
@@ -54,41 +50,12 @@ private:
         }
     }
 
-    Camera& require_camera_component() {
-        auto* go = owner();
-        if (go == nullptr) {
-            logger()->error("TrackBall camera lookup failed: owner is null.");
-            throw std::runtime_error("TrackBallCameraController owner is null.");
-        }
-        auto* camera = go->get_component<Camera>();
-        if (camera == nullptr) {
-            logger()->error("TrackBall camera lookup failed: owner {} has no Camera.", go->id());
-            throw std::runtime_error("TrackBallCameraController owner does not have a Camera.");
-        }
-        return *camera;
-    }
-
-    void validate_dependencies() {
-        if (owner() == nullptr) {
-            logger()->error("TrackBall validate_dependencies failed: owner is null.");
-            throw std::runtime_error("TrackBallCameraController owner is null.");
-        }
-        if (m_input_state == nullptr) {
-            logger()->error("TrackBall validate_dependencies failed: input_state is null.");
-            throw std::runtime_error("TrackBallCameraController input_state is null.");
-        }
-        (void)require_camera_component();
-        m_validated_once = true;
-    }
-
-    void ensure_validated() {
-        if (!m_validated_once) {
-            validate_dependencies();
-        }
+    void validate_controller_config() const override {
+        validate_config(m_config);
     }
 
     void sync_spherical_from_current_position() {
-        const auto node                     = owner()->node();
+        const auto node                     = require_owner().node();
         const pbpt::math::vec3 world_pos    = node.world_position();
         const pbpt::math::vec3 offset       = world_pos - m_target_world;
         m_radius                            = std::max(pbpt::math::length(offset), kEpsilon);
@@ -99,7 +66,7 @@ private:
 
     void initialize_orbit_state() {
         sync_spherical_from_current_position();
-        auto node = owner()->node();
+        auto node = require_owner().node();
         const pbpt::math::vec3 look_dir = m_target_world - node.world_position();
         if (pbpt::math::length(look_dir) > kEpsilon) {
             node.set_world_rotation(world_rotation_looking_to(look_dir));
@@ -132,7 +99,7 @@ private:
     }
 
     void apply_pose_from_orbit_state() {
-        auto node = owner()->node();
+        auto node = require_owner().node();
         const pbpt::math::vec3 dir      = spherical_direction();
         const pbpt::math::vec3 position = m_target_world + dir * m_radius;
         const pbpt::math::vec3 look_dir = m_target_world - position;
@@ -143,19 +110,15 @@ private:
         node.set_world_rotation(world_rotation_looking_to(look_dir));
         logger()->trace(
             "TrackBall node orbit updated (game_object_id={}, target=[{:.4f}, {:.4f}, {:.4f}], radius={:.4f}).",
-            owner()->id(), m_target_world.x(), m_target_world.y(), m_target_world.z(), m_radius);
+            require_owner().id(), m_target_world.x(), m_target_world.y(), m_target_world.z(), m_radius);
     }
 
 public:
-    explicit TrackBallCameraController(const system::input::InputState* input_state,
+    explicit TrackBallCameraController(core::GameObject& owner,
+                                       const system::input::InputState& input_state,
                                        TrackBallCameraControllerConfig   config = {})
-        : m_input_state(input_state), m_config(config), m_target_world(config.default_target) {
+        : CameraController(owner, input_state), m_config(config), m_target_world(config.default_target) {
         validate_config(m_config);
-    }
-
-    void set_input_state(const system::input::InputState* input_state) {
-        m_input_state    = input_state;
-        m_validated_once = false;
     }
 
     void set_config(const TrackBallCameraControllerConfig& config) {
@@ -172,38 +135,27 @@ public:
 
     const pbpt::math::vec3& target() const { return m_target_world; }
 
-    void on_awake() override { validate_dependencies(); }
-
-    void on_update(const core::FrameTickContext& /*ctx*/) override {
-        ensure_validated();
-
-        auto* go = owner();
-        if (go == nullptr) {
-            logger()->error("TrackBall on_update failed: owner is null.");
-            throw std::runtime_error("TrackBallCameraController owner is null.");
-        }
-        auto& camera = require_camera_component();
-        if (!camera.active()) {
-            return;
-        }
+    void on_update_active_camera(const core::FrameTickContext& /*ctx*/, Camera& camera) override {
+        auto& go = require_owner();
         if (!m_orbit_initialized) {
             initialize_orbit_state();
         }
 
-        const bool left_down   = m_input_state->mouse_button_down(system::input::MouseButton::LEFT);
-        const bool middle_down = m_input_state->mouse_button_down(system::input::MouseButton::MIDDLE);
+        const auto& input = input_state();
+        const bool left_down   = input.mouse_button_down(system::input::MouseButton::LEFT);
+        const bool middle_down = input.mouse_button_down(system::input::MouseButton::MIDDLE);
 
         if (left_down) {
-            m_yaw_degrees += static_cast<float>(m_input_state->mouse_dx()) * m_config.rotate_speed;
-            m_pitch_degrees += static_cast<float>(m_input_state->mouse_dy()) * m_config.rotate_speed;
+            m_yaw_degrees += static_cast<float>(input.mouse_dx()) * m_config.rotate_speed;
+            m_pitch_degrees += static_cast<float>(input.mouse_dy()) * m_config.rotate_speed;
             m_pitch_degrees = pbpt::math::clamp(m_pitch_degrees, m_config.pitch_min_degrees, m_config.pitch_max_degrees);
             apply_pose_from_orbit_state();
         } else if (middle_down) {
-            auto node = go->node();
+            auto node = go.node();
             const float distance_scale = std::max(m_radius, kEpsilon);
             const pbpt::math::vec3 delta =
-                node.world_right() * static_cast<float>(m_input_state->mouse_dx()) * m_config.pan_speed * distance_scale +
-                node.world_up() * static_cast<float>(m_input_state->mouse_dy()) * m_config.pan_speed * distance_scale;
+                node.world_right() * static_cast<float>(input.mouse_dx()) * m_config.pan_speed * distance_scale +
+                node.world_up() * static_cast<float>(input.mouse_dy()) * m_config.pan_speed * distance_scale;
 
             m_target_world += delta;
             node.set_world_position(node.world_position() + delta);
@@ -213,7 +165,7 @@ public:
             }
         }
 
-        const float scroll_y = static_cast<float>(m_input_state->mouse_scroll_dy());
+        const float scroll_y = static_cast<float>(input.mouse_scroll_dy());
         if (scroll_y != 0.0f) {
             camera.adjust_zoom(scroll_y * m_config.zoom_speed);
             if (dynamic_cast<PerspectiveCamera*>(&camera) != nullptr) {

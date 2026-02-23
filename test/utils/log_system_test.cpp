@@ -105,7 +105,11 @@ resource::MeshHandle create_triangle_mesh(resource::ResourceManager& resources) 
     return resources.create<rtr::resource::MeshResourceKind>(std::move(mesh));
 }
 
-class DummyFrameworkComponent final : public framework::component::Component {};
+class DummyFrameworkComponent final : public framework::component::Component {
+public:
+    explicit DummyFrameworkComponent(framework::core::GameObject& owner)
+        : Component(owner) {}
+};
 
 } // namespace
 
@@ -289,7 +293,8 @@ TEST(LogSystemTest, FrameworkCoreLifecycleLogsAreWritten) {
     config.level = LogLevel::debug;
     init_logging(config);
 
-    framework::core::World world{};
+    resource::ResourceManager resources{};
+    framework::core::World world{resources};
     auto& scene_a = world.create_scene("scene_a");
     auto& scene_b = world.create_scene("scene_b");
 
@@ -331,13 +336,13 @@ TEST(LogSystemTest, ControllerNodeChangeTraceLogsAppearAtTraceLevel) {
     auto& free_look_go = scene.create_game_object("free_look_camera");
     auto& free_look_camera = free_look_go.add_component<framework::component::PerspectiveCamera>();
     free_look_camera.set_active(true);
-    (void)free_look_go.add_component<framework::component::FreeLookCameraController>(&input);
+    (void)free_look_go.add_component<framework::component::FreeLookCameraController>(input);
 
     auto& trackball_go = scene.create_game_object("trackball_camera");
     auto& trackball_camera = trackball_go.add_component<framework::component::PerspectiveCamera>();
     trackball_camera.set_active(false);
     trackball_go.node().set_world_position({0.0f, 0.0f, -5.0f});
-    (void)trackball_go.add_component<framework::component::TrackBallCameraController>(&input);
+    (void)trackball_go.add_component<framework::component::TrackBallCameraController>(input);
 
     input.update_key(system::input::KeyCode::W, system::input::KeyAction::PRESS, system::input::KeyMod::NONE);
     scene.tick({.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0});
@@ -412,11 +417,11 @@ TEST(LogSystemTest, ResourceManagerAndRhiMeshLogsAppearDuringFirstGpuUpload) {
 
     rhi::Window window(320, 240, "rtr_log_system_gpu_test");
     rhi::Context context(make_context_create_info(window));
-    rhi::Device device(&context);
+    rhi::Device device(context);
 
-    resource::ResourceManager resources(2, "./assets/");
+    resource::ResourceManager resources("./assets/");
     const auto handle = create_triangle_mesh(resources);
-    (void)resources.require_gpu<rtr::resource::MeshResourceKind>(handle, &device);
+    (void)resources.require_gpu<rtr::resource::MeshResourceKind>(handle, device);
     device.wait_idle();
 
     get_logger("resource.manager")->flush();

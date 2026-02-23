@@ -22,10 +22,12 @@ private:
 
 public:
     explicit MeshRenderer(
+        core::GameObject& owner,
         resource::MeshHandle mesh,
         pbpt::math::vec4 base_color = pbpt::math::vec4{1.0f, 1.0f, 1.0f, 1.0f}
     )
-        : m_mesh(mesh),
+        : Component(owner),
+          m_mesh(mesh),
           m_base_color(base_color) {
         if (!m_mesh.is_valid()) {
             logger()->error("MeshRenderer ctor failed: mesh handle is invalid.");

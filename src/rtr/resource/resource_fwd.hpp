@@ -1,13 +1,15 @@
 #pragma once
 
+#include "rtr/rhi/frame_constants.hpp"
+
 namespace rtr::resource {
 
 struct MeshResourceKind;
 struct TextureResourceKind;
 
-template <class Kind0, class Kind1, class... Kinds>
+template <std::uint32_t FramesInFlight, class Kind0, class Kind1, class... Kinds>
 class ResourceManagerT;
 
-using ResourceManager = ResourceManagerT<MeshResourceKind, TextureResourceKind>;
+using ResourceManager = ResourceManagerT<rhi::kFramesInFlight, MeshResourceKind, TextureResourceKind>;
 
 } // namespace rtr::resource

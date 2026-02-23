@@ -2,18 +2,19 @@
 
 #include "device.hpp"
 #include "vulkan/vulkan_raii.hpp"
+#include <functional>
 #include <vector>
 
 namespace rtr::rhi {
 
 class CommandBuffer {
 private:
-    Device* m_device;
+    std::reference_wrapper<Device> m_device;
     vk::raii::CommandBuffer m_command_buffer;
     bool m_is_recording = false;
 
 public:
-    CommandBuffer(Device* device, vk::raii::CommandBuffer&& command_buffer)
+    CommandBuffer(Device& device, vk::raii::CommandBuffer&& command_buffer)
         : m_device(device)
         , m_command_buffer(std::move(command_buffer)) {
     }
@@ -85,7 +86,7 @@ public:
         }
 
         vk::Fence fence_handle = submit_info.fence.value_or(VK_NULL_HANDLE);
-        m_device->queue().submit(vk_submit_info, fence_handle);
+        m_device.get().queue().submit(vk_submit_info, fence_handle);
     }
 
     // Record and submit in one call
@@ -99,21 +100,21 @@ public:
 
     // Get underlying command buffer for direct access
     const vk::raii::CommandBuffer& command_buffer() const { return m_command_buffer; }
-    Device* device() const { return m_device; }
+    Device& device() const { return m_device.get(); }
 };
 
 class CommandPool {
 private:
-    Device* m_device;
+    std::reference_wrapper<Device> m_device;
     vk::raii::CommandPool m_pool{nullptr};
 
 public:
-    CommandPool(Device* device, vk::CommandPoolCreateFlags flags)
+    CommandPool(Device& device, vk::CommandPoolCreateFlags flags)
         : m_device(device) {
         vk::CommandPoolCreateInfo create_info{};
         create_info.flags = flags;
-        create_info.queueFamilyIndex = device->queue_family_index();
-        m_pool = vk::raii::CommandPool(device->device(), create_info);
+        create_info.queueFamilyIndex = device.queue_family_index();
+        m_pool = vk::raii::CommandPool(device.device(), create_info);
     }
 
     vk::raii::CommandBuffer allocate_command_buffer(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) {
@@ -122,7 +123,7 @@ public:
         alloc_info.level = level;
         alloc_info.commandBufferCount = 1;
 
-        auto buffers = m_device->device().allocateCommandBuffers(alloc_info);
+        auto buffers = m_device.get().device().allocateCommandBuffers(alloc_info);
         return std::move(buffers.front());
     }
 
@@ -132,7 +133,7 @@ public:
         alloc_info.level = level;
         alloc_info.commandBufferCount = count;
 
-        auto buffers = m_device->device().allocateCommandBuffers(alloc_info);
+        auto buffers = m_device.get().device().allocateCommandBuffers(alloc_info);
         std::vector<vk::raii::CommandBuffer> result;
         result.reserve(buffers.size());
         for (auto& buffer : buffers) {
@@ -144,7 +145,7 @@ public:
     // Create a CommandBuffer wrapper for easier command recording and submission
     CommandBuffer create_command_buffer(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) {
         auto raw_buffer = allocate_command_buffer(level);
-        return CommandBuffer(m_device, std::move(raw_buffer));
+        return CommandBuffer(m_device.get(), std::move(raw_buffer));
     }
 
     std::vector<CommandBuffer> create_command_buffers(uint32_t count, vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) {
@@ -152,13 +153,13 @@ public:
         std::vector<CommandBuffer> result;
         result.reserve(raw_buffers.size());
         for (auto& raw_buffer : raw_buffers) {
-            result.emplace_back(m_device, std::move(raw_buffer));
+            result.emplace_back(m_device.get(), std::move(raw_buffer));
         }
         return result;
     }
 
     const vk::raii::CommandPool& command_pool() const { return m_pool; }
-    const Device* device() const { return m_device; }
+    const Device& device() const { return m_device.get(); }
 
 };
 

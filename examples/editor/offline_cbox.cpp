@@ -26,9 +26,6 @@
 #include "rtr/system/input/input_types.hpp"
 
 namespace {
-
-constexpr uint32_t kMaxFramesInFlight = 2;
-
 constexpr const char* kCboxSceneRootRel       = "pbpt_scene/cbox";
 constexpr const char* kCboxSceneXmlFilename   = "cbox.xml";
 constexpr const char* kOutputExrPath          = "output/cbox_offline.exr";
@@ -215,10 +212,9 @@ public:
 int main() {
     try {
         rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
-            .window_width         = 1280,
-            .window_height        = 720,
-            .window_title         = "RTR Framework Offline CBox",
-            .max_frames_in_flight = kMaxFramesInFlight,
+            .window_width  = 1280,
+            .window_height = 720,
+            .window_title  = "RTR Framework Offline CBox",
         });
         rtr::framework::integration::PbptOfflineRenderService offline_render_service{};
 

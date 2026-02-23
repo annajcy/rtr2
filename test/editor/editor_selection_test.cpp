@@ -1,17 +1,22 @@
 #include "gtest/gtest.h"
 
+#include "rtr/app/app_runtime.hpp"
 #include "rtr/editor/core/editor_context.hpp"
-#include "rtr/framework/core/world.hpp"
 
 namespace rtr::editor::test {
 
 TEST(EditorSelectionTest, KeepsValidSelection) {
-    framework::core::World world;
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_selection_test",
+        .auto_init_logging = false,
+    });
+    auto& world = runtime.world();
     auto& scene = world.create_scene("main");
     auto& go = scene.create_game_object("node");
 
-    EditorContext ctx;
-    ctx.bind_runtime(&world, nullptr, nullptr, nullptr);
+    EditorContext ctx(world, runtime.resource_manager(), runtime.renderer(), runtime.input_system());
     ctx.set_selection(scene.id(), go.id());
     ctx.validate_selection();
 
@@ -21,12 +26,17 @@ TEST(EditorSelectionTest, KeepsValidSelection) {
 }
 
 TEST(EditorSelectionTest, ClearsSelectionWhenGameObjectDestroyed) {
-    framework::core::World world;
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_selection_test",
+        .auto_init_logging = false,
+    });
+    auto& world = runtime.world();
     auto& scene = world.create_scene("main");
     auto& go = scene.create_game_object("node");
 
-    EditorContext ctx;
-    ctx.bind_runtime(&world, nullptr, nullptr, nullptr);
+    EditorContext ctx(world, runtime.resource_manager(), runtime.renderer(), runtime.input_system());
     ctx.set_selection(scene.id(), go.id());
 
     ASSERT_TRUE(scene.destroy_game_object(go.id()));
@@ -36,12 +46,17 @@ TEST(EditorSelectionTest, ClearsSelectionWhenGameObjectDestroyed) {
 }
 
 TEST(EditorSelectionTest, ClearsSelectionWhenSceneDestroyed) {
-    framework::core::World world;
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_selection_test",
+        .auto_init_logging = false,
+    });
+    auto& world = runtime.world();
     auto& scene = world.create_scene("main");
     auto& go = scene.create_game_object("node");
 
-    EditorContext ctx;
-    ctx.bind_runtime(&world, nullptr, nullptr, nullptr);
+    EditorContext ctx(world, runtime.resource_manager(), runtime.renderer(), runtime.input_system());
     ctx.set_selection(scene.id(), go.id());
 
     ASSERT_TRUE(world.destroy_scene(scene.id()));
@@ -56,4 +71,3 @@ int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-

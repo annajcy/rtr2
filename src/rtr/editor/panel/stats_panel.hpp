@@ -1,7 +1,5 @@
 #pragma once
 
-#include <stdexcept>
-
 #include "imgui.h"
 
 #include "rtr/editor/core/editor_panel.hpp"
@@ -38,11 +36,6 @@ public:
     void on_imgui(EditorContext& ctx) override {
         if (!m_visible) {
             return;
-        }
-
-        if (!ctx.is_bound()) {
-            logger()->error("StatsPanel on_imgui failed: EditorContext is not fully bound.");
-            throw std::runtime_error("StatsPanel requires bound EditorContext.");
         }
 
         if (!ImGui::Begin("Stats", &m_visible)) {

@@ -36,7 +36,7 @@ inline constexpr bool contains_kind_v = (std::same_as<Kind, SupportedKinds> || .
 
 } // namespace detail
 
-template <class Kind0, class Kind1, class... Kinds>
+template <std::uint32_t FramesInFlight, class Kind0, class Kind1, class... Kinds>
 class ResourceManagerT {
 public:
     static constexpr std::string_view kDefaultResourceRootDir = "./assets/";
@@ -70,29 +70,23 @@ private:
         detail::unique_types<Kind0, Kind1, Kinds...>::value,
         "ResourceManager kinds must be unique."
     );
+    static_assert(FramesInFlight > 0, "FramesInFlight must be greater than zero.");
 
     std::uint64_t m_current_frame_serial{0};
-    std::uint32_t m_frames_in_flight{2};
     std::filesystem::path m_resource_root_dir{std::string(kDefaultResourceRootDir)};
 
     std::tuple<ResourceStorage<Kind0>, ResourceStorage<Kind1>, ResourceStorage<Kinds>...> m_storages{};
 
 public:
     explicit ResourceManagerT(
-        std::uint32_t frames_in_flight = 2,
         std::filesystem::path resource_root_dir = std::filesystem::path(std::string(kDefaultResourceRootDir))
     )
-        : m_frames_in_flight(std::max<std::uint32_t>(frames_in_flight, 1)),
-          m_resource_root_dir(std::move(resource_root_dir)) {
+        : m_resource_root_dir(std::move(resource_root_dir)) {
         logger()->info(
             "ResourceManager initialized (frames_in_flight={}, root='{}')",
-            m_frames_in_flight,
+            FramesInFlight,
             m_resource_root_dir.string()
         );
-    }
-
-    void set_frames_in_flight(std::uint32_t frames_in_flight) {
-        m_frames_in_flight = std::max<std::uint32_t>(frames_in_flight, 1);
     }
 
     const std::filesystem::path& resource_root_dir() const {
@@ -172,12 +166,7 @@ public:
     }
 
     template <ResourceKind Kind>
-    typename Kind::gpu_type& require_gpu(ResourceHandle<Kind> handle, rhi::Device* device) {
-        if (device == nullptr) {
-            logger()->error("require_gpu failed for handle={}: device is null.", handle.value);
-            throw std::invalid_argument("ResourceManager require_gpu requires non-null device.");
-        }
-
+    typename Kind::gpu_type& require_gpu(ResourceHandle<Kind> handle, rhi::Device& device) {
         auto& record = require_record<Kind>(handle);
         ensure_cpu_loaded(record);
 
@@ -256,7 +245,7 @@ private:
     }
 
     std::uint64_t retire_after_frame() const {
-        return m_current_frame_serial + static_cast<std::uint64_t>(m_frames_in_flight);
+        return m_current_frame_serial + static_cast<std::uint64_t>(FramesInFlight);
     }
 
     template <ResourceKind Kind>

@@ -36,7 +36,6 @@ public:
 private:
     vk::raii::PipelineLayout*             m_pipeline_layout{};
     vk::raii::Pipeline*                   m_compute_pipeline{};
-    RenderPassResources                   m_render_pass_resources{};
     std::chrono::steady_clock::time_point m_start_time = std::chrono::steady_clock::now();
     std::vector<ResourceDependency>       m_dependencies{{"shadertoy.uniform", ResourceAccess::eRead},
                                                          {"shadertoy.compute", ResourceAccess::eRead},
@@ -50,28 +49,24 @@ public:
 
     const std::vector<ResourceDependency>& dependencies() const override { return m_dependencies; }
 
-    void bind_render_pass_resources(const RenderPassResources& resources) {
+    static void validate_resources(const RenderPassResources& resources) {
         if (resources.uniform_buffer == nullptr || resources.offscreen_image == nullptr ||
             resources.offscreen_layout == nullptr || resources.compute_set == nullptr) {
             throw std::runtime_error("ShaderToyComputePass frame resources are incomplete.");
         }
-        m_render_pass_resources = resources;
     }
 
-    void execute(render::FrameContext& ctx) override {
-        if (m_render_pass_resources.uniform_buffer == nullptr || m_render_pass_resources.offscreen_image == nullptr ||
-            m_render_pass_resources.offscreen_layout == nullptr || m_render_pass_resources.compute_set == nullptr) {
-            throw std::runtime_error("ShaderToyComputePass frame resources are not bound.");
-        }
+    void execute(render::FrameContext& ctx, const RenderPassResources& resources) {
+        validate_resources(resources);
 
-        const vk::Extent2D offscreen_extent{m_render_pass_resources.offscreen_image->width(),
-                                            m_render_pass_resources.offscreen_image->height()};
-        update_uniform_buffer(*m_render_pass_resources.uniform_buffer, offscreen_extent,
-                              m_render_pass_resources.i_params);
+        const vk::Extent2D offscreen_extent{resources.offscreen_image->width(),
+                                            resources.offscreen_image->height()};
+        update_uniform_buffer(*resources.uniform_buffer, offscreen_extent,
+                              resources.i_params);
 
         auto&                 cmd        = ctx.cmd().command_buffer();
-        rhi::Image&           offscreen  = *m_render_pass_resources.offscreen_image;
-        const vk::ImageLayout old_layout = *m_render_pass_resources.offscreen_layout;
+        rhi::Image&           offscreen  = *resources.offscreen_image;
+        const vk::ImageLayout old_layout = *resources.offscreen_layout;
 
         vk::PipelineStageFlags2 src_stage  = vk::PipelineStageFlagBits2::eTopOfPipe;
         vk::AccessFlags2        src_access = vk::AccessFlagBits2::eNone;
@@ -102,14 +97,14 @@ public:
         to_general_dep.pImageMemoryBarriers    = &to_general;
         cmd.pipelineBarrier2(to_general_dep);
 
-        *m_render_pass_resources.offscreen_layout = vk::ImageLayout::eGeneral;
+        *resources.offscreen_layout = vk::ImageLayout::eGeneral;
 
         cmd.bindPipeline(vk::PipelineBindPoint::eCompute, **m_compute_pipeline);
         cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, **m_pipeline_layout, 0,
-                               **m_render_pass_resources.compute_set, {});
+                               **resources.compute_set, {});
 
-        const vk::Extent2D extent{m_render_pass_resources.offscreen_image->width(),
-                                  m_render_pass_resources.offscreen_image->height()};
+        const vk::Extent2D extent{resources.offscreen_image->width(),
+                                  resources.offscreen_image->height()};
         const uint32_t     group_count_x = (extent.width + 7) / 8;
         const uint32_t     group_count_y = (extent.height + 7) / 8;
         cmd.dispatch(group_count_x, group_count_y, 1);

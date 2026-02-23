@@ -46,26 +46,12 @@ private:
         return utils::get_logger("framework.component.pbpt_mesh");
     }
 
-    const MeshRenderer& require_mesh_renderer() const {
-        const auto* go = owner();
-        if (go == nullptr) {
-            logger()->error("PbptMesh require_mesh_renderer failed: owner is null.");
-            throw std::runtime_error("PbptMesh owner is null.");
-        }
-
-        const auto* renderer = go->get_component<MeshRenderer>();
-        if (renderer == nullptr) {
-            logger()->error(
-                "PbptMesh require_mesh_renderer failed: owner {} missing MeshRenderer.",
-                go->id()
-            );
-            throw std::runtime_error("PbptMesh requires MeshRenderer on the same GameObject.");
-        }
-
-        return *renderer;
-    }
+    const MeshRenderer& require_mesh_renderer() const { return owner().component_or_throw<MeshRenderer>(); }
 
 public:
+    explicit PbptMesh(core::GameObject& owner)
+        : Component(owner) {}
+
     void on_awake() override {
         (void)require_mesh_renderer();
     }

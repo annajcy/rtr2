@@ -14,6 +14,9 @@ namespace rtr::framework::core::test {
 
 class CountingComponent final : public component::Component {
 public:
+    explicit CountingComponent(core::GameObject& owner)
+        : Component(owner) {}
+
     std::size_t fixed_count{0};
     std::size_t update_count{0};
     std::size_t late_count{0};

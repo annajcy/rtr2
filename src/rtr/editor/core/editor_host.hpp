@@ -24,7 +24,7 @@ private:
         return utils::get_logger("editor.host");
     }
 
-    EditorContext m_context{};
+    EditorContext m_context;
     std::vector<std::unique_ptr<IEditorPanel>> m_panels{};
     bool m_panels_dirty{false};
     bool m_default_layout_initialized{false};
@@ -203,10 +203,8 @@ private:
     }
 
 public:
-    EditorHost() = default;
-    explicit EditorHost(app::AppRuntime& runtime) { 
-        m_context.bind_runtime(&runtime.world(), &runtime.resource_manager(), &runtime.renderer(), &runtime.input_system());
-    }
+    explicit EditorHost(app::AppRuntime& runtime)
+        : m_context(runtime.world(), runtime.resource_manager(), runtime.renderer(), runtime.input_system()) {}
 
     void reset_layout() {
         m_default_layout_initialized = false;

@@ -6,11 +6,21 @@
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/scene_graph.hpp"
 #include "rtr/framework/core/world.hpp"
+#include "rtr/resource/resource_manager.hpp"
 
 namespace rtr::framework::core::test {
 
-class DummyComponentA final : public component::Component {};
-class DummyComponentB final : public component::Component {};
+class DummyComponentA final : public component::Component {
+public:
+    explicit DummyComponentA(core::GameObject& owner)
+        : Component(owner) {}
+};
+
+class DummyComponentB final : public component::Component {
+public:
+    explicit DummyComponentB(core::GameObject& owner)
+        : Component(owner) {}
+};
 
 TEST(FrameworkWorldSceneTest, GameObjectEnforcesUniqueComponentType) {
     Scene scene(1, "scene");
@@ -29,6 +39,28 @@ TEST(FrameworkWorldSceneTest, GameObjectEnforcesUniqueComponentType) {
     (void)comp_b;
     EXPECT_TRUE(go.has_component<DummyComponentB>());
     EXPECT_EQ(go.component_count(), 2u);
+}
+
+TEST(FrameworkWorldSceneTest, GameObjectComponentOrThrowProvidesStrongDependencyAccess) {
+    Scene scene(1, "scene");
+    auto& go = scene.create_game_object("player");
+
+    auto& comp_a = go.add_component<DummyComponentA>();
+    auto& required = go.component_or_throw<DummyComponentA>();
+    EXPECT_EQ(&required, &comp_a);
+    EXPECT_TRUE(go.has_component<DummyComponentA>());
+    EXPECT_NE(go.get_component<DummyComponentA>(), nullptr);
+
+    EXPECT_THROW((void)go.component_or_throw<DummyComponentB>(), std::runtime_error);
+    EXPECT_FALSE(go.has_component<DummyComponentB>());
+    EXPECT_EQ(go.get_component<DummyComponentB>(), nullptr);
+
+    const Scene& const_scene = scene;
+    const auto* const_go = const_scene.find_game_object(go.id());
+    ASSERT_NE(const_go, nullptr);
+    const auto& const_required = const_go->component_or_throw<DummyComponentA>();
+    EXPECT_EQ(&const_required, &comp_a);
+    EXPECT_THROW((void)const_go->component_or_throw<DummyComponentB>(), std::runtime_error);
 }
 
 TEST(FrameworkWorldSceneTest, SceneGameObjectHandleIsInvalidAfterDestroy) {
@@ -135,7 +167,8 @@ TEST(FrameworkWorldSceneTest, SceneDestroyGameObjectClearsIdAndNameIndexesForSub
 }
 
 TEST(FrameworkWorldSceneTest, WorldSceneHandleIsInvalidAfterDestroy) {
-    World world;
+    resource::ResourceManager resources;
+    World world(resources);
     auto& scene_a = world.create_scene("a");
     auto& scene_b = world.create_scene("b");
     const SceneId id_a = scene_a.id();

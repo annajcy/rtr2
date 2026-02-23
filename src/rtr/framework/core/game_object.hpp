@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
@@ -22,16 +23,11 @@ private:
 
     GameObjectId m_id{core::kInvalidGameObjectId};
     bool         m_components_destroyed{false};
-    SceneGraph*  m_scene_graph{nullptr};
+    SceneGraph&  m_scene_graph;
     std::vector<std::unique_ptr<component::Component>> m_components{};
 
 public:
-    explicit GameObject(GameObjectId id, SceneGraph* scene_graph) : m_id(id), m_scene_graph(scene_graph) {
-        if (m_scene_graph == nullptr) {
-            logger()->error("GameObject constructor failed: scene_graph is null (game_object_id={}).", m_id);
-            throw std::invalid_argument("scene_graph must not be null");
-        }
-    }
+    explicit GameObject(GameObjectId id, SceneGraph& scene_graph) : m_id(id), m_scene_graph(scene_graph) {}
 
     ~GameObject() {
         try {
@@ -43,36 +39,22 @@ public:
 
     GameObject(const GameObject&) = delete;
     GameObject& operator=(const GameObject&) = delete;
-    GameObject(GameObject&&) noexcept = default;
-    GameObject& operator=(GameObject&&) noexcept = default;
+    GameObject(GameObject&&) = delete;
+    GameObject& operator=(GameObject&&) = delete;
 
     GameObjectId id() const { return m_id; }
     bool enabled() const { return node().is_enabled(); }
 
     void set_enabled(bool enabled) {
-        if (m_scene_graph == nullptr) {
-            logger()->error("set_enabled failed: GameObject {} is not attached to a SceneGraph.", m_id);
-            throw std::runtime_error("GameObject is not attached to a SceneGraph.");
-        }
-        m_scene_graph->set_enabled(m_id, enabled);
+        m_scene_graph.set_enabled(m_id, enabled);
     }
 
-    bool has_scene_graph() const { return m_scene_graph != nullptr; }
-
     SceneGraph::NodeView node() {
-        if (m_scene_graph == nullptr) {
-            logger()->error("node() failed: GameObject {} is not attached to a SceneGraph.", m_id);
-            throw std::runtime_error("GameObject is not attached to a SceneGraph.");
-        }
-        return m_scene_graph->node(m_id);
+        return m_scene_graph.node(m_id);
     }
 
     SceneGraph::ConstNodeView node() const {
-        if (m_scene_graph == nullptr) {
-            logger()->error("node() const failed: GameObject {} is not attached to a SceneGraph.", m_id);
-            throw std::runtime_error("GameObject is not attached to a SceneGraph.");
-        }
-        return m_scene_graph->node(m_id);
+        return m_scene_graph.node(m_id);
     }
 
     std::size_t component_count() const { return m_components.size(); }
@@ -94,13 +76,14 @@ public:
     template <typename TComponent, typename... TArgs>
     TComponent& add_component(TArgs&&... args) {
         static_assert(std::is_base_of_v<component::Component, TComponent>);
+        static_assert(std::is_constructible_v<TComponent, GameObject&, TArgs...>,
+                      "Component type must be constructible with (GameObject&, ...).");
         if (has_component<TComponent>()) {
             logger()->warn("add_component rejected: duplicate component type '{}' on GameObject {}.",
                            typeid(TComponent).name(), m_id);
             throw std::runtime_error("GameObject already has this component type.");
         }
-        auto component = std::make_unique<TComponent>(std::forward<TArgs>(args)...);
-        component->bind_owner(this);
+        auto component = std::make_unique<TComponent>(*this, std::forward<TArgs>(args)...);
         component->on_awake();
         TComponent* instance = component.get();
         m_components.emplace_back(std::move(component));
@@ -134,6 +117,30 @@ public:
     template <typename TComponent>
     bool has_component() const {
         return get_component<TComponent>() != nullptr;
+    }
+
+    template <typename TComponent>
+    TComponent& component_or_throw() {
+        static_assert(std::is_base_of_v<component::Component, TComponent>);
+        auto* found = get_component<TComponent>();
+        if (found == nullptr) {
+            logger()->error("component_or_throw failed: GameObject {} missing component type '{}'.",
+                            m_id, typeid(TComponent).name());
+            throw std::runtime_error(std::string("GameObject missing required component: ") + typeid(TComponent).name());
+        }
+        return *found;
+    }
+
+    template <typename TComponent>
+    const TComponent& component_or_throw() const {
+        static_assert(std::is_base_of_v<component::Component, TComponent>);
+        const auto* found = get_component<TComponent>();
+        if (found == nullptr) {
+            logger()->error("component_or_throw failed: GameObject {} missing component type '{}'.",
+                            m_id, typeid(TComponent).name());
+            throw std::runtime_error(std::string("GameObject missing required component: ") + typeid(TComponent).name());
+        }
+        return *found;
     }
 
     void fixed_tick(const FixedTickContext& ctx) {

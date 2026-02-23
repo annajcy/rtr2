@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -11,14 +12,14 @@ namespace rtr::rhi {
 
 class ShaderModule {
 private:
-    Device* m_device{};
+    std::reference_wrapper<Device> m_device;
     vk::raii::ShaderModule m_module{nullptr};
     vk::ShaderStageFlagBits m_stage{};
     std::string m_entry_point{"main"};
 
 public:
     static ShaderModule from_file(
-        Device* device,
+        Device& device,
         const std::string& filepath,
         vk::ShaderStageFlagBits stage,
         const std::string& entry_point = "main"
@@ -28,7 +29,7 @@ public:
     }
 
     ShaderModule(
-        Device* device,
+        Device& device,
         const std::vector<char>& code,
         vk::ShaderStageFlagBits stage,
         const std::string& entry_point = "main"
@@ -38,7 +39,7 @@ public:
         create_info.codeSize = code.size();
         create_info.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
-        m_module = vk::raii::ShaderModule(device->device(), create_info);
+        m_module = vk::raii::ShaderModule(device.device(), create_info);
     }
 
     vk::PipelineShaderStageCreateInfo stage_create_info() const {

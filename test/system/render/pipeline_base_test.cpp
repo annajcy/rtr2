@@ -16,14 +16,14 @@ public:
     void render(FrameContext&) override {}
 
     const SwapchainChangeSummary& last_diff() const { return m_last_diff; }
-    const FrameScheduler::SwapchainState& last_state() const { return m_last_state; }
+    const ActiveFrameScheduler::SwapchainState& last_state() const { return m_last_state; }
 
 private:
     SwapchainChangeSummary m_last_diff{};
-    FrameScheduler::SwapchainState m_last_state{};
+    ActiveFrameScheduler::SwapchainState m_last_state{};
 
     void handle_swapchain_state_change(
-        const FrameScheduler::SwapchainState& state,
+        const ActiveFrameScheduler::SwapchainState& state,
         const SwapchainChangeSummary& diff
     ) override {
         m_last_state = state;
@@ -43,8 +43,8 @@ PipelineRuntime make_runtime_stub() {
     };
 }
 
-FrameScheduler::SwapchainState make_state() {
-    return FrameScheduler::SwapchainState{
+ActiveFrameScheduler::SwapchainState make_state() {
+    return ActiveFrameScheduler::SwapchainState{
         .generation = 1,
         .extent = vk::Extent2D{640, 480},
         .image_count = 3,

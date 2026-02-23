@@ -74,7 +74,7 @@ public:
         m_offscreen_format    = pick_offscreen_format();
 
         m_compute_shader_module = std::make_unique<rhi::ShaderModule>(rhi::ShaderModule::from_file(
-            m_device,
+            *m_device,
             "/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/shadertoy_compute_comp.spv",
             vk::ShaderStageFlagBits::eCompute));
 
@@ -83,12 +83,12 @@ public:
         rhi::DescriptorSetLayout::Builder compute_layout_builder;
         compute_layout_builder.add_binding(0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eCompute)
             .add_binding(1, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
-        m_compute_layout = std::make_unique<rhi::DescriptorSetLayout>(compute_layout_builder.build(m_device));
+        m_compute_layout = std::make_unique<rhi::DescriptorSetLayout>(compute_layout_builder.build(*m_device));
 
         rhi::DescriptorPool::Builder pool_builder;
         pool_builder.add_layout(*m_compute_layout, m_frame_count)
             .set_flags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-        m_descriptor_pool = std::make_unique<rhi::DescriptorPool>(pool_builder.build(m_device));
+        m_descriptor_pool = std::make_unique<rhi::DescriptorPool>(pool_builder.build(*m_device));
 
         m_compute_sets = m_descriptor_pool->allocate_multiple(*m_compute_layout, m_frame_count);
 
@@ -146,7 +146,7 @@ public:
     // -----------------------------------------------------------------------
     void on_resize(int /*w*/, int /*h*/) override {}
 
-    void handle_swapchain_state_change(const system::render::FrameScheduler::SwapchainState& state,
+    void handle_swapchain_state_change(const system::render::ActiveFrameScheduler::SwapchainState& state,
                                        const system::render::SwapchainChangeSummary&         diff) override {
         if (diff.extent_or_depth_changed())
             m_scene_extent_dirty = true;
@@ -168,13 +168,13 @@ public:
 
         // --- 1. ComputePass ---
         auto& frame = m_offscreen_frame_resources[frame_index];
-        m_compute_pass->bind_render_pass_resources(
+        m_compute_pass->execute(
+            ctx,
             ComputePass::RenderPassResources{.uniform_buffer   = m_uniform_buffers[frame_index].get(),
                                              .offscreen_image  = frame.image.get(),
                                              .offscreen_layout = &frame.layout,
                                              .compute_set      = &m_compute_sets[frame_index],
                                              .i_params         = m_params});
-        m_compute_pass->execute(ctx);
 
         // --- 2. Image barriers ---
         auto& cmd = ctx.cmd().command_buffer();
@@ -211,11 +211,9 @@ public:
 
         // --- 3. EditorImGuiPass ---
         auto source_view = frame_color_source_view(frame_index);
-        m_editor_pass->bind_render_pass_resources(
-            EditorImGuiPass::RenderPassResources{.scene_image_view   = source_view.image_view,
-                                                 .scene_image_layout = source_view.image_layout,
-                                                 .scene_extent       = source_view.extent});
-        m_editor_pass->execute(ctx);
+        m_editor_pass->execute(ctx, EditorImGuiPass::RenderPassResources{.scene_image_view   = source_view.image_view,
+                                                                          .scene_image_layout = source_view.image_layout,
+                                                                          .scene_extent       = source_view.extent});
     }
 
 private:
@@ -264,7 +262,7 @@ private:
         for (uint32_t i = 0; i < m_frame_count; ++i) {
             OffscreenFrameResources res{};
             res.image = std::make_unique<rhi::Image>(
-                rhi::Image(m_device, m_scene_target_extent.width, m_scene_target_extent.height, m_offscreen_format,
+                rhi::Image(*m_device, m_scene_target_extent.width, m_scene_target_extent.height, m_offscreen_format,
                            vk::ImageTiling::eOptimal, usage, vk::MemoryPropertyFlagBits::eDeviceLocal,
                            vk::ImageAspectFlagBits::eColor, false));
             res.layout = vk::ImageLayout::eUndefined;
@@ -277,7 +275,7 @@ private:
             rhi::DescriptorWriter w;
             w.write_buffer(0, *m_uniform_buffers[i]->buffer(), 0, m_uniform_buffer_size);
             w.write_storage_image(1, *m_offscreen_frame_resources[i].image->image_view(), vk::ImageLayout::eGeneral);
-            w.update(m_device, *m_compute_sets[i]);
+            w.update(*m_device, *m_compute_sets[i]);
         }
     }
 
@@ -286,7 +284,7 @@ private:
         buffers.reserve(m_frame_count);
         for (uint32_t i = 0; i < m_frame_count; ++i) {
             auto buf = std::make_unique<rhi::Buffer>(
-                rhi::Buffer::create_host_visible_buffer(m_device, size, vk::BufferUsageFlagBits::eUniformBuffer));
+                rhi::Buffer::create_host_visible_buffer(*m_device, size, vk::BufferUsageFlagBits::eUniformBuffer));
             buf->map();
             buffers.emplace_back(std::move(buf));
         }

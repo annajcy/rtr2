@@ -48,13 +48,11 @@ rtr::framework::component::Camera* find_unique_active_camera(rtr::framework::cor
 int main() {
     constexpr uint32_t kWidth             = 1280;
     constexpr uint32_t kHeight            = 720;
-    constexpr uint32_t kMaxFramesInFlight = 2;
 
     try {
         rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{.window_width         = kWidth,
                                                                 .window_height        = kHeight,
-                                                                .window_title         = "RTR Framework Quickstart",
-                                                                .max_frames_in_flight = kMaxFramesInFlight});
+                                                                .window_title         = "RTR Framework Quickstart"});
 
         auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);
         editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
@@ -75,7 +73,7 @@ int main() {
         camera.aspect_ratio() = static_cast<float>(kWidth) / static_cast<float>(kHeight);
         camera.set_active(true);
         camera_go.node().set_local_position({0.0f, 1.0f, 6.0f});
-        camera_go.add_component<rtr::framework::component::FreeLookCameraController>(&runtime.input_system().state());
+        camera_go.add_component<rtr::framework::component::FreeLookCameraController>(runtime.input_system().state());
 
         camera.camera_look_at_point_world(pbpt::math::vec3{0.0, 0.0, 0.0});
 

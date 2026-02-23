@@ -26,7 +26,7 @@ TEST(FrameworkTrackballCameraControllerTest, LeftDragOrbitsAroundTargetAndPreser
     go.node().set_world_position({0.0f, 0.0f, -10.0f});
 
     system::input::InputState input{};
-    auto&                     controller = go.add_component<TrackBallCameraController>(&input);
+    auto&                     controller = go.add_component<TrackBallCameraController>(input);
 
     const pbpt::math::vec3 before        = go.node().world_position();
     const float            before_radius = pbpt::math::length(before - controller.target());
@@ -51,7 +51,7 @@ TEST(FrameworkTrackballCameraControllerTest, MiddleDragPansCameraAndTargetTogeth
     go.node().set_world_position({0.0f, 0.0f, -10.0f});
 
     system::input::InputState input{};
-    auto&                     controller = go.add_component<TrackBallCameraController>(&input);
+    auto&                     controller = go.add_component<TrackBallCameraController>(input);
 
     scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
     const pbpt::math::vec3 before_pos    = go.node().world_position();
@@ -80,7 +80,7 @@ TEST(FrameworkTrackballCameraControllerTest, ScrollCallsAdjustZoomPerspective) {
     go.node().set_world_position({0.0f, 0.0f, -5.0f});
 
     system::input::InputState input{};
-    (void)go.add_component<TrackBallCameraController>(&input);
+    (void)go.add_component<TrackBallCameraController>(input);
 
     const pbpt::math::vec3 before = go.node().world_position();
     input.update_mouse_scroll(0.0, 1.0);
@@ -102,8 +102,8 @@ TEST(FrameworkTrackballCameraControllerTest, OnlyActiveCameraResponds) {
     go_b.node().set_world_position({2.0f, 0.0f, -10.0f});
 
     system::input::InputState input{};
-    (void)go_a.add_component<TrackBallCameraController>(&input);
-    (void)go_b.add_component<TrackBallCameraController>(&input);
+    (void)go_a.add_component<TrackBallCameraController>(input);
+    (void)go_b.add_component<TrackBallCameraController>(input);
 
     const pbpt::math::vec3 a_before = go_a.node().world_position();
     const pbpt::math::vec3 b_before = go_b.node().world_position();
@@ -135,7 +135,7 @@ TEST(FrameworkTrackballCameraControllerTest, ThrowsWhenOwnerHasNoCameraComponent
     auto&                     go = scene.create_game_object("go");
     system::input::InputState input{};
 
-    EXPECT_THROW((void)go.add_component<TrackBallCameraController>(&input), std::runtime_error);
+    EXPECT_THROW((void)go.add_component<TrackBallCameraController>(input), std::runtime_error);
 }
 
 TEST(FrameworkTrackballCameraControllerTest, PitchIsClamped) {
@@ -146,7 +146,7 @@ TEST(FrameworkTrackballCameraControllerTest, PitchIsClamped) {
     go.node().set_world_position({0.0f, 0.0f, -10.0f});
 
     system::input::InputState input{};
-    auto&                     controller = go.add_component<TrackBallCameraController>(&input);
+    auto&                     controller = go.add_component<TrackBallCameraController>(input);
 
     input.update_mouse_button(system::input::MouseButton::LEFT, system::input::KeyAction::PRESS,
                               system::input::KeyMod::NONE);
@@ -168,7 +168,7 @@ TEST(FrameworkTrackballCameraControllerTest, LeftHasPriorityOverMiddle) {
     go.node().set_world_position({0.0f, 0.0f, -10.0f});
 
     system::input::InputState input{};
-    auto&                     controller = go.add_component<TrackBallCameraController>(&input);
+    auto&                     controller = go.add_component<TrackBallCameraController>(input);
     const pbpt::math::vec3    before_pos = go.node().world_position();
 
     input.update_mouse_button(system::input::MouseButton::LEFT, system::input::KeyAction::PRESS,
@@ -190,7 +190,7 @@ TEST(FrameworkTrackballCameraControllerTest, CustomTargetOrbitWorks) {
     go.node().set_world_position({5.0f, 0.0f, -10.0f});
 
     system::input::InputState input{};
-    auto&                     controller = go.add_component<TrackBallCameraController>(&input);
+    auto&                     controller = go.add_component<TrackBallCameraController>(input);
     controller.set_target({5.0f, 0.0f, 0.0f});
 
     const pbpt::math::vec3 target        = controller.target();
@@ -216,7 +216,7 @@ TEST(FrameworkTrackballCameraControllerTest, InitializesLookingAtTargetBeforeMou
     go.node().set_world_position({3.0f, 2.0f, -6.0f});
 
     system::input::InputState input{};
-    auto&                     controller = go.add_component<TrackBallCameraController>(&input);
+    auto&                     controller = go.add_component<TrackBallCameraController>(input);
     controller.set_target({0.0f, 0.0f, 0.0f});
 
     scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
