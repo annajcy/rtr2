@@ -14,7 +14,9 @@ TEST(EditorSelectionTest, KeepsValidSelection) {
     });
     auto& world = runtime.world();
     auto& scene = world.create_scene("main");
+    auto& keep_alive_scene = world.create_scene("keep_alive");
     auto& go = scene.create_game_object("node");
+    (void)keep_alive_scene;
 
     EditorContext ctx(world, runtime.resource_manager(), runtime.renderer(), runtime.input_system());
     ctx.set_selection(scene.id(), go.id());
@@ -34,7 +36,9 @@ TEST(EditorSelectionTest, ClearsSelectionWhenGameObjectDestroyed) {
     });
     auto& world = runtime.world();
     auto& scene = world.create_scene("main");
+    auto& keep_alive_scene = world.create_scene("keep_alive");
     auto& go = scene.create_game_object("node");
+    (void)keep_alive_scene;
 
     EditorContext ctx(world, runtime.resource_manager(), runtime.renderer(), runtime.input_system());
     ctx.set_selection(scene.id(), go.id());
@@ -54,11 +58,14 @@ TEST(EditorSelectionTest, ClearsSelectionWhenSceneDestroyed) {
     });
     auto& world = runtime.world();
     auto& scene = world.create_scene("main");
+    auto& keep_alive_scene = world.create_scene("keep_alive");
     auto& go = scene.create_game_object("node");
+    (void)keep_alive_scene;
 
     EditorContext ctx(world, runtime.resource_manager(), runtime.renderer(), runtime.input_system());
     ctx.set_selection(scene.id(), go.id());
 
+    ASSERT_TRUE(world.set_active_scene("keep_alive"));
     ASSERT_TRUE(world.destroy_scene(scene.id()));
     ctx.validate_selection();
 

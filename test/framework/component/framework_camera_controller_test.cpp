@@ -21,14 +21,14 @@ protected:
 };
 
 TEST(FrameworkCameraControllerTest, ThrowsWhenOwnerHasNoCameraComponent) {
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     auto&                     go = scene.create_game_object("go");
     system::input::InputState input{};
     EXPECT_THROW((void)go.add_component<ProbeCameraController>(input), std::runtime_error);
 }
 
 TEST(FrameworkCameraControllerTest, InactiveCameraDoesNotRunDerivedUpdate) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go = scene.create_game_object("camera_go");
     (void)go.add_component<PerspectiveCamera>();
 
@@ -39,7 +39,7 @@ TEST(FrameworkCameraControllerTest, InactiveCameraDoesNotRunDerivedUpdate) {
 }
 
 TEST(FrameworkCameraControllerTest, ActiveCameraRunsDerivedUpdate) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -51,7 +51,7 @@ TEST(FrameworkCameraControllerTest, ActiveCameraRunsDerivedUpdate) {
 }
 
 TEST(FrameworkCameraControllerTest, ConstructorInjectedInputKeepsControllerWorking) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);

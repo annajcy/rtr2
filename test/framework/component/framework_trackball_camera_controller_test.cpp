@@ -19,7 +19,7 @@ static void expect_vec3_near(const pbpt::math::vec3& lhs, const pbpt::math::vec3
 }
 
 TEST(FrameworkTrackballCameraControllerTest, LeftDragOrbitsAroundTargetAndPreservesRadius) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -44,7 +44,7 @@ TEST(FrameworkTrackballCameraControllerTest, LeftDragOrbitsAroundTargetAndPreser
 }
 
 TEST(FrameworkTrackballCameraControllerTest, MiddleDragPansCameraAndTargetTogether) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -73,7 +73,7 @@ TEST(FrameworkTrackballCameraControllerTest, MiddleDragPansCameraAndTargetTogeth
 }
 
 TEST(FrameworkTrackballCameraControllerTest, ScrollCallsAdjustZoomPerspective) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -91,7 +91,7 @@ TEST(FrameworkTrackballCameraControllerTest, ScrollCallsAdjustZoomPerspective) {
 }
 
 TEST(FrameworkTrackballCameraControllerTest, OnlyActiveCameraResponds) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go_a     = scene.create_game_object("camera_a");
     auto&       go_b     = scene.create_game_object("camera_b");
     auto&       camera_a = go_a.add_component<PerspectiveCamera>();
@@ -131,7 +131,7 @@ TEST(FrameworkTrackballCameraControllerTest, OnlyActiveCameraResponds) {
 }
 
 TEST(FrameworkTrackballCameraControllerTest, ThrowsWhenOwnerHasNoCameraComponent) {
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     auto&                     go = scene.create_game_object("go");
     system::input::InputState input{};
 
@@ -139,7 +139,7 @@ TEST(FrameworkTrackballCameraControllerTest, ThrowsWhenOwnerHasNoCameraComponent
 }
 
 TEST(FrameworkTrackballCameraControllerTest, PitchIsClamped) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -161,7 +161,7 @@ TEST(FrameworkTrackballCameraControllerTest, PitchIsClamped) {
 }
 
 TEST(FrameworkTrackballCameraControllerTest, LeftHasPriorityOverMiddle) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -183,7 +183,7 @@ TEST(FrameworkTrackballCameraControllerTest, LeftHasPriorityOverMiddle) {
 }
 
 TEST(FrameworkTrackballCameraControllerTest, CustomTargetOrbitWorks) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -209,7 +209,7 @@ TEST(FrameworkTrackballCameraControllerTest, CustomTargetOrbitWorks) {
 }
 
 TEST(FrameworkTrackballCameraControllerTest, InitializesLookingAtTargetBeforeMouseInput) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);

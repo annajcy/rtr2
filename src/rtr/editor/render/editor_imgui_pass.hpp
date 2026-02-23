@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
@@ -11,6 +12,7 @@
 #include "imgui_impl_vulkan.h"
 
 #include "rtr/editor/core/editor_host.hpp"
+#include "rtr/rhi/frame_constants.hpp"
 #include "rtr/rhi/imgui_context.hpp"
 #include "rtr/rhi/texture.hpp"
 #include "rtr/system/render/frame_color_source.hpp"
@@ -56,7 +58,7 @@ private:
     std::shared_ptr<EditorHostOverlayAdapter> m_overlay_adapter{};
 
     rtr::rhi::Sampler                m_scene_sampler;
-    std::vector<SceneTextureEntry>     m_scene_texture_entries{};
+    std::array<SceneTextureEntry, rhi::kFramesInFlight> m_scene_texture_entries{};
     ImTextureID                        m_current_scene_texture{};
     ImVec2                             m_current_scene_texture_size{0.0f, 0.0f};
 
@@ -88,17 +90,16 @@ private:
 public:
     EditorImGuiPass(const system::render::PipelineRuntime& runtime, std::shared_ptr<EditorHost> editor_host,
                     system::render::IRenderPipeline* owner_pipeline)
-        : m_imgui_context(*runtime.device, *runtime.context, *runtime.window, runtime.image_count, runtime.color_format,
+        : m_imgui_context(runtime.device, runtime.context, runtime.window, runtime.image_count, runtime.color_format,
                           runtime.depth_format),
           m_editor_host(std::move(editor_host)),
-          m_scene_sampler(rtr::rhi::Sampler::create_default(*runtime.device, 1)),
+          m_scene_sampler(rtr::rhi::Sampler::create_default(runtime.device, 1)),
           m_owner_pipeline(owner_pipeline) {
         if (!m_editor_host) {
             throw std::invalid_argument("EditorImGuiPass requires non-null editor host.");
         }
 
         m_overlay_adapter = std::make_shared<EditorHostOverlayAdapter>(m_editor_host);
-        m_scene_texture_entries.resize(runtime.frame_count);
         bind_editor_services();
     }
 
@@ -220,8 +221,8 @@ private:
         const vk::ImageLayout layout = resources.scene_image_layout;
         const vk::Extent2D    extent = resources.scene_extent;
 
-        if (frame_index >= m_scene_texture_entries.size()) {
-            m_scene_texture_entries.resize(frame_index + 1);
+        if (frame_index >= rhi::kFramesInFlight) {
+            throw std::runtime_error("EditorImGuiPass frame index exceeds rhi::kFramesInFlight.");
         }
         auto& entry = m_scene_texture_entries[frame_index];
 

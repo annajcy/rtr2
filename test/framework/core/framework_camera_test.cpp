@@ -22,7 +22,7 @@ static void expect_mat4_near(const pbpt::math::mat4& lhs, const pbpt::math::mat4
 }
 
 TEST(FrameworkCameraTest, PerspectiveProjectionMatchesGlmHelper) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& go     = scene.create_game_object("camera");
     auto& camera = go.add_component<component::PerspectiveCamera>();
 
@@ -35,7 +35,7 @@ TEST(FrameworkCameraTest, PerspectiveProjectionMatchesGlmHelper) {
 }
 
 TEST(FrameworkCameraTest, OrthographicProjectionMatchesGlmHelper) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& go     = scene.create_game_object("camera");
     auto& camera = go.add_component<component::OrthographicCamera>();
 
@@ -50,7 +50,7 @@ TEST(FrameworkCameraTest, OrthographicProjectionMatchesGlmHelper) {
 }
 
 TEST(FrameworkCameraTest, ViewMatrixUsesNodeWorldTransform) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& go     = scene.create_game_object("camera");
     auto& camera = go.add_component<component::PerspectiveCamera>();
 
@@ -63,7 +63,7 @@ TEST(FrameworkCameraTest, ViewMatrixUsesNodeWorldTransform) {
 }
 
 TEST(FrameworkCameraTest, LookAtDirectionLocalAndWorldDifferWithParentRotation) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& parent    = scene.create_game_object("parent");
     auto& camera_go = scene.create_game_object("camera");
     auto& camera    = camera_go.add_component<component::PerspectiveCamera>();
@@ -87,7 +87,7 @@ TEST(FrameworkCameraTest, LookAtDirectionLocalAndWorldDifferWithParentRotation) 
 }
 
 TEST(FrameworkCameraTest, PerspectiveAdjustZoomMovesAlongFront) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& go     = scene.create_game_object("camera");
     auto& camera = go.add_component<component::PerspectiveCamera>();
 
@@ -102,7 +102,7 @@ TEST(FrameworkCameraTest, PerspectiveAdjustZoomMovesAlongFront) {
 }
 
 TEST(FrameworkCameraTest, OrthographicAdjustZoomExpandsBoundsAroundCenter) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& go     = scene.create_game_object("camera");
     auto& camera = go.add_component<component::OrthographicCamera>();
     camera.left_bound()   = -2.0f;
@@ -118,14 +118,14 @@ TEST(FrameworkCameraTest, OrthographicAdjustZoomExpandsBoundsAroundCenter) {
 }
 
 TEST(FrameworkCameraTest, CameraDefaultsToInactive) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& go     = scene.create_game_object("camera");
     auto& camera = go.add_component<component::PerspectiveCamera>();
     EXPECT_FALSE(camera.active());
 }
 
 TEST(FrameworkCameraTest, AddingSecondCameraComponentOnSameGameObjectThrows) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& go = scene.create_game_object("camera");
     (void)go.add_component<component::PerspectiveCamera>();
     EXPECT_THROW((void)go.add_component<component::OrthographicCamera>(), std::runtime_error);

@@ -15,14 +15,14 @@
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/frame_scheduler.hpp"
 #include "rtr/system/render/pipeline.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::system::render {
 
 class Renderer {
 public:
-    using ActiveFrameScheduler = FrameScheduler<rhi::kFramesInFlight>;
-    using PerFrameResources = ActiveFrameScheduler::PerFrameResources;
-    using PerImageResources = ActiveFrameScheduler::PerImageResources;
+    using PerFrameResources = FrameScheduler::PerFrameResources;
+    using PerImageResources = FrameScheduler::PerImageResources;
     using RenderCallback = std::function<void(FrameContext&)>;
     using ComputeRecordCallback = std::function<void(rhi::CommandBuffer&)>;
 
@@ -120,7 +120,7 @@ private:
     rhi::Device m_device;
 
     rhi::CommandPool m_compute_command_pool;
-    ActiveFrameScheduler m_frame_scheduler;
+    FrameScheduler m_frame_scheduler;
     std::unique_ptr<IRenderPipeline> m_active_pipeline{};
 
     utils::SubscriptionToken m_window_resize_subscription{};
@@ -148,17 +148,32 @@ public:
         m_last_swapchain_generation = m_frame_scheduler.swapchain_state().generation;
     }
 
-    ~Renderer() = default;
+    ~Renderer() noexcept {
+        try {
+            m_device.wait_idle();
+        } catch (const std::exception& ex) {
+            try {
+                auto logger = utils::get_logger("system.render.renderer");
+                logger->error("Renderer::~Renderer wait_idle failed: {}", ex.what());
+            } catch (...) {
+            }
+        } catch (...) {
+            try {
+                auto logger = utils::get_logger("system.render.renderer");
+                logger->error("Renderer::~Renderer wait_idle failed with unknown exception.");
+            } catch (...) {
+            }
+        }
+    }
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
     PipelineRuntime build_pipeline_runtime() {
         return PipelineRuntime{
-            .device = &m_device,
-            .context = &m_context,
-            .window = &m_window,
-            .frame_count = m_frame_scheduler.max_frames_in_flight(),
+            .device = m_device,
+            .context = m_context,
+            .window = m_window,
             .image_count = m_frame_scheduler.image_count(),
             .color_format = m_frame_scheduler.render_format(),
             .depth_format = m_frame_scheduler.depth_format()
@@ -225,8 +240,8 @@ public:
         handle_swapchain_state_change(m_frame_scheduler.swapchain_state());
 
         FrameContext frame_ctx = build_frame_context(ticket);
-        ticket.command_buffer->reset();
-        ticket.command_buffer->record([&](rhi::CommandBuffer& cb) {
+        ticket.command_buffer.reset();
+        ticket.command_buffer.record([&](rhi::CommandBuffer& cb) {
             m_active_pipeline->render(frame_ctx);
             transition_swapchain_to_present(cb.command_buffer(), frame_ctx.swapchain_image());
         }, vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
@@ -248,11 +263,11 @@ public:
     rhi::Context& context() { return m_context; }
     rhi::Window& window() { return m_window; }
 
-    const ActiveFrameScheduler& frame_scheduler() const { return m_frame_scheduler; }
-    ActiveFrameScheduler& frame_scheduler() { return m_frame_scheduler; }
+    const FrameScheduler& frame_scheduler() const { return m_frame_scheduler; }
+    FrameScheduler& frame_scheduler() { return m_frame_scheduler; }
 
 private:
-    void handle_swapchain_state_change(const ActiveFrameScheduler::SwapchainState& state) {
+    void handle_swapchain_state_change(const FrameScheduler::SwapchainState& state) {
         if (state.generation == m_last_swapchain_generation) {
             return;
         }
@@ -284,10 +299,10 @@ private:
         command_buffer.pipelineBarrier2(to_present_dep);
     }
 
-    FrameContext build_frame_context(const ActiveFrameScheduler::FrameTicket& ticket) {
+    FrameContext build_frame_context(const FrameScheduler::FrameTicket& ticket) {
         return FrameContext(
             &m_device,
-            ticket.command_buffer,
+            &ticket.command_buffer,
             m_frame_scheduler.swapchain().image_views()[ticket.image_index],
             m_frame_scheduler.swapchain().images()[ticket.image_index],
             m_frame_scheduler.render_extent(),

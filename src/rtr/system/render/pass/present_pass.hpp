@@ -16,9 +16,9 @@ namespace rtr::system::render {
 class PresentPass final : public render::IRenderPass {
 public:
     struct RenderPassResources {
-        rhi::Image*      src_color_image{};
-        vk::ImageLayout* src_color_layout{};
-        vk::Extent2D     src_extent{};
+        rhi::Image&      src_color_image;
+        vk::ImageLayout& src_color_layout;
+        vk::Extent2D     src_extent;
     };
 
 private:
@@ -33,8 +33,7 @@ public:
     const std::vector<render::ResourceDependency>& dependencies() const override { return m_dependencies; }
 
     static void validate_resources(const RenderPassResources& resources) {
-        if (resources.src_color_image == nullptr || resources.src_color_layout == nullptr ||
-            resources.src_extent.width == 0 || resources.src_extent.height == 0) {
+        if (resources.src_extent.width == 0 || resources.src_extent.height == 0) {
             throw std::runtime_error("PresentPass frame resources are incomplete.");
         }
     }
@@ -43,8 +42,8 @@ public:
         validate_resources(resources);
 
         auto& cmd          = ctx.cmd().command_buffer();
-        auto& color_image  = *resources.src_color_image;
-        auto& color_layout = *resources.src_color_layout;
+        auto& color_image  = resources.src_color_image;
+        auto& color_layout = resources.src_color_layout;
 
         vk::ImageMemoryBarrier2 offscreen_to_src{};
         offscreen_to_src.srcStageMask                    = vk::PipelineStageFlagBits2::eColorAttachmentOutput;

@@ -56,7 +56,9 @@ public:
         ImGui::Text("Scene Count: %zu", world.scene_count());
 
         if (const auto* active_scene = world.active_scene(); active_scene != nullptr) {
-            ImGui::Text("Active Scene: %s (%llu)", active_scene->name().c_str(), static_cast<unsigned long long>(active_scene->id()));
+            const auto scene_name = world.scene_name(active_scene->id()).value_or("<missing>");
+            ImGui::Text("Active Scene: %.*s (%llu)", static_cast<int>(scene_name.size()), scene_name.data(),
+                        static_cast<unsigned long long>(active_scene->id()));
             ImGui::Text("GameObjects: %zu", active_scene->game_object_count());
         } else {
             ImGui::TextDisabled("Active Scene: none");

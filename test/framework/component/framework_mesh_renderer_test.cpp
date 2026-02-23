@@ -10,7 +10,7 @@
 namespace rtr::framework::component::test {
 
 TEST(FrameworkMeshRendererTest, ConstructWithValidHandles) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
     auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{1});
     EXPECT_EQ(renderer.mesh_handle(), resource::MeshHandle{1});
@@ -18,7 +18,7 @@ TEST(FrameworkMeshRendererTest, ConstructWithValidHandles) {
 }
 
 TEST(FrameworkMeshRendererTest, InvalidMeshHandleThrows) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
     EXPECT_THROW(
         (void)go.add_component<MeshRenderer>(resource::MeshHandle{}),
@@ -30,14 +30,14 @@ TEST(FrameworkMeshRendererTest, InvalidMeshHandleThrows) {
 }
 
 TEST(FrameworkMeshRendererTest, AllowsCustomBaseColor) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
     auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{1}, pbpt::math::vec4{0.2f, 0.3f, 0.4f, 1.0f});
     EXPECT_EQ(renderer.base_color(), pbpt::math::vec4(0.2f, 0.3f, 0.4f, 1.0f));
 }
 
 TEST(FrameworkMeshRendererTest, SettersUpdateState) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
     auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{1});
 
@@ -49,7 +49,7 @@ TEST(FrameworkMeshRendererTest, SettersUpdateState) {
 }
 
 TEST(FrameworkMeshRendererTest, GameObjectCanAddAndQueryMeshRenderer) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
     auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{11});
 
@@ -59,7 +59,7 @@ TEST(FrameworkMeshRendererTest, GameObjectCanAddAndQueryMeshRenderer) {
 }
 
 TEST(FrameworkMeshRendererTest, GameObjectEnforcesUniqueMeshRendererType) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
     (void)go.add_component<MeshRenderer>(resource::MeshHandle{1});
 

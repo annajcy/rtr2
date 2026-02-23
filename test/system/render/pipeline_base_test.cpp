@@ -16,14 +16,14 @@ public:
     void render(FrameContext&) override {}
 
     const SwapchainChangeSummary& last_diff() const { return m_last_diff; }
-    const ActiveFrameScheduler::SwapchainState& last_state() const { return m_last_state; }
+    const FrameScheduler::SwapchainState& last_state() const { return m_last_state; }
 
 private:
     SwapchainChangeSummary m_last_diff{};
-    ActiveFrameScheduler::SwapchainState m_last_state{};
+    FrameScheduler::SwapchainState m_last_state{};
 
     void handle_swapchain_state_change(
-        const ActiveFrameScheduler::SwapchainState& state,
+        const FrameScheduler::SwapchainState& state,
         const SwapchainChangeSummary& diff
     ) override {
         m_last_state = state;
@@ -32,19 +32,21 @@ private:
 };
 
 PipelineRuntime make_runtime_stub() {
+    auto& device = *reinterpret_cast<rhi::Device*>(0x1);
+    auto& context = *reinterpret_cast<rhi::Context*>(0x1);
+    auto& window = *reinterpret_cast<rhi::Window*>(0x1);
     return PipelineRuntime{
-        .device = reinterpret_cast<rhi::Device*>(0x1),
-        .context = reinterpret_cast<rhi::Context*>(0x1),
-        .window = reinterpret_cast<rhi::Window*>(0x1),
-        .frame_count = 2,
+        .device = device,
+        .context = context,
+        .window = window,
         .image_count = 3,
         .color_format = vk::Format::eB8G8R8A8Unorm,
         .depth_format = vk::Format::eD32Sfloat
     };
 }
 
-ActiveFrameScheduler::SwapchainState make_state() {
-    return ActiveFrameScheduler::SwapchainState{
+FrameScheduler::SwapchainState make_state() {
+    return FrameScheduler::SwapchainState{
         .generation = 1,
         .extent = vk::Extent2D{640, 480},
         .image_count = 3,

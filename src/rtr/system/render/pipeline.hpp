@@ -1,7 +1,11 @@
 #pragma once
 
-#include <memory>
+#include <array>
+#include <cstdint>
 #include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "rtr/resource/resource_fwd.hpp"
@@ -14,7 +18,6 @@
 #include "rtr/rhi/texture.hpp"
 #include "rtr/rhi/window.hpp"
 #include "vulkan/vulkan_enums.hpp"
-#include <cstdint>
 
 namespace rtr::framework::core {
 class World;
@@ -26,20 +29,13 @@ class InputSystem;
 
 namespace rtr::system::render {
 
-using ActiveFrameScheduler = FrameScheduler<rhi::kFramesInFlight>;
-
 struct PipelineRuntime {
-    rhi::Device* device{};
-    rhi::Context* context{};
-    rhi::Window* window{};
-    uint32_t frame_count{0};
+    rhi::Device& device;
+    rhi::Context& context;
+    rhi::Window& window;
     uint32_t image_count{0};
     vk::Format color_format{vk::Format::eUndefined};
     vk::Format depth_format{vk::Format::eUndefined};
-
-    bool is_valid() const {
-        return device != nullptr && context != nullptr && window != nullptr;
-    }
 };
 
 class IRenderPipeline {
@@ -47,7 +43,7 @@ public:
     virtual ~IRenderPipeline() = default;
 
     virtual void on_resize(int width, int height) {}
-    virtual void on_swapchain_state_changed(const ActiveFrameScheduler::SwapchainState& state) {}
+    virtual void on_swapchain_state_changed(const FrameScheduler::SwapchainState& state) {}
 
     // Renderer owns command buffer begin/end/reset/submit; pipeline only records draw commands.
     virtual void render(FrameContext& ctx) = 0;
@@ -84,10 +80,9 @@ struct SwapchainChangeSummary {
 
 class RenderPipelineBase : public IRenderPipeline {
 protected:
-    rhi::Device* m_device{};
-    rhi::Context* m_context{};
-    rhi::Window* m_window{};
-    uint32_t m_frame_count{0};
+    rhi::Device& m_device;
+    rhi::Context& m_context;
+    rhi::Window& m_window;
     uint32_t m_image_count{0};
     vk::Format m_color_format{vk::Format::eUndefined};
     vk::Format m_depth_format{vk::Format::eUndefined};
@@ -98,16 +93,11 @@ public:
         : m_device(runtime.device),
           m_context(runtime.context),
           m_window(runtime.window),
-          m_frame_count(runtime.frame_count),
           m_image_count(runtime.image_count),
           m_color_format(runtime.color_format),
-          m_depth_format(runtime.depth_format) {
-        if (!runtime.is_valid()) {
-            throw std::runtime_error("RenderPipelineBase requires valid device/context/window.");
-        }
-    }
+          m_depth_format(runtime.depth_format) {}
 
-    void on_swapchain_state_changed(const ActiveFrameScheduler::SwapchainState& state) final {
+    void on_swapchain_state_changed(const FrameScheduler::SwapchainState& state) final {
         SwapchainChangeSummary diff{
             .extent_changed =
                 (m_swapchain_extent.width != state.extent.width) ||
@@ -127,7 +117,7 @@ public:
 
 protected:
     virtual void handle_swapchain_state_change(
-        const ActiveFrameScheduler::SwapchainState& state,
+        const FrameScheduler::SwapchainState& state,
         const SwapchainChangeSummary& diff
     ) = 0;
 
@@ -135,43 +125,55 @@ protected:
         return m_swapchain_extent.width > 0 && m_swapchain_extent.height > 0;
     }
 
-    std::vector<std::unique_ptr<rhi::Buffer>> make_per_frame_mapped_uniform_buffers(
+    template <typename TComponent, typename Factory, std::size_t... I>
+    static std::array<TComponent, rhi::kFramesInFlight> make_frame_array_impl(Factory&& factory, std::index_sequence<I...>) {
+        return {{factory(static_cast<uint32_t>(I))...}};
+    }
+
+    template <typename TComponent, typename Factory>
+    static std::array<TComponent, rhi::kFramesInFlight> make_frame_array(Factory&& factory) {
+        return make_frame_array_impl<TComponent>(std::forward<Factory>(factory), std::make_index_sequence<rhi::kFramesInFlight>{});
+    }
+
+    template <typename TComponent, std::size_t... I>
+    static std::array<TComponent, rhi::kFramesInFlight> vector_to_frame_array_impl(
+        std::vector<TComponent>&& values,
+        std::index_sequence<I...>
+    ) {
+        return {{std::move(values[I])...}};
+    }
+
+    template <typename TComponent>
+    static std::array<TComponent, rhi::kFramesInFlight> vector_to_frame_array(std::vector<TComponent>&& values, std::string_view label) {
+        if (values.size() != rhi::kFramesInFlight) {
+            throw std::runtime_error(std::string(label) + " size mismatch with kFramesInFlight.");
+        }
+        return vector_to_frame_array_impl<TComponent>(std::move(values), std::make_index_sequence<rhi::kFramesInFlight>{});
+    }
+
+    std::array<rhi::Buffer, rhi::kFramesInFlight> make_per_frame_mapped_uniform_buffers(
         vk::DeviceSize size,
         vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer
     ) const {
-        std::vector<std::unique_ptr<rhi::Buffer>> buffers;
-        buffers.reserve(m_frame_count);
-        for (uint32_t i = 0; i < m_frame_count; ++i) {
-            auto buffer = std::make_unique<rhi::Buffer>(
-                rhi::Buffer::create_host_visible_buffer(
-                    *m_device,
-                    size,
-                    usage
-                )
-            );
-            buffer->map();
-            buffers.emplace_back(std::move(buffer));
-        }
-        return buffers;
+        return make_frame_array<rhi::Buffer>([&](uint32_t) {
+            auto buffer = rhi::Buffer::create_host_visible_buffer(m_device, size, usage);
+            buffer.map();
+            return buffer;
+        });
     }
 
-    std::vector<std::unique_ptr<rhi::Image>> make_per_frame_depth_images(
+    std::array<rhi::Image, rhi::kFramesInFlight> make_per_frame_depth_images(
         const vk::Extent2D& extent,
         vk::Format depth_format
     ) const {
-        std::vector<std::unique_ptr<rhi::Image>> depth_images;
-        depth_images.reserve(m_frame_count);
-        for (uint32_t i = 0; i < m_frame_count; ++i) {
-            depth_images.emplace_back(std::make_unique<rhi::Image>(
-                rhi::Image::create_depth_image(
-                    *m_device,
-                    extent.width,
-                    extent.height,
-                    depth_format
-                )
-            ));
-        }
-        return depth_images;
+        return make_frame_array<rhi::Image>([&](uint32_t) {
+            return rhi::Image::create_depth_image(
+                m_device,
+                extent.width,
+                extent.height,
+                depth_format
+            );
+        });
     }
 };
 

@@ -94,7 +94,7 @@ bool wait_for_terminal_state(
 } // namespace
 
 TEST(PbptOfflineRenderServiceTest, StartTransitionsToRunningAndThenSucceeded) {
-    core::Scene scene(1, "offline_service_scene");
+    core::Scene scene(1);
     resource::ResourceManager resources(repo_assets_dir());
     setup_scene_with_camera(scene);
     add_minimal_pbpt_emitter_shape(scene, resources);
@@ -143,7 +143,7 @@ TEST(PbptOfflineRenderServiceTest, StartTransitionsToRunningAndThenSucceeded) {
 }
 
 TEST(PbptOfflineRenderServiceTest, RequestCancelTransitionsToCanceled) {
-    core::Scene scene(1, "offline_service_scene");
+    core::Scene scene(1);
     resource::ResourceManager resources(repo_assets_dir());
     setup_scene_with_camera(scene);
     add_minimal_pbpt_emitter_shape(scene, resources);
@@ -186,7 +186,7 @@ TEST(PbptOfflineRenderServiceTest, RequestCancelTransitionsToCanceled) {
 }
 
 TEST(PbptOfflineRenderServiceTest, BackendFailureTransitionsToFailed) {
-    core::Scene scene(1, "offline_service_scene");
+    core::Scene scene(1);
     resource::ResourceManager resources(repo_assets_dir());
     setup_scene_with_camera(scene);
     add_minimal_pbpt_emitter_shape(scene, resources);

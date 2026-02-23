@@ -10,7 +10,7 @@
 namespace rtr::framework::component::test {
 
 TEST(FrameworkPbptLightTest, ThrowsWhenMeshRendererIsMissing) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("light");
 
     EXPECT_THROW(
@@ -20,7 +20,7 @@ TEST(FrameworkPbptLightTest, ThrowsWhenMeshRendererIsMissing) {
 }
 
 TEST(FrameworkPbptLightTest, CanAttachWhenMeshRendererExists) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("light");
     auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_light = go.add_component<PbptLight>();
@@ -30,7 +30,7 @@ TEST(FrameworkPbptLightTest, CanAttachWhenMeshRendererExists) {
 }
 
 TEST(FrameworkPbptLightTest, RadianceSpectrumValidationThrowsForInvalidData) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("light");
     (void)go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_light = go.add_component<PbptLight>();
@@ -56,7 +56,7 @@ TEST(FrameworkPbptLightTest, RadianceSpectrumValidationThrowsForInvalidData) {
 }
 
 TEST(FrameworkPbptLightTest, RadianceSpectrumSetAndReadBack) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("light");
     (void)go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_light = go.add_component<PbptLight>();

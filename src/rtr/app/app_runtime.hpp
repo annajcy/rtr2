@@ -46,7 +46,6 @@ struct RuntimeContext {
     resource::ResourceManager&       resources;
     system::render::Renderer&        renderer;
     system::input::InputSystem&      input;
-    system::render::IRenderPipeline* pipeline{};
     std::uint64_t                    frame_serial{0};
     double                           delta_seconds{0.0};
     std::function<void()>            request_stop{};
@@ -294,7 +293,6 @@ private:
             .resources     = m_resources,
             .renderer      = m_renderer,
             .input         = m_input,
-            .pipeline      = m_renderer.pipeline(),
             .frame_serial  = m_frame_serial,
             .delta_seconds = delta_seconds,
             .request_stop  = [this]() { request_stop(); },

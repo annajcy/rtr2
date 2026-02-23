@@ -136,7 +136,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
   </shape>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources(temp_dir.path);
     const auto                result = load_scene_summary(xml_path.string(), scene, resources);
 
@@ -230,7 +230,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsRgbReflectanceAndMapsToBaseColor) {
   </shape>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources(temp_dir.path);
     const auto                result = load_scene_summary(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
@@ -279,7 +279,7 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsForInvalidMatrixElementCount) {
   </shape>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources(temp_dir.path);
     EXPECT_THROW((void)load_scene_summary(xml_path.string(), scene, resources), std::runtime_error);
 }
@@ -313,7 +313,7 @@ TEST(FrameworkPbptSceneLoaderTest, DisambiguatesDuplicateImportedNameBetweenCame
   </shape>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources(temp_dir.path);
     const auto                result = load_scene_summary(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
@@ -350,7 +350,7 @@ TEST(FrameworkPbptSceneLoaderTest, RecordsDefaultShapeNameWhenShapeIdMissing) {
   </shape>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources(temp_dir.path);
     const auto                result = load_scene_summary(xml_path.string(), scene, resources);
 
@@ -384,7 +384,7 @@ TEST(FrameworkPbptSceneLoaderTest, LookAtSensorAlignsWithRtrCameraFrontConventio
   </sensor>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources(temp_dir.path);
     (void)load_scene_summary(xml_path.string(), scene, resources);
 
@@ -419,7 +419,7 @@ TEST(FrameworkPbptSceneLoaderTest, AttachesFreeLookControllerWhenInputStateProvi
   </sensor>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     system::input::InputState input_state{};
     resource::ResourceManager resources(temp_dir.path);
     LoadOptions         options{};
@@ -462,7 +462,7 @@ TEST(FrameworkPbptSceneLoaderTest, RelativeMeshFilenameResolvesFromXmlDirectoryW
   </shape>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources(resource_root);
     const auto                result = load_scene_summary(xml_path.string(), scene, resources);
     EXPECT_EQ(result.imported_shape_count, 1u);
@@ -509,7 +509,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportWithCompatibleInfoMapsSubsetAndPreserve
   </shape>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources(temp_dir.path);
     const auto package = pbpt_bridge::load_scene(xml_path.string(), scene, resources);
 
@@ -553,7 +553,7 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsWhenSensorIsMissing) {
   </shape>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources(temp_dir.path);
     EXPECT_THROW((void)load_scene_summary(xml_path.string(), scene, resources), std::runtime_error);
 }
@@ -584,7 +584,7 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsWhenIntegratorIsMissing) {
   </shape>
 </scene>)XML");
 
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources(temp_dir.path);
     EXPECT_THROW((void)load_scene_summary(xml_path.string(), scene, resources), std::runtime_error);
 }

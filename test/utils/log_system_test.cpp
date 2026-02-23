@@ -304,7 +304,7 @@ TEST(LogSystemTest, FrameworkCoreLifecycleLogsAreWritten) {
     camera.set_active(true);
     EXPECT_TRUE(scene_a.destroy_game_object(camera_go.id()));
 
-    EXPECT_TRUE(world.set_active_scene(scene_b.id()));
+    EXPECT_TRUE(world.set_active_scene(scene_a.id()));
     EXPECT_TRUE(world.destroy_scene(scene_b.id()));
 
     get_logger("framework.core.world")->flush();
@@ -330,7 +330,7 @@ TEST(LogSystemTest, ControllerNodeChangeTraceLogsAppearAtTraceLevel) {
     config.level = LogLevel::trace;
     init_logging(config);
 
-    framework::core::Scene scene(1, "controller_trace_scene");
+    framework::core::Scene scene(1);
 
     system::input::InputState input{};
     auto& free_look_go = scene.create_game_object("free_look_camera");
@@ -382,7 +382,7 @@ TEST(LogSystemTest, PbptServiceLifecycleLogsAreWritten) {
     config.level = LogLevel::debug;
     init_logging(config);
 
-    framework::core::Scene scene(1, "pbpt_service_log_scene");
+    framework::core::Scene scene(1);
     resource::ResourceManager resources{};
     framework::integration::PbptOfflineRenderService service{};
 
