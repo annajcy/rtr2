@@ -8,13 +8,15 @@
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
+#include "rtr/rhi/device.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::system::render {
 
 inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& scene,
-                                                 resource::ResourceManager&    resources) {
+                                                 resource::ResourceManager&    resources,
+                                                 rhi::Device&                  device) {
     ForwardSceneView view{};
     bool has_camera_data = false;
     bool has_multiple_active_cameras = false;
@@ -63,12 +65,13 @@ inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& s
 
         const pbpt::math::mat4     normal      = pbpt::math::transpose(pbpt::math::inverse(model));
         const resource::MeshHandle mesh_handle = mesh_renderer->mesh_handle();
-        if (!mesh_handle.is_valid() || !resources.alive<rtr::resource::MeshResourceKind>(mesh_handle)) {
-            throw std::runtime_error("MeshRenderer mesh handle is invalid or unloaded.");
+        if (!mesh_handle.is_valid()) {
+            throw std::runtime_error("MeshRenderer mesh handle is invalid.");
         }
+        auto& mesh = resources.require_gpu<rtr::resource::MeshResourceKind>(mesh_handle, device);
 
         view.renderables.emplace_back(ForwardSceneRenderable{.instance_id = static_cast<std::uint64_t>(id),
-                                                             .mesh        = mesh_handle,
+                                                             .mesh        = mesh,
                                                              .base_color  = mesh_renderer->base_color(),
                                                              .model       = model,
                                                              .normal      = normal});

@@ -7,6 +7,7 @@
 
 #include "rtr/rhi/command.hpp"
 #include "rtr/rhi/device.hpp"
+#include "rtr/rhi/frame_constants.hpp"
 #include "rtr/rhi/swap_chain.hpp"
 #include "rtr/utils/log.hpp"
 
@@ -18,11 +19,9 @@ namespace rtr::system::render {
  * This class owns swapchain + per-frame/per-image synchronization and provides
  * a begin/submit-present API so higher layers can focus on recording commands.
  */
-template <std::uint32_t FramesInFlight>
+
 class FrameScheduler {
 public:
-    static_assert(FramesInFlight > 0, "FramesInFlight must be greater than zero.");
-
     struct PerFrameResources {
         rhi::CommandBuffer command_buffer;
         vk::raii::Semaphore image_available_semaphore{nullptr};
@@ -36,7 +35,7 @@ public:
     struct FrameTicket {
         uint32_t frame_index{0};
         uint32_t image_index{0};
-        rhi::CommandBuffer* command_buffer{nullptr};
+        rhi::CommandBuffer& command_buffer;
     };
 
     struct SwapchainState {
@@ -84,7 +83,7 @@ public:
         init_per_frame_resources();
         log->info(
             "FrameScheduler initialized (max_frames_in_flight={}, image_count={})",
-            FramesInFlight,
+            rhi::kFramesInFlight,
             m_swapchain.images().size()
         );
     }
@@ -126,7 +125,7 @@ public:
         return FrameTicket{
             .frame_index = m_current_frame_index,
             .image_index = m_current_image_index,
-            .command_buffer = &frame_res.command_buffer
+            .command_buffer = frame_res.command_buffer
         };
     }
 
@@ -140,7 +139,7 @@ public:
         submit_info.wait_stages = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
         submit_info.signal_semaphores = {*image_res.render_finished_semaphore};
         submit_info.fence = *frame_res.in_flight_fence;
-        ticket.command_buffer->submit(submit_info);
+        ticket.command_buffer.submit(submit_info);
 
         vk::Result present_result = m_swapchain.present(
             ticket.image_index,
@@ -167,7 +166,7 @@ public:
             recreate_swapchain_resources();
         }
 
-        m_current_frame_index = (m_current_frame_index + 1) % FramesInFlight;
+        m_current_frame_index = (m_current_frame_index + 1) % rhi::kFramesInFlight;
     }
 
     void on_window_resized(uint32_t width, uint32_t height) {
@@ -179,7 +178,7 @@ public:
     vk::Extent2D render_extent() const { return m_swapchain.extent(); }
     vk::Format render_format() const { return m_swapchain.image_format(); }
     uint32_t image_count() const { return static_cast<uint32_t>(m_swapchain.images().size()); }
-    uint32_t max_frames_in_flight() const { return FramesInFlight; }
+    uint32_t max_frames_in_flight() const { return rhi::kFramesInFlight; }
     uint32_t current_frame_index() const { return m_current_frame_index; }
     uint32_t current_image_index() const { return m_current_image_index; }
     const vk::Format& depth_format() const { return m_depth_format; }
@@ -228,14 +227,14 @@ private:
 
     void init_per_frame_resources() {
         m_per_frame_resources.clear();
-        m_per_frame_resources.reserve(FramesInFlight);
+        m_per_frame_resources.reserve(rhi::kFramesInFlight);
 
         vk::SemaphoreCreateInfo semaphore_info{};
         vk::FenceCreateInfo fence_info{};
         fence_info.flags = vk::FenceCreateFlagBits::eSignaled;
 
-        auto command_buffers = m_command_pool.create_command_buffers(FramesInFlight);
-        for (uint32_t i = 0; i < FramesInFlight; ++i) {
+        auto command_buffers = m_command_pool.create_command_buffers(rhi::kFramesInFlight);
+        for (uint32_t i = 0; i < rhi::kFramesInFlight; ++i) {
             PerFrameResources resources{
                 .command_buffer = std::move(command_buffers[i]),
                 .image_available_semaphore = vk::raii::Semaphore(

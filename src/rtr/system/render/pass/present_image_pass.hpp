@@ -16,10 +16,10 @@ namespace rtr::system::render {
 class PresentImagePass final : public IRenderPass {
 public:
     struct RenderPassResources {
-        rhi::Image*              offscreen_image{};
-        vk::ImageLayout*         offscreen_layout{};
-        rhi::Image*              depth_image{};
-        vk::raii::DescriptorSet* present_set{};
+        rhi::Image&              offscreen_image;
+        vk::ImageLayout&         offscreen_layout;
+        rhi::Image&              depth_image;
+        vk::raii::DescriptorSet& present_set;
     };
 
 private:
@@ -39,18 +39,15 @@ public:
     const std::vector<ResourceDependency>& dependencies() const override { return m_dependencies; }
 
     static void validate_resources(const RenderPassResources& resources) {
-        if (resources.offscreen_image == nullptr || resources.offscreen_layout == nullptr ||
-            resources.depth_image == nullptr || resources.present_set == nullptr) {
-            throw std::runtime_error("PresentImagePass frame resources are incomplete.");
-        }
+        (void)resources;
     }
 
     void execute(render::FrameContext& ctx, const RenderPassResources& resources) {
         validate_resources(resources);
 
         auto&       cmd       = ctx.cmd().command_buffer();
-        rhi::Image& offscreen = *resources.offscreen_image;
-        rhi::Image& depth     = *resources.depth_image;
+        rhi::Image& offscreen = resources.offscreen_image;
+        rhi::Image& depth     = resources.depth_image;
 
         vk::ImageMemoryBarrier2 to_sampled{};
         to_sampled.srcStageMask                    = vk::PipelineStageFlagBits2::eComputeShader;
@@ -70,7 +67,7 @@ public:
         to_sampled_dep.imageMemoryBarrierCount = 1;
         to_sampled_dep.pImageMemoryBarriers    = &to_sampled;
         cmd.pipelineBarrier2(to_sampled_dep);
-        *resources.offscreen_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        resources.offscreen_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
         vk::ImageMemoryBarrier2 to_color{};
         to_color.srcStageMask                    = vk::PipelineStageFlagBits2::eTopOfPipe;
@@ -135,7 +132,7 @@ public:
         cmd.beginRendering(rendering_info);
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, **m_present_pipeline);
         cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, **m_pipeline_layout, 1,
-                               **resources.present_set, {});
+                               *resources.present_set, {});
 
         vk::Viewport viewport{};
         viewport.x        = 0.0f;

@@ -20,7 +20,7 @@ static void expect_vec3_near(const pbpt::math::vec3& lhs, const pbpt::math::vec3
 }
 
 TEST(FrameworkFreeLookCameraControllerTest, MovesWithWASDQE) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -58,7 +58,7 @@ TEST(FrameworkFreeLookCameraControllerTest, MovesWithWASDQE) {
 }
 
 TEST(FrameworkFreeLookCameraControllerTest, ShiftAppliesSprintMultiplier) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -86,7 +86,7 @@ TEST(FrameworkFreeLookCameraControllerTest, ShiftAppliesSprintMultiplier) {
 }
 
 TEST(FrameworkFreeLookCameraControllerTest, RightMouseRequiredForLook) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -113,7 +113,7 @@ TEST(FrameworkFreeLookCameraControllerTest, RightMouseRequiredForLook) {
 }
 
 TEST(FrameworkFreeLookCameraControllerTest, PitchIsClamped) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -136,7 +136,7 @@ TEST(FrameworkFreeLookCameraControllerTest, PitchIsClamped) {
 }
 
 TEST(FrameworkFreeLookCameraControllerTest, ScrollCallsAdjustZoom) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go     = scene.create_game_object("camera_go");
     auto&       camera = go.add_component<PerspectiveCamera>();
     camera.set_active(true);
@@ -153,7 +153,7 @@ TEST(FrameworkFreeLookCameraControllerTest, ScrollCallsAdjustZoom) {
 }
 
 TEST(FrameworkFreeLookCameraControllerTest, OnlyActiveCameraResponds) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go_a     = scene.create_game_object("camera_a");
     auto&       go_b     = scene.create_game_object("camera_b");
     auto&       camera_a = go_a.add_component<PerspectiveCamera>();
@@ -180,7 +180,7 @@ TEST(FrameworkFreeLookCameraControllerTest, OnlyActiveCameraResponds) {
 }
 
 TEST(FrameworkFreeLookCameraControllerTest, ThrowsWhenOwnerHasNoCameraComponent) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go = scene.create_game_object("go");
 
     system::input::InputState input{};
@@ -196,7 +196,7 @@ public:
 };
 
 TEST(FrameworkFreeLookCameraControllerTest, SceneTickRefreshesWorldTransformAfterComponentUpdate) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto&       go = scene.create_game_object("go");
     (void)go.add_component<MoveOnUpdateComponent>();
 

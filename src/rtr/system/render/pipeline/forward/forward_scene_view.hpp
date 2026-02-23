@@ -6,7 +6,7 @@
 #include <vector>
 #include <array>
 
-#include "rtr/resource/resource_types.hpp"
+#include "rtr/rhi/mesh.hpp"
 
 namespace rtr::system::render {
 
@@ -28,11 +28,11 @@ struct ForwardScenePointLight {
 };
 
 struct ForwardSceneRenderable {
-    std::uint64_t        instance_id{0};
-    resource::MeshHandle mesh{};
-    pbpt::math::vec4     base_color{1.0f, 1.0f, 1.0f, 1.0f};
-    pbpt::math::mat4     model{1.0f};
-    pbpt::math::mat4     normal{1.0f};
+    std::uint64_t    instance_id{0};
+    rhi::Mesh&       mesh;
+    pbpt::math::vec4 base_color{1.0f, 1.0f, 1.0f, 1.0f};
+    pbpt::math::mat4 model{1.0f};
+    pbpt::math::mat4 normal{1.0f};
 };
 
 struct ForwardSceneView {

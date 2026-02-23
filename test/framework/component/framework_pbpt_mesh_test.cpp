@@ -11,7 +11,7 @@
 namespace rtr::framework::component::test {
 
 TEST(FrameworkPbptMeshTest, ThrowsWhenMeshRendererIsMissing) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
 
     EXPECT_THROW(
@@ -21,7 +21,7 @@ TEST(FrameworkPbptMeshTest, ThrowsWhenMeshRendererIsMissing) {
 }
 
 TEST(FrameworkPbptMeshTest, CanAttachWhenMeshRendererExists) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
     auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
@@ -32,7 +32,7 @@ TEST(FrameworkPbptMeshTest, CanAttachWhenMeshRendererExists) {
 }
 
 TEST(FrameworkPbptMeshTest, MeshHandleTracksMeshRendererUpdates) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
     auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
@@ -43,7 +43,7 @@ TEST(FrameworkPbptMeshTest, MeshHandleTracksMeshRendererUpdates) {
 }
 
 TEST(FrameworkPbptMeshTest, MeshRendererAccessorTracksBaseColorUpdates) {
-    core::Scene scene(1, "scene");
+    core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
     auto& renderer = go.add_component<MeshRenderer>(resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();

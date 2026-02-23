@@ -104,7 +104,7 @@ std::vector<float> parse_csv_floats(const std::string& csv) {
 }  // namespace
 
 TEST(FrameworkPbptSceneWriterTest, BuildsXmlResultFromActiveNodesWithMeshAndPbptMesh) {
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources{};
 
     auto& camera_go = scene.create_game_object("camera");
@@ -147,7 +147,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildsXmlResultFromActiveNodesWithMeshAndPbpt
 }
 
 TEST(FrameworkPbptSceneWriterTest, ThrowsWhenPbptLightExistsWithoutPbptMesh) {
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources{};
 
     auto& camera_go = scene.create_game_object("camera");
@@ -162,7 +162,7 @@ TEST(FrameworkPbptSceneWriterTest, ThrowsWhenPbptLightExistsWithoutPbptMesh) {
 }
 
 TEST(FrameworkPbptSceneWriterTest, BuildXmlResultUsesPbptLightSpectrumAndKeepsPassthroughShapes) {
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources{};
 
     auto& camera_go = scene.create_game_object("camera");
@@ -257,7 +257,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildXmlResultUsesPbptLightSpectrumAndKeepsPa
 }
 
 TEST(FrameworkPbptSceneWriterTest, BuildXmlResultThrowsWhenMappedShapeIdAlsoInPassthroughSet) {
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources{};
 
     CompatibleInfo compatible{};
@@ -312,7 +312,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildXmlResultThrowsWhenMappedShapeIdAlsoInPa
 }
 
 TEST(FrameworkPbptSceneWriterTest, BuildXmlResultSuffixesMappedMaterialWhenNameCollidesWithPassthrough) {
-    core::Scene               scene(1, "scene");
+    core::Scene               scene(1);
     resource::ResourceManager resources{};
 
     auto& camera_go = scene.create_game_object("camera");

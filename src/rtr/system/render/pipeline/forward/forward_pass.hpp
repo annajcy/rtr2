@@ -18,15 +18,15 @@ namespace rtr::system::render {
 class ForwardPass final : public render::IRenderPass {
 public:
     struct DrawItem {
-        rhi::Mesh*               mesh{};
-        vk::raii::DescriptorSet* per_object_set{};
+        rhi::Mesh&               mesh;
+        vk::raii::DescriptorSet& per_object_set;
     };
 
     struct RenderPassResources {
-        rhi::Image*           color_image{};
-        vk::ImageLayout*      color_layout{};
-        rhi::Image*           depth_image{};
-        vk::Extent2D          extent{};
+        rhi::Image&           color_image;
+        vk::ImageLayout&      color_layout;
+        rhi::Image&           depth_image;
+        vk::Extent2D          extent;
         std::vector<DrawItem> draw_items{};
     };
 
@@ -47,14 +47,8 @@ public:
     const std::vector<render::ResourceDependency>& dependencies() const override { return m_dependencies; }
 
     static void validate_resources(const RenderPassResources& resources) {
-        if (resources.color_image == nullptr || resources.color_layout == nullptr || resources.depth_image == nullptr ||
-            resources.extent.width == 0 || resources.extent.height == 0) {
+        if (resources.extent.width == 0 || resources.extent.height == 0) {
             throw std::runtime_error("ForwardPass frame resources are incomplete.");
-        }
-        for (const auto& item : resources.draw_items) {
-            if (item.mesh == nullptr || item.per_object_set == nullptr) {
-                throw std::runtime_error("ForwardPass draw item resources are incomplete.");
-            }
         }
     }
 
@@ -62,19 +56,19 @@ public:
         validate_resources(resources);
 
         auto&       cmd         = ctx.cmd().command_buffer();
-        rhi::Image& color_image = *resources.color_image;
-        rhi::Image& depth_image = *resources.depth_image;
+        rhi::Image& color_image = resources.color_image;
+        rhi::Image& depth_image = resources.depth_image;
 
         vk::ImageMemoryBarrier2 to_color{};
-        to_color.srcStageMask                  = (*resources.color_layout == vk::ImageLayout::eUndefined)
+        to_color.srcStageMask                  = (resources.color_layout == vk::ImageLayout::eUndefined)
                                                      ? vk::PipelineStageFlagBits2::eTopOfPipe
                                                      : vk::PipelineStageFlagBits2::eAllCommands;
         to_color.dstStageMask                  = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-        to_color.srcAccessMask                 = (*resources.color_layout == vk::ImageLayout::eUndefined)
+        to_color.srcAccessMask                 = (resources.color_layout == vk::ImageLayout::eUndefined)
                                                      ? vk::AccessFlagBits2::eNone
                                                      : vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite;
         to_color.dstAccessMask                 = vk::AccessFlagBits2::eColorAttachmentWrite;
-        to_color.oldLayout                     = *resources.color_layout;
+        to_color.oldLayout                     = resources.color_layout;
         to_color.newLayout                     = vk::ImageLayout::eColorAttachmentOptimal;
         to_color.image                         = *color_image.image();
         to_color.subresourceRange.aspectMask   = vk::ImageAspectFlagBits::eColor;
@@ -146,18 +140,18 @@ public:
         cmd.setScissor(0, scissor);
 
         for (const auto& item : resources.draw_items) {
-            std::vector<vk::Buffer>     vertex_buffers = {item.mesh->vertex_buffer()};
+            std::vector<vk::Buffer>     vertex_buffers = {item.mesh.vertex_buffer()};
             std::vector<vk::DeviceSize> offsets        = {0};
             cmd.bindVertexBuffers(0, vertex_buffers, offsets);
-            cmd.bindIndexBuffer(item.mesh->index_buffer(), 0, vk::IndexType::eUint32);
+            cmd.bindIndexBuffer(item.mesh.index_buffer(), 0, vk::IndexType::eUint32);
 
-            cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, **m_pipeline_layout, 0, **item.per_object_set, {});
+            cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, **m_pipeline_layout, 0, *item.per_object_set, {});
 
-            cmd.drawIndexed(item.mesh->index_count(), 1, 0, 0, 0);
+            cmd.drawIndexed(item.mesh.index_count(), 1, 0, 0, 0);
         }
 
         cmd.endRendering();
-        *resources.color_layout = vk::ImageLayout::eColorAttachmentOptimal;
+        resources.color_layout = vk::ImageLayout::eColorAttachmentOptimal;
     }
 };
 

@@ -22,9 +22,8 @@ class Scene final {
 private:
     static std::shared_ptr<spdlog::logger> logger() { return utils::get_logger("framework.core.scene"); }
 
-    SceneId      m_id{core::kInvalidSceneId};
-    std::string  m_name{"Scene"};
-    bool         m_enabled{true};
+    SceneId m_id{core::kInvalidSceneId};
+    bool    m_enabled{true};
 
     GameObjectId                             m_next_game_object_id{1};
     SceneGraph                               m_scene_graph{};
@@ -56,8 +55,8 @@ private:
     }
 
 public:
-    explicit Scene(SceneId id = core::kInvalidSceneId, std::string name = "Scene")
-        : m_id(id), m_name(std::move(name)) {}
+    explicit Scene(SceneId id = core::kInvalidSceneId)
+        : m_id(id) {}
 
     Scene(const Scene&) = delete;
     Scene& operator=(const Scene&) = delete;
@@ -65,8 +64,6 @@ public:
     Scene& operator=(Scene&&) noexcept = delete;
 
     SceneId id() const { return m_id; }
-    const std::string& name() const { return m_name; }
-    void set_name(std::string name) { m_name = std::move(name); }
 
     bool enabled() const { return m_enabled; }
 

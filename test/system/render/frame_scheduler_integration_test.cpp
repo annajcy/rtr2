@@ -40,7 +40,7 @@ struct Harness {
     rhi::Window window;
     rhi::Context context;
     rhi::Device device;
-    FrameScheduler<rhi::kFramesInFlight> scheduler;
+    FrameScheduler scheduler;
 
     Harness()
         : window(640, 480, "rtr_frame_scheduler_integration"),
@@ -62,8 +62,8 @@ bool try_submit_single_empty_frame(Harness& harness) {
         return false;
     }
 
-    ticket->command_buffer->reset();
-    ticket->command_buffer->record(
+    ticket->command_buffer.reset();
+    ticket->command_buffer.record(
         [](rtr::rhi::CommandBuffer&) {},
         vk::CommandBufferUsageFlagBits::eOneTimeSubmit
     );

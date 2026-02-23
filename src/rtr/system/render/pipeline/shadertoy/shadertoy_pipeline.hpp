@@ -4,9 +4,10 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
-#include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "rtr/rhi/buffer.hpp"
@@ -36,101 +37,85 @@ struct ShaderToyPipelineConfig {
 };
 
 class ShaderToyPipeline final : public RenderPipelineBase, public IFrameColorSource, public ISceneViewportSink {
-    struct OffscreenFrameResources {
-        std::unique_ptr<rhi::Image> image{};
-        vk::ImageLayout             layout{vk::ImageLayout::eUndefined};
+    struct ShaderToyFrameTargets {
+        std::array<rhi::Image, rhi::kFramesInFlight> offscreen_images;
+        std::array<vk::ImageLayout, rhi::kFramesInFlight> offscreen_layouts;
+        std::array<rhi::Image, rhi::kFramesInFlight> depth_images;
+
+        ShaderToyFrameTargets(
+            std::array<rhi::Image, rhi::kFramesInFlight>&& offscreen_images_in,
+            std::array<vk::ImageLayout, rhi::kFramesInFlight>&& offscreen_layouts_in,
+            std::array<rhi::Image, rhi::kFramesInFlight>&& depth_images_in
+        )
+            : offscreen_images(std::move(offscreen_images_in)),
+              offscreen_layouts(std::move(offscreen_layouts_in)),
+              depth_images(std::move(depth_images_in)) {}
     };
 
     vk::Format m_offscreen_format{vk::Format::eUndefined};
 
-    std::unique_ptr<rhi::ShaderModule> m_compute_shader_module{nullptr};
-    std::unique_ptr<rhi::ShaderModule> m_present_vertex_shader_module{nullptr};
-    std::unique_ptr<rhi::ShaderModule> m_present_fragment_shader_module{nullptr};
+    rhi::ShaderModule m_compute_shader_module;
+    rhi::ShaderModule m_present_vertex_shader_module;
+    rhi::ShaderModule m_present_fragment_shader_module;
 
-    std::unique_ptr<rhi::DescriptorSetLayout> m_compute_layout{nullptr};
-    std::unique_ptr<rhi::DescriptorSetLayout> m_present_layout{nullptr};
-    std::unique_ptr<rhi::DescriptorPool>      m_descriptor_pool{nullptr};
-    std::unique_ptr<rhi::Sampler>             m_offscreen_sampler{nullptr};
+    rhi::DescriptorSetLayout m_compute_layout;
+    rhi::DescriptorSetLayout m_present_layout;
+    rhi::DescriptorPool      m_descriptor_pool;
+    rhi::Sampler             m_offscreen_sampler;
 
-    std::vector<vk::raii::DescriptorSet> m_compute_sets{};
-    std::vector<vk::raii::DescriptorSet> m_present_sets{};
+    std::array<vk::raii::DescriptorSet, rhi::kFramesInFlight> m_compute_sets;
+    std::array<vk::raii::DescriptorSet, rhi::kFramesInFlight> m_present_sets;
 
     vk::raii::PipelineLayout m_compute_pipeline_layout{nullptr};
     vk::raii::Pipeline       m_compute_pipeline{nullptr};
     vk::raii::PipelineLayout m_present_pipeline_layout{nullptr};
     vk::raii::Pipeline       m_present_pipeline{nullptr};
 
-    vk::DeviceSize                            m_uniform_buffer_size{0};
-    std::vector<std::unique_ptr<rhi::Buffer>> m_uniform_buffers{};
-    std::vector<std::unique_ptr<rhi::Image>>  m_depth_images{};
-
-    std::vector<OffscreenFrameResources> m_offscreen_frame_resources{};
+    vk::DeviceSize               m_uniform_buffer_size{0};
+    std::array<rhi::Buffer, rhi::kFramesInFlight> m_uniform_buffers;
+    std::optional<ShaderToyFrameTargets> m_frame_targets{};
     vk::Extent2D                         m_scene_target_extent{};
     vk::Extent2D                         m_requested_scene_extent{};
     bool                                 m_scene_extent_dirty{false};
 
-    std::unique_ptr<ComputePass>      m_compute_pass{nullptr};
-    std::unique_ptr<PresentImagePass> m_present_pass{nullptr};
+    ComputePass      m_compute_pass;
+    PresentImagePass m_present_pass;
 
 public:
     ShaderToyPipeline(const render::PipelineRuntime& runtime, const ShaderToyPipelineConfig& config = {})
-        : RenderPipelineBase(runtime) {
-        m_uniform_buffer_size = sizeof(ShaderToyUniformBufferObject);
-        m_offscreen_format    = pick_offscreen_format();
-
-        m_compute_shader_module        = std::make_unique<rhi::ShaderModule>(rhi::ShaderModule::from_file(
-            *m_device, config.shader_output_dir + config.compute_shader_filename, vk::ShaderStageFlagBits::eCompute));
-        m_present_vertex_shader_module = std::make_unique<rhi::ShaderModule>(
-            rhi::ShaderModule::from_file(*m_device, config.shader_output_dir + config.present_vertex_shader_filename,
-                                         vk::ShaderStageFlagBits::eVertex));
-        m_present_fragment_shader_module = std::make_unique<rhi::ShaderModule>(
-            rhi::ShaderModule::from_file(*m_device, config.shader_output_dir + config.present_fragment_shader_filename,
-                                         vk::ShaderStageFlagBits::eFragment));
-
-        m_uniform_buffers   = make_per_frame_mapped_uniform_buffers(m_uniform_buffer_size);
-        m_offscreen_sampler = std::make_unique<rhi::Sampler>(rhi::Sampler::create_default(*m_device, 1));
-
-        rhi::DescriptorSetLayout::Builder compute_layout_builder;
-        compute_layout_builder.add_binding(0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eCompute)
-            .add_binding(1, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
-        m_compute_layout = std::make_unique<rhi::DescriptorSetLayout>(compute_layout_builder.build(*m_device));
-
-        rhi::DescriptorSetLayout::Builder present_layout_builder;
-        present_layout_builder.add_binding(0, vk::DescriptorType::eCombinedImageSampler,
-                                           vk::ShaderStageFlagBits::eFragment);
-        m_present_layout = std::make_unique<rhi::DescriptorSetLayout>(present_layout_builder.build(*m_device));
-
-        rhi::DescriptorPool::Builder pool_builder;
-        pool_builder.add_layout(*m_compute_layout, m_frame_count)
-            .add_layout(*m_present_layout, m_frame_count)
-            .set_flags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
-        m_descriptor_pool = std::make_unique<rhi::DescriptorPool>(pool_builder.build(*m_device));
-
-        m_compute_sets = m_descriptor_pool->allocate_multiple(*m_compute_layout, m_frame_count);
-        m_present_sets = m_descriptor_pool->allocate_multiple(*m_present_layout, m_frame_count);
-
-        // Compute pipeline layout (set 0 = compute)
-        {
-            std::array<vk::DescriptorSetLayout, 1> layouts{*m_compute_layout->layout()};
-            vk::PipelineLayoutCreateInfo           info{};
-            info.setLayoutCount       = static_cast<uint32_t>(layouts.size());
-            info.pSetLayouts          = layouts.data();
-            m_compute_pipeline_layout = vk::raii::PipelineLayout{m_device->device(), info};
-        }
-        // Present pipeline layout (set 0 = present sampler)
-        {
-            std::array<vk::DescriptorSetLayout, 1> layouts{*m_present_layout->layout()};
-            vk::PipelineLayoutCreateInfo           info{};
-            info.setLayoutCount       = static_cast<uint32_t>(layouts.size());
-            info.pSetLayouts          = layouts.data();
-            m_present_pipeline_layout = vk::raii::PipelineLayout{m_device->device(), info};
-        }
+        : RenderPipelineBase(runtime),
+          m_offscreen_format(pick_offscreen_format()),
+          m_compute_shader_module(build_shader_module(m_device, config.shader_output_dir + config.compute_shader_filename,
+                                                     vk::ShaderStageFlagBits::eCompute)),
+          m_present_vertex_shader_module(build_shader_module(
+              m_device, config.shader_output_dir + config.present_vertex_shader_filename, vk::ShaderStageFlagBits::eVertex
+          )),
+          m_present_fragment_shader_module(build_shader_module(
+              m_device, config.shader_output_dir + config.present_fragment_shader_filename, vk::ShaderStageFlagBits::eFragment
+          )),
+          m_compute_layout(build_compute_layout(m_device)),
+          m_present_layout(build_present_layout(m_device)),
+          m_descriptor_pool(build_descriptor_pool(m_device, m_compute_layout, m_present_layout,
+                                                  static_cast<uint32_t>(rhi::kFramesInFlight))),
+          m_offscreen_sampler(rhi::Sampler::create_default(m_device, 1)),
+          m_uniform_buffer_size(sizeof(ShaderToyUniformBufferObject)),
+          m_uniform_buffers(make_per_frame_mapped_uniform_buffers(m_uniform_buffer_size)),
+          m_compute_sets(vector_to_frame_array(
+              m_descriptor_pool.allocate_multiple(m_compute_layout, static_cast<uint32_t>(rhi::kFramesInFlight)),
+              "ShaderToyPipeline compute descriptor sets"
+          )),
+          m_present_sets(vector_to_frame_array(
+              m_descriptor_pool.allocate_multiple(m_present_layout, static_cast<uint32_t>(rhi::kFramesInFlight)),
+              "ShaderToyPipeline present descriptor sets"
+          )),
+          m_compute_pipeline_layout(build_pipeline_layout(m_device, m_compute_layout)),
+          m_present_pipeline_layout(build_pipeline_layout(m_device, m_present_layout)),
+          m_compute_pass(&m_compute_pipeline_layout, &m_compute_pipeline),
+          m_present_pass(&m_present_pipeline_layout, &m_present_pipeline) {
 
         build_compute_pipeline();
         build_present_pipeline();
 
-        m_compute_pass = std::make_unique<ComputePass>(&m_compute_pipeline_layout, &m_compute_pipeline);
-        m_present_pass = std::make_unique<PresentImagePass>(&m_present_pipeline_layout, &m_present_pipeline);
     }
 
     ~ShaderToyPipeline() override = default;
@@ -138,12 +123,16 @@ public:
     void on_resize(int /*w*/, int /*h*/) override {}
 
     FrameColorSourceView frame_color_source_view(uint32_t frame_index) const override {
-        if (frame_index >= m_offscreen_frame_resources.size() || !m_offscreen_frame_resources[frame_index].image)
+        if (!m_frame_targets.has_value()) {
             return {};
-        const auto& f = m_offscreen_frame_resources[frame_index];
-        return FrameColorSourceView{.image_view   = *f.image->image_view(),
-                                    .image_layout = f.layout,
-                                    .extent       = {f.image->width(), f.image->height()}};
+        }
+        if (frame_index >= rhi::kFramesInFlight) {
+            return {};
+        }
+        const auto& offscreen = m_frame_targets->offscreen_images[frame_index];
+        return FrameColorSourceView{.image_view   = *offscreen.image_view(),
+                                    .image_layout = m_frame_targets->offscreen_layouts[frame_index],
+                                    .extent       = {offscreen.width(), offscreen.height()}};
     }
 
     void set_scene_viewport_extent(vk::Extent2D extent) override {
@@ -155,7 +144,7 @@ public:
         m_scene_extent_dirty     = true;
     }
 
-    void handle_swapchain_state_change(const ActiveFrameScheduler::SwapchainState& /*state*/,
+    void handle_swapchain_state_change(const FrameScheduler::SwapchainState& /*state*/,
                                        const SwapchainChangeSummary& diff) override {
         if (diff.extent_or_depth_changed())
             m_scene_extent_dirty = true;
@@ -171,37 +160,88 @@ public:
 
         ensure_scene_targets(extent);
         const uint32_t frame_index = ctx.frame_index();
+        auto& frame_targets = require_frame_targets();
 
         // --- 2. ComputePass: write to offscreen storage image ---
-        auto& frame = m_offscreen_frame_resources[frame_index];
-        m_compute_pass->execute(
+        m_compute_pass.execute(
             ctx,
-            ComputePass::RenderPassResources{.uniform_buffer   = m_uniform_buffers[frame_index].get(),
-                                             .offscreen_image  = frame.image.get(),
-                                             .offscreen_layout = &frame.layout,
-                                             .compute_set      = &m_compute_sets[frame_index]});
+            ComputePass::RenderPassResources{.uniform_buffer   = m_uniform_buffers[frame_index],
+                                             .offscreen_image  = frame_targets.offscreen_images[frame_index],
+                                             .offscreen_layout = frame_targets.offscreen_layouts[frame_index],
+                                             .compute_set      = m_compute_sets[frame_index]});
 
         // Update present descriptor so the sampler points to the (possibly recreated) offscreen image
         update_present_descriptor(frame_index);
 
         // --- 3. PresentImagePass: sample offscreen → swapchain ---
-        m_present_pass->execute(
+        m_present_pass.execute(
             ctx,
-            PresentImagePass::RenderPassResources{.offscreen_image  = frame.image.get(),
-                                                  .offscreen_layout = &frame.layout,
-                                                  .depth_image      = m_depth_images[frame_index].get(),
-                                                  .present_set      = &m_present_sets[frame_index]});
+            PresentImagePass::RenderPassResources{.offscreen_image  = frame_targets.offscreen_images[frame_index],
+                                                  .offscreen_layout = frame_targets.offscreen_layouts[frame_index],
+                                                  .depth_image      = frame_targets.depth_images[frame_index],
+                                                  .present_set      = m_present_sets[frame_index]});
     }
 
 private:
+    static rhi::ShaderModule build_shader_module(
+        rhi::Device& device,
+        const std::string& shader_path,
+        vk::ShaderStageFlagBits stage
+    ) {
+        return rhi::ShaderModule::from_file(device, shader_path, stage);
+    }
+
+    static rhi::DescriptorSetLayout build_compute_layout(rhi::Device& device) {
+        rhi::DescriptorSetLayout::Builder compute_layout_builder;
+        compute_layout_builder.add_binding(0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eCompute)
+            .add_binding(1, vk::DescriptorType::eStorageImage, vk::ShaderStageFlagBits::eCompute);
+        return compute_layout_builder.build(device);
+    }
+
+    static rhi::DescriptorSetLayout build_present_layout(rhi::Device& device) {
+        rhi::DescriptorSetLayout::Builder present_layout_builder;
+        present_layout_builder.add_binding(0, vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment);
+        return present_layout_builder.build(device);
+    }
+
+    static rhi::DescriptorPool build_descriptor_pool(
+        rhi::Device& device,
+        const rhi::DescriptorSetLayout& compute_layout,
+        const rhi::DescriptorSetLayout& present_layout,
+        uint32_t frame_count
+    ) {
+        rhi::DescriptorPool::Builder pool_builder;
+        pool_builder.add_layout(compute_layout, frame_count)
+            .add_layout(present_layout, frame_count)
+            .set_flags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
+        return pool_builder.build(device);
+    }
+
+    static vk::raii::PipelineLayout build_pipeline_layout(
+        rhi::Device& device,
+        const rhi::DescriptorSetLayout& layout
+    ) {
+        std::array<vk::DescriptorSetLayout, 1> layouts{*layout.layout()};
+        vk::PipelineLayoutCreateInfo           info{};
+        info.setLayoutCount       = static_cast<uint32_t>(layouts.size());
+        info.pSetLayouts          = layouts.data();
+        return vk::raii::PipelineLayout{device.device(), info};
+    }
+
+    ShaderToyFrameTargets& require_frame_targets() {
+        if (!m_frame_targets.has_value()) {
+            throw std::runtime_error("ShaderToyPipeline frame targets are not initialized.");
+        }
+        return *m_frame_targets;
+    }
+
     void update_present_descriptor(uint32_t frame_index) {
-        auto* img = m_offscreen_frame_resources[frame_index].image.get();
-        if (!img)
-            return;
+        auto& frame_targets = require_frame_targets();
+        auto& img = frame_targets.offscreen_images[frame_index];
         rhi::DescriptorWriter w;
-        w.write_combined_image(0, *img->image_view(), *m_offscreen_sampler->sampler(),
+        w.write_combined_image(0, *img.image_view(), *m_offscreen_sampler.sampler(),
                                vk::ImageLayout::eShaderReadOnlyOptimal);
-        w.update(*m_device, *m_present_sets[frame_index]);
+        w.update(m_device, *m_present_sets[frame_index]);
     }
 
     void ensure_scene_targets(vk::Extent2D fallback) {
@@ -211,21 +251,20 @@ private:
 
         const bool need_recreate = m_scene_extent_dirty || m_scene_target_extent.width != desired.width ||
                                    m_scene_target_extent.height != desired.height ||
-                                   m_offscreen_frame_resources.empty() || m_depth_images.empty();
+                                   !m_frame_targets.has_value();
         if (!need_recreate)
             return;
 
-        m_device->wait_idle();
+        m_device.wait_idle();
         m_scene_target_extent = desired;
-        create_offscreen_images();
-        create_depth_images();
+        m_frame_targets = create_frame_targets();
         refresh_compute_descriptors();
         m_scene_extent_dirty = false;
     }
 
     vk::Format pick_offscreen_format() const {
         auto supports = [this](vk::Format fmt) {
-            const auto f = m_device->physical_device().getFormatProperties(fmt).optimalTilingFeatures;
+            const auto f = m_device.physical_device().getFormatProperties(fmt).optimalTilingFeatures;
             return (f & vk::FormatFeatureFlagBits::eStorageImage) == vk::FormatFeatureFlagBits::eStorageImage &&
                    (f & vk::FormatFeatureFlagBits::eSampledImage) == vk::FormatFeatureFlagBits::eSampledImage;
         };
@@ -238,14 +277,14 @@ private:
 
     void build_compute_pipeline() {
         vk::ComputePipelineCreateInfo info{};
-        info.stage         = m_compute_shader_module->stage_create_info();
+        info.stage         = m_compute_shader_module.stage_create_info();
         info.layout        = *m_compute_pipeline_layout;
-        m_compute_pipeline = vk::raii::Pipeline{m_device->device(), nullptr, info};
+        m_compute_pipeline = vk::raii::Pipeline{m_device.device(), nullptr, info};
     }
 
     void build_present_pipeline() {
-        std::vector<vk::PipelineShaderStageCreateInfo> stages = {m_present_vertex_shader_module->stage_create_info(),
-                                                                 m_present_fragment_shader_module->stage_create_info()};
+        std::vector<vk::PipelineShaderStageCreateInfo> stages = {m_present_vertex_shader_module.stage_create_info(),
+                                                                 m_present_fragment_shader_module.stage_create_info()};
 
         vk::PipelineVertexInputStateCreateInfo   vi{};
         vk::PipelineInputAssemblyStateCreateInfo ia{};
@@ -301,32 +340,45 @@ private:
 
         vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> chain{info, ri};
         m_present_pipeline =
-            vk::raii::Pipeline{m_device->device(), nullptr, chain.get<vk::GraphicsPipelineCreateInfo>()};
+            vk::raii::Pipeline{m_device.device(), nullptr, chain.get<vk::GraphicsPipelineCreateInfo>()};
     }
 
-    void create_offscreen_images() {
-        m_offscreen_frame_resources.clear();
-        m_offscreen_frame_resources.reserve(m_frame_count);
+    std::array<rhi::Image, rhi::kFramesInFlight> create_offscreen_images() const {
         const vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled;
-        for (uint32_t i = 0; i < m_frame_count; ++i) {
-            OffscreenFrameResources res{};
-            res.image = std::make_unique<rhi::Image>(
-                rhi::Image(*m_device, m_scene_target_extent.width, m_scene_target_extent.height, m_offscreen_format,
-                           vk::ImageTiling::eOptimal, usage, vk::MemoryPropertyFlagBits::eDeviceLocal,
-                           vk::ImageAspectFlagBits::eColor, false));
-            res.layout = vk::ImageLayout::eUndefined;
-            m_offscreen_frame_resources.push_back(std::move(res));
-        }
+        return make_frame_array<rhi::Image>([&](uint32_t) {
+            return rhi::Image(
+                m_device,
+                m_scene_target_extent.width,
+                m_scene_target_extent.height,
+                m_offscreen_format,
+                vk::ImageTiling::eOptimal,
+                usage,
+                vk::MemoryPropertyFlagBits::eDeviceLocal,
+                vk::ImageAspectFlagBits::eColor,
+                false
+            );
+        });
     }
 
-    void create_depth_images() { m_depth_images = make_per_frame_depth_images(m_scene_target_extent, m_depth_format); }
+    static std::array<vk::ImageLayout, rhi::kFramesInFlight> create_initial_offscreen_layouts() {
+        return make_frame_array<vk::ImageLayout>([](uint32_t) { return vk::ImageLayout::eUndefined; });
+    }
+
+    ShaderToyFrameTargets create_frame_targets() const {
+        return ShaderToyFrameTargets{
+            create_offscreen_images(),
+            create_initial_offscreen_layouts(),
+            make_per_frame_depth_images(m_scene_target_extent, m_depth_format)
+        };
+    }
 
     void refresh_compute_descriptors() {
-        for (uint32_t i = 0; i < m_frame_count; ++i) {
+        auto& frame_targets = require_frame_targets();
+        for (uint32_t i = 0; i < rhi::kFramesInFlight; ++i) {
             rhi::DescriptorWriter w;
-            w.write_buffer(0, *m_uniform_buffers[i]->buffer(), 0, m_uniform_buffer_size);
-            w.write_storage_image(1, *m_offscreen_frame_resources[i].image->image_view(), vk::ImageLayout::eGeneral);
-            w.update(*m_device, *m_compute_sets[i]);
+            w.write_buffer(0, *m_uniform_buffers[i].buffer(), 0, m_uniform_buffer_size);
+            w.write_storage_image(1, *frame_targets.offscreen_images[i].image_view(), vk::ImageLayout::eGeneral);
+            w.update(m_device, *m_compute_sets[i]);
         }
     }
 };

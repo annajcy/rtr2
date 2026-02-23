@@ -23,7 +23,7 @@ public:
 };
 
 TEST(FrameworkWorldSceneTest, GameObjectEnforcesUniqueComponentType) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& go = scene.create_game_object("player");
 
     auto& comp_a = go.add_component<DummyComponentA>();
@@ -42,7 +42,7 @@ TEST(FrameworkWorldSceneTest, GameObjectEnforcesUniqueComponentType) {
 }
 
 TEST(FrameworkWorldSceneTest, GameObjectComponentOrThrowProvidesStrongDependencyAccess) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& go = scene.create_game_object("player");
 
     auto& comp_a = go.add_component<DummyComponentA>();
@@ -64,7 +64,7 @@ TEST(FrameworkWorldSceneTest, GameObjectComponentOrThrowProvidesStrongDependency
 }
 
 TEST(FrameworkWorldSceneTest, SceneGameObjectHandleIsInvalidAfterDestroy) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& go_a = scene.create_game_object("a");
     auto& go_b = scene.create_game_object("b");
     const GameObjectId id_a = go_a.id();
@@ -88,7 +88,7 @@ TEST(FrameworkWorldSceneTest, SceneGameObjectHandleIsInvalidAfterDestroy) {
 }
 
 TEST(FrameworkWorldSceneTest, SceneCreateGameObjectGeneratesUniqueNamesAndSupportsNameLookup) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& a = scene.create_game_object("Camera");
     auto& b = scene.create_game_object("Camera");
     auto& c = scene.create_game_object("Camera");
@@ -116,7 +116,7 @@ TEST(FrameworkWorldSceneTest, SceneCreateGameObjectGeneratesUniqueNamesAndSuppor
 }
 
 TEST(FrameworkWorldSceneTest, SceneRenameGameObjectMaintainsUniqueNames) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& light = scene.create_game_object("Light");
     auto& fill  = scene.create_game_object("Light");
 
@@ -139,7 +139,7 @@ TEST(FrameworkWorldSceneTest, SceneRenameGameObjectMaintainsUniqueNames) {
 }
 
 TEST(FrameworkWorldSceneTest, SceneDestroyGameObjectClearsIdAndNameIndexesForSubtree) {
-    Scene scene(1, "scene");
+    Scene scene(1);
     auto& root       = scene.create_game_object("root");
     auto& child      = scene.create_game_object("child");
     auto& grandchild = scene.create_game_object("grandchild");
@@ -166,7 +166,35 @@ TEST(FrameworkWorldSceneTest, SceneDestroyGameObjectClearsIdAndNameIndexesForSub
     EXPECT_EQ(scene.find_game_object("survivor")->id(), survivor.id());
 }
 
-TEST(FrameworkWorldSceneTest, WorldSceneHandleIsInvalidAfterDestroy) {
+TEST(FrameworkWorldSceneTest, WorldSceneNamesAreUniqueAndSearchable) {
+    resource::ResourceManager resources;
+    World world(resources);
+    auto& scene_a = world.create_scene("Scene");
+    auto& scene_b = world.create_scene("Scene");
+    auto& scene_c = world.create_scene("");
+
+    const SceneId id_a = scene_a.id();
+    const SceneId id_b = scene_b.id();
+    const SceneId id_c = scene_c.id();
+
+    EXPECT_EQ(world.scene_name(id_a).value_or(""), "Scene");
+    EXPECT_EQ(world.scene_name(id_b).value_or(""), "Scene_1");
+    EXPECT_EQ(world.scene_name(id_c).value_or(""), "Scene_2");
+    EXPECT_TRUE(world.has_scene("Scene_1"));
+    ASSERT_NE(world.find_scene("Scene_1"), nullptr);
+    EXPECT_EQ(world.find_scene("Scene_1")->id(), id_b);
+
+    EXPECT_TRUE(world.rename_scene(id_a, "Scene_1"));
+    EXPECT_EQ(world.scene_name(id_a).value_or(""), "Scene_1_1");
+    EXPECT_TRUE(world.has_scene("Scene_1_1"));
+
+    EXPECT_TRUE(world.rename_scene(id_b, "renamed"));
+    EXPECT_EQ(world.scene_name(id_b).value_or(""), "renamed");
+    EXPECT_TRUE(world.set_active_scene("renamed"));
+    EXPECT_EQ(world.active_scene_id(), id_b);
+}
+
+TEST(FrameworkWorldSceneTest, WorldDestroySceneRejectsActiveSceneAndMaintainsIndexes) {
     resource::ResourceManager resources;
     World world(resources);
     auto& scene_a = world.create_scene("a");
@@ -179,20 +207,41 @@ TEST(FrameworkWorldSceneTest, WorldSceneHandleIsInvalidAfterDestroy) {
     EXPECT_TRUE(world.set_active_scene(id_b));
     EXPECT_EQ(world.active_scene_id(), id_b);
 
-    EXPECT_TRUE(world.destroy_scene(id_b));
-    EXPECT_FALSE(world.has_scene(id_b));
-    EXPECT_EQ(world.find_scene(id_b), nullptr);
+    EXPECT_FALSE(world.destroy_scene(id_b));
+    EXPECT_TRUE(world.has_scene(id_b));
+    EXPECT_EQ(world.scene_count(), 2u);
+
+    EXPECT_TRUE(world.destroy_scene(id_a));
+    EXPECT_FALSE(world.has_scene(id_a));
+    EXPECT_FALSE(world.has_scene("a"));
+    EXPECT_FALSE(world.scene_name(id_a).has_value());
     EXPECT_EQ(world.scene_count(), 1u);
 
-    // Active scene falls back to the first remaining scene.
     ASSERT_NE(world.active_scene(), nullptr);
-    EXPECT_EQ(world.active_scene()->id(), id_a);
+    EXPECT_EQ(world.active_scene()->id(), id_b);
 
     EXPECT_FALSE(world.destroy_scene(id_b));
-    EXPECT_TRUE(world.destroy_scene(id_a));
-    EXPECT_EQ(world.scene_count(), 0u);
-    EXPECT_EQ(world.active_scene_id(), kInvalidSceneId);
-    EXPECT_EQ(world.active_scene(), nullptr);
+    EXPECT_TRUE(world.has_scene(id_b));
+
+    EXPECT_TRUE(world.set_active_scene("b"));
+    EXPECT_EQ(world.active_scene_id(), id_b);
+
+    EXPECT_FALSE(world.destroy_scene(999999));
+}
+
+TEST(FrameworkWorldSceneTest, WorldSetActiveSceneByNameMatchesIdPath) {
+    resource::ResourceManager resources;
+    World world(resources);
+    auto& scene_a = world.create_scene("main");
+    auto& scene_b = world.create_scene("secondary");
+
+    EXPECT_TRUE(world.set_active_scene(scene_b.id()));
+    EXPECT_EQ(world.active_scene_id(), scene_b.id());
+    EXPECT_TRUE(world.set_active_scene("main"));
+    EXPECT_EQ(world.active_scene_id(), scene_a.id());
+    EXPECT_FALSE(world.set_active_scene("missing"));
+
+    EXPECT_NE(world.find_scene(scene_b.id()), nullptr);
 }
 
 } // namespace rtr::framework::core::test
