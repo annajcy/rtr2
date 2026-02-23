@@ -12,6 +12,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include "rtr/app/app_runtime.hpp"
 #include "rtr/editor/core/editor_panel.hpp"
 #include "rtr/utils/log.hpp"
 
@@ -203,6 +204,9 @@ private:
 
 public:
     EditorHost() = default;
+    explicit EditorHost(app::AppRuntime& runtime) { 
+        m_context.bind_runtime(&runtime.world(), &runtime.resource_manager(), &runtime.renderer(), &runtime.input_system());
+    }
 
     void reset_layout() {
         m_default_layout_initialized = false;
@@ -221,22 +225,6 @@ public:
             return panel->visible();
         }
         return std::nullopt;
-    }
-
-    void bind_runtime(
-        framework::core::World* world,
-        resource::ResourceManager* resources,
-        system::render::Renderer* renderer,
-        system::input::InputSystem* input
-    ) {
-        m_context.bind_runtime(world, resources, renderer, input);
-        logger()->info(
-            "Editor runtime bound (world={}, resources={}, renderer={}, input={}).",
-            world != nullptr,
-            resources != nullptr,
-            renderer != nullptr,
-            input != nullptr
-        );
     }
 
     EditorContext& context() {
@@ -317,12 +305,6 @@ public:
                 previous_selection.scene_id,
                 previous_selection.game_object_id
             );
-        }
-        sort_panels_if_needed();
-        for (const auto& panel : m_panels) {
-            if (panel && panel->visible()) {
-                panel->on_frame(m_context);
-            }
         }
     }
 

@@ -10,6 +10,7 @@
 
 #include "imgui.h"
 
+#include "rtr/app/app_runtime.hpp"
 #include "rtr/editor/core/editor_capture.hpp"
 #include "rtr/editor/core/editor_host.hpp"
 #include "rtr/editor/panel/hierarchy_panel.hpp"
@@ -19,15 +20,10 @@
 #include "rtr/editor/panel/stats_panel.hpp"
 #include "rtr/editor/render/forward_editor_pipeline.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
-#include "rtr/framework/core/engine.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
 #include "rtr/framework/integration/pbpt/serde/scene_loader.hpp"
 #include "rtr/resource/resource_manager.hpp"
-#include "rtr/system/input/input_system.hpp"
 #include "rtr/system/input/input_types.hpp"
-#include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
-#include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
-#include "rtr/system/render/renderer.hpp"
 
 namespace {
 
@@ -116,9 +112,7 @@ private:
     };
 
     rtr::framework::integration::PbptOfflineRenderService& m_offline_render_service;
-    rtr::framework::core::Engine&                          m_engine;
-    rtr::system::render::Renderer&                         m_renderer;
-    rtr::resource::ResourceManager&                        m_resource_manager;
+    rtr::app::AppRuntime&                                  m_runtime;
     const rtr::framework::integration::LoadSummary&        m_import_result;
     uint32_t                                               m_scene_width{0};
     uint32_t                                               m_scene_height{0};
@@ -127,15 +121,12 @@ private:
 
 public:
     OfflineRenderPanel(rtr::framework::integration::PbptOfflineRenderService& offline_render_service,
-                       rtr::framework::core::Engine& engine, rtr::system::render::Renderer& renderer,
-                       rtr::resource::ResourceManager&                 resource_manager,
+                       rtr::app::AppRuntime& runtime,
                        const rtr::framework::integration::LoadSummary& import_result, uint32_t scene_width,
                        uint32_t scene_height, const std::string& scene_xml_path, const std::string& output_exr_path,
                        const std::string& output_scene_xml_path)
         : m_offline_render_service(offline_render_service),
-          m_engine(engine),
-          m_renderer(renderer),
-          m_resource_manager(resource_manager),
+          m_runtime(runtime),
           m_import_result(import_result),
           m_scene_width(scene_width),
           m_scene_height(scene_height) {
@@ -170,7 +161,7 @@ public:
         ImGui::InputInt("SPP", &m_ui_state.spp);
         m_ui_state.spp = std::clamp(m_ui_state.spp, 1, 4096);
 
-        const auto export_resolution = resolve_export_resolution(m_renderer.window(), m_scene_width, m_scene_height);
+        const auto export_resolution = resolve_export_resolution(m_runtime.renderer().window(), m_scene_width, m_scene_height);
         ImGui::Text("Window: %d x %d", export_resolution.window_w, export_resolution.window_h);
         ImGui::Text("Scale: %.2f x %.2f", export_resolution.scale_x, export_resolution.scale_y);
         ImGui::Text("Framebuffer: %d x %d", export_resolution.framebuffer_w, export_resolution.framebuffer_h);
@@ -183,7 +174,7 @@ public:
             ImGui::BeginDisabled();
         }
         if (ImGui::Button("Render")) {
-            auto* active_scene = m_engine.world().active_scene();
+            auto* active_scene = m_runtime.world().active_scene();
             if (active_scene == nullptr) {
                 throw std::runtime_error("No active scene to export for offline render.");
             }
@@ -194,7 +185,7 @@ public:
                 .spp             = m_ui_state.spp,
                 .film_width      = export_resolution.export_w,
                 .film_height     = export_resolution.export_h};
-            (void)m_offline_render_service.start(*active_scene, m_resource_manager, config);
+            (void)m_offline_render_service.start(*active_scene, m_runtime.resource_manager(), config);
         }
         if (!can_render) {
             ImGui::EndDisabled();
@@ -223,28 +214,22 @@ public:
 
 int main() {
     try {
-        rtr::resource::ResourceManager                        resource_manager(kMaxFramesInFlight);
+        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
+            .window_width         = 1280,
+            .window_height        = 720,
+            .window_title         = "RTR Framework Offline CBox",
+            .max_frames_in_flight = kMaxFramesInFlight,
+        });
         rtr::framework::integration::PbptOfflineRenderService offline_render_service{};
 
+        auto& resource_manager = runtime.resource_manager();
         const auto import_xml_path =
             (resource_manager.resource_root_dir() / kCboxSceneRootRel / kCboxSceneXmlFilename).string();
 
-        auto renderer = std::make_unique<rtr::system::render::Renderer>(1280, 720, "RTR Framework Offline CBox",
-                                                                        kMaxFramesInFlight);
-
-        auto input_system = std::make_unique<rtr::system::input::InputSystem>(&renderer->window());
-
         rtr::framework::integration::LoadOptions import_options{};
-        import_options.free_look_input_state = &input_system->state();
+        import_options.free_look_input_state = &runtime.input_system().state();
 
-        rtr::framework::core::Engine engine(
-            rtr::framework::core::EngineConfig{.window_width         = 1280,
-                                               .window_height        = 720,
-                                               .window_title         = "RTR Framework Offline CBox",
-                                               .max_frames_in_flight = kMaxFramesInFlight});
-        engine.world().set_resource_manager(&resource_manager);
-
-        auto&      scene = engine.world().create_scene("cbox_scene");
+        auto&      scene = runtime.world().create_scene("cbox_scene");
         const auto import_package =
             rtr::framework::integration::load_scene(import_xml_path, scene, resource_manager, import_options);
         const auto& import_result = import_package.result;
@@ -270,42 +255,40 @@ int main() {
             throw std::runtime_error("Imported cbox scene has no active camera.");
         }
 
-        auto editor_host = std::make_shared<rtr::editor::EditorHost>();
-        editor_host->bind_runtime(&engine.world(), &resource_manager, renderer.get(), input_system.get());
+        auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);
         editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
         editor_host->register_panel(std::make_unique<OfflineRenderPanel>(
-            offline_render_service, engine, *renderer, resource_manager, import_result, scene_width, scene_height,
+            offline_render_service, runtime, import_result, scene_width, scene_height,
             (resource_manager.resource_root_dir() / kCboxSceneRootRel / kCboxSceneXmlFilename).string(),
             (resource_manager.resource_root_dir() / kCboxSceneRootRel / kOutputExrPath).string(),
             (resource_manager.resource_root_dir() / kCboxSceneRootRel / kOutputSceneXmlFilename).string()));
 
         auto editor_pipeline = std::make_unique<rtr::editor::render::ForwardEditorPipeline>(
-            renderer->build_pipeline_runtime(), editor_host);
-        rtr::editor::bind_input_capture_to_editor(*input_system, *editor_pipeline);
+            runtime.renderer().build_pipeline_runtime(), editor_host);
+        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), *editor_pipeline);
+        runtime.set_pipeline(std::move(editor_pipeline));
 
-        auto* active_editor_pipeline = editor_pipeline.get();
-        renderer->set_pipeline(std::move(editor_pipeline));
+        runtime.set_callbacks(rtr::app::RuntimeCallbacks{
+            .on_post_update =
+                [editor_host](rtr::app::RuntimeContext& ctx) {
+                    editor_host->begin_frame(rtr::editor::EditorFrameData{
+                        .frame_serial  = ctx.frame_serial,
+                        .delta_seconds = ctx.delta_seconds,
+                        .paused        = ctx.paused,
+                    });
 
-        engine.set_loop_hooks(rtr::framework::core::Engine::LoopHooks{
-            .input_begin = [&]() { input_system->begin_frame(); },
-            .input_poll  = [&]() { renderer->window().poll_events(); },
-            .input_end   = [&]() { input_system->end_frame(); },
-            .render =
-                [&]() {
-                    static std::uint64_t frame_serial = 0;
-
-                    auto* active_scene = engine.world().active_scene();
+                    auto* active_scene = ctx.world.active_scene();
                     if (active_scene == nullptr) {
                         throw std::runtime_error("No active scene.");
                     }
 
                     auto* active_camera = find_unique_active_camera(*active_scene);
                     if (active_camera != nullptr) {
-                        const auto [fb_w, fb_h] = renderer->window().framebuffer_size();
+                        const auto [fb_w, fb_h] = ctx.renderer.window().framebuffer_size();
                         if (fb_w > 0 && fb_h > 0) {
                             if (auto* perspective =
                                     dynamic_cast<rtr::framework::component::PerspectiveCamera*>(active_camera);
@@ -314,32 +297,19 @@ int main() {
                             }
                         }
                     }
-
-                    editor_host->begin_frame(rtr::editor::EditorFrameData{
-                        .frame_serial  = frame_serial,
-                        .delta_seconds = 0.0,
-                        .paused        = engine.paused(),
-                    });
-
-                    active_editor_pipeline->prepare_frame(rtr::system::render::FramePrepareContext{
-                        .world         = engine.world(),
-                        .resources     = resource_manager,
-                        .input         = *input_system,
-                        .frame_serial  = frame_serial,
-                        .delta_seconds = 0.0,
-                    });
-                    renderer->draw_frame();
-                    resource_manager.tick(frame_serial++);
-
-                    if (input_system->state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
-                        renderer->window().close();
+                },
+            .on_pre_render =
+                [](rtr::app::RuntimeContext& ctx) {
+                    if (ctx.input.state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
+                        ctx.renderer.window().close();
                     }
                 },
-            .should_close = [&]() { return renderer->window().is_should_close(); }});
+        });
 
-        engine.run();
-        renderer->device().wait_idle();
-        resource_manager.flush_after_wait_idle();
+        const auto result = runtime.run();
+        if (!result.ok) {
+            throw std::runtime_error(result.error_message);
+        }
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;

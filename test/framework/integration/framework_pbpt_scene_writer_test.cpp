@@ -138,7 +138,9 @@ TEST(FrameworkPbptSceneWriterTest, BuildsXmlResultFromActiveNodesWithMeshAndPbpt
     ASSERT_EQ(result.scene.resources.shape_instances.size(), 1u);
 
     const auto& shape = result.scene.resources.shape_instances.front();
-    EXPECT_EQ(shape.shape_id, "go_" + std::to_string(static_cast<std::uint64_t>(go_ok.id())));
+    const std::string go_name = std::string(scene.game_object_name(go_ok.id()).value_or(""));
+    EXPECT_EQ(shape.shape_id, go_name);
+    EXPECT_EQ(shape.mesh_name, go_name);
     EXPECT_FALSE(shape.emission_spectrum_name.has_value());
     expect_mat4_near(pbpt_bridge::compat_export_detail::to_mat4(shape.object_to_world),
                      scene.scene_graph().node(go_ok.id()).world_matrix());

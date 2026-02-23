@@ -220,7 +220,8 @@ inline ::pbpt::serde::PbptXmlResult<float> build_scene_result(
         try {
             auto shape_res = dispatch_impl(ShapeWriterList{}, *go, ctx, result);
             if (shape_res.matched) {
-                log->debug("Shape {} mapped by {}", go->name(), shape_res.mapper_name);
+                const auto object_name = std::string(scene.game_object_name(go->id()).value_or("GameObject"));
+                log->debug("Shape {} mapped by {}", object_name, shape_res.mapper_name);
             }
         } catch (const std::exception& e) {
             throw std::runtime_error(std::string("[domain=shape] ") + e.what());

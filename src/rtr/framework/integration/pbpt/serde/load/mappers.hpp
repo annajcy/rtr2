@@ -20,6 +20,7 @@
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/framework/core/scene.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::framework::integration {
 
@@ -97,7 +98,8 @@ struct ObjLambertianShapeImportMapper {
             ++pkg.result.imported_light_shape_count;
         }
 
-        compat_import_detail::register_imported_game_object(pkg.result, go.name(), go.id());
+        const auto registered_name = std::string(ctx.scene.game_object_name(go.id()).value_or(object_name));
+        compat_import_detail::register_imported_game_object(pkg.result, registered_name, go.id());
         pkg.compatible_info.mapped_shape_info_by_game_object.emplace(
             go.id(), MappedShapeInfo{.source_shape_id          = record.shape_id,
                                      .source_mesh_name         = record.mesh_name,
@@ -149,10 +151,13 @@ struct ThinLensPerspectiveImportMapper {
         }
         camera.set_active(true);
         camera_go.node().set_local_model_matrix(sensor.to_world);
-        compat_import_detail::register_imported_game_object(pkg.result, camera_go.name(), camera_go.id());
+        const auto registered_name = std::string(ctx.scene.game_object_name(camera_go.id()).value_or(camera_name));
+        compat_import_detail::register_imported_game_object(pkg.result, registered_name, camera_go.id());
 
         if (ctx.options.free_look_input_state != nullptr) {
             (void)camera_go.add_component<component::FreeLookCameraController>(ctx.options.free_look_input_state);
+        } else {
+            utils::get_logger("rtr.framework.integration.ThinLensPerspectiveImportMapper")->warn("No free look input state provided in import options; imported camera will not be controllable.");
         }
     }
 };

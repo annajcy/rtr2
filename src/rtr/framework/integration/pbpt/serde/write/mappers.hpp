@@ -51,9 +51,12 @@ struct MeshRendererPbptMeshExportMapper {
         const auto& cpu_mesh        = ctx.resources.cpu<rtr::resource::MeshResourceKind>(mesh_handle);
         const auto  object_to_world = compat_export_detail::to_transform(go.node().world_matrix());
 
+        std::string mesh_base = std::string(ctx.scene.game_object_name(go.id()).value_or(""));
+        if (mesh_base.empty()) {
+            mesh_base = "go_" + std::to_string(static_cast<std::uint64_t>(go.id()));
+        }
         std::string mesh_name = compat_export_detail::make_unique_name(
-            "rtr_mesh_" + std::to_string(mesh_handle.value),
-            [&](const std::string& name) { return result.scene.resources.mesh_library.name_to_id().contains(name); });
+            mesh_base, [&](const std::string& name) { return result.scene.resources.mesh_library.name_to_id().contains(name); });
         auto mesh =
             compat_export_detail::to_pbpt_triangle_mesh(cpu_mesh, result.scene.render_transform, object_to_world);
         (void)result.scene.resources.mesh_library.add_item(mesh_name, std::move(mesh));
@@ -80,7 +83,7 @@ struct MeshRendererPbptMeshExportMapper {
         result.scene.resources.mesh_material_map[mesh_name] =
             result.scene.resources.any_material_library.name_to_id().at(material_name);
 
-        std::string shape_base = go.name();
+        std::string shape_base = std::string(ctx.scene.game_object_name(go.id()).value_or(""));
         if (shape_base.empty()) {
             shape_base = "go_" + std::to_string(static_cast<std::uint64_t>(go.id()));
         }
