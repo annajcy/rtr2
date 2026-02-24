@@ -62,6 +62,7 @@ class ShaderToyEditorPipeline final : public system::render::RenderPipeline,
 
     vk::DeviceSize m_uniform_buffer_size{0};
     std::array<rhi::Buffer, rhi::kFramesInFlight> m_uniform_buffers;
+    std::array<std::uint64_t, rhi::kFramesInFlight> m_compute_set_generation{};
 
     system::render::SceneTargetController<ShaderToyFrameTargets> m_scene_targets;
 
@@ -127,13 +128,15 @@ public:
             return;
 
         auto& frame_targets = m_scene_targets.ensure(
+            ctx.frame_index(),
             extent,
             [this](vk::Extent2D desired_extent) { return create_frame_targets(desired_extent); },
-            [this](ShaderToyFrameTargets& targets) { refresh_compute_descriptors(targets); }
+            [](ShaderToyFrameTargets&) {}
         );
 
         const uint32_t frame_index = ctx.frame_index();
         auto& tracked_offscreen = frame_targets.offscreen_images[frame_index];
+        refresh_compute_descriptor(frame_index, frame_targets);
 
         m_compute_pass.execute(
             ctx,
@@ -267,13 +270,17 @@ private:
         return ShaderToyFrameTargets{create_offscreen_images(scene_extent)};
     }
 
-    void refresh_compute_descriptors(ShaderToyFrameTargets& frame_targets) {
-        for (uint32_t i = 0; i < rhi::kFramesInFlight; ++i) {
-            rhi::DescriptorWriter w;
-            w.write_buffer(0, *m_uniform_buffers[i].buffer(), 0, m_uniform_buffer_size);
-            w.write_storage_image(1, *frame_targets.offscreen_images[i].image.image_view(), vk::ImageLayout::eGeneral);
-            w.update(m_device, *m_compute_sets[i]);
+    void refresh_compute_descriptor(uint32_t frame_index, ShaderToyFrameTargets& frame_targets) {
+        const auto generation = m_scene_targets.active_generation();
+        if (m_compute_set_generation[frame_index] == generation) {
+            return;
         }
+
+        rhi::DescriptorWriter w;
+        w.write_buffer(0, *m_uniform_buffers[frame_index].buffer(), 0, m_uniform_buffer_size);
+        w.write_storage_image(1, *frame_targets.offscreen_images[frame_index].image.image_view(), vk::ImageLayout::eGeneral);
+        w.update(m_device, *m_compute_sets[frame_index]);
+        m_compute_set_generation[frame_index] = generation;
     }
 };
 
