@@ -146,6 +146,7 @@ public:
             throw std::runtime_error("ForwardEditorPipeline: scene view not set.");
 
         auto& frame_targets = m_scene_targets.ensure(
+            ctx.frame_index(),
             extent,
             [this](vk::Extent2D desired_extent) { return create_frame_targets(desired_extent); },
             [](ForwardFrameTargets&) {}
