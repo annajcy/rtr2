@@ -3,47 +3,37 @@
 #include <array>
 #include <cstdint>
 #include <stdexcept>
-#include <string_view>
-#include <vector>
 
 #include "rtr/rhi/texture.hpp"
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/render_pass.hpp"
+#include "rtr/system/render/render_resource_state.hpp"
 #include "vulkan/vulkan.hpp"
 
 namespace rtr::system::render {
 
-class PresentPass final : public render::IRenderPass {
-public:
-    struct RenderPassResources {
-        rhi::Image&      src_color_image;
-        vk::ImageLayout& src_color_layout;
-        vk::Extent2D     src_extent;
-    };
+struct PresentPassResources {
+    TrackedImage src_color;
+    vk::Extent2D src_extent;
+};
 
-private:
-    std::vector<render::ResourceDependency> m_dependencies{{"offscreen_color", render::ResourceAccess::eRead},
-                                                           {"swapchain", render::ResourceAccess::eWrite}};
+class PresentPass final : public RenderPass<PresentPassResources> {
+public:
+    using RenderPassResources = PresentPassResources;
 
 public:
     PresentPass() = default;
 
-    std::string_view name() const override { return "present_pass"; }
-
-    const std::vector<render::ResourceDependency>& dependencies() const override { return m_dependencies; }
-
-    static void validate_resources(const RenderPassResources& resources) {
-        if (resources.src_extent.width == 0 || resources.src_extent.height == 0) {
-            throw std::runtime_error("PresentPass frame resources are incomplete.");
-        }
+protected:
+    void validate(const RenderPassResources& resources) const override {
+        require_valid_extent(resources.src_extent, "PresentPass frame resources are incomplete.");
+        require_valid_tracked_image(resources.src_color, "PresentPass source color is invalid.");
     }
 
-    void execute(render::FrameContext& ctx, const RenderPassResources& resources) {
-        validate_resources(resources);
-
+    void do_execute(render::FrameContext& ctx, const RenderPassResources& resources) override {
         auto& cmd          = ctx.cmd().command_buffer();
-        auto& color_image  = resources.src_color_image;
-        auto& color_layout = resources.src_color_layout;
+        auto& color_image  = resources.src_color.image;
+        auto& color_layout = resources.src_color.layout;
 
         vk::ImageMemoryBarrier2 offscreen_to_src{};
         offscreen_to_src.srcStageMask                    = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
@@ -139,7 +129,7 @@ public:
         to_final_dep.pImageMemoryBarriers    = to_final_barriers.data();
         cmd.pipelineBarrier2(to_final_dep);
 
-        color_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        resources.src_color.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
     }
 };
 

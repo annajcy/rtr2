@@ -23,8 +23,11 @@ void require_gpu_tests_enabled() {
     }
 }
 
-class NoopPipeline final : public IRenderPipeline {
+class NoopPipeline final : public RenderPipeline {
 public:
+    explicit NoopPipeline(const PipelineRuntime& runtime)
+        : RenderPipeline(runtime) {}
+
     void render(FrameContext& ctx) override {
         auto& cmd = ctx.cmd().command_buffer();
 
@@ -63,6 +66,12 @@ public:
         cmd.beginRendering(rendering_info);
         cmd.endRendering();
     }
+
+private:
+    void handle_swapchain_state_change(
+        const FrameScheduler::SwapchainState&,
+        const SwapchainChangeSummary&
+    ) override {}
 };
 
 } // namespace
@@ -82,13 +91,13 @@ TEST(RendererIntegrationTest, SetPipelineRejectsNullAndSecondAssignment) {
 
     Renderer renderer(640, 480, "rtr_renderer_pipeline_guard");
     EXPECT_THROW(
-        renderer.set_pipeline(std::unique_ptr<IRenderPipeline>{}),
+        renderer.set_pipeline(std::unique_ptr<RenderPipeline>{}),
         std::runtime_error
     );
 
-    renderer.set_pipeline(std::make_unique<NoopPipeline>());
+    renderer.set_pipeline(std::make_unique<NoopPipeline>(renderer.build_pipeline_runtime()));
     EXPECT_THROW(
-        renderer.set_pipeline(std::make_unique<NoopPipeline>()),
+        renderer.set_pipeline(std::make_unique<NoopPipeline>(renderer.build_pipeline_runtime())),
         std::runtime_error
     );
 }
@@ -97,7 +106,7 @@ TEST(RendererIntegrationTest, DrawFrameWithNoopPipelineCanAdvanceFrameIndex) {
     require_gpu_tests_enabled();
 
     Renderer renderer(640, 480, "rtr_renderer_noop_draw");
-    renderer.set_pipeline(std::make_unique<NoopPipeline>());
+    renderer.set_pipeline(std::make_unique<NoopPipeline>(renderer.build_pipeline_runtime()));
 
     const auto initial_frame_index = renderer.frame_scheduler().current_frame_index();
     bool advanced = false;

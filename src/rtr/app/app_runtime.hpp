@@ -14,7 +14,7 @@
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/frame_constants.hpp"
 #include "rtr/system/input/input_system.hpp"
-#include "rtr/system/render/pipeline.hpp"
+#include "rtr/system/render/render_pipeline.hpp"
 #include "rtr/system/render/renderer.hpp"
 #include "rtr/utils/log.hpp"
 
@@ -114,13 +114,13 @@ public:
     system::input::InputSystem& input_system() { return m_input; }
     const system::input::InputSystem& input_system() const { return m_input; }
 
-    system::render::IRenderPipeline* pipeline() { return m_renderer.pipeline(); }
-    const system::render::IRenderPipeline* pipeline() const { return m_renderer.pipeline(); }
+    system::render::RenderPipeline* pipeline() { return m_renderer.pipeline(); }
+    const system::render::RenderPipeline* pipeline() const { return m_renderer.pipeline(); }
 
     void set_callbacks(RuntimeCallbacks callbacks) { m_callbacks = std::move(callbacks); }
     const RuntimeCallbacks& callbacks() const { return m_callbacks; }
 
-    void set_pipeline(std::unique_ptr<system::render::IRenderPipeline> pipeline) {
+    void set_pipeline(std::unique_ptr<system::render::RenderPipeline> pipeline) {
         auto log = logger();
         if (!pipeline) {
             log->error("set_pipeline received null pipeline.");
@@ -218,16 +218,13 @@ public:
                     m_callbacks.on_post_update(ctx);
                 }
 
-                if (auto* frame_prepare = dynamic_cast<system::render::IFramePreparePipeline*>(m_renderer.pipeline());
-                    frame_prepare != nullptr) {
-                    frame_prepare->prepare_frame(system::render::FramePrepareContext{
-                        .world         = m_world,
-                        .resources     = m_resources,
-                        .input         = m_input,
-                        .frame_serial  = m_frame_serial,
-                        .delta_seconds = frame_delta,
-                    });
-                }
+                m_renderer.pipeline()->prepare_frame(system::render::FramePrepareContext{
+                    .world         = m_world,
+                    .resources     = m_resources,
+                    .input         = m_input,
+                    .frame_serial  = m_frame_serial,
+                    .delta_seconds = frame_delta,
+                });
 
                 if (m_callbacks.on_pre_render) {
                     auto ctx = make_runtime_context(frame_delta);

@@ -2,59 +2,61 @@
 
 #include <array>
 #include <stdexcept>
-#include <string_view>
-#include <vector>
 
 #include "rtr/rhi/descriptor.hpp"
 #include "rtr/rhi/texture.hpp"
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/render_pass.hpp"
+#include "rtr/system/render/render_resource_state.hpp"
 #include "vulkan/vulkan.hpp"
 
 namespace rtr::system::render {
 
-class PresentImagePass final : public IRenderPass {
+struct PresentImagePassResources {
+    TrackedImage offscreen;
+    rhi::Image& depth_image;
+    vk::raii::DescriptorSet& present_set;
+};
+
+class PresentImagePass final : public RenderPass<PresentImagePassResources> {
 public:
-    struct RenderPassResources {
-        rhi::Image&              offscreen_image;
-        vk::ImageLayout&         offscreen_layout;
-        rhi::Image&              depth_image;
-        vk::raii::DescriptorSet& present_set;
-    };
+    using RenderPassResources = PresentImagePassResources;
 
 private:
-    vk::raii::PipelineLayout*       m_pipeline_layout{};
-    vk::raii::Pipeline*             m_present_pipeline{};
-    std::vector<ResourceDependency> m_dependencies{{"shadertoy.present", ResourceAccess::eRead},
-                                                   {"shadertoy.offscreen", ResourceAccess::eRead},
-                                                   {"swapchain_color", ResourceAccess::eReadWrite},
-                                                   {"depth", ResourceAccess::eReadWrite}};
+    vk::raii::PipelineLayout& m_pipeline_layout;
+    vk::raii::Pipeline& m_present_pipeline;
 
 public:
-    PresentImagePass(vk::raii::PipelineLayout* pipeline_layout, vk::raii::Pipeline* present_pipeline)
+    PresentImagePass(vk::raii::PipelineLayout& pipeline_layout, vk::raii::Pipeline& present_pipeline)
         : m_pipeline_layout(pipeline_layout), m_present_pipeline(present_pipeline) {}
 
-    std::string_view name() const override { return "shadertoy.present"; }
-
-    const std::vector<ResourceDependency>& dependencies() const override { return m_dependencies; }
-
-    static void validate_resources(const RenderPassResources& resources) {
-        (void)resources;
+protected:
+    void validate(const RenderPassResources& resources) const override {
+        require_valid_tracked_image(resources.offscreen, "PresentImagePass offscreen image is invalid.");
     }
 
-    void execute(render::FrameContext& ctx, const RenderPassResources& resources) {
-        validate_resources(resources);
-
+    void do_execute(render::FrameContext& ctx, const RenderPassResources& resources) override {
         auto&       cmd       = ctx.cmd().command_buffer();
-        rhi::Image& offscreen = resources.offscreen_image;
+        rhi::Image& offscreen = resources.offscreen.image;
         rhi::Image& depth     = resources.depth_image;
+        const vk::ImageLayout old_layout = resources.offscreen.layout;
+
+        vk::PipelineStageFlags2 src_stage = vk::PipelineStageFlagBits2::eTopOfPipe;
+        vk::AccessFlags2 src_access = vk::AccessFlagBits2::eNone;
+        if (old_layout == vk::ImageLayout::eGeneral) {
+            src_stage = vk::PipelineStageFlagBits2::eComputeShader;
+            src_access = vk::AccessFlagBits2::eShaderStorageWrite;
+        } else if (old_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+            src_stage = vk::PipelineStageFlagBits2::eFragmentShader;
+            src_access = vk::AccessFlagBits2::eShaderRead;
+        }
 
         vk::ImageMemoryBarrier2 to_sampled{};
-        to_sampled.srcStageMask                    = vk::PipelineStageFlagBits2::eComputeShader;
+        to_sampled.srcStageMask                    = src_stage;
         to_sampled.dstStageMask                    = vk::PipelineStageFlagBits2::eFragmentShader;
-        to_sampled.srcAccessMask                   = vk::AccessFlagBits2::eShaderStorageWrite;
+        to_sampled.srcAccessMask                   = src_access;
         to_sampled.dstAccessMask                   = vk::AccessFlagBits2::eShaderSampledRead;
-        to_sampled.oldLayout                       = vk::ImageLayout::eGeneral;
+        to_sampled.oldLayout                       = old_layout;
         to_sampled.newLayout                       = vk::ImageLayout::eShaderReadOnlyOptimal;
         to_sampled.image                           = *offscreen.image();
         to_sampled.subresourceRange.aspectMask     = vk::ImageAspectFlagBits::eColor;
@@ -67,7 +69,7 @@ public:
         to_sampled_dep.imageMemoryBarrierCount = 1;
         to_sampled_dep.pImageMemoryBarriers    = &to_sampled;
         cmd.pipelineBarrier2(to_sampled_dep);
-        resources.offscreen_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        resources.offscreen.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
         vk::ImageMemoryBarrier2 to_color{};
         to_color.srcStageMask                    = vk::PipelineStageFlagBits2::eTopOfPipe;
@@ -130,8 +132,8 @@ public:
         rendering_info.pDepthAttachment     = &depth_attachment_info;
 
         cmd.beginRendering(rendering_info);
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, **m_present_pipeline);
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, **m_pipeline_layout, 1,
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_present_pipeline);
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_pipeline_layout, 1,
                                *resources.present_set, {});
 
         vk::Viewport viewport{};

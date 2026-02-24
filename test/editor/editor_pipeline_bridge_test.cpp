@@ -5,7 +5,6 @@
 
 #include "rtr/editor/core/editor_capture.hpp"
 #include "rtr/editor/core/editor_host.hpp"
-#include "rtr/system/render/frame_color_source.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
 #include "rtr/system/render/pipeline/shadertoy/shadertoy_pipeline.hpp"
 

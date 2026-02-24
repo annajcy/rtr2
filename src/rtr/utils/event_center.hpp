@@ -13,6 +13,8 @@
 #include <utility>
 #include <vector>
 
+#include "rtr/utils/log.hpp"
+
 namespace rtr::utils {
 
 class ISubscriptionOwner {
@@ -124,6 +126,10 @@ private:
         std::uint64_t m_next_handle{1};
         std::uint32_t m_dispatch_depth{0};
 
+        static std::shared_ptr<spdlog::logger> logger() {
+            return get_logger("utils.event_center");
+        }
+
         void flush_pending() {
             if (!m_pending_remove.empty()) {
                 std::sort(m_pending_remove.begin(), m_pending_remove.end());
@@ -161,6 +167,7 @@ private:
     public:
         std::uint64_t add(const Action& action) {
             if (!action) {
+                logger()->error("Event::subscribe failed: action is invalid.");
                 throw std::runtime_error("Event action must be valid.");
             }
 
@@ -170,6 +177,11 @@ private:
                     .handle = handle,
                     .action = action
                 });
+                logger()->debug(
+                    "Event::subscribe queued during dispatch (handle={}, dispatch_depth={}).",
+                    handle,
+                    m_dispatch_depth
+                );
                 return handle;
             }
 
@@ -178,6 +190,7 @@ private:
                 .action = action,
                 .active = true
             };
+            logger()->debug("Event::subscribe added (handle={}, subscriber_count={}).", handle, m_actions.size());
             return handle;
         }
 
@@ -195,10 +208,16 @@ private:
             if (m_dispatch_depth > 0) {
                 it->second.active = false;
                 m_pending_remove.emplace_back(handle);
+                logger()->debug(
+                    "Event::unsubscribe deferred during dispatch (handle={}, dispatch_depth={}).",
+                    handle,
+                    m_dispatch_depth
+                );
                 return;
             }
 
             m_actions.erase(it);
+            logger()->debug("Event::unsubscribe applied (handle={}, subscriber_count={}).", handle, m_actions.size());
         }
 
         void clear() {
@@ -215,6 +234,7 @@ private:
             m_actions.clear();
             m_pending_add.clear();
             m_pending_remove.clear();
+            logger()->debug("Event::clear applied immediately.");
         }
 
         void execute(Args... args) {
@@ -223,6 +243,12 @@ private:
             for (const auto& [_, entry] : m_actions) {
                 snapshot.emplace_back(entry);
             }
+
+            logger()->trace(
+                "Event::publish begin (subscriber_count={}, dispatch_depth={}).",
+                snapshot.size(),
+                m_dispatch_depth
+            );
 
             ++m_dispatch_depth;
             std::vector<std::exception_ptr> exceptions{};
@@ -233,6 +259,14 @@ private:
                 try {
                     entry.action(args...);
                 } catch (...) {
+                    auto log = logger();
+                    try {
+                        throw;
+                    } catch (const std::exception& ex) {
+                        log->warn("Event subscriber {} threw exception: {}", entry.handle, ex.what());
+                    } catch (...) {
+                        log->warn("Event subscriber {} threw non-std exception.", entry.handle);
+                    }
                     exceptions.emplace_back(std::current_exception());
                 }
             }
@@ -243,8 +277,14 @@ private:
             }
 
             if (!exceptions.empty()) {
+                logger()->warn(
+                    "Event::publish finished with subscriber exceptions (count={}).",
+                    exceptions.size()
+                );
                 throw EventDispatchException(std::move(exceptions));
             }
+
+            logger()->trace("Event::publish completed successfully.");
         }
 
         size_t size() const {
@@ -342,15 +382,24 @@ private:
 public:
     template <typename TEvent>
     SubscriptionToken subscribe(std::function<void(const TEvent&)> action) {
-        return get_or_create_holder<TEvent>()->event.subscribe(action);
+        auto token = get_or_create_holder<TEvent>()->event.subscribe(std::move(action));
+        get_logger("utils.event_center")
+            ->debug("TypedEventCenter::subscribe type={} (action_count={}).",
+                     typeid(TEvent).name(),
+                     action_count<TEvent>());
+        return token;
     }
 
     template <typename TEvent>
     void publish(const TEvent& event) {
         auto holder = find_holder<TEvent>();
         if (holder == nullptr) {
+            get_logger("utils.event_center")
+                ->trace("TypedEventCenter::publish ignored (type={} has no subscribers).", typeid(TEvent).name());
             return;
         }
+        get_logger("utils.event_center")
+            ->trace("TypedEventCenter::publish type={} (action_count={}).", typeid(TEvent).name(), holder->event.size());
         holder->event.publish(event);
     }
 
@@ -364,6 +413,8 @@ public:
     }
 
     void clear() {
+        get_logger("utils.event_center")
+            ->debug("TypedEventCenter::clear all event types (type_count={}).", m_events.size());
         for (auto& [_, holder] : m_events) {
             holder->clear();
         }

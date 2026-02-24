@@ -45,6 +45,7 @@ option(RTR_BUILD_EXAMPLES "Build the project's examples" ${RTR_DEFAULT_BUILD_EXA
 option(RTR_BUILD_EDITOR "Build editor module (ImGui integration)" ${RTR_DEFAULT_BUILD_EDITOR})
 option(RTR_COMPILE_SHADERS "Build the project's shaders" ON)
 option(RTR_BUILD_DOCUMENTATION "Build the Doxygen documentation" ${PROJECT_IS_TOP_LEVEL})
+set(RTR_DEFAULT_SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/shaders/compiled")
 
 set(PBPT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(PBPT_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)

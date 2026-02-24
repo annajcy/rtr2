@@ -1,7 +1,10 @@
 #pragma once
 
 #include <array>
+#include <cstdlib>
 #include <cstdint>
+#include <filesystem>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -9,14 +12,15 @@
 #include <vector>
 
 #include "rtr/resource/resource_fwd.hpp"
-#include "rtr/system/render/frame_context.hpp"
-#include "rtr/system/render/frame_scheduler.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/context.hpp"
 #include "rtr/rhi/device.hpp"
 #include "rtr/rhi/frame_constants.hpp"
 #include "rtr/rhi/texture.hpp"
 #include "rtr/rhi/window.hpp"
+#include "rtr/system/render/frame_context.hpp"
+#include "rtr/system/render/frame_scheduler.hpp"
+#include "rtr/utils/event_center.hpp"
 #include "vulkan/vulkan_enums.hpp"
 
 namespace rtr::framework::core {
@@ -36,17 +40,7 @@ struct PipelineRuntime {
     uint32_t image_count{0};
     vk::Format color_format{vk::Format::eUndefined};
     vk::Format depth_format{vk::Format::eUndefined};
-};
-
-class IRenderPipeline {
-public:
-    virtual ~IRenderPipeline() = default;
-
-    virtual void on_resize(int width, int height) {}
-    virtual void on_swapchain_state_changed(const FrameScheduler::SwapchainState& state) {}
-
-    // Renderer owns command buffer begin/end/reset/submit; pipeline only records draw commands.
-    virtual void render(FrameContext& ctx) = 0;
+    std::filesystem::path shader_root_dir{};
 };
 
 struct FramePrepareContext {
@@ -57,10 +51,9 @@ struct FramePrepareContext {
     double delta_seconds{0.0};
 };
 
-class IFramePreparePipeline {
-public:
-    virtual ~IFramePreparePipeline() = default;
-    virtual void prepare_frame(const FramePrepareContext& ctx) = 0;
+struct SceneViewportResizeEvent {
+    std::uint32_t width{0};
+    std::uint32_t height{0};
 };
 
 struct SwapchainChangeSummary {
@@ -78,7 +71,7 @@ struct SwapchainChangeSummary {
     }
 };
 
-class RenderPipelineBase : public IRenderPipeline {
+class RenderPipeline {
 protected:
     rhi::Device& m_device;
     rhi::Context& m_context;
@@ -88,8 +81,11 @@ protected:
     vk::Format m_depth_format{vk::Format::eUndefined};
     vk::Extent2D m_swapchain_extent{};
 
+private:
+    utils::TypedEventCenter m_events{};
+
 public:
-    explicit RenderPipelineBase(const PipelineRuntime& runtime)
+    explicit RenderPipeline(const PipelineRuntime& runtime)
         : m_device(runtime.device),
           m_context(runtime.context),
           m_window(runtime.window),
@@ -97,7 +93,23 @@ public:
           m_color_format(runtime.color_format),
           m_depth_format(runtime.depth_format) {}
 
-    void on_swapchain_state_changed(const FrameScheduler::SwapchainState& state) final {
+    virtual ~RenderPipeline() = default;
+
+    virtual void render(FrameContext& ctx) = 0;
+    virtual void prepare_frame(const FramePrepareContext& ctx) {
+        (void)ctx;
+    }
+
+    virtual void on_resize(int width, int height) {
+        (void)width;
+        (void)height;
+    }
+
+    virtual void wait_for_scene_target_rebuild() {
+        m_device.wait_idle();
+    }
+
+    void on_swapchain_state_changed(const FrameScheduler::SwapchainState& state) {
         SwapchainChangeSummary diff{
             .extent_changed =
                 (m_swapchain_extent.width != state.extent.width) ||
@@ -115,7 +127,43 @@ public:
         handle_swapchain_state_change(state, diff);
     }
 
+    template <typename TEvent>
+    utils::SubscriptionToken subscribe_event(std::function<void(const TEvent&)> action) {
+        return m_events.subscribe<TEvent>(std::move(action));
+    }
+
+    template <typename TEvent>
+    void publish_event(const TEvent& event) {
+        m_events.publish<TEvent>(event);
+    }
+
 protected:
+    static std::filesystem::path resolve_shader_root_dir(const PipelineRuntime& runtime) {
+        if (!runtime.shader_root_dir.empty()) {
+            return runtime.shader_root_dir;
+        }
+        if (const char* env_root = std::getenv("RTR_SHADER_ROOT");
+            env_root != nullptr && env_root[0] != '\0') {
+            return std::filesystem::path(env_root);
+        }
+#ifdef RTR_DEFAULT_SHADER_OUTPUT_DIR
+        return std::filesystem::path(RTR_DEFAULT_SHADER_OUTPUT_DIR);
+#else
+        return {};
+#endif
+    }
+
+    static std::filesystem::path resolve_shader_path(const PipelineRuntime& runtime, std::string_view filename) {
+        if (filename.empty()) {
+            throw std::invalid_argument("Shader filename must not be empty.");
+        }
+        const std::filesystem::path root = resolve_shader_root_dir(runtime);
+        if (root.empty()) {
+            throw std::runtime_error("Shader root directory is not configured.");
+        }
+        return (root / std::filesystem::path(filename)).lexically_normal();
+    }
+
     virtual void handle_swapchain_state_change(
         const FrameScheduler::SwapchainState& state,
         const SwapchainChangeSummary& diff

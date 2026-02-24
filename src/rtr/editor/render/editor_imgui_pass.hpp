@@ -15,21 +15,22 @@
 #include "rtr/rhi/frame_constants.hpp"
 #include "rtr/rhi/imgui_context.hpp"
 #include "rtr/rhi/texture.hpp"
-#include "rtr/system/render/frame_color_source.hpp"
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/render_pass.hpp"
-#include "rtr/system/render/pipeline.hpp"
+#include "rtr/system/render/render_pipeline.hpp"
 #include "vulkan/vulkan.hpp"
 
 namespace rtr::editor::render {
 
-class EditorImGuiPass final : public rtr::system::render::IRenderPass {
+struct EditorImGuiPassResources {
+    vk::ImageView scene_image_view{};
+    vk::ImageLayout scene_image_layout{vk::ImageLayout::eUndefined};
+    vk::Extent2D scene_extent{};
+};
+
+class EditorImGuiPass final : public rtr::system::render::RenderPass<EditorImGuiPassResources> {
 public:
-    struct RenderPassResources {
-        vk::ImageView   scene_image_view{};
-        vk::ImageLayout scene_image_layout{vk::ImageLayout::eUndefined};
-        vk::Extent2D    scene_extent{};
-    };
+    using RenderPassResources = EditorImGuiPassResources;
 
 private:
     class EditorHostOverlayAdapter final {
@@ -65,11 +66,7 @@ private:
     bool m_scene_hovered{false};
     bool m_scene_focused{false};
 
-    std::vector<system::render::ResourceDependency> m_dependencies{
-        {"offscreen_color", system::render::ResourceAccess::eRead},
-        {"swapchain", system::render::ResourceAccess::eReadWrite}};
-
-    system::render::IRenderPipeline* m_owner_pipeline{};
+    system::render::RenderPipeline& m_owner_pipeline;
 
     static ImTextureID descriptor_set_to_texture_id(VkDescriptorSet descriptor_set) {
         if constexpr (std::is_pointer_v<ImTextureID>) {
@@ -89,7 +86,7 @@ private:
 
 public:
     EditorImGuiPass(const system::render::PipelineRuntime& runtime, std::shared_ptr<EditorHost> editor_host,
-                    system::render::IRenderPipeline* owner_pipeline)
+                    system::render::RenderPipeline& owner_pipeline)
         : m_imgui_context(runtime.device, runtime.context, runtime.window, runtime.image_count, runtime.color_format,
                           runtime.depth_format),
           m_editor_host(std::move(editor_host)),
@@ -107,10 +104,6 @@ public:
         clear_editor_services();
         release_scene_textures();
     }
-
-    std::string_view name() const override { return "editor_imgui_pass"; }
-
-    const std::vector<system::render::ResourceDependency>& dependencies() const override { return m_dependencies; }
 
     void on_swapchain_recreated(uint32_t image_count, vk::Format color_format, vk::Format depth_format) {
         m_imgui_context.on_swapchain_recreated(image_count, color_format, depth_format);
@@ -131,7 +124,8 @@ public:
         return m_imgui_context.wants_capture_keyboard();
     }
 
-    static void validate_resources(const RenderPassResources& resources) {
+protected:
+    void validate(const RenderPassResources& resources) const override {
         if (resources.scene_image_view == vk::ImageView{} ||
             resources.scene_extent.width == 0 ||
             resources.scene_extent.height == 0) {
@@ -139,8 +133,7 @@ public:
         }
     }
 
-    void execute(system::render::FrameContext& ctx, const RenderPassResources& resources) {
-        validate_resources(resources);
+    void do_execute(system::render::FrameContext& ctx, const RenderPassResources& resources) override {
         refresh_scene_texture(ctx.frame_index(), resources);
 
         m_imgui_context.begin_frame();
@@ -181,12 +174,9 @@ private:
         services.set_scene_hovered       = [this](bool hovered) { m_scene_hovered = hovered; };
         services.set_scene_focused       = [this](bool focused) { m_scene_focused = focused; };
         services.set_scene_viewport_size = [this](std::uint32_t width, std::uint32_t height) {
-            if (m_owner_pipeline) {
-                auto* sink = dynamic_cast<system::render::ISceneViewportSink*>(m_owner_pipeline);
-                if (sink != nullptr) {
-                    sink->set_scene_viewport_extent(vk::Extent2D{width, height});
-                }
-            }
+            m_owner_pipeline.publish_event<system::render::SceneViewportResizeEvent>(
+                system::render::SceneViewportResizeEvent{.width = width, .height = height}
+            );
         };
     }
 
