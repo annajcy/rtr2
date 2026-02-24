@@ -2,16 +2,16 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/system/render/pipeline.hpp"
+#include "rtr/system/render/render_pipeline.hpp"
 
 namespace rtr::system::render::test {
 
 namespace {
 
-class ProbePipeline final : public RenderPipelineBase {
+class ProbePipeline final : public RenderPipeline {
 public:
     explicit ProbePipeline(const PipelineRuntime& runtime)
-        : RenderPipelineBase(runtime) {}
+        : RenderPipeline(runtime) {}
 
     void render(FrameContext&) override {}
 
@@ -41,7 +41,8 @@ PipelineRuntime make_runtime_stub() {
         .window = window,
         .image_count = 3,
         .color_format = vk::Format::eB8G8R8A8Unorm,
-        .depth_format = vk::Format::eD32Sfloat
+        .depth_format = vk::Format::eD32Sfloat,
+        .shader_root_dir = {}
     };
 }
 
@@ -125,6 +126,31 @@ TEST(PipelineBaseTest, SummaryHelpersReflectFlags) {
     summary.depth_format_changed = true;
     EXPECT_TRUE(summary.extent_or_depth_changed());
     EXPECT_TRUE(summary.color_or_depth_changed());
+}
+
+TEST(PipelineBaseTest, TypedEventSubscriptionAndPublish) {
+    ProbePipeline pipeline(make_runtime_stub());
+
+    uint32_t observed_width = 0;
+    uint32_t observed_height = 0;
+    uint32_t publish_count = 0;
+
+    auto token = pipeline.subscribe_event<SceneViewportResizeEvent>(
+        [&](const SceneViewportResizeEvent& event) {
+            ++publish_count;
+            observed_width = event.width;
+            observed_height = event.height;
+        }
+    );
+
+    pipeline.publish_event(SceneViewportResizeEvent{.width = 320, .height = 180});
+    EXPECT_EQ(publish_count, 1u);
+    EXPECT_EQ(observed_width, 320u);
+    EXPECT_EQ(observed_height, 180u);
+
+    token.reset();
+    pipeline.publish_event(SceneViewportResizeEvent{.width = 640, .height = 360});
+    EXPECT_EQ(publish_count, 1u);
 }
 
 } // namespace rtr::system::render::test

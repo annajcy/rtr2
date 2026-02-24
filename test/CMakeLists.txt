@@ -71,6 +71,21 @@ rtr_add_test(
     system/render/pipeline_base_test.cpp
     rtr::runtime
 )
+rtr_add_test(
+    test_scene_target_controller
+    system/render/scene_target_controller_test.cpp
+    rtr::runtime
+)
+rtr_add_test(
+    test_render_pass_base
+    system/render/render_pass_base_test.cpp
+    rtr::runtime
+)
+rtr_add_test(
+    test_render_pass_resource_state
+    system/render/render_pass_resource_state_test.cpp
+    rtr::runtime
+)
 rtr_add_integration_test(
     test_frame_scheduler_integration
     system/render/frame_scheduler_integration_test.cpp

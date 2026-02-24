@@ -74,6 +74,7 @@ class RTRConan(ConanFile):
         self.requires("tinyobjloader/2.0.0-rc10", transitive_headers=True)
 
         self.requires("openexr/3.2.4", transitive_headers=True)
+        self.requires("pugixml/[>=1.14 <2]", transitive_headers=True)
         self.requires("embree/4.4.0", transitive_headers=True)
         self.requires("onetbb/2021.12.0", transitive_headers=True)
 
@@ -133,6 +134,7 @@ class RTRConan(ConanFile):
             "slang::slang",
             "tinyobjloader::tinyobjloader",
             "openexr::openexr",
+            "pugixml::pugixml",
             "embree::embree",
             "onetbb::onetbb",
             "stb::stb",

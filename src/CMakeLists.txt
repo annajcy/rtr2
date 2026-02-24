@@ -19,6 +19,10 @@ target_link_libraries(rtr_runtime INTERFACE
   pbpt::pbpt
 )
 
+target_compile_definitions(rtr_runtime INTERFACE
+  RTR_DEFAULT_SHADER_OUTPUT_DIR=\"${RTR_DEFAULT_SHADER_OUTPUT_DIR}\"
+)
+
 if (RTR_BUILD_EDITOR)
   add_library(rtr_editor INTERFACE)
   add_library(rtr::editor ALIAS rtr_editor)

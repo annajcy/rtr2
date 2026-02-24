@@ -1,74 +1,65 @@
 #pragma once
 
-#include <array>
-#include <string_view>
-#include <vector>
 #include <stdexcept>
+#include <array>
+#include <vector>
 
-#include "rtr/rhi/texture.hpp"
-#include "rtr/rhi/mesh.hpp"
 #include "rtr/rhi/descriptor.hpp"
+#include "rtr/rhi/mesh.hpp"
+#include "rtr/rhi/texture.hpp"
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/render_pass.hpp"
+#include "rtr/system/render/render_resource_state.hpp"
 #include "vulkan/vulkan.hpp"
-#include "rtr/system/render/pipeline.hpp"
 
 namespace rtr::system::render {
 
-class ForwardPass final : public render::IRenderPass {
-public:
-    struct DrawItem {
-        rhi::Mesh&               mesh;
-        vk::raii::DescriptorSet& per_object_set;
-    };
+struct ForwardPassDrawItem {
+    rhi::Mesh& mesh;
+    vk::raii::DescriptorSet& per_object_set;
+};
 
-    struct RenderPassResources {
-        rhi::Image&           color_image;
-        vk::ImageLayout&      color_layout;
-        rhi::Image&           depth_image;
-        vk::Extent2D          extent;
-        std::vector<DrawItem> draw_items{};
-    };
+struct ForwardPassResources {
+    TrackedImage color;
+    rhi::Image& depth_image;
+    vk::Extent2D extent;
+    std::vector<ForwardPassDrawItem> draw_items{};
+};
+
+class ForwardPass final : public RenderPass<ForwardPassResources> {
+public:
+    using DrawItem = ForwardPassDrawItem;
+    using RenderPassResources = ForwardPassResources;
 
 private:
-    vk::raii::PipelineLayout* m_pipeline_layout{};
-    vk::raii::Pipeline*       m_pipeline{};
-
-    std::vector<render::ResourceDependency> m_dependencies{{"forward.per_object", render::ResourceAccess::eRead},
-                                                           {"offscreen_color", render::ResourceAccess::eReadWrite},
-                                                           {"depth", render::ResourceAccess::eReadWrite}};
+    vk::raii::PipelineLayout& m_pipeline_layout;
+    vk::raii::Pipeline& m_pipeline;
 
 public:
-    ForwardPass(vk::raii::PipelineLayout* pipeline_layout, vk::raii::Pipeline* pipeline)
+    ForwardPass(vk::raii::PipelineLayout& pipeline_layout, vk::raii::Pipeline& pipeline)
         : m_pipeline_layout(pipeline_layout), m_pipeline(pipeline) {}
 
-    std::string_view name() const override { return "forward_main"; }
-
-    const std::vector<render::ResourceDependency>& dependencies() const override { return m_dependencies; }
-
-    static void validate_resources(const RenderPassResources& resources) {
-        if (resources.extent.width == 0 || resources.extent.height == 0) {
-            throw std::runtime_error("ForwardPass frame resources are incomplete.");
-        }
+protected:
+    void validate(const RenderPassResources& resources) const override {
+        require_valid_extent(resources.extent, "ForwardPass frame resources are incomplete.");
+        require_valid_tracked_image(resources.color, "ForwardPass color target is invalid.");
     }
 
-    void execute(render::FrameContext& ctx, const RenderPassResources& resources) {
-        validate_resources(resources);
-
+    void do_execute(render::FrameContext& ctx, const RenderPassResources& resources) override {
         auto&       cmd         = ctx.cmd().command_buffer();
-        rhi::Image& color_image = resources.color_image;
+        rhi::Image& color_image = resources.color.image;
         rhi::Image& depth_image = resources.depth_image;
 
         vk::ImageMemoryBarrier2 to_color{};
-        to_color.srcStageMask                  = (resources.color_layout == vk::ImageLayout::eUndefined)
+        to_color.srcStageMask                  = (resources.color.layout == vk::ImageLayout::eUndefined)
                                                      ? vk::PipelineStageFlagBits2::eTopOfPipe
                                                      : vk::PipelineStageFlagBits2::eAllCommands;
         to_color.dstStageMask                  = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-        to_color.srcAccessMask                 = (resources.color_layout == vk::ImageLayout::eUndefined)
+        to_color.srcAccessMask                 = (resources.color.layout == vk::ImageLayout::eUndefined)
                                                      ? vk::AccessFlagBits2::eNone
                                                      : vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite;
         to_color.dstAccessMask                 = vk::AccessFlagBits2::eColorAttachmentWrite;
-        to_color.oldLayout                     = resources.color_layout;
+        to_color.oldLayout                     = resources.color.layout;
         to_color.newLayout                     = vk::ImageLayout::eColorAttachmentOptimal;
         to_color.image                         = *color_image.image();
         to_color.subresourceRange.aspectMask   = vk::ImageAspectFlagBits::eColor;
@@ -145,13 +136,13 @@ public:
             cmd.bindVertexBuffers(0, vertex_buffers, offsets);
             cmd.bindIndexBuffer(item.mesh.index_buffer(), 0, vk::IndexType::eUint32);
 
-            cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, **m_pipeline_layout, 0, *item.per_object_set, {});
+            cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_pipeline_layout, 0, *item.per_object_set, {});
 
             cmd.drawIndexed(item.mesh.index_count(), 1, 0, 0, 0);
         }
 
         cmd.endRendering();
-        resources.color_layout = vk::ImageLayout::eColorAttachmentOptimal;
+        resources.color.layout = vk::ImageLayout::eColorAttachmentOptimal;
     }
 };
 

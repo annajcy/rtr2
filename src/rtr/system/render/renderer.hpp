@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <stdexcept>
@@ -14,7 +16,7 @@
 #include "rtr/rhi/window.hpp"
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/frame_scheduler.hpp"
-#include "rtr/system/render/pipeline.hpp"
+#include "rtr/system/render/render_pipeline.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::system::render {
@@ -115,13 +117,25 @@ private:
         return context_info;
     }
 
+    static std::filesystem::path resolve_shader_root_dir() {
+        if (const char* env_root = std::getenv("RTR_SHADER_ROOT");
+            env_root != nullptr && env_root[0] != '\0') {
+            return std::filesystem::path(env_root);
+        }
+#ifdef RTR_DEFAULT_SHADER_OUTPUT_DIR
+        return std::filesystem::path(RTR_DEFAULT_SHADER_OUTPUT_DIR);
+#else
+        return {};
+#endif
+    }
+
     rhi::Window m_window;
     rhi::Context m_context;
     rhi::Device m_device;
 
     rhi::CommandPool m_compute_command_pool;
     FrameScheduler m_frame_scheduler;
-    std::unique_ptr<IRenderPipeline> m_active_pipeline{};
+    std::unique_ptr<RenderPipeline> m_active_pipeline{};
 
     utils::SubscriptionToken m_window_resize_subscription{};
     uint64_t m_last_swapchain_generation{0};
@@ -176,11 +190,12 @@ public:
             .window = m_window,
             .image_count = m_frame_scheduler.image_count(),
             .color_format = m_frame_scheduler.render_format(),
-            .depth_format = m_frame_scheduler.depth_format()
+            .depth_format = m_frame_scheduler.depth_format(),
+            .shader_root_dir = resolve_shader_root_dir()
         };
     }
 
-    void set_pipeline(std::unique_ptr<IRenderPipeline> pipeline) {
+    void set_pipeline(std::unique_ptr<RenderPipeline> pipeline) {
         if (!pipeline) {
             throw std::runtime_error("set_pipeline received null pipeline.");
         }
@@ -191,8 +206,8 @@ public:
         m_active_pipeline->on_swapchain_state_changed(m_frame_scheduler.swapchain_state());
     }
 
-    IRenderPipeline* pipeline() { return m_active_pipeline.get(); }
-    const IRenderPipeline* pipeline() const { return m_active_pipeline.get(); }
+    RenderPipeline* pipeline() { return m_active_pipeline.get(); }
+    const RenderPipeline* pipeline() const { return m_active_pipeline.get(); }
 
     // Contract:
     // 1) compute/compute_async do not require set_pipeline().

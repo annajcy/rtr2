@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -19,13 +20,13 @@
 #include "rtr/rhi/mesh.hpp"
 #include "rtr/rhi/shader_module.hpp"
 #include "rtr/rhi/texture.hpp"
-#include "rtr/system/render/frame_color_source.hpp"
 #include "rtr/system/render/pass/present_pass.hpp"
-#include "rtr/system/render/pipeline.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pass.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
-#include "rtr/system/render/render_pass.hpp"
+#include "rtr/system/render/render_pipeline.hpp"
+#include "rtr/system/render/render_resource_state.hpp"
+#include "rtr/system/render/scene_target_controller.hpp"
 #include "rtr/utils/log.hpp"
 #include "vulkan/vulkan.hpp"
 
@@ -61,7 +62,7 @@ struct UniformBufferObjectGpu {
 };
 
 inline GpuMat4 pack_mat4_row_major(const pbpt::math::mat4& m) {
-    GpuMat4     out{};
+    GpuMat4 out{};
     std::size_t idx = 0;
     for (int r = 0; r < 4; ++r)
         for (int c = 0; c < 4; ++c)
@@ -70,7 +71,6 @@ inline GpuMat4 pack_mat4_row_major(const pbpt::math::mat4& m) {
 }
 
 struct ForwardPipelineConfig {
-    std::string shader_output_dir{"/Users/jinceyang/Desktop/codebase/graphics/rtr2/build/Debug/shaders/compiled/"};
     std::string vertex_shader_filename{"vert_buffer_vert.spv"};
     std::string fragment_shader_filename{"vert_buffer_frag.spv"};
 };
@@ -79,43 +79,33 @@ struct ForwardPipelineConfig {
 // ForwardPipeline
 // Sequence: ForwardPass (offscreen) → PresentPass (blit to swapchain).
 // ---------------------------------------------------------------------------
-class ForwardPipeline final : public RenderPipelineBase,
-                              public IFramePreparePipeline,
-                              public IFrameColorSource,
-                              public ISceneViewportSink {
+class ForwardPipeline final : public RenderPipeline {
     static constexpr uint32_t kMaxRenderables = 256;
 
     struct ForwardFrameTargets {
-        std::array<rhi::Image, rhi::kFramesInFlight> color_images;
+        std::array<FrameTrackedImage, rhi::kFramesInFlight> color_images;
         std::array<rhi::Image, rhi::kFramesInFlight> depth_images;
-        std::array<vk::ImageLayout, rhi::kFramesInFlight> color_image_layouts;
 
         ForwardFrameTargets(
-            std::array<rhi::Image, rhi::kFramesInFlight>&& color_images_in,
-            std::array<rhi::Image, rhi::kFramesInFlight>&& depth_images_in,
-            std::array<vk::ImageLayout, rhi::kFramesInFlight>&& color_image_layouts_in
+            std::array<FrameTrackedImage, rhi::kFramesInFlight>&& color_images_in,
+            std::array<rhi::Image, rhi::kFramesInFlight>&& depth_images_in
         )
             : color_images(std::move(color_images_in)),
-              depth_images(std::move(depth_images_in)),
-              color_image_layouts(std::move(color_image_layouts_in)) {}
+              depth_images(std::move(depth_images_in)) {}
     };
 
-    rhi::ShaderModule      m_vertex_shader_module;
-    rhi::ShaderModule      m_fragment_shader_module;
+    rhi::ShaderModule m_vertex_shader_module;
+    rhi::ShaderModule m_fragment_shader_module;
     rhi::DescriptorSetLayout m_per_object_layout;
-    rhi::DescriptorPool      m_descriptor_pool;
+    rhi::DescriptorPool m_descriptor_pool;
     vk::raii::PipelineLayout m_pipeline_layout{nullptr};
-    vk::raii::Pipeline       m_pipeline{nullptr};
+    vk::raii::Pipeline m_pipeline{nullptr};
 
-    vk::DeviceSize                                         m_uniform_buffer_size{0};
-    std::array<std::vector<rhi::Buffer>, rhi::kFramesInFlight>      m_object_uniform_buffers{};
+    vk::DeviceSize m_uniform_buffer_size{0};
+    std::array<std::vector<rhi::Buffer>, rhi::kFramesInFlight> m_object_uniform_buffers{};
     std::array<std::vector<vk::raii::DescriptorSet>, rhi::kFramesInFlight> m_object_sets{};
-    std::optional<ForwardFrameTargets> m_frame_targets{};
 
-    vk::Extent2D m_scene_target_extent{};
-    vk::Extent2D m_requested_scene_extent{};
-    bool         m_scene_extent_dirty{false};
-
+    SceneTargetController<ForwardFrameTargets> m_scene_targets;
     std::optional<ForwardSceneView> m_scene_view{};
 
     render::ForwardPass m_forward_pass;
@@ -123,17 +113,24 @@ class ForwardPipeline final : public RenderPipelineBase,
 
 public:
     ForwardPipeline(const render::PipelineRuntime& runtime, const ForwardPipelineConfig& config = {})
-        : RenderPipelineBase(runtime),
-          m_vertex_shader_module(build_shader_module(m_device, config.shader_output_dir + config.vertex_shader_filename,
-                                                     vk::ShaderStageFlagBits::eVertex)),
-          m_fragment_shader_module(build_shader_module(m_device, config.shader_output_dir + config.fragment_shader_filename,
-                                                       vk::ShaderStageFlagBits::eFragment)),
+        : RenderPipeline(runtime),
+          m_vertex_shader_module(build_shader_module(
+              m_device,
+              resolve_shader_path(runtime, config.vertex_shader_filename),
+              vk::ShaderStageFlagBits::eVertex
+          )),
+          m_fragment_shader_module(build_shader_module(
+              m_device,
+              resolve_shader_path(runtime, config.fragment_shader_filename),
+              vk::ShaderStageFlagBits::eFragment
+          )),
           m_per_object_layout(build_per_object_layout(m_device)),
           m_descriptor_pool(build_per_object_pool(m_device, m_per_object_layout,
                                                   static_cast<uint32_t>(rhi::kFramesInFlight), kMaxRenderables)),
           m_pipeline_layout(build_pipeline_layout(m_device, m_per_object_layout)),
           m_uniform_buffer_size(sizeof(UniformBufferObjectGpu)),
-          m_forward_pass(&m_pipeline_layout, &m_pipeline) {
+          m_scene_targets(*this, "ForwardPipeline"),
+          m_forward_pass(m_pipeline_layout, m_pipeline) {
         create_per_object_resources();
         create_graphics_pipeline();
     }
@@ -147,76 +144,63 @@ public:
         m_scene_view = build_forward_scene_view(*active_scene, ctx.resources, m_device);
     }
 
-    void set_scene_viewport_extent(vk::Extent2D extent) override {
-        if (extent.width == 0 || extent.height == 0)
-            return;
-        if (m_requested_scene_extent.width == extent.width && m_requested_scene_extent.height == extent.height)
-            return;
-        m_requested_scene_extent = extent;
-        m_scene_extent_dirty     = true;
-    }
-
-    FrameColorSourceView frame_color_source_view(uint32_t frame_index) const override {
-        if (!m_frame_targets.has_value()) {
-            return {};
-        }
-        if (frame_index >= rhi::kFramesInFlight) {
-            return {};
-        }
-        const auto& color = m_frame_targets->color_images[frame_index];
-        return FrameColorSourceView{
-            .image_view   = *color.image_view(),
-            .image_layout = m_frame_targets->color_image_layouts[frame_index],
-            .extent       = {color.width(), color.height()}};
-    }
-
     void on_resize(int /*w*/, int /*h*/) override {}
 
     void handle_swapchain_state_change(const FrameScheduler::SwapchainState& /*state*/,
                                        const SwapchainChangeSummary& diff) override {
-        if (diff.color_or_depth_changed())
+        if (diff.color_or_depth_changed()) {
             create_graphics_pipeline();
-        if (diff.extent_or_depth_changed())
-            m_scene_extent_dirty = true;
+            m_scene_targets.request_recreate();
+        }
+        if (diff.extent_changed) {
+            m_scene_targets.on_swapchain_extent_changed();
+        }
     }
 
     void render(FrameContext& ctx) override {
-        // --- 1. Guard ---
         const auto extent = ctx.render_extent();
         if (extent.width == 0 || extent.height == 0)
             return;
         if (!m_scene_view)
             throw std::runtime_error("ForwardPipeline: scene view not set.");
 
-        ensure_scene_targets(extent);
+        auto& frame_targets = m_scene_targets.ensure(
+            extent,
+            [this](vk::Extent2D desired_extent) { return create_frame_targets(desired_extent); },
+            [](ForwardFrameTargets&) {}
+        );
+
         const uint32_t frame_index = ctx.frame_index();
         check_frame_resources(frame_index);
-        auto& frame_targets = require_frame_targets();
 
-        // --- 2. ForwardPass: render scene to offscreen color image ---
+        auto& tracked_color = frame_targets.color_images[frame_index];
+
         m_forward_pass.execute(
             ctx,
-            ForwardPass::RenderPassResources{.color_image  = frame_targets.color_images[frame_index],
-                                             .color_layout = frame_targets.color_image_layouts[frame_index],
-                                             .depth_image  = frame_targets.depth_images[frame_index],
-                                             .extent       = m_scene_target_extent,
-                                             .draw_items   = build_draw_items(frame_index)});
+            ForwardPass::RenderPassResources{
+                .color = tracked_color.view(),
+                .depth_image = frame_targets.depth_images[frame_index],
+                .extent = m_scene_targets.scene_extent(),
+                .draw_items = build_draw_items(frame_index)
+            }
+        );
 
-        // --- 3. PresentPass: blit offscreen → swapchain ---
         m_present_pass.execute(
             ctx,
-            PresentPass::RenderPassResources{.src_color_image  = frame_targets.color_images[frame_index],
-                                             .src_color_layout = frame_targets.color_image_layouts[frame_index],
-                                             .src_extent       = m_scene_target_extent});
+            PresentPass::RenderPassResources{
+                .src_color = tracked_color.view(),
+                .src_extent = m_scene_targets.scene_extent()
+            }
+        );
     }
 
 private:
     static rhi::ShaderModule build_shader_module(
         rhi::Device& device,
-        const std::string& shader_path,
+        const std::filesystem::path& shader_path,
         vk::ShaderStageFlagBits stage
     ) {
-        return rhi::ShaderModule::from_file(device, shader_path, stage);
+        return rhi::ShaderModule::from_file(device, shader_path.string(), stage);
     }
 
     static rhi::DescriptorSetLayout build_per_object_layout(rhi::Device& device) {
@@ -246,31 +230,16 @@ private:
         const rhi::DescriptorSetLayout& per_object_layout
     ) {
         std::array<vk::DescriptorSetLayout, 1> set_layouts{*per_object_layout.layout()};
-        vk::PipelineLayoutCreateInfo           layout_info{};
+        vk::PipelineLayoutCreateInfo layout_info{};
         layout_info.setLayoutCount = static_cast<uint32_t>(set_layouts.size());
-        layout_info.pSetLayouts    = set_layouts.data();
+        layout_info.pSetLayouts = set_layouts.data();
         return vk::raii::PipelineLayout{device.device(), layout_info};
-    }
-
-    ForwardFrameTargets& require_frame_targets() {
-        if (!m_frame_targets.has_value()) {
-            throw std::runtime_error("ForwardPipeline frame targets are not initialized.");
-        }
-        return *m_frame_targets;
-    }
-
-    const ForwardFrameTargets& require_frame_targets() const {
-        if (!m_frame_targets.has_value()) {
-            throw std::runtime_error("ForwardPipeline frame targets are not initialized.");
-        }
-        return *m_frame_targets;
     }
 
     void check_frame_resources(uint32_t frame_index) const {
         if (frame_index >= rhi::kFramesInFlight) {
             throw std::runtime_error("ForwardPipeline frame index out of range.");
         }
-        (void)require_frame_targets();
         if (m_object_uniform_buffers[frame_index].empty() || m_object_sets[frame_index].empty()) {
             throw std::runtime_error("ForwardPipeline frame resources not ready.");
         }
@@ -287,32 +256,32 @@ private:
         std::vector<ForwardPass::DrawItem> items;
         items.reserve(scene_view.renderables.size());
         for (std::size_t i = 0; i < scene_view.renderables.size(); ++i) {
-            const auto& r    = scene_view.renderables[i];
+            const auto& r = scene_view.renderables[i];
 
             UniformBufferObjectGpu ubo{};
-            ubo.model      = pack_mat4_row_major(r.model);
-            ubo.view       = pack_mat4_row_major(scene_view.camera.view);
-            ubo.proj       = pack_mat4_row_major(scene_view.camera.proj);
-            ubo.normal     = pack_mat4_row_major(r.normal);
+            ubo.model = pack_mat4_row_major(r.model);
+            ubo.view = pack_mat4_row_major(scene_view.camera.view);
+            ubo.proj = pack_mat4_row_major(scene_view.camera.proj);
+            ubo.normal = pack_mat4_row_major(r.normal);
             ubo.base_color = {static_cast<float>(r.base_color.x()), static_cast<float>(r.base_color.y()),
                               static_cast<float>(r.base_color.z()), static_cast<float>(r.base_color.w())};
 
             ubo.point_light_count = static_cast<uint32_t>(scene_view.point_lights.size());
-            ubo.camera_world_pos  = {static_cast<float>(scene_view.camera.world_pos.x()),
-                                     static_cast<float>(scene_view.camera.world_pos.y()),
-                                     static_cast<float>(scene_view.camera.world_pos.z())};
+            ubo.camera_world_pos = {static_cast<float>(scene_view.camera.world_pos.x()),
+                                    static_cast<float>(scene_view.camera.world_pos.y()),
+                                    static_cast<float>(scene_view.camera.world_pos.z())};
 
             for (std::size_t j = 0; j < ubo.point_light_count; ++j) {
-                const auto& pl                = scene_view.point_lights[j];
-                ubo.point_lights[j].position  = {static_cast<float>(pl.position.x()),
-                                                 static_cast<float>(pl.position.y()),
-                                                 static_cast<float>(pl.position.z())};
+                const auto& pl = scene_view.point_lights[j];
+                ubo.point_lights[j].position = {static_cast<float>(pl.position.x()),
+                                                static_cast<float>(pl.position.y()),
+                                                static_cast<float>(pl.position.z())};
                 ubo.point_lights[j].intensity = pl.intensity;
-                ubo.point_lights[j].color     = {static_cast<float>(pl.color.x()), static_cast<float>(pl.color.y()),
-                                                 static_cast<float>(pl.color.z())};
-                ubo.point_lights[j].range     = pl.range;
+                ubo.point_lights[j].color = {static_cast<float>(pl.color.x()), static_cast<float>(pl.color.y()),
+                                             static_cast<float>(pl.color.z())};
+                ubo.point_lights[j].range = pl.range;
                 ubo.point_lights[j].specular_strength = pl.specular_strength;
-                ubo.point_lights[j].shininess         = pl.shininess;
+                ubo.point_lights[j].shininess = pl.shininess;
             }
 
             std::memcpy(frame_ubos[i].mapped_data(), &ubo, sizeof(ubo));
@@ -320,22 +289,6 @@ private:
             items.push_back({.mesh = r.mesh, .per_object_set = frame_sets[i]});
         }
         return items;
-    }
-
-    void ensure_scene_targets(vk::Extent2D fallback) {
-        vk::Extent2D desired = fallback;
-        if (m_requested_scene_extent.width > 0 && m_requested_scene_extent.height > 0)
-            desired = m_requested_scene_extent;
-
-        const bool need_recreate = m_scene_extent_dirty || m_scene_target_extent.width != desired.width ||
-                                   m_scene_target_extent.height != desired.height || !m_frame_targets.has_value();
-        if (!need_recreate)
-            return;
-
-        m_device.wait_idle();
-        m_scene_target_extent = desired;
-        m_frame_targets = create_frame_targets();
-        m_scene_extent_dirty = false;
     }
 
     void create_per_object_resources() {
@@ -359,100 +312,100 @@ private:
         }
     }
 
-    std::array<rhi::Image, rhi::kFramesInFlight> create_color_images() const {
+    std::array<FrameTrackedImage, rhi::kFramesInFlight> create_color_images(vk::Extent2D scene_extent) const {
         const vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
                                           vk::ImageUsageFlagBits::eTransferSrc;
-        return make_frame_array<rhi::Image>([&](uint32_t) {
-            return rhi::Image(
-                m_device,
-                m_scene_target_extent.width,
-                m_scene_target_extent.height,
-                m_color_format,
-                vk::ImageTiling::eOptimal,
-                usage,
-                vk::MemoryPropertyFlagBits::eDeviceLocal,
-                vk::ImageAspectFlagBits::eColor,
-                false
-            );
+        return make_frame_array<FrameTrackedImage>([&](uint32_t) {
+            return FrameTrackedImage{
+                rhi::Image(
+                    m_device,
+                    scene_extent.width,
+                    scene_extent.height,
+                    m_color_format,
+                    vk::ImageTiling::eOptimal,
+                    usage,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal,
+                    vk::ImageAspectFlagBits::eColor,
+                    false
+                ),
+                vk::ImageLayout::eUndefined
+            };
         });
     }
 
-    static std::array<vk::ImageLayout, rhi::kFramesInFlight> create_initial_color_layouts() {
-        return make_frame_array<vk::ImageLayout>([](uint32_t) { return vk::ImageLayout::eUndefined; });
-    }
-
-    ForwardFrameTargets create_frame_targets() const {
+    ForwardFrameTargets create_frame_targets(vk::Extent2D scene_extent) const {
         return ForwardFrameTargets{
-            create_color_images(),
-            make_per_frame_depth_images(m_scene_target_extent, m_depth_format),
-            create_initial_color_layouts()
+            create_color_images(scene_extent),
+            make_per_frame_depth_images(scene_extent, m_depth_format)
         };
     }
 
     void create_graphics_pipeline() {
-        std::vector<vk::PipelineShaderStageCreateInfo> stages = {m_vertex_shader_module.stage_create_info(),
-                                                                 m_fragment_shader_module.stage_create_info()};
+        std::vector<vk::PipelineShaderStageCreateInfo> stages = {
+            m_vertex_shader_module.stage_create_info(),
+            m_fragment_shader_module.stage_create_info()
+        };
 
-        auto                                   vi_state = rhi::Mesh::vertex_input_state();
+        auto vi_state = rhi::Mesh::vertex_input_state();
         vk::PipelineVertexInputStateCreateInfo vi{};
-        vi.vertexBindingDescriptionCount   = static_cast<uint32_t>(vi_state.bindings.size());
-        vi.pVertexBindingDescriptions      = vi_state.bindings.data();
+        vi.vertexBindingDescriptionCount = static_cast<uint32_t>(vi_state.bindings.size());
+        vi.pVertexBindingDescriptions = vi_state.bindings.data();
         vi.vertexAttributeDescriptionCount = static_cast<uint32_t>(vi_state.attributes.size());
-        vi.pVertexAttributeDescriptions    = vi_state.attributes.data();
+        vi.pVertexAttributeDescriptions = vi_state.attributes.data();
 
         vk::PipelineInputAssemblyStateCreateInfo ia{};
         ia.topology = vk::PrimitiveTopology::eTriangleList;
 
         vk::PipelineViewportStateCreateInfo vp{};
         vp.viewportCount = 1;
-        vp.scissorCount  = 1;
+        vp.scissorCount = 1;
 
         vk::PipelineRasterizationStateCreateInfo rs{};
         rs.polygonMode = vk::PolygonMode::eFill;
-        rs.cullMode    = vk::CullModeFlagBits::eNone;
-        rs.frontFace   = vk::FrontFace::eCounterClockwise;
-        rs.lineWidth   = 1.0f;
+        rs.cullMode = vk::CullModeFlagBits::eNone;
+        rs.frontFace = vk::FrontFace::eCounterClockwise;
+        rs.lineWidth = 1.0f;
 
         vk::PipelineMultisampleStateCreateInfo ms{};
         ms.rasterizationSamples = vk::SampleCountFlagBits::e1;
 
         vk::PipelineDepthStencilStateCreateInfo ds{};
-        ds.depthTestEnable  = VK_TRUE;
+        ds.depthTestEnable = VK_TRUE;
         ds.depthWriteEnable = VK_TRUE;
-        ds.depthCompareOp   = vk::CompareOp::eLess;
+        ds.depthCompareOp = vk::CompareOp::eLess;
 
         vk::PipelineColorBlendAttachmentState cba{};
-        cba.blendEnable    = VK_FALSE;
+        cba.blendEnable = VK_FALSE;
         cba.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
         vk::PipelineColorBlendStateCreateInfo cb{};
         cb.attachmentCount = 1;
-        cb.pAttachments    = &cba;
+        cb.pAttachments = &cba;
 
-        std::vector<vk::DynamicState>      dyn = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+        std::vector<vk::DynamicState> dyn = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
         vk::PipelineDynamicStateCreateInfo dys{};
         dys.dynamicStateCount = static_cast<uint32_t>(dyn.size());
-        dys.pDynamicStates    = dyn.data();
+        dys.pDynamicStates = dyn.data();
 
         vk::GraphicsPipelineCreateInfo info{};
-        info.stageCount          = static_cast<uint32_t>(stages.size());
-        info.pStages             = stages.data();
-        info.pVertexInputState   = &vi;
+        info.stageCount = static_cast<uint32_t>(stages.size());
+        info.pStages = stages.data();
+        info.pVertexInputState = &vi;
         info.pInputAssemblyState = &ia;
-        info.pViewportState      = &vp;
+        info.pViewportState = &vp;
         info.pRasterizationState = &rs;
-        info.pMultisampleState   = &ms;
-        info.pDepthStencilState  = &ds;
-        info.pColorBlendState    = &cb;
-        info.pDynamicState       = &dys;
-        info.layout              = *m_pipeline_layout;
-        info.renderPass          = VK_NULL_HANDLE;
+        info.pMultisampleState = &ms;
+        info.pDepthStencilState = &ds;
+        info.pColorBlendState = &cb;
+        info.pDynamicState = &dys;
+        info.layout = *m_pipeline_layout;
+        info.renderPass = VK_NULL_HANDLE;
 
         vk::PipelineRenderingCreateInfo ri{};
-        vk::Format                      cfmt = m_color_format;
-        ri.colorAttachmentCount              = 1;
-        ri.pColorAttachmentFormats           = &cfmt;
-        ri.depthAttachmentFormat             = m_depth_format;
+        vk::Format cfmt = m_color_format;
+        ri.colorAttachmentCount = 1;
+        ri.pColorAttachmentFormats = &cfmt;
+        ri.depthAttachmentFormat = m_depth_format;
 
         vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> chain{info, ri};
         m_pipeline = vk::raii::Pipeline{m_device.device(), nullptr, chain.get<vk::GraphicsPipelineCreateInfo>()};
