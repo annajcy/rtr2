@@ -27,26 +27,31 @@ public:
     using PerImageResources = FrameScheduler::PerImageResources;
     using RenderCallback = std::function<void(FrameContext&)>;
     using ComputeRecordCallback = std::function<void(rhi::CommandBuffer&)>;
+    using ComputeCompleteCallback = std::function<void()>;
 
     class ComputeJob {
     private:
-        rhi::Device* m_device{};
-        std::unique_ptr<rhi::CommandBuffer> m_command_buffer{};
+        rhi::Device& m_device;
+        rhi::CommandBuffer m_command_buffer;
         vk::raii::Fence m_fence{nullptr};
+        mutable ComputeCompleteCallback m_on_complete{};
+        mutable bool m_on_complete_invoked{false};
 
         ComputeJob(
-            rhi::Device* device,
+                        rhi::Device& device,
             rhi::CommandBuffer&& command_buffer,
-            vk::raii::Fence&& fence
+                        vk::raii::Fence&& fence,
+                        ComputeCompleteCallback&& on_complete
         )
             : m_device(device),
-              m_command_buffer(std::make_unique<rhi::CommandBuffer>(std::move(command_buffer))),
-              m_fence(std::move(fence)) {}
+                            m_command_buffer(std::move(command_buffer)),
+                            m_fence(std::move(fence)),
+                            m_on_complete(std::move(on_complete)) {}
 
         friend class Renderer;
 
     public:
-        ComputeJob() = default;
+        ComputeJob() = delete;
         ~ComputeJob() noexcept {
             if (!valid()) {
                 return;
@@ -60,24 +65,28 @@ public:
         ComputeJob(const ComputeJob&) = delete;
         ComputeJob& operator=(const ComputeJob&) = delete;
         ComputeJob(ComputeJob&&) noexcept = default;
-        ComputeJob& operator=(ComputeJob&&) noexcept = default;
+        ComputeJob& operator=(ComputeJob&&) noexcept = delete;
 
         bool valid() const {
-            return m_device != nullptr &&
-                   m_command_buffer != nullptr &&
-                   static_cast<vk::Fence>(m_fence) != vk::Fence{};
+            return static_cast<vk::Fence>(m_fence) != vk::Fence{};
+        }
+
+        void set_on_complete(ComputeCompleteCallback on_complete) {
+            m_on_complete = std::move(on_complete);
+            m_on_complete_invoked = false;
         }
 
         bool is_done() const {
             if (!valid()) {
                 return false;
             }
-            const vk::Result result = m_device->device().waitForFences(
+            const vk::Result result = m_device.device().waitForFences(
                 *m_fence,
                 VK_TRUE,
                 0
             );
             if (result == vk::Result::eSuccess) {
+                invoke_on_complete_if_needed();
                 return true;
             }
             if (result == vk::Result::eTimeout) {
@@ -91,18 +100,28 @@ public:
                 throw std::runtime_error("ComputeJob is invalid.");
             }
 
-            const vk::Result result = m_device->device().waitForFences(
+            const vk::Result result = m_device.device().waitForFences(
                 *m_fence,
                 VK_TRUE,
                 timeout_ns
             );
             if (result == vk::Result::eSuccess) {
+                invoke_on_complete_if_needed();
                 return;
             }
             if (result == vk::Result::eTimeout) {
                 throw std::runtime_error("ComputeJob wait timed out.");
             }
             throw std::runtime_error("ComputeJob wait failed.");
+        }
+
+    private:
+        void invoke_on_complete_if_needed() const {
+            if (m_on_complete_invoked || !m_on_complete) {
+                return;
+            }
+            m_on_complete_invoked = true;
+            m_on_complete();
         }
     };
 
@@ -214,12 +233,12 @@ public:
     // 2) compute/compute_async do not acquire/present swapchain images.
     // 3) Renderer is not thread-safe; draw_frame()/compute* must be called serially.
     // 4) ComputeJob must be used while Renderer is alive.
-    void compute(const ComputeRecordCallback& record) {
-        auto job = compute_async(record);
+    void compute(const ComputeRecordCallback& record, ComputeCompleteCallback on_complete = {}) {
+        auto job = compute_async(record, std::move(on_complete));
         job.wait();
     }
 
-    ComputeJob compute_async(const ComputeRecordCallback& record) {
+    ComputeJob compute_async(const ComputeRecordCallback& record, ComputeCompleteCallback on_complete = {}) {
         if (!record) {
             throw std::runtime_error("compute_async received empty callback.");
         }
@@ -235,9 +254,10 @@ public:
         command_buffer.submit(submit_info);
 
         return ComputeJob(
-            &m_device,
+            m_device,
             std::move(command_buffer),
-            std::move(fence)
+            std::move(fence),
+            std::move(on_complete)
         );
     }
 

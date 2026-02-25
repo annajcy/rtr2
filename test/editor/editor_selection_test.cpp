@@ -1,3 +1,6 @@
+#include <cstdlib>
+#include <string>
+
 #include "gtest/gtest.h"
 
 #include "rtr/app/app_runtime.hpp"
@@ -5,7 +8,24 @@
 
 namespace rtr::editor::test {
 
+namespace {
+
+bool gpu_tests_enabled() {
+    const char* value = std::getenv("RTR_RUN_GPU_TESTS");
+    return value != nullptr && std::string(value) == "1";
+}
+
+void require_gpu_tests_enabled() {
+    if (!gpu_tests_enabled()) {
+        GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
+    }
+}
+
+} // namespace
+
 TEST(EditorSelectionTest, KeepsValidSelection) {
+    require_gpu_tests_enabled();
+
     app::AppRuntime runtime(app::AppRuntimeConfig{
         .window_width = 320,
         .window_height = 240,
@@ -28,6 +48,8 @@ TEST(EditorSelectionTest, KeepsValidSelection) {
 }
 
 TEST(EditorSelectionTest, ClearsSelectionWhenGameObjectDestroyed) {
+    require_gpu_tests_enabled();
+
     app::AppRuntime runtime(app::AppRuntimeConfig{
         .window_width = 320,
         .window_height = 240,
@@ -50,6 +72,8 @@ TEST(EditorSelectionTest, ClearsSelectionWhenGameObjectDestroyed) {
 }
 
 TEST(EditorSelectionTest, ClearsSelectionWhenSceneDestroyed) {
+    require_gpu_tests_enabled();
+
     app::AppRuntime runtime(app::AppRuntimeConfig{
         .window_width = 320,
         .window_height = 240,
