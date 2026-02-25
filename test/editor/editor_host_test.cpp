@@ -1,4 +1,5 @@
 #include <memory>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -11,6 +12,17 @@
 namespace rtr::editor::test {
 
 namespace {
+
+bool gpu_tests_enabled() {
+    const char* value = std::getenv("RTR_RUN_GPU_TESTS");
+    return value != nullptr && std::string(value) == "1";
+}
+
+void require_gpu_tests_enabled() {
+    if (!gpu_tests_enabled()) {
+        GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
+    }
+}
 
 class ProbePanel final : public IEditorPanel {
 private:
@@ -49,6 +61,8 @@ public:
 } // namespace
 
 TEST(EditorHostTest, OrdersPanelsByOrderThenId) {
+    require_gpu_tests_enabled();
+
     app::AppRuntime runtime(app::AppRuntimeConfig{
         .window_width = 320,
         .window_height = 240,
@@ -72,6 +86,8 @@ TEST(EditorHostTest, OrdersPanelsByOrderThenId) {
 }
 
 TEST(EditorHostTest, SkipsInvisiblePanelsInImgui) {
+    require_gpu_tests_enabled();
+
     app::AppRuntime runtime(app::AppRuntimeConfig{
         .window_width = 320,
         .window_height = 240,
@@ -92,6 +108,8 @@ TEST(EditorHostTest, SkipsInvisiblePanelsInImgui) {
 }
 
 TEST(EditorHostTest, CanRemovePanelById) {
+    require_gpu_tests_enabled();
+
     app::AppRuntime runtime(app::AppRuntimeConfig{
         .window_width = 320,
         .window_height = 240,
@@ -115,6 +133,8 @@ TEST(EditorHostTest, CanRemovePanelById) {
 }
 
 TEST(EditorHostTest, RejectsDuplicatePanelId) {
+    require_gpu_tests_enabled();
+
     app::AppRuntime runtime(app::AppRuntimeConfig{
         .window_width = 320,
         .window_height = 240,
@@ -132,6 +152,8 @@ TEST(EditorHostTest, RejectsDuplicatePanelId) {
 }
 
 TEST(EditorHostTest, CanTogglePanelVisibilityById) {
+    require_gpu_tests_enabled();
+
     app::AppRuntime runtime(app::AppRuntimeConfig{
         .window_width = 320,
         .window_height = 240,
@@ -155,6 +177,8 @@ TEST(EditorHostTest, CanTogglePanelVisibilityById) {
 }
 
 TEST(EditorHostTest, ReturnsMissingForUnknownPanelVisibility) {
+    require_gpu_tests_enabled();
+
     app::AppRuntime runtime(app::AppRuntimeConfig{
         .window_width = 320,
         .window_height = 240,

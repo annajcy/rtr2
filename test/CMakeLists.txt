@@ -159,12 +159,12 @@ rtr_add_test(
 
 # editor
 if (TARGET rtr_editor)
-    rtr_add_test(
+    rtr_add_integration_test(
         test_editor_host
         editor/editor_host_test.cpp
         rtr::editor
     )
-    rtr_add_test(
+    rtr_add_integration_test(
         test_editor_selection
         editor/editor_selection_test.cpp
         rtr::editor
