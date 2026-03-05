@@ -33,8 +33,8 @@ inline std::string reflectance_key(const component::PbptRgb& reflectance) {
     return "rgb:" + rgb_value_string(reflectance);
 }
 
-inline ::pbpt::math::mat4 to_mat4(const ::pbpt::geometry::Transform<float>& transform) {
-    ::pbpt::math::mat4 matrix{1.0f};
+inline ::pbpt::math::Mat4 to_mat4(const ::pbpt::geometry::Transform<float>& transform) {
+    ::pbpt::math::Mat4 matrix{1.0f};
     const auto&      src = transform.matrix();
     for (int row = 0; row < 4; ++row) {
         for (int col = 0; col < 4; ++col) {
@@ -44,7 +44,7 @@ inline ::pbpt::math::mat4 to_mat4(const ::pbpt::geometry::Transform<float>& tran
     return matrix;
 }
 
-inline ::pbpt::geometry::Transform<float> to_transform(const ::pbpt::math::mat4& matrix) {
+inline ::pbpt::geometry::Transform<float> to_transform(const ::pbpt::math::Mat4& matrix) {
     return ::pbpt::geometry::Transform<float>(matrix);
 }
 

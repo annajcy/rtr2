@@ -62,7 +62,7 @@ struct MeshRendererPbptMeshExportMapper {
             compat_export_detail::to_pbpt_triangle_mesh(cpu_mesh, result.scene.render_transform, object_to_world);
         (void)result.scene.resources.mesh_library.add_item(mesh_name, std::move(mesh));
 
-        const ::pbpt::math::vec4 base_color = mesh_renderer->base_color();
+        const ::pbpt::math::Vec4 base_color = mesh_renderer->base_color();
         const component::PbptRgb reflectance{.r = base_color.x(), .g = base_color.y(), .b = base_color.z()};
         component::validate_pbpt_rgb(reflectance, "MeshRenderer.base_color");
 

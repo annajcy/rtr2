@@ -23,8 +23,8 @@
 
 namespace rtr::framework::integration::compat_import_detail {
 
-inline ::pbpt::math::mat4 to_mat4(const ::pbpt::geometry::Transform<float>& transform) {
-    ::pbpt::math::mat4 matrix{1.0f};
+inline ::pbpt::math::Mat4 to_mat4(const ::pbpt::geometry::Transform<float>& transform) {
+    ::pbpt::math::Mat4 matrix{1.0f};
     const auto&        src = transform.matrix();
     for (int row = 0; row < 4; ++row) {
         for (int col = 0; col < 4; ++col) {
@@ -46,7 +46,7 @@ inline component::PbptSpectrum to_component_spectrum(
 }
 
 struct PreviewPointLightParams {
-    ::pbpt::math::vec3 color{1.0f, 1.0f, 1.0f};
+    ::pbpt::math::Vec3 color{1.0f, 1.0f, 1.0f};
     float              intensity{0.0f};
 };
 
@@ -62,7 +62,7 @@ inline PreviewPointLightParams area_emission_to_preview_point_light(
     PreviewPointLightParams params{};
     const float             max_channel = std::max({r, g, b});
     if (max_channel > 0.0f && std::isfinite(max_channel)) {
-        params.color = ::pbpt::math::vec3{r / max_channel, g / max_channel, b / max_channel};
+        params.color = ::pbpt::math::Vec3{r / max_channel, g / max_channel, b / max_channel};
     }
 
     const float luminance_like = std::max(0.0f, static_cast<float>(xyz.y()));
@@ -96,12 +96,12 @@ inline utils::ObjMeshData to_rtr_mesh_data(const ::pbpt::shape::TriangleMesh<flo
     // Convert positions and UVs back to object space.
     for (std::size_t i = 0; i < positions.size(); ++i) {
         const auto object_p      = render_to_object.transform_point(positions[i]);
-        out.vertices[i].position = ::pbpt::math::vec3(object_p.x(), object_p.y(), object_p.z());
+        out.vertices[i].position = ::pbpt::math::Vec3(object_p.x(), object_p.y(), object_p.z());
 
         if (mesh.has_uvs() && i < uvs.size()) {
-            out.vertices[i].uv = ::pbpt::math::vec2(uvs[i].x(), uvs[i].y());
+            out.vertices[i].uv = ::pbpt::math::Vec2(uvs[i].x(), uvs[i].y());
         } else {
-            out.vertices[i].uv = ::pbpt::math::vec2(0.0f, 0.0f);
+            out.vertices[i].uv = ::pbpt::math::Vec2(0.0f, 0.0f);
         }
     }
 
@@ -123,12 +123,12 @@ inline utils::ObjMeshData to_rtr_mesh_data(const ::pbpt::shape::TriangleMesh<flo
             if (flip) {
                 object_n = -object_n;
             }
-            out.vertices[i].normal = ::pbpt::math::vec3(object_n.x(), object_n.y(), object_n.z());
+            out.vertices[i].normal = ::pbpt::math::Vec3(object_n.x(), object_n.y(), object_n.z());
         }
     } else {
         // No normals in the PBPT mesh — compute them from geometry winding,
         // the same way obj_io.hpp does it.
-        std::vector<::pbpt::math::vec3> accum(out.vertices.size(), ::pbpt::math::vec3(0.0f));
+        std::vector<::pbpt::math::Vec3> accum(out.vertices.size(), ::pbpt::math::Vec3(0.0f));
         for (std::size_t i = 0; i + 2u < out.indices.size(); i += 3u) {
             const auto  i0     = out.indices[i + 0u];
             const auto  i1     = out.indices[i + 1u];
@@ -144,7 +144,7 @@ inline utils::ObjMeshData to_rtr_mesh_data(const ::pbpt::shape::TriangleMesh<flo
         for (std::size_t v = 0; v < out.vertices.size(); ++v) {
             const float len = ::pbpt::math::length(accum[v]);
             out.vertices[v].normal =
-                len > 0.0f ? ::pbpt::math::normalize(accum[v]) : ::pbpt::math::vec3(0.0f, 1.0f, 0.0f);
+                len > 0.0f ? ::pbpt::math::normalize(accum[v]) : ::pbpt::math::Vec3(0.0f, 1.0f, 0.0f);
         }
     }
 

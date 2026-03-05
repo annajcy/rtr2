@@ -391,7 +391,7 @@ TEST(FrameworkPbptSceneLoaderTest, LookAtSensorAlignsWithRtrCameraFrontConventio
     const auto* camera = find_unique_active_camera(scene);
     ASSERT_NE(camera, nullptr);
 
-    const ::pbpt::math::vec3 front = camera->camera_world_front();
+    const ::pbpt::math::Vec3 front = camera->camera_world_front();
     EXPECT_NEAR(front.x(), 0.0f, 1e-5f);
     EXPECT_NEAR(front.y(), 0.0f, 1e-5f);
     EXPECT_NEAR(front.z(), 1.0f, 1e-5f);

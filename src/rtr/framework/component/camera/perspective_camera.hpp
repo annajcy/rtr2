@@ -19,7 +19,7 @@ public:
     float& aspect_ratio() { return m_aspect_ratio; }
     const float& aspect_ratio() const { return m_aspect_ratio; }
 
-    pbpt::math::mat4 projection_matrix() const override {
+    pbpt::math::Mat4 projection_matrix() const override {
         return pbpt::math::perspective(pbpt::math::radians(m_fov_degrees), m_aspect_ratio, near_bound(), far_bound());
     }
 

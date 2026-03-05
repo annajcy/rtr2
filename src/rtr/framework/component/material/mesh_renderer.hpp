@@ -18,13 +18,13 @@ private:
     }
 
     resource::MeshHandle m_mesh{};
-    pbpt::math::vec4 m_base_color{1.0f, 1.0f, 1.0f, 1.0f};
+    pbpt::math::Vec4 m_base_color{1.0f, 1.0f, 1.0f, 1.0f};
 
 public:
     explicit MeshRenderer(
         core::GameObject& owner,
         resource::MeshHandle mesh,
-        pbpt::math::vec4 base_color = pbpt::math::vec4{1.0f, 1.0f, 1.0f, 1.0f}
+        pbpt::math::Vec4 base_color = pbpt::math::Vec4{1.0f, 1.0f, 1.0f, 1.0f}
     )
         : Component(owner),
           m_mesh(mesh),
@@ -50,11 +50,11 @@ public:
         m_mesh = mesh;
     }
 
-    const pbpt::math::vec4& base_color() const {
+    const pbpt::math::Vec4& base_color() const {
         return m_base_color;
     }
 
-    void set_base_color(const pbpt::math::vec4& base_color) {
+    void set_base_color(const pbpt::math::Vec4& base_color) {
         m_base_color = base_color;
     }
 };

@@ -9,9 +9,9 @@
 namespace rtr::utils {
 
 struct ObjVertex {
-    pbpt::math::vec3 position{0.0f};
-    pbpt::math::vec2 uv{0.0f};
-    pbpt::math::vec3 normal{0.0f};
+    pbpt::math::Vec3 position{0.0f};
+    pbpt::math::Vec2 uv{0.0f};
+    pbpt::math::Vec3 normal{0.0f};
 };
 
 struct ObjMeshData {

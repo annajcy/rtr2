@@ -19,8 +19,8 @@ struct TrackBallCameraControllerConfig {
     float            zoom_speed{0.35f};
     float            pitch_min_degrees{-89.0f};
     float            pitch_max_degrees{89.0f};
-    pbpt::math::vec3 world_up{0.0f, 1.0f, 0.0f};
-    pbpt::math::vec3 default_target{0.0f, 0.0f, 0.0f};
+    pbpt::math::Vec3 world_up{0.0f, 1.0f, 0.0f};
+    pbpt::math::Vec3 default_target{0.0f, 0.0f, 0.0f};
 };
 
 class TrackBallCameraController final : public CameraController {
@@ -33,7 +33,7 @@ private:
 
     bool m_orbit_initialized{false};
 
-    pbpt::math::vec3 m_target_world{0.0f, 0.0f, 0.0f};
+    pbpt::math::Vec3 m_target_world{0.0f, 0.0f, 0.0f};
     float            m_radius{1.0f};
     float            m_yaw_degrees{0.0f};
     float            m_pitch_degrees{0.0f};
@@ -56,8 +56,8 @@ private:
 
     void sync_spherical_from_current_position() {
         const auto node                     = require_owner().node();
-        const pbpt::math::vec3 world_pos    = node.world_position();
-        const pbpt::math::vec3 offset       = world_pos - m_target_world;
+        const pbpt::math::Vec3 world_pos    = node.world_position();
+        const pbpt::math::Vec3 offset       = world_pos - m_target_world;
         m_radius                            = std::max(pbpt::math::length(offset), kEpsilon);
         m_yaw_degrees                       = pbpt::math::degrees(std::atan2(offset.x(), offset.z()));
         m_pitch_degrees                     = pbpt::math::degrees(pbpt::math::asin(pbpt::math::clamp(offset.y() / m_radius, -1.0f, 1.0f)));
@@ -67,42 +67,42 @@ private:
     void initialize_orbit_state() {
         sync_spherical_from_current_position();
         auto node = require_owner().node();
-        const pbpt::math::vec3 look_dir = m_target_world - node.world_position();
+        const pbpt::math::Vec3 look_dir = m_target_world - node.world_position();
         if (pbpt::math::length(look_dir) > kEpsilon) {
             node.set_world_rotation(world_rotation_looking_to(look_dir));
         }
         m_orbit_initialized = true;
     }
 
-    pbpt::math::vec3 spherical_direction() const {
+    pbpt::math::Vec3 spherical_direction() const {
         const float yaw_rad   = pbpt::math::radians(m_yaw_degrees);
         const float pitch_rad = pbpt::math::radians(m_pitch_degrees);
         const float cos_pitch = std::cos(pitch_rad);
         return pbpt::math::normalize(
-            pbpt::math::vec3{std::sin(yaw_rad) * cos_pitch, std::sin(pitch_rad), std::cos(yaw_rad) * cos_pitch});
+            pbpt::math::Vec3{std::sin(yaw_rad) * cos_pitch, std::sin(pitch_rad), std::cos(yaw_rad) * cos_pitch});
     }
 
-    pbpt::math::quat world_rotation_looking_to(const pbpt::math::vec3& forward_dir) const {
-        const pbpt::math::vec3 forward = pbpt::math::normalize(forward_dir);
-        pbpt::math::vec3       up      = pbpt::math::normalize(m_config.world_up);
+    pbpt::math::Quat world_rotation_looking_to(const pbpt::math::Vec3& forward_dir) const {
+        const pbpt::math::Vec3 forward = pbpt::math::normalize(forward_dir);
+        pbpt::math::Vec3       up      = pbpt::math::normalize(m_config.world_up);
         if (pbpt::math::length(pbpt::math::cross(up, forward)) <= kEpsilon) {
-            up = pbpt::math::vec3(0.0f, 0.0f, 1.0f);
+            up = pbpt::math::Vec3(0.0f, 0.0f, 1.0f);
             if (pbpt::math::length(pbpt::math::cross(up, forward)) <= kEpsilon) {
-                up = pbpt::math::vec3(1.0f, 0.0f, 0.0f);
+                up = pbpt::math::Vec3(1.0f, 0.0f, 0.0f);
             }
         }
 
-        const pbpt::math::vec3 right        = pbpt::math::normalize(pbpt::math::cross(forward, up));
-        const pbpt::math::vec3 corrected_up = pbpt::math::normalize(pbpt::math::cross(right, forward));
-        const pbpt::math::mat3 basis        = pbpt::math::mat3::from_cols(right, corrected_up, -forward);
+        const pbpt::math::Vec3 right        = pbpt::math::normalize(pbpt::math::cross(forward, up));
+        const pbpt::math::Vec3 corrected_up = pbpt::math::normalize(pbpt::math::cross(right, forward));
+        const pbpt::math::Mat3 basis        = pbpt::math::Mat3::from_cols(right, corrected_up, -forward);
         return pbpt::math::normalize(pbpt::math::quat_cast(basis));
     }
 
     void apply_pose_from_orbit_state() {
         auto node = require_owner().node();
-        const pbpt::math::vec3 dir      = spherical_direction();
-        const pbpt::math::vec3 position = m_target_world + dir * m_radius;
-        const pbpt::math::vec3 look_dir = m_target_world - position;
+        const pbpt::math::Vec3 dir      = spherical_direction();
+        const pbpt::math::Vec3 position = m_target_world + dir * m_radius;
+        const pbpt::math::Vec3 look_dir = m_target_world - position;
         if (pbpt::math::length(look_dir) <= kEpsilon) {
             return;
         }
@@ -128,12 +128,12 @@ public:
 
     const TrackBallCameraControllerConfig& config() const { return m_config; }
 
-    void set_target(const pbpt::math::vec3& target_world) {
+    void set_target(const pbpt::math::Vec3& target_world) {
         m_target_world      = target_world;
         m_orbit_initialized = false;
     }
 
-    const pbpt::math::vec3& target() const { return m_target_world; }
+    const pbpt::math::Vec3& target() const { return m_target_world; }
 
     void on_update_active_camera(const core::FrameTickContext& /*ctx*/, Camera& camera) override {
         auto& go = require_owner();
@@ -153,13 +153,13 @@ public:
         } else if (middle_down) {
             auto node = go.node();
             const float distance_scale = std::max(m_radius, kEpsilon);
-            const pbpt::math::vec3 delta =
+            const pbpt::math::Vec3 delta =
                 node.world_right() * static_cast<float>(input.mouse_dx()) * m_config.pan_speed * distance_scale +
                 node.world_up() * static_cast<float>(input.mouse_dy()) * m_config.pan_speed * distance_scale;
 
             m_target_world += delta;
             node.set_world_position(node.world_position() + delta);
-            const pbpt::math::vec3 look_dir = m_target_world - node.world_position();
+            const pbpt::math::Vec3 look_dir = m_target_world - node.world_position();
             if (pbpt::math::length(look_dir) > kEpsilon) {
                 node.set_world_rotation(world_rotation_looking_to(look_dir));
             }
