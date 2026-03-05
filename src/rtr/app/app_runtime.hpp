@@ -14,6 +14,7 @@
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/frame_constants.hpp"
 #include "rtr/system/input/input_system.hpp"
+#include "rtr/system/physics/physics_system.hpp"
 #include "rtr/system/render/render_pipeline.hpp"
 #include "rtr/system/render/renderer.hpp"
 #include "rtr/utils/log.hpp"
@@ -46,6 +47,7 @@ struct RuntimeContext {
     resource::ResourceManager&       resources;
     system::render::Renderer&        renderer;
     system::input::InputSystem&      input;
+    system::physics::PhysicsSystem&  physics;
     std::uint64_t                    frame_serial{0};
     double                           delta_seconds{0.0};
     std::function<void()>            request_stop{};
@@ -77,6 +79,7 @@ private:
     RuntimeCallbacks m_callbacks{};
 
     resource::ResourceManager        m_resources;
+    system::physics::PhysicsSystem   m_physics;
     framework::core::World           m_world;
     system::render::Renderer         m_renderer;
     system::input::InputSystem       m_input;
@@ -90,6 +93,7 @@ public:
     explicit AppRuntime(AppRuntimeConfig config = {})
         : m_config(prepare_config(std::move(config))),
           m_resources(m_config.resource_root_dir),
+          m_physics(),
           m_world(m_resources),
           m_renderer(static_cast<int>(m_config.window_width), static_cast<int>(m_config.window_height),
                      m_config.window_title),
@@ -113,6 +117,9 @@ public:
 
     system::input::InputSystem& input_system() { return m_input; }
     const system::input::InputSystem& input_system() const { return m_input; }
+
+    system::physics::PhysicsSystem& physics_system() { return m_physics; }
+    const system::physics::PhysicsSystem& physics_system() const { return m_physics; }
 
     system::render::RenderPipeline* pipeline() { return m_renderer.pipeline(); }
     const system::render::RenderPipeline* pipeline() const { return m_renderer.pipeline(); }
@@ -195,10 +202,14 @@ public:
                         std::uint32_t fixed_steps = 0;
                         while (accumulator >= m_config.fixed_delta_seconds &&
                                fixed_steps < m_config.max_fixed_steps_per_frame) {
-                            m_world.fixed_tick(framework::core::FixedTickContext{
+                            const framework::core::FixedTickContext fixed_ctx{
                                 .fixed_delta_seconds = m_config.fixed_delta_seconds,
                                 .fixed_tick_index    = m_fixed_tick_index++,
-                            });
+                            };
+                            m_world.fixed_tick(fixed_ctx);
+                            if (auto* active_scene = m_world.active_scene(); active_scene != nullptr) {
+                                m_physics.fixed_tick(*active_scene, fixed_ctx);
+                            }
                             accumulator -= m_config.fixed_delta_seconds;
                             ++fixed_steps;
                         }
@@ -290,6 +301,7 @@ private:
             .resources     = m_resources,
             .renderer      = m_renderer,
             .input         = m_input,
+            .physics       = m_physics,
             .frame_serial  = m_frame_serial,
             .delta_seconds = delta_seconds,
             .request_stop  = [this]() { request_stop(); },

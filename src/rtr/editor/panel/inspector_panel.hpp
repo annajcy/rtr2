@@ -12,6 +12,8 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/camera_control/trackball_camera_controller.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
+#include "rtr/framework/component/physics/ping_pong_component.hpp"
+#include "rtr/framework/component/physics/rigid_body_component.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/core/game_object.hpp"
@@ -213,6 +215,92 @@ private:
         }
     }
 
+    static void draw_rigid_body_editor(framework::core::GameObject& game_object) {
+        auto* rigid_body = game_object.get_component<framework::component::RigidBodyComponent>();
+        if (rigid_body == nullptr) {
+            return;
+        }
+
+        if (ImGui::CollapsingHeader("RigidBody", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = rigid_body->enabled();
+            if (ImGui::Checkbox("Enabled##rigid_body", &enabled)) {
+                rigid_body->set_enabled(enabled);
+                logger()->debug("RigidBody enabled updated (game_object_id={}, enabled={}).", game_object.id(), enabled);
+            }
+
+            ImGui::Text("RigidBody ID: %llu", static_cast<unsigned long long>(rigid_body->rigid_body_id()));
+            if (!rigid_body->has_rigid_body()) {
+                ImGui::TextDisabled("Physics body is not registered.");
+                return;
+            }
+
+            pbpt::math::Vec3 position = rigid_body->position();
+            if (ImGui::DragFloat3("Position##rigid_body", &position.x(), 0.05f)) {
+                rigid_body->set_position(position);
+                logger()->debug("RigidBody position updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                                game_object.id(), position.x(), position.y(), position.z());
+            }
+
+            pbpt::math::Vec3 linear_velocity = rigid_body->linear_velocity();
+            if (ImGui::DragFloat3("Linear Velocity", &linear_velocity.x(), 0.05f)) {
+                rigid_body->set_linear_velocity(linear_velocity);
+                logger()->debug(
+                    "RigidBody linear_velocity updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), linear_velocity.x(), linear_velocity.y(), linear_velocity.z());
+            }
+        }
+    }
+
+    static void draw_ping_pong_editor(framework::core::GameObject& game_object) {
+        auto* ping_pong = game_object.get_component<framework::component::PingPongComponent>();
+        if (ping_pong == nullptr) {
+            return;
+        }
+
+        if (ImGui::CollapsingHeader("PingPong", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = ping_pong->enabled();
+            if (ImGui::Checkbox("Enabled##ping_pong", &enabled)) {
+                ping_pong->set_enabled(enabled);
+                logger()->debug("PingPong enabled updated (game_object_id={}, enabled={}).", game_object.id(), enabled);
+            }
+
+            float min_x = ping_pong->min_x();
+            float max_x = ping_pong->max_x();
+            float speed = ping_pong->speed();
+            bool dirty_bounds = false;
+
+            if (ImGui::DragFloat("Min X", &min_x, 0.05f)) {
+                dirty_bounds = true;
+            }
+            if (ImGui::DragFloat("Max X", &max_x, 0.05f)) {
+                dirty_bounds = true;
+            }
+            if (dirty_bounds) {
+                ping_pong->set_bounds(min_x, max_x);
+                logger()->debug("PingPong bounds updated (game_object_id={}, min_x={:.4f}, max_x={:.4f}).",
+                                game_object.id(), ping_pong->min_x(), ping_pong->max_x());
+            }
+
+            if (ImGui::DragFloat("Speed", &speed, 0.05f, 0.0f, 100.0f)) {
+                ping_pong->set_speed(speed);
+                logger()->debug("PingPong speed updated (game_object_id={}, speed={:.4f}).", game_object.id(),
+                                ping_pong->speed());
+            }
+
+            bool start_positive = ping_pong->start_positive();
+            if (ImGui::Checkbox("Start Positive", &start_positive)) {
+                ping_pong->set_start_positive(start_positive);
+                logger()->debug("PingPong start_positive updated (game_object_id={}, start_positive={}).",
+                                game_object.id(), start_positive);
+            }
+
+            if (ImGui::Button("Apply Direction")) {
+                ping_pong->apply_start_direction();
+                logger()->debug("PingPong apply_start_direction called (game_object_id={}).", game_object.id());
+            }
+        }
+    }
+
     static void draw_free_look_editor(framework::core::GameObject& game_object) {
         auto* free_look = game_object.get_component<framework::component::FreeLookCameraController>();
         if (free_look == nullptr) {
@@ -387,6 +475,8 @@ public:
         draw_camera_editor(*scene, *game_object);
         draw_mesh_renderer_editor(*game_object);
         draw_point_light_editor(*game_object);
+        draw_rigid_body_editor(*game_object);
+        draw_ping_pong_editor(*game_object);
         draw_free_look_editor(*game_object);
         draw_trackball_editor(*game_object);
 
