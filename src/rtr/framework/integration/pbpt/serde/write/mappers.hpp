@@ -55,13 +55,14 @@ struct MeshRendererPbptMeshExportMapper {
         if (mesh_base.empty()) {
             mesh_base = "go_" + std::to_string(static_cast<std::uint64_t>(go.id()));
         }
-        std::string mesh_name = compat_export_detail::make_unique_name(
-            mesh_base, [&](const std::string& name) { return result.scene.resources.mesh_library.name_to_id().contains(name); });
-        auto mesh =
+        std::string mesh_name = compat_export_detail::make_unique_name(mesh_base, [&](const std::string& name) {
+            return result.scene.resources.mesh_library.name_to_id().contains(name);
+        });
+        auto        mesh =
             compat_export_detail::to_pbpt_triangle_mesh(cpu_mesh, result.scene.render_transform, object_to_world);
         (void)result.scene.resources.mesh_library.add_item(mesh_name, std::move(mesh));
 
-        const ::pbpt::math::vec4   base_color = mesh_renderer->base_color();
+        const ::pbpt::math::vec4 base_color = mesh_renderer->base_color();
         const component::PbptRgb reflectance{.r = base_color.x(), .g = base_color.y(), .b = base_color.z()};
         component::validate_pbpt_rgb(reflectance, "MeshRenderer.base_color");
 
@@ -118,19 +119,19 @@ struct MeshRendererPbptMeshExportMapper {
             const auto& mesh_ref = result.scene.resources.mesh_library.get(mesh_name);
             const auto& emission_spectrum =
                 result.scene.resources.reflectance_spectrum_library.get(shape_record.emission_spectrum_name.value());
-            auto light_spectrum = ::pbpt::radiometry::StandardEmissionSpectrum<float>(
-                emission_spectrum, ::pbpt::radiometry::constant::CIE_D65_ilum<float>);
+            auto light_spectrum = emission_spectrum;
             for (int triangle_index = 0; triangle_index < mesh_ref.triangle_count(); ++triangle_index) {
                 const std::string light_name = compat_export_detail::make_unique_name(
                     shape_id + "_light_" + std::to_string(triangle_index), [&](const std::string& name) {
                         return result.scene.resources.any_light_library.name_to_id().contains(name);
                     });
                 const int light_id = result.scene.resources.any_light_library.add_item(
-                    light_name, ::pbpt::light::AreaLight<float, ::pbpt::shape::Triangle<float>, decltype(light_spectrum)>(
-                                    ::pbpt::shape::Triangle<float>(mesh_ref, triangle_index), light_spectrum,
-                                    ::pbpt::light::AreaLightSamplingDomain::Shape));
-                result.scene.resources.mesh_light_map[::pbpt::scene::make_mesh_triangle_key(mesh_name, triangle_index)] =
-                    light_id;
+                    light_name,
+                    ::pbpt::light::AreaLight<float, ::pbpt::shape::Triangle<float>, decltype(light_spectrum)>(
+                        ::pbpt::shape::Triangle<float>(mesh_ref, triangle_index), light_spectrum,
+                        ::pbpt::light::AreaLightSamplingDomain::Shape));
+                result.scene.resources
+                    .mesh_light_map[::pbpt::scene::make_mesh_triangle_key(mesh_name, triangle_index)] = light_id;
             }
         }
     }

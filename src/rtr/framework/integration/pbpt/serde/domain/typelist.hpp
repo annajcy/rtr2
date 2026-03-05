@@ -9,7 +9,7 @@ namespace rtr::framework::integration {
 
 using ShapeLoaderList      = std::tuple<ObjLambertianShapeImportMapper>;
 using CameraLoaderList     = std::tuple<ThinLensPerspectiveImportMapper>;
-using IntegratorLoaderList = std::tuple<PathIntegratorImportMapper>;
+using IntegratorLoaderList = std::tuple<SimplePathIntegratorImportMapper>;
 
 using ShapeWriterList = std::tuple<MeshRendererPbptMeshExportMapper>;
 
@@ -18,7 +18,7 @@ static_assert(ImportShapeMapperConcept<ObjLambertianShapeImportMapper>,
               "ObjLambertianShapeImportMapper violates concept");
 static_assert(ImportCameraMapperConcept<ThinLensPerspectiveImportMapper>,
               "ThinLensPerspectiveImportMapper violates concept");
-static_assert(ImportIntegratorMapperConcept<PathIntegratorImportMapper>, "PathIntegratorImportMapper violates concept");
+static_assert(ImportIntegratorMapperConcept<SimplePathIntegratorImportMapper>, "SimplePathIntegratorImportMapper violates concept");
 static_assert(ExportShapeMapperConcept<MeshRendererPbptMeshExportMapper>,
               "MeshRendererPbptMeshExportMapper violates concept");
 

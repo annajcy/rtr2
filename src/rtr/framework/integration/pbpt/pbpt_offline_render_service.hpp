@@ -14,7 +14,7 @@
 #include <utility>
 
 #include "pbpt/integrator/integrator.hpp"
-#include "pbpt/integrator/plugin/integrator/path_integrator.hpp"
+#include "pbpt/integrator/plugin/integrator/simple_path_integrator.hpp"
 #include "pbpt/serde/scene_loader.hpp"
 
 #include "rtr/framework/component/camera/camera.hpp"
@@ -114,7 +114,7 @@ public:
                         const CancelQuery& is_cancel_requested) {
                 auto pbpt_scene_result = ::pbpt::serde::load_scene<float>(config.scene_xml_path);
                 auto& pbpt_scene = pbpt_scene_result.scene;
-                ::pbpt::integrator::PathIntegrator<float, 4> integrator(-1, 0.9f);
+                ::pbpt::integrator::SimplePathIntegrator<float, 4> integrator(-1, 0.9f);
 
                 ::pbpt::integrator::RenderObserver observer{};
                 observer.on_progress = on_progress;

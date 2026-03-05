@@ -73,7 +73,7 @@ inline std::vector<::pbpt::shape::Primitive<float>> build_primitives_from_resour
 }
 
 inline ::pbpt::integrator::AnyIntegrator<float> make_default_integrator() {
-    return ::pbpt::integrator::PathIntegrator<float, 4>(static_cast<unsigned>(-1), 0.9f);
+    return ::pbpt::integrator::SimplePathIntegrator<float, 4>(static_cast<unsigned>(-1), 0.9f);
 }
 
 inline ::pbpt::serde::PbptXmlResult<float> make_initial_xml_result(const CompatibleInfo* compatible_info) {

@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include "pbpt/serde/scene_io_config.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/pbpt/serde/context.hpp"
 #include "rtr/framework/integration/pbpt/serde/dispatch.hpp"
@@ -82,7 +83,9 @@ inline LoadPackage load_scene(const std::string& scene_xml_path, core::Scene& sc
         throw std::invalid_argument("scene_xml_path must not be empty.");
     }
     try {
-        auto pbpt_scene_result = ::pbpt::serde::load_scene<float>(scene_xml_path);
+        pbpt::serde::SceneLoadConfig config;
+        config.to_left_handed = false;
+        auto pbpt_scene_result = ::pbpt::serde::load_scene<float>(scene_xml_path, config);
         return load_scene(pbpt_scene_result, scene, resources, options);
     } catch (const std::exception& e) {
         pbpt_import_logger()->error("PBPT XML import failed: {}", e.what());

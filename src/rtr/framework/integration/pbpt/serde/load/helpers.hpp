@@ -25,7 +25,7 @@ namespace rtr::framework::integration::compat_import_detail {
 
 inline ::pbpt::math::mat4 to_mat4(const ::pbpt::geometry::Transform<float>& transform) {
     ::pbpt::math::mat4 matrix{1.0f};
-    const auto&      src = transform.matrix();
+    const auto&        src = transform.matrix();
     for (int row = 0; row < 4; ++row) {
         for (int col = 0; col < 4; ++col) {
             matrix[row][col] = src.at(row, col);
@@ -52,8 +52,7 @@ struct PreviewPointLightParams {
 
 inline PreviewPointLightParams area_emission_to_preview_point_light(
     const ::pbpt::radiometry::PiecewiseLinearSpectrumDistribution<float>& spectrum) {
-    const auto xyz = ::pbpt::radiometry::XYZ<float>::from_emission(
-        spectrum, ::pbpt::radiometry::constant::CIE_D65_ilum<float>);
+    const auto xyz        = ::pbpt::radiometry::XYZ<float>::from_emission(spectrum);
     const auto linear_rgb = ::pbpt::radiometry::constant::sRGB<float>.to_rgb(xyz);
 
     const float r = std::max(0.0f, static_cast<float>(linear_rgb.r()));
@@ -61,7 +60,7 @@ inline PreviewPointLightParams area_emission_to_preview_point_light(
     const float b = std::max(0.0f, static_cast<float>(linear_rgb.b()));
 
     PreviewPointLightParams params{};
-    const float max_channel = std::max({r, g, b});
+    const float             max_channel = std::max({r, g, b});
     if (max_channel > 0.0f && std::isfinite(max_channel)) {
         params.color = ::pbpt::math::vec3{r / max_channel, g / max_channel, b / max_channel};
     }
@@ -143,8 +142,9 @@ inline utils::ObjMeshData to_rtr_mesh_data(const ::pbpt::shape::TriangleMesh<flo
             accum[i2] += face_n;
         }
         for (std::size_t v = 0; v < out.vertices.size(); ++v) {
-            const float len        = ::pbpt::math::length(accum[v]);
-            out.vertices[v].normal = len > 0.0f ? ::pbpt::math::normalize(accum[v]) : ::pbpt::math::vec3(0.0f, 1.0f, 0.0f);
+            const float len = ::pbpt::math::length(accum[v]);
+            out.vertices[v].normal =
+                len > 0.0f ? ::pbpt::math::normalize(accum[v]) : ::pbpt::math::vec3(0.0f, 1.0f, 0.0f);
         }
     }
 
