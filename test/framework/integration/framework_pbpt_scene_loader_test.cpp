@@ -100,7 +100,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
-  <integrator type="path">
+  <integrator type="simple_path">
     <integer name="maxDepth" value="-1"/>
   </integrator>
   <sensor type="perspective">
@@ -211,7 +211,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsRgbReflectanceAndMapsToBaseColor) {
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
-  <integrator type="path">
+  <integrator type="simple_path">
     <integer name="maxDepth" value="-1"/>
   </integrator>
   <sensor type="perspective">
@@ -257,7 +257,7 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsForInvalidMatrixElementCount) {
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
-  <integrator type="path">
+  <integrator type="simple_path">
     <integer name="maxDepth" value="-1"/>
   </integrator>
   <sensor type="perspective">
@@ -294,7 +294,7 @@ TEST(FrameworkPbptSceneLoaderTest, DisambiguatesDuplicateImportedNameBetweenCame
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
-  <integrator type="path">
+  <integrator type="simple_path">
     <integer name="maxDepth" value="-1"/>
   </integrator>
   <sensor type="perspective">
@@ -331,7 +331,7 @@ TEST(FrameworkPbptSceneLoaderTest, RecordsDefaultShapeNameWhenShapeIdMissing) {
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
-  <integrator type="path">
+  <integrator type="simple_path">
     <integer name="maxDepth" value="-1"/>
   </integrator>
   <sensor type="perspective">
@@ -369,7 +369,7 @@ TEST(FrameworkPbptSceneLoaderTest, LookAtSensorAlignsWithRtrCameraFrontConventio
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
-  <integrator type="path">
+  <integrator type="simple_path">
     <integer name="maxDepth" value="-1"/>
   </integrator>
   <sensor type="perspective">
@@ -404,7 +404,7 @@ TEST(FrameworkPbptSceneLoaderTest, AttachesFreeLookControllerWhenInputStateProvi
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
-  <integrator type="path">
+  <integrator type="simple_path">
     <integer name="maxDepth" value="-1"/>
   </integrator>
   <sensor type="perspective">
@@ -443,7 +443,7 @@ TEST(FrameworkPbptSceneLoaderTest, RelativeMeshFilenameResolvesFromXmlDirectoryW
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
-  <integrator type="path">
+  <integrator type="simple_path">
     <integer name="maxDepth" value="-1"/>
   </integrator>
   <sensor type="perspective">
@@ -479,7 +479,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportWithCompatibleInfoMapsSubsetAndPreserve
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
-  <integrator type="path">
+  <integrator type="simple_path">
     <integer name="maxDepth" value="-1"/>
   </integrator>
   <sensor type="perspective">
@@ -541,7 +541,7 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsWhenSensorIsMissing) {
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
 <scene version="0.4.0">
-  <integrator type="path">
+  <integrator type="simple_path">
     <integer name="maxDepth" value="-1"/>
   </integrator>
   <bsdf type="diffuse" id="mat_white">

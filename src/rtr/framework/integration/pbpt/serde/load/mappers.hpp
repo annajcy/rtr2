@@ -11,7 +11,7 @@
 #include "rtr/framework/integration/pbpt/serde/load/helpers.hpp"
 
 #include "pbpt/camera/plugin/camera/projective_cameras.hpp"
-#include "pbpt/integrator/plugin/integrator/path_integrator.hpp"
+#include "pbpt/integrator/plugin/integrator/simple_path_integrator.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
@@ -162,17 +162,17 @@ struct ThinLensPerspectiveImportMapper {
     }
 };
 
-struct PathIntegratorImportMapper {
-    static constexpr std::string_view kName = "PathIntegratorImportMapper";
+struct SimplePathIntegratorImportMapper {
+    static constexpr std::string_view kName = "SimplePathIntegratorImportMapper";
 
     static bool matches(const ::pbpt::integrator::AnyIntegrator<float>& integrator, const ImportGlobalContext&,
                         LoadPackage&) {
-        return std::holds_alternative<::pbpt::integrator::PathIntegrator<float, 4>>(integrator);
+        return std::holds_alternative<::pbpt::integrator::SimplePathIntegrator<float, 4>>(integrator);
     }
 
     static void map(const ::pbpt::integrator::AnyIntegrator<float>& integrator, const ImportGlobalContext&,
                     LoadPackage& pkg) {
-        const auto& path_integrator = std::get<::pbpt::integrator::PathIntegrator<float, 4>>(integrator);
+        const auto& path_integrator = std::get<::pbpt::integrator::SimplePathIntegrator<float, 4>>(integrator);
         int         max_depth       = static_cast<int>(path_integrator.max_depth());
         if (path_integrator.max_depth() == std::numeric_limits<unsigned>::max()) {
             max_depth = -1;

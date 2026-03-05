@@ -5,7 +5,6 @@
 #include <stdexcept>
 #include <string>
 
-#include "pbpt/math/vector.hpp"
 #include "rtr/app/app_runtime.hpp"
 #include "rtr/editor/core/editor_capture.hpp"
 #include "rtr/editor/core/editor_host.hpp"
@@ -46,13 +45,12 @@ rtr::framework::component::Camera* find_unique_active_camera(rtr::framework::cor
 }  // namespace
 
 int main() {
-    constexpr uint32_t kWidth             = 1280;
-    constexpr uint32_t kHeight            = 720;
+    constexpr uint32_t kWidth  = 1280;
+    constexpr uint32_t kHeight = 720;
 
     try {
-        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{.window_width         = kWidth,
-                                                                .window_height        = kHeight,
-                                                                .window_title         = "RTR Framework Quickstart"});
+        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
+            .window_width = kWidth, .window_height = kHeight, .window_title = "RTR Framework Quickstart"});
 
         auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);
         editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
@@ -68,8 +66,8 @@ int main() {
 
         auto& scene = runtime.world().create_scene("main_scene");
 
-        auto& camera_go = scene.create_game_object("main_camera");
-        auto& camera    = camera_go.add_component<rtr::framework::component::PerspectiveCamera>();
+        auto& camera_go       = scene.create_game_object("main_camera");
+        auto& camera          = camera_go.add_component<rtr::framework::component::PerspectiveCamera>();
         camera.aspect_ratio() = static_cast<float>(kWidth) / static_cast<float>(kHeight);
         camera.set_active(true);
         camera_go.node().set_local_position({0.0f, 1.0f, 6.0f});
