@@ -62,6 +62,10 @@ rtr_add_test(
     Vulkan::Loader
 )
 rtr_add_test(
+    test_physics_scene_integration
+    system/physics/physics_scene_integration_test.cpp
+)
+rtr_add_test(
     test_framework_forward_scene_view_builder
     system/render/framework_forward_scene_view_builder_test.cpp
     rtr::runtime
@@ -133,6 +137,10 @@ rtr_add_test(
 rtr_add_test(
     test_framework_pbpt_light
     framework/component/framework_pbpt_light_test.cpp
+)
+rtr_add_test(
+    test_framework_ping_pong_component
+    framework/component/framework_ping_pong_component_test.cpp
 )
 rtr_add_test(
     test_pbpt_spectrum
