@@ -10,7 +10,7 @@ namespace rtr::framework::component::light {
 
 class PointLight final : public Component {
 public:
-    pbpt::math::vec3 color{1.0f, 1.0f, 1.0f};
+    pbpt::math::Vec3 color{1.0f, 1.0f, 1.0f};
     float            intensity{10.0f};
     float            range{10.0f};
     float            specular_strength{1.0f};
@@ -19,7 +19,7 @@ public:
     explicit PointLight(core::GameObject& owner)
         : Component(owner) {}
 
-    void set_color(const pbpt::math::vec3& c) { color = c; }
+    void set_color(const pbpt::math::Vec3& c) { color = c; }
 
     void set_intensity(float i) {
         if (i < 0.0f || !std::isfinite(i)) {

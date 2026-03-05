@@ -85,19 +85,19 @@ resource::MeshHandle create_triangle_mesh(resource::ResourceManager& resources) 
     utils::ObjMeshData mesh{};
 
     utils::ObjVertex v0{};
-    v0.position = pbpt::math::vec3(0.0f, 0.0f, 0.0f);
-    v0.uv = pbpt::math::vec2(0.0f, 0.0f);
-    v0.normal = pbpt::math::vec3(0.0f, 0.0f, 1.0f);
+    v0.position = pbpt::math::Vec3(0.0f, 0.0f, 0.0f);
+    v0.uv = pbpt::math::Vec2(0.0f, 0.0f);
+    v0.normal = pbpt::math::Vec3(0.0f, 0.0f, 1.0f);
 
     utils::ObjVertex v1{};
-    v1.position = pbpt::math::vec3(1.0f, 0.0f, 0.0f);
-    v1.uv = pbpt::math::vec2(1.0f, 0.0f);
-    v1.normal = pbpt::math::vec3(0.0f, 0.0f, 1.0f);
+    v1.position = pbpt::math::Vec3(1.0f, 0.0f, 0.0f);
+    v1.uv = pbpt::math::Vec2(1.0f, 0.0f);
+    v1.normal = pbpt::math::Vec3(0.0f, 0.0f, 1.0f);
 
     utils::ObjVertex v2{};
-    v2.position = pbpt::math::vec3(0.0f, 1.0f, 0.0f);
-    v2.uv = pbpt::math::vec2(0.0f, 1.0f);
-    v2.normal = pbpt::math::vec3(0.0f, 0.0f, 1.0f);
+    v2.position = pbpt::math::Vec3(0.0f, 1.0f, 0.0f);
+    v2.uv = pbpt::math::Vec2(0.0f, 1.0f);
+    v2.normal = pbpt::math::Vec3(0.0f, 0.0f, 1.0f);
 
     mesh.vertices = {v0, v1, v2};
     mesh.indices = {0, 1, 2};

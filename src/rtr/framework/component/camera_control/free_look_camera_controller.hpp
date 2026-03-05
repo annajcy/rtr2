@@ -47,28 +47,28 @@ private:
     }
 
     void initialize_angles_from_front() {
-        const pbpt::math::vec3 front = pbpt::math::normalize(require_camera_component().camera_world_front());
+        const pbpt::math::Vec3 front = pbpt::math::normalize(require_camera_component().camera_world_front());
         m_yaw_degrees                = pbpt::math::degrees(std::atan2(front.x(), front.z()));
         m_pitch_degrees              = pbpt::math::degrees(std::asin(pbpt::math::clamp(front.y(), -1.0f, 1.0f)));
         m_pitch_degrees              = pbpt::math::clamp(m_pitch_degrees, m_config.pitch_min_degrees, m_config.pitch_max_degrees);
         m_angles_initialized         = true;
     }
 
-    pbpt::math::quat world_rotation_looking_to(const pbpt::math::vec3& forward_dir) const {
-        const pbpt::math::vec3 forward = pbpt::math::normalize(forward_dir);
-        pbpt::math::vec3       up      = pbpt::math::vec3(0.0f, 1.0f, 0.0f);
+    pbpt::math::Quat world_rotation_looking_to(const pbpt::math::Vec3& forward_dir) const {
+        const pbpt::math::Vec3 forward = pbpt::math::normalize(forward_dir);
+        pbpt::math::Vec3       up      = pbpt::math::Vec3(0.0f, 1.0f, 0.0f);
         if (pbpt::math::length(pbpt::math::cross(up, forward)) <= kEpsilon) {
-            up = pbpt::math::vec3(0.0f, 0.0f, 1.0f);
+            up = pbpt::math::Vec3(0.0f, 0.0f, 1.0f);
             if (pbpt::math::length(pbpt::math::cross(up, forward)) <= kEpsilon) {
-                up = pbpt::math::vec3(1.0f, 0.0f, 0.0f);
+                up = pbpt::math::Vec3(1.0f, 0.0f, 0.0f);
             }
         }
 
-        const pbpt::math::vec3 right        = pbpt::math::normalize(pbpt::math::cross(forward, up));
-        const pbpt::math::vec3 corrected_up = pbpt::math::normalize(pbpt::math::cross(right, forward));
+        const pbpt::math::Vec3 right        = pbpt::math::normalize(pbpt::math::cross(forward, up));
+        const pbpt::math::Vec3 corrected_up = pbpt::math::normalize(pbpt::math::cross(right, forward));
 
         // Camera convention: local -Z is front.
-        const pbpt::math::mat3 basis = pbpt::math::mat3::from_cols(right, corrected_up, -forward);
+        const pbpt::math::Mat3 basis = pbpt::math::Mat3::from_cols(right, corrected_up, -forward);
         return pbpt::math::normalize(pbpt::math::quat_cast(basis));
     }
 
@@ -103,7 +103,7 @@ public:
             const float yaw_rad   = pbpt::math::radians(m_yaw_degrees);
             const float pitch_rad = pbpt::math::radians(m_pitch_degrees);
             const float cos_pitch = std::cos(pitch_rad);
-            const pbpt::math::vec3 desired_front = pbpt::math::normalize(pbpt::math::vec3{
+            const pbpt::math::Vec3 desired_front = pbpt::math::normalize(pbpt::math::Vec3{
                 std::sin(yaw_rad) * cos_pitch,
                 std::sin(pitch_rad),
                 std::cos(yaw_rad) * cos_pitch});
@@ -115,10 +115,10 @@ public:
             speed *= m_config.sprint_multiplier;
         }
 
-        pbpt::math::vec3 move_direction(0.0f);
-        const pbpt::math::vec3 world_front = camera.camera_world_front();
-        const pbpt::math::vec3 world_right = node.world_right();
-        const pbpt::math::vec3 world_up    = node.world_up();
+        pbpt::math::Vec3 move_direction(0.0f);
+        const pbpt::math::Vec3 world_front = camera.camera_world_front();
+        const pbpt::math::Vec3 world_right = node.world_right();
+        const pbpt::math::Vec3 world_up    = node.world_up();
 
         if (input.key_down(system::input::KeyCode::W))
             move_direction += world_front;
@@ -136,8 +136,8 @@ public:
         if (pbpt::math::length(move_direction) > 0.0f) {
             move_direction              = pbpt::math::normalize(move_direction);
             const float           dt    = static_cast<float>(std::max(ctx.delta_seconds, 0.0));
-            const pbpt::math::vec3 delta = move_direction * speed * dt;
-            const pbpt::math::vec3 new_position = node.world_position() + delta;
+            const pbpt::math::Vec3 delta = move_direction * speed * dt;
+            const pbpt::math::Vec3 new_position = node.world_position() + delta;
             node.set_world_position(new_position);
             logger()->trace("FreeLook node position updated (game_object_id={}, position=[{:.4f}, {:.4f}, {:.4f}]).",
                             go.id(), new_position.x(), new_position.y(), new_position.z());

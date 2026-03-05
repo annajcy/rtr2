@@ -21,9 +21,9 @@ public:
     struct NodeSnapshot {
         GameObjectId id{core::kInvalidGameObjectId};
         GameObjectId parent_id{core::kInvalidGameObjectId};
-        pbpt::math::vec3 local_position{0.0f, 0.0f, 0.0f};
-        pbpt::math::quat local_rotation{1.0f, 0.0f, 0.0f, 0.0f};
-        pbpt::math::vec3 local_scale{1.0f, 1.0f, 1.0f};
+        pbpt::math::Vec3 local_position{0.0f, 0.0f, 0.0f};
+        pbpt::math::Quat local_rotation{1.0f, 0.0f, 0.0f, 0.0f};
+        pbpt::math::Vec3 local_scale{1.0f, 1.0f, 1.0f};
         bool is_enabled{true};
         std::vector<GameObjectId> children{};
     };
@@ -38,10 +38,10 @@ public:
         GameObjectId parent_id{kVirtualRootId};
         std::vector<GameObjectId> children{};
 
-        pbpt::math::vec3 local_position{0.0f, 0.0f, 0.0f};
-        pbpt::math::quat local_rotation{1.0f, 0.0f, 0.0f, 0.0f};
-        pbpt::math::vec3 local_scale{1.0f, 1.0f, 1.0f};
-        pbpt::math::mat4 world_matrix{1.0f};
+        pbpt::math::Vec3 local_position{0.0f, 0.0f, 0.0f};
+        pbpt::math::Quat local_rotation{1.0f, 0.0f, 0.0f, 0.0f};
+        pbpt::math::Vec3 local_scale{1.0f, 1.0f, 1.0f};
+        pbpt::math::Mat4 world_matrix{1.0f};
 
         bool dirty{true};
         bool is_enabled{true};
@@ -76,19 +76,19 @@ public:
             return graph().checked_record(m_id).children;
         }
 
-        const pbpt::math::vec3& local_position() const {
+        const pbpt::math::Vec3& local_position() const {
             return graph().checked_record(m_id).local_position;
         }
 
-        const pbpt::math::quat& local_rotation() const {
+        const pbpt::math::Quat& local_rotation() const {
             return graph().checked_record(m_id).local_rotation;
         }
 
-        const pbpt::math::vec3& local_scale() const {
+        const pbpt::math::Vec3& local_scale() const {
             return graph().checked_record(m_id).local_scale;
         }
 
-        const pbpt::math::mat4& world_matrix() const {
+        const pbpt::math::Mat4& world_matrix() const {
             if (graph().checked_record(m_id).dirty) {
                 auto& mutable_graph = const_cast<SceneGraph&>(graph());
                 mutable_graph.update_world_transforms();
@@ -96,15 +96,15 @@ public:
             return graph().checked_record(m_id).world_matrix;
         }
 
-        pbpt::math::vec3 world_position() const {
+        pbpt::math::Vec3 world_position() const {
             return SceneGraph::extract_world_position(world_matrix());
         }
 
-        pbpt::math::quat world_rotation() const {
+        pbpt::math::Quat world_rotation() const {
             return SceneGraph::extract_world_rotation(world_matrix());
         }
 
-        pbpt::math::vec3 world_scale() const {
+        pbpt::math::Vec3 world_scale() const {
             return SceneGraph::extract_world_scale(world_matrix());
         }
 
@@ -116,59 +116,59 @@ public:
             return graph().checked_record(m_id).is_enabled;
         }
 
-        pbpt::math::vec3 rotation_euler() const {
+        pbpt::math::Vec3 rotation_euler() const {
             return pbpt::math::degrees(pbpt::math::eulerAngles(local_rotation()));
         }
 
-        pbpt::math::vec3 local_up() const {
-            return local_rotation() * pbpt::math::vec3(0.0f, 1.0f, 0.0f);
+        pbpt::math::Vec3 local_up() const {
+            return local_rotation() * pbpt::math::Vec3(0.0f, 1.0f, 0.0f);
         }
 
-        pbpt::math::vec3 local_down() const {
-            return local_rotation() * pbpt::math::vec3(0.0f, -1.0f, 0.0f);
+        pbpt::math::Vec3 local_down() const {
+            return local_rotation() * pbpt::math::Vec3(0.0f, -1.0f, 0.0f);
         }
 
-        pbpt::math::vec3 local_right() const {
-            return local_rotation() * pbpt::math::vec3(1.0f, 0.0f, 0.0f);
+        pbpt::math::Vec3 local_right() const {
+            return local_rotation() * pbpt::math::Vec3(1.0f, 0.0f, 0.0f);
         }
 
-        pbpt::math::vec3 local_left() const {
-            return local_rotation() * pbpt::math::vec3(-1.0f, 0.0f, 0.0f);
+        pbpt::math::Vec3 local_left() const {
+            return local_rotation() * pbpt::math::Vec3(-1.0f, 0.0f, 0.0f);
         }
 
-        pbpt::math::vec3 local_front() const {
-            return local_rotation() * pbpt::math::vec3(0.0f, 0.0f, 1.0f);
+        pbpt::math::Vec3 local_front() const {
+            return local_rotation() * pbpt::math::Vec3(0.0f, 0.0f, 1.0f);
         }
 
-        pbpt::math::vec3 local_back() const {
-            return local_rotation() * pbpt::math::vec3(0.0f, 0.0f, -1.0f);
+        pbpt::math::Vec3 local_back() const {
+            return local_rotation() * pbpt::math::Vec3(0.0f, 0.0f, -1.0f);
         }
 
-        pbpt::math::vec3 world_up() const {
-            return world_rotation() * pbpt::math::vec3(0.0f, 1.0f, 0.0f);
+        pbpt::math::Vec3 world_up() const {
+            return world_rotation() * pbpt::math::Vec3(0.0f, 1.0f, 0.0f);
         }
 
-        pbpt::math::vec3 world_down() const {
-            return world_rotation() * pbpt::math::vec3(0.0f, -1.0f, 0.0f);
+        pbpt::math::Vec3 world_down() const {
+            return world_rotation() * pbpt::math::Vec3(0.0f, -1.0f, 0.0f);
         }
 
-        pbpt::math::vec3 world_right() const {
-            return world_rotation() * pbpt::math::vec3(1.0f, 0.0f, 0.0f);
+        pbpt::math::Vec3 world_right() const {
+            return world_rotation() * pbpt::math::Vec3(1.0f, 0.0f, 0.0f);
         }
 
-        pbpt::math::vec3 world_left() const {
-            return world_rotation() * pbpt::math::vec3(-1.0f, 0.0f, 0.0f);
+        pbpt::math::Vec3 world_left() const {
+            return world_rotation() * pbpt::math::Vec3(-1.0f, 0.0f, 0.0f);
         }
 
-        pbpt::math::vec3 world_front() const {
-            return world_rotation() * pbpt::math::vec3(0.0f, 0.0f, 1.0f);
+        pbpt::math::Vec3 world_front() const {
+            return world_rotation() * pbpt::math::Vec3(0.0f, 0.0f, 1.0f);
         }
 
-        pbpt::math::vec3 world_back() const {
-            return world_rotation() * pbpt::math::vec3(0.0f, 0.0f, -1.0f);
+        pbpt::math::Vec3 world_back() const {
+            return world_rotation() * pbpt::math::Vec3(0.0f, 0.0f, -1.0f);
         }
 
-        pbpt::math::mat4 normal_matrix() const {
+        pbpt::math::Mat4 normal_matrix() const {
             return pbpt::math::transpose(pbpt::math::inverse(world_matrix()));
         }
     };
@@ -185,69 +185,69 @@ public:
         NodeView(SceneGraph& graph, GameObjectId id)
             : ConstNodeView(graph, id), m_mutable_graph(graph) {}
 
-        void set_local_position(const pbpt::math::vec3& value) {
+        void set_local_position(const pbpt::math::Vec3& value) {
             auto& scene_graph = graph();
             auto& record = scene_graph.checked_record(m_id);
             record.local_position = value;
             scene_graph.mark_subtree_dirty(m_id);
         }
 
-        void set_local_rotation(const pbpt::math::quat& value) {
+        void set_local_rotation(const pbpt::math::Quat& value) {
             auto& scene_graph = graph();
             auto& record = scene_graph.checked_record(m_id);
             record.local_rotation = value;
             scene_graph.mark_subtree_dirty(m_id);
         }
 
-        void set_local_scale(const pbpt::math::vec3& value) {
+        void set_local_scale(const pbpt::math::Vec3& value) {
             auto& scene_graph = graph();
             auto& record = scene_graph.checked_record(m_id);
             record.local_scale = value;
             scene_graph.mark_subtree_dirty(m_id);
         }
 
-        void set_local_model_matrix(const pbpt::math::mat4& local_model_matrix) {
-            pbpt::math::vec3 scale = {
-                pbpt::math::length(pbpt::math::vec3(local_model_matrix[0][0], local_model_matrix[1][0], local_model_matrix[2][0])),
-                pbpt::math::length(pbpt::math::vec3(local_model_matrix[0][1], local_model_matrix[1][1], local_model_matrix[2][1])),
-                pbpt::math::length(pbpt::math::vec3(local_model_matrix[0][2], local_model_matrix[1][2], local_model_matrix[2][2]))
+        void set_local_model_matrix(const pbpt::math::Mat4& local_model_matrix) {
+            pbpt::math::Vec3 scale = {
+                pbpt::math::length(pbpt::math::Vec3(local_model_matrix[0][0], local_model_matrix[1][0], local_model_matrix[2][0])),
+                pbpt::math::length(pbpt::math::Vec3(local_model_matrix[0][1], local_model_matrix[1][1], local_model_matrix[2][1])),
+                pbpt::math::length(pbpt::math::Vec3(local_model_matrix[0][2], local_model_matrix[1][2], local_model_matrix[2][2]))
             };
 
-            pbpt::math::mat3 rotation_matrix = pbpt::math::mat3(local_model_matrix);
+            pbpt::math::Mat3 rotation_matrix = pbpt::math::Mat3(local_model_matrix);
             for (int r = 0; r < 3; ++r) {
                 rotation_matrix[r][0] /= scale.x();
                 rotation_matrix[r][1] /= scale.y();
                 rotation_matrix[r][2] /= scale.z();
             }
-            pbpt::math::quat rotation = pbpt::math::quat_cast(rotation_matrix);
-            pbpt::math::vec3 position(local_model_matrix[0][3], local_model_matrix[1][3], local_model_matrix[2][3]);
+            pbpt::math::Quat rotation = pbpt::math::quat_cast(rotation_matrix);
+            pbpt::math::Vec3 position(local_model_matrix[0][3], local_model_matrix[1][3], local_model_matrix[2][3]);
 
             set_local_position(position);
             set_local_rotation(rotation);
             set_local_scale(scale);
         }
 
-        void set_world_position(const pbpt::math::vec3& value) {
+        void set_world_position(const pbpt::math::Vec3& value) {
             graph().set_world_position_internal(m_id, value);
         }
 
-        void set_world_rotation(const pbpt::math::quat& value) {
+        void set_world_rotation(const pbpt::math::Quat& value) {
             graph().set_world_rotation_internal(m_id, value);
         }
 
-        void set_world_scale(const pbpt::math::vec3& value) {
+        void set_world_scale(const pbpt::math::Vec3& value) {
             graph().set_world_scale_internal(m_id, value);
         }
 
-        void look_at_direction_local(const pbpt::math::vec3& target_direction_local) {
+        void look_at_direction_local(const pbpt::math::Vec3& target_direction_local) {
             if (pbpt::math::length(target_direction_local) < SceneGraph::kEpsilon) {
                 return;
             }
 
-            const pbpt::math::vec3 direction = pbpt::math::normalize(target_direction_local);
-            const pbpt::math::vec3 current_front = local_front();
+            const pbpt::math::Vec3 direction = pbpt::math::normalize(target_direction_local);
+            const pbpt::math::Vec3 current_front = local_front();
             const float cross_len = pbpt::math::length(pbpt::math::cross(current_front, direction));
-            pbpt::math::quat rotation = local_rotation();
+            pbpt::math::Quat rotation = local_rotation();
 
             if (cross_len < SceneGraph::kEpsilon) {
                 if (pbpt::math::dot(current_front, direction) < 0.0f) {
@@ -257,11 +257,11 @@ public:
                 return;
             }
 
-            const pbpt::math::quat delta = pbpt::math::rotation(current_front, direction);
+            const pbpt::math::Quat delta = pbpt::math::rotation(current_front, direction);
             set_local_rotation(pbpt::math::normalize(delta * rotation));
         }
 
-        void look_at_direction_world(const pbpt::math::vec3& target_direction_world) {
+        void look_at_direction_world(const pbpt::math::Vec3& target_direction_world) {
             if (pbpt::math::length(target_direction_world) < SceneGraph::kEpsilon) {
                 return;
             }
@@ -271,30 +271,30 @@ public:
             }
 
             const auto& node_record = graph().checked_record(m_id);
-            const pbpt::math::quat parent_world_rotation =
+            const pbpt::math::Quat parent_world_rotation =
                 (node_record.parent_id == SceneGraph::kVirtualRootId)
-                    ? pbpt::math::quat::identity()
+                    ? pbpt::math::Quat::identity()
                     : SceneGraph::extract_world_rotation(graph().checked_record(node_record.parent_id).world_matrix);
 
-            const pbpt::math::vec3 target_direction_local =
+            const pbpt::math::Vec3 target_direction_local =
                 parent_world_rotation.inversed() * target_direction_world;
             look_at_direction_local(target_direction_local);
         }
 
-        void look_at_point_local(const pbpt::math::vec3& target_point_local) {
+        void look_at_point_local(const pbpt::math::Vec3& target_point_local) {
             look_at_direction_local(target_point_local - local_position());
         }
 
-        void look_at_point_world(const pbpt::math::vec3& target_point_world) {
+        void look_at_point_world(const pbpt::math::Vec3& target_point_world) {
             look_at_direction_world(target_point_world - world_position());
         }
 
-        void translate(const pbpt::math::vec3& direction, float distance) {
+        void translate(const pbpt::math::Vec3& direction, float distance) {
             set_local_position(local_position() + direction * distance);
         }
 
-        void rotate(float angle, const pbpt::math::vec3& axis) {
-            const pbpt::math::quat q = pbpt::math::angleAxis(pbpt::math::radians(angle), axis);
+        void rotate(float angle, const pbpt::math::Vec3& axis) {
+            const pbpt::math::Quat q = pbpt::math::angleAxis(pbpt::math::radians(angle), axis);
             set_local_rotation(q * local_rotation());
         }
     };
@@ -306,7 +306,7 @@ public:
         NodeRecord root{};
         root.id = kVirtualRootId;
         root.parent_id = kVirtualRootId;
-        root.world_matrix = pbpt::math::mat4{1.0f};
+        root.world_matrix = pbpt::math::Mat4{1.0f};
         root.dirty = false;
         root.is_enabled = true;
         graph.m_nodes.emplace(kVirtualRootId, std::move(root));
@@ -359,28 +359,28 @@ public:
         return graph;
     }
 
-    static pbpt::math::mat4 compose_local_matrix(const NodeRecord& node) {
-        pbpt::math::mat4 transform = pbpt::math::translate(pbpt::math::mat4{1.0f}, node.local_position);
+    static pbpt::math::Mat4 compose_local_matrix(const NodeRecord& node) {
+        pbpt::math::Mat4 transform = pbpt::math::translate(pbpt::math::Mat4{1.0f}, node.local_position);
         transform = transform * pbpt::math::mat4_cast(node.local_rotation);
         transform = pbpt::math::scale(transform, node.local_scale);
         return transform;
     }
 
-    static pbpt::math::vec3 extract_world_position(const pbpt::math::mat4& world_matrix) {
+    static pbpt::math::Vec3 extract_world_position(const pbpt::math::Mat4& world_matrix) {
         return {world_matrix[0][3], world_matrix[1][3], world_matrix[2][3]};
     }
 
-    static pbpt::math::vec3 extract_world_scale(const pbpt::math::mat4& world_matrix) {
+    static pbpt::math::Vec3 extract_world_scale(const pbpt::math::Mat4& world_matrix) {
         return {
-            pbpt::math::length(pbpt::math::vec3(world_matrix[0][0], world_matrix[1][0], world_matrix[2][0])),
-            pbpt::math::length(pbpt::math::vec3(world_matrix[0][1], world_matrix[1][1], world_matrix[2][1])),
-            pbpt::math::length(pbpt::math::vec3(world_matrix[0][2], world_matrix[1][2], world_matrix[2][2]))
+            pbpt::math::length(pbpt::math::Vec3(world_matrix[0][0], world_matrix[1][0], world_matrix[2][0])),
+            pbpt::math::length(pbpt::math::Vec3(world_matrix[0][1], world_matrix[1][1], world_matrix[2][1])),
+            pbpt::math::length(pbpt::math::Vec3(world_matrix[0][2], world_matrix[1][2], world_matrix[2][2]))
         };
     }
 
-    static pbpt::math::quat extract_world_rotation(const pbpt::math::mat4& world_matrix) {
-        pbpt::math::vec3 scale = extract_world_scale(world_matrix);
-        pbpt::math::mat3 rotation_matrix = pbpt::math::mat3(world_matrix);
+    static pbpt::math::Quat extract_world_rotation(const pbpt::math::Mat4& world_matrix) {
+        pbpt::math::Vec3 scale = extract_world_scale(world_matrix);
+        pbpt::math::Mat3 rotation_matrix = pbpt::math::Mat3(world_matrix);
         for (int r = 0; r < 3; ++r) {
             rotation_matrix[r][0] /= scale.x();
             rotation_matrix[r][1] /= scale.y();
@@ -451,7 +451,7 @@ private:
         out.emplace_back(id);
     }
 
-    void update_world_recursive(GameObjectId id, const pbpt::math::mat4& parent_world, bool parent_dirty) {
+    void update_world_recursive(GameObjectId id, const pbpt::math::Mat4& parent_world, bool parent_dirty) {
         auto it = m_nodes.find(id);
         if (it == m_nodes.end()) {
             return;
@@ -495,35 +495,35 @@ public:
         NodeRecord root{};
         root.id = kVirtualRootId;
         root.parent_id = kVirtualRootId;
-        root.world_matrix = pbpt::math::mat4{1.0f};
+        root.world_matrix = pbpt::math::Mat4{1.0f};
         root.dirty = false;
         root.is_enabled = true;
         m_nodes.emplace(kVirtualRootId, std::move(root));
     }
 
-    void set_world_position_internal(GameObjectId id, const pbpt::math::vec3& world_pos) {
+    void set_world_position_internal(GameObjectId id, const pbpt::math::Vec3& world_pos) {
         NodeRecord& node = checked_record(id);
-        const pbpt::math::mat4 parent_world = (node.parent_id == kVirtualRootId)
-                                           ? pbpt::math::mat4{1.0f}
+        const pbpt::math::Mat4 parent_world = (node.parent_id == kVirtualRootId)
+                                           ? pbpt::math::Mat4{1.0f}
                                            : checked_record(node.parent_id).world_matrix;
-        const pbpt::math::vec4 local = pbpt::math::inverse(parent_world) * pbpt::math::vec4(world_pos, 1.0f);
-        node.local_position = pbpt::math::vec3(local);
+        const pbpt::math::Vec4 local = pbpt::math::inverse(parent_world) * pbpt::math::Vec4(world_pos, 1.0f);
+        node.local_position = pbpt::math::Vec3(local);
         mark_subtree_dirty_recursive(id);
     }
 
-    void set_world_rotation_internal(GameObjectId id, const pbpt::math::quat& world_rot) {
+    void set_world_rotation_internal(GameObjectId id, const pbpt::math::Quat& world_rot) {
         NodeRecord& node = checked_record(id);
-        const pbpt::math::quat parent_rot = (node.parent_id == kVirtualRootId)
-                                         ? pbpt::math::quat::identity()
+        const pbpt::math::Quat parent_rot = (node.parent_id == kVirtualRootId)
+                                         ? pbpt::math::Quat::identity()
                                          : extract_world_rotation(checked_record(node.parent_id).world_matrix);
         node.local_rotation = parent_rot.inversed() * world_rot;
         mark_subtree_dirty_recursive(id);
     }
 
-    void set_world_scale_internal(GameObjectId id, const pbpt::math::vec3& world_scale) {
+    void set_world_scale_internal(GameObjectId id, const pbpt::math::Vec3& world_scale) {
         NodeRecord& node = checked_record(id);
-        const pbpt::math::vec3 parent_scale = (node.parent_id == kVirtualRootId)
-                                           ? pbpt::math::vec3{1.0f, 1.0f, 1.0f}
+        const pbpt::math::Vec3 parent_scale = (node.parent_id == kVirtualRootId)
+                                           ? pbpt::math::Vec3{1.0f, 1.0f, 1.0f}
                                            : extract_world_scale(checked_record(node.parent_id).world_matrix);
         node.local_scale = world_scale / parent_scale;
         mark_subtree_dirty_recursive(id);
@@ -617,9 +617,9 @@ public:
 
         update_world_transforms();
 
-        const pbpt::math::vec3 world_pos = extract_world_position(checked_record(child).world_matrix);
-        const pbpt::math::quat world_rot = extract_world_rotation(checked_record(child).world_matrix);
-        const pbpt::math::vec3 world_scale = extract_world_scale(checked_record(child).world_matrix);
+        const pbpt::math::Vec3 world_pos = extract_world_position(checked_record(child).world_matrix);
+        const pbpt::math::Quat world_rot = extract_world_rotation(checked_record(child).world_matrix);
+        const pbpt::math::Vec3 world_scale = extract_world_scale(checked_record(child).world_matrix);
 
         NodeRecord& child_node = checked_record(child);
         remove_child_link(child_node.parent_id, child);
@@ -650,7 +650,7 @@ public:
     void update_world_transforms() {
         const NodeRecord& root = checked_record(kVirtualRootId);
         for (const auto child_id : root.children) {
-            update_world_recursive(child_id, pbpt::math::mat4{1.0f}, false);
+            update_world_recursive(child_id, pbpt::math::Mat4{1.0f}, false);
         }
     }
 

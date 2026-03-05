@@ -56,7 +56,7 @@ component::PbptRgb make_test_rgb(float base) {
     return component::PbptRgb{.r = base, .g = base + 0.1f, .b = base + 0.2f};
 }
 
-void expect_mat4_near(const ::pbpt::math::mat4& lhs, const ::pbpt::math::mat4& rhs, float eps = 1e-5f) {
+void expect_mat4_near(const ::pbpt::math::Mat4& lhs, const ::pbpt::math::Mat4& rhs, float eps = 1e-5f) {
     for (int c = 0; c < 4; ++c) {
         for (int r = 0; r < 4; ++r) {
             EXPECT_NEAR(lhs[c][r], rhs[c][r], eps);
@@ -115,7 +115,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildsXmlResultFromActiveNodesWithMeshAndPbpt
     const auto               expected_handle = create_test_mesh(resources);
     auto&                    renderer        = go_ok.add_component<component::MeshRenderer>(expected_handle);
     const component::PbptRgb reflectance     = make_test_rgb(0.2f);
-    renderer.set_base_color(::pbpt::math::vec4(reflectance.r, reflectance.g, reflectance.b, 1.0f));
+    renderer.set_base_color(::pbpt::math::Vec4(reflectance.r, reflectance.g, reflectance.b, 1.0f));
     (void)go_ok.add_component<component::PbptMesh>();
     go_ok.node().set_local_position({1.0f, 2.0f, 3.0f});
 
@@ -322,7 +322,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildXmlResultSuffixesMappedMaterialWhenNameC
     auto&      mapped_go       = scene.create_game_object("mapped_go");
     const auto expected_handle = create_test_mesh(resources);
     auto&      renderer        = mapped_go.add_component<component::MeshRenderer>(expected_handle);
-    renderer.set_base_color(::pbpt::math::vec4(0.5f, 0.5f, 0.5f, 1.0f));
+    renderer.set_base_color(::pbpt::math::Vec4(0.5f, 0.5f, 0.5f, 1.0f));
     (void)mapped_go.add_component<component::PbptMesh>();
 
     CompatibleInfo compatible{};

@@ -32,12 +32,12 @@ public:
     float& top_bound() { return m_top_bound; }
     const float& top_bound() const { return m_top_bound; }
 
-    pbpt::math::mat4 projection_matrix() const override {
+    pbpt::math::Mat4 projection_matrix() const override {
         return pbpt::math::ortho(m_left_bound, m_right_bound, m_bottom_bound, m_top_bound, near_bound(), far_bound());
     }
 
     void adjust_zoom(float delta_zoom) override {
-        const pbpt::math::vec2 center = {(m_left_bound + m_right_bound) * 0.5f, (m_bottom_bound + m_top_bound) * 0.5f};
+        const pbpt::math::Vec2 center = {(m_left_bound + m_right_bound) * 0.5f, (m_bottom_bound + m_top_bound) * 0.5f};
         const float half_w = std::max((m_right_bound - m_left_bound) * 0.5f + delta_zoom, 0.01f);
         const float half_h = std::max((m_top_bound - m_bottom_bound) * 0.5f + delta_zoom, 0.01f);
         m_left_bound       = center.x() - half_w;

@@ -41,7 +41,7 @@ struct VertexKeyHash {
     }
 };
 
-inline pbpt::math::vec3 read_position(
+inline pbpt::math::Vec3 read_position(
     const std::vector<tinyobj::real_t>& vertices,
     int index,
     const std::string& filepath
@@ -50,14 +50,14 @@ inline pbpt::math::vec3 read_position(
     if (base + 2u >= vertices.size()) {
         throw std::runtime_error("OBJ vertex index out of range in " + filepath);
     }
-    return pbpt::math::vec3(
+    return pbpt::math::Vec3(
         static_cast<float>(vertices[base + 0u]),
         static_cast<float>(vertices[base + 1u]),
         static_cast<float>(vertices[base + 2u])
     );
 }
 
-inline pbpt::math::vec2 read_texcoord(
+inline pbpt::math::Vec2 read_texcoord(
     const std::vector<tinyobj::real_t>& texcoords,
     int index,
     const std::string& filepath
@@ -66,13 +66,13 @@ inline pbpt::math::vec2 read_texcoord(
     if (base + 1u >= texcoords.size()) {
         throw std::runtime_error("OBJ texcoord index out of range in " + filepath);
     }
-    return pbpt::math::vec2(
+    return pbpt::math::Vec2(
         static_cast<float>(texcoords[base + 0u]),
         static_cast<float>(texcoords[base + 1u])
     );
 }
 
-inline pbpt::math::vec3 read_normal(
+inline pbpt::math::Vec3 read_normal(
     const std::vector<tinyobj::real_t>& normals,
     int index,
     const std::string& filepath
@@ -81,7 +81,7 @@ inline pbpt::math::vec3 read_normal(
     if (base + 2u >= normals.size()) {
         throw std::runtime_error("OBJ normal index out of range in " + filepath);
     }
-    return pbpt::math::vec3(
+    return pbpt::math::Vec3(
         static_cast<float>(normals[base + 0u]),
         static_cast<float>(normals[base + 1u]),
         static_cast<float>(normals[base + 2u])
@@ -155,15 +155,15 @@ inline ObjMeshData load_obj_from_path(const std::string& filepath) {
     }
 
     if (!has_input_normals) {
-        std::vector<pbpt::math::vec3> accum_normals(data.vertices.size(), pbpt::math::vec3(0.0f));
+        std::vector<pbpt::math::Vec3> accum_normals(data.vertices.size(), pbpt::math::Vec3(0.0f));
         for (size_t i = 0; i + 2u < data.indices.size(); i += 3u) {
             const auto i0 = data.indices[i + 0u];
             const auto i1 = data.indices[i + 1u];
             const auto i2 = data.indices[i + 2u];
-            const pbpt::math::vec3& p0 = data.vertices[i0].position;
-            const pbpt::math::vec3& p1 = data.vertices[i1].position;
-            const pbpt::math::vec3& p2 = data.vertices[i2].position;
-            const pbpt::math::vec3 face_normal = pbpt::math::normalize(pbpt::math::cross(p1 - p0, p2 - p0));
+            const pbpt::math::Vec3& p0 = data.vertices[i0].position;
+            const pbpt::math::Vec3& p1 = data.vertices[i1].position;
+            const pbpt::math::Vec3& p2 = data.vertices[i2].position;
+            const pbpt::math::Vec3 face_normal = pbpt::math::normalize(pbpt::math::cross(p1 - p0, p2 - p0));
             accum_normals[i0] += face_normal;
             accum_normals[i1] += face_normal;
             accum_normals[i2] += face_normal;
@@ -172,7 +172,7 @@ inline ObjMeshData load_obj_from_path(const std::string& filepath) {
             if (pbpt::math::length(accum_normals[v]) > 0.0f) {
                 data.vertices[v].normal = pbpt::math::normalize(accum_normals[v]);
             } else {
-                data.vertices[v].normal = pbpt::math::vec3(0.0f, 1.0f, 0.0f);
+                data.vertices[v].normal = pbpt::math::Vec3(0.0f, 1.0f, 0.0f);
             }
         }
     }

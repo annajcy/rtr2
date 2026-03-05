@@ -13,7 +13,7 @@
 
 namespace rtr::framework::component::test {
 
-static void expect_vec3_near(const pbpt::math::vec3& lhs, const pbpt::math::vec3& rhs, float eps = 1e-4f) {
+static void expect_vec3_near(const pbpt::math::Vec3& lhs, const pbpt::math::Vec3& rhs, float eps = 1e-4f) {
     EXPECT_NEAR(lhs.x(), rhs.x(), eps);
     EXPECT_NEAR(lhs.y(), rhs.y(), eps);
     EXPECT_NEAR(lhs.z(), rhs.z(), eps);
@@ -54,7 +54,7 @@ TEST(FrameworkFreeLookCameraControllerTest, MovesWithWASDQE) {
     scene.tick(ctx);
     input.update_key(system::input::KeyCode::Q, system::input::KeyAction::RELEASE, system::input::KeyMod::NONE);
 
-    expect_vec3_near(scene.scene_graph().node(go.id()).world_position(), pbpt::math::vec3(0.0f));
+    expect_vec3_near(scene.scene_graph().node(go.id()).world_position(), pbpt::math::Vec3(0.0f));
 }
 
 TEST(FrameworkFreeLookCameraControllerTest, ShiftAppliesSprintMultiplier) {
@@ -73,7 +73,7 @@ TEST(FrameworkFreeLookCameraControllerTest, ShiftAppliesSprintMultiplier) {
     const float normal_distance = scene.scene_graph().node(go.id()).world_position().z();
 
     auto node = scene.scene_graph().node(go.id());
-    node.set_world_position(pbpt::math::vec3(0.0f));
+    node.set_world_position(pbpt::math::Vec3(0.0f));
     scene.scene_graph().update_world_transforms();
 
     input.update_key(system::input::KeyCode::LEFT_SHIFT, system::input::KeyAction::PRESS, system::input::KeyMod::SHIFT);
@@ -95,11 +95,11 @@ TEST(FrameworkFreeLookCameraControllerTest, RightMouseRequiredForLook) {
     (void)go.add_component<FreeLookCameraController>(input);
 
     core::FrameTickContext ctx{.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0};
-    const pbpt::math::vec3 before_front = scene.scene_graph().node(go.id()).world_front();
+    const pbpt::math::Vec3 before_front = scene.scene_graph().node(go.id()).world_front();
 
     input.update_mouse_position(30.0, 0.0);
     scene.tick(ctx);
-    const pbpt::math::vec3 without_right_front = scene.scene_graph().node(go.id()).world_front();
+    const pbpt::math::Vec3 without_right_front = scene.scene_graph().node(go.id()).world_front();
     expect_vec3_near(without_right_front, before_front);
 
     input.reset_deltas();
@@ -107,7 +107,7 @@ TEST(FrameworkFreeLookCameraControllerTest, RightMouseRequiredForLook) {
                               system::input::KeyMod::NONE);
     input.update_mouse_position(60.0, 0.0);
     scene.tick(ctx);
-    const pbpt::math::vec3 with_right_front = scene.scene_graph().node(go.id()).world_front();
+    const pbpt::math::Vec3 with_right_front = scene.scene_graph().node(go.id()).world_front();
 
     EXPECT_GT(pbpt::math::length(with_right_front - before_front), 1e-4f);
 }
@@ -128,7 +128,7 @@ TEST(FrameworkFreeLookCameraControllerTest, PitchIsClamped) {
     input.update_mouse_position(0.0, -2000.0);
     scene.tick(ctx);
 
-    const pbpt::math::vec3 front = camera.camera_world_front();
+    const pbpt::math::Vec3 front = camera.camera_world_front();
     const float            pitch_deg =
         pbpt::math::degrees(std::asin(pbpt::math::clamp(front.y(), -1.0f, 1.0f)));
     EXPECT_LE(pitch_deg, 89.0f + 1e-3f);
@@ -148,7 +148,7 @@ TEST(FrameworkFreeLookCameraControllerTest, ScrollCallsAdjustZoom) {
     input.update_mouse_scroll(0.0, 1.0);
     scene.tick(ctx);
 
-    const pbpt::math::vec3 pos = scene.scene_graph().node(go.id()).world_position();
+    const pbpt::math::Vec3 pos = scene.scene_graph().node(go.id()).world_position();
     EXPECT_NEAR(pos.z(), -0.8f, 1e-4f);
 }
 
@@ -203,7 +203,7 @@ TEST(FrameworkFreeLookCameraControllerTest, SceneTickRefreshesWorldTransformAfte
     core::FrameTickContext ctx{.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0};
     scene.tick(ctx);
 
-    const pbpt::math::vec3 world_pos = scene.scene_graph().node(go.id()).world_position();
+    const pbpt::math::Vec3 world_pos = scene.scene_graph().node(go.id()).world_position();
     expect_vec3_near(world_pos, {1.0f, 2.0f, 3.0f});
 }
 

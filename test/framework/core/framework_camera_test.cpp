@@ -7,13 +7,13 @@
 
 namespace rtr::framework::core::test {
 
-static void expect_vec3_near(const pbpt::math::vec3& lhs, const pbpt::math::vec3& rhs, float eps = 1e-5f) {
+static void expect_vec3_near(const pbpt::math::Vec3& lhs, const pbpt::math::Vec3& rhs, float eps = 1e-5f) {
     EXPECT_NEAR(lhs.x(), rhs.x(), eps);
     EXPECT_NEAR(lhs.y(), rhs.y(), eps);
     EXPECT_NEAR(lhs.z(), rhs.z(), eps);
 }
 
-static void expect_mat4_near(const pbpt::math::mat4& lhs, const pbpt::math::mat4& rhs, float eps = 1e-5f) {
+static void expect_mat4_near(const pbpt::math::Mat4& lhs, const pbpt::math::Mat4& rhs, float eps = 1e-5f) {
     for (int c = 0; c < 4; ++c) {
         for (int r = 0; r < 4; ++r) {
             EXPECT_NEAR(lhs[c][r], rhs[c][r], eps);
@@ -57,8 +57,8 @@ TEST(FrameworkCameraTest, ViewMatrixUsesNodeWorldTransform) {
     go.node().set_local_position({1.0f, 2.0f, 3.0f});
     scene.scene_graph().update_world_transforms();
 
-    const pbpt::math::mat4 expected = pbpt::math::lookAt(pbpt::math::vec3(1.0f, 2.0f, 3.0f), pbpt::math::vec3(1.0f, 2.0f, 2.0f),
-                                                          pbpt::math::vec3(0.0f, 1.0f, 0.0f));
+    const pbpt::math::Mat4 expected = pbpt::math::lookAt(pbpt::math::Vec3(1.0f, 2.0f, 3.0f), pbpt::math::Vec3(1.0f, 2.0f, 2.0f),
+                                                          pbpt::math::Vec3(0.0f, 1.0f, 0.0f));
     expect_mat4_near(camera.view_matrix(), expected);
 }
 
@@ -70,17 +70,17 @@ TEST(FrameworkCameraTest, LookAtDirectionLocalAndWorldDifferWithParentRotation) 
     ASSERT_TRUE(scene.scene_graph().set_parent(camera_go.id(), parent.id(), false));
 
     scene.scene_graph().node(parent.id()).set_local_rotation(
-        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::vec3(0.0f, 1.0f, 0.0f)));
-    scene.scene_graph().node(camera_go.id()).set_local_rotation(pbpt::math::quat::identity());
+        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
+    scene.scene_graph().node(camera_go.id()).set_local_rotation(pbpt::math::Quat::identity());
 
     camera.camera_look_at_direction_local({0.0f, 0.0f, -1.0f});
     scene.scene_graph().update_world_transforms();
-    const pbpt::math::vec3 front_after_local = camera.camera_world_front();
+    const pbpt::math::Vec3 front_after_local = camera.camera_world_front();
 
-    scene.scene_graph().node(camera_go.id()).set_local_rotation(pbpt::math::quat::identity());
+    scene.scene_graph().node(camera_go.id()).set_local_rotation(pbpt::math::Quat::identity());
     camera.camera_look_at_direction_world({0.0f, 0.0f, -1.0f});
     scene.scene_graph().update_world_transforms();
-    const pbpt::math::vec3 front_after_world = camera.camera_world_front();
+    const pbpt::math::Vec3 front_after_world = camera.camera_world_front();
 
     expect_vec3_near(front_after_local, {-1.0f, 0.0f, 0.0f});
     expect_vec3_near(front_after_world, {0.0f, 0.0f, -1.0f});

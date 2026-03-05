@@ -35,7 +35,7 @@ inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& s
         const auto* point_light   = go->get_component<framework::component::light::PointLight>();
 
         const auto             node  = scene.scene_graph().node(id);
-        const pbpt::math::mat4 model = node.world_matrix();
+        const pbpt::math::Mat4 model = node.world_matrix();
 
         if (camera != nullptr && camera->enabled() && camera->active()) {
             if (has_camera_data) {
@@ -63,7 +63,7 @@ inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& s
             continue;
         }
 
-        const pbpt::math::mat4     normal      = pbpt::math::transpose(pbpt::math::inverse(model));
+        const pbpt::math::Mat4     normal      = pbpt::math::transpose(pbpt::math::inverse(model));
         const resource::MeshHandle mesh_handle = mesh_renderer->mesh_handle();
         if (!mesh_handle.is_valid()) {
             throw std::runtime_error("MeshRenderer mesh handle is invalid.");

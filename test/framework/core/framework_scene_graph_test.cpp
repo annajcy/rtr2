@@ -21,7 +21,7 @@ public:
     }
 };
 
-static void expect_vec3_near(const pbpt::math::vec3& lhs, const pbpt::math::vec3& rhs, float eps = 1e-5f) {
+static void expect_vec3_near(const pbpt::math::Vec3& lhs, const pbpt::math::Vec3& rhs, float eps = 1e-5f) {
     EXPECT_NEAR(lhs.x(), rhs.x(), eps);
     EXPECT_NEAR(lhs.y(), rhs.y(), eps);
     EXPECT_NEAR(lhs.z(), rhs.z(), eps);
@@ -59,11 +59,11 @@ TEST(SceneGraphTest, SetParentWorldStaysKeepsWorldPosition) {
     scene.scene_graph().node(parent.id()).set_local_position({10.0f, 0.0f, 0.0f});
     scene.scene_graph().node(child.id()).set_local_position({5.0f, 0.0f, 0.0f});
     scene.scene_graph().update_world_transforms();
-    const pbpt::math::vec3 before = scene.scene_graph().node(child.id()).world_position();
+    const pbpt::math::Vec3 before = scene.scene_graph().node(child.id()).world_position();
 
     ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id()));
     scene.scene_graph().update_world_transforms();
-    const pbpt::math::vec3 after = scene.scene_graph().node(child.id()).world_position();
+    const pbpt::math::Vec3 after = scene.scene_graph().node(child.id()).world_position();
 
     expect_vec3_near(before, after);
 }
@@ -138,19 +138,19 @@ TEST(SceneGraphTest, LookAtDirectionLocalAndWorldHaveDifferentSemanticsWithParen
     ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id(), false));
 
     scene.scene_graph().node(parent.id()).set_local_rotation(
-        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::vec3(0.0f, 1.0f, 0.0f))
+        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f))
     );
 
     auto child_node = scene.scene_graph().node(child.id());
-    child_node.set_local_rotation(pbpt::math::quat::identity());
+    child_node.set_local_rotation(pbpt::math::Quat::identity());
     child_node.look_at_direction_local({0.0f, 0.0f, 1.0f});
     scene.scene_graph().update_world_transforms();
-    const pbpt::math::vec3 world_front_after_local = scene.scene_graph().node(child.id()).world_front();
+    const pbpt::math::Vec3 world_front_after_local = scene.scene_graph().node(child.id()).world_front();
 
-    child_node.set_local_rotation(pbpt::math::quat::identity());
+    child_node.set_local_rotation(pbpt::math::Quat::identity());
     child_node.look_at_direction_world({0.0f, 0.0f, 1.0f});
     scene.scene_graph().update_world_transforms();
-    const pbpt::math::vec3 world_front_after_world = scene.scene_graph().node(child.id()).world_front();
+    const pbpt::math::Vec3 world_front_after_world = scene.scene_graph().node(child.id()).world_front();
 
     expect_vec3_near(world_front_after_local, {1.0f, 0.0f, 0.0f});
     expect_vec3_near(world_front_after_world, {0.0f, 0.0f, 1.0f});

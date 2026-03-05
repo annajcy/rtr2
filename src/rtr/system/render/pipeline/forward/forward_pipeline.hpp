@@ -61,7 +61,7 @@ struct UniformBufferObjectGpu {
     alignas(4) uint32_t point_light_count{0};
 };
 
-inline GpuMat4 pack_mat4_row_major(const pbpt::math::mat4& m) {
+inline GpuMat4 pack_mat4_row_major(const pbpt::math::Mat4& m) {
     GpuMat4 out{};
     std::size_t idx = 0;
     for (int r = 0; r < 4; ++r)

@@ -11,7 +11,7 @@ struct IntegratorRecord {
 };
 
 struct SensorRecord {
-    ::pbpt::math::mat4 to_world{1.0f};
+    ::pbpt::math::Mat4 to_world{1.0f};
     float             fov_degrees{45.0f};
     float             near_clip{0.1f};
     float             far_clip{1000.0f};

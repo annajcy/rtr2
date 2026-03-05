@@ -31,21 +31,21 @@ private:
     static void draw_transform_editor(framework::core::GameObject& game_object) {
         auto node = game_object.node();
 
-        pbpt::math::vec3 local_position = node.local_position();
+        pbpt::math::Vec3 local_position = node.local_position();
         if (ImGui::DragFloat3("Position", &local_position.x(), 0.05f)) {
             node.set_local_position(local_position);
             logger()->debug("Transform position updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
                             game_object.id(), local_position.x(), local_position.y(), local_position.z());
         }
 
-        pbpt::math::vec3 local_euler = node.rotation_euler();
+        pbpt::math::Vec3 local_euler = node.rotation_euler();
         if (ImGui::DragFloat3("Rotation (deg)", &local_euler.x(), 0.5f)) {
-            node.set_local_rotation(pbpt::math::quat(pbpt::math::radians(local_euler)));
+            node.set_local_rotation(pbpt::math::Quat(pbpt::math::radians(local_euler)));
             logger()->debug("Transform rotation updated (game_object_id={}, euler_deg=[{:.3f}, {:.3f}, {:.3f}]).",
                             game_object.id(), local_euler.x(), local_euler.y(), local_euler.z());
         }
 
-        pbpt::math::vec3 local_scale = node.local_scale();
+        pbpt::math::Vec3 local_scale = node.local_scale();
         if (ImGui::DragFloat3("Scale", &local_scale.x(), 0.02f)) {
             local_scale.x() = std::max(local_scale.x(), 0.0001f);
             local_scale.y() = std::max(local_scale.y(), 0.0001f);
@@ -160,7 +160,7 @@ private:
                                 enabled);
             }
 
-            pbpt::math::vec4 base_color = mesh_renderer->base_color();
+            pbpt::math::Vec4 base_color = mesh_renderer->base_color();
             if (ImGui::ColorEdit4("Base Color", &base_color.x())) {
                 mesh_renderer->set_base_color(base_color);
                 logger()->debug(
@@ -186,7 +186,7 @@ private:
                                 enabled);
             }
 
-            pbpt::math::vec3 color = point_light->color;
+            pbpt::math::Vec3 color = point_light->color;
             if (ImGui::ColorEdit3("Color", &color.x())) {
                 point_light->set_color(color);
             }
@@ -291,8 +291,8 @@ private:
                     game_object.id(), old_min, old_max, config.pitch_min_degrees, config.pitch_max_degrees);
             }
             if (pbpt::math::length(config.world_up) <= 1e-6f) {
-                const pbpt::math::vec3 old_world_up = config.world_up;
-                config.world_up                     = pbpt::math::vec3{0.0f, 1.0f, 0.0f};
+                const pbpt::math::Vec3 old_world_up = config.world_up;
+                config.world_up                     = pbpt::math::Vec3{0.0f, 1.0f, 0.0f};
                 dirty                               = true;
                 logger()->debug(
                     "TrackBall world_up corrected (game_object_id={}, old=[{:.3f}, {:.3f}, {:.3f}], new=[{:.3f}, "
@@ -311,7 +311,7 @@ private:
                     config.world_up.z());
             }
 
-            pbpt::math::vec3 target = trackball->target();
+            pbpt::math::Vec3 target = trackball->target();
             if (ImGui::DragFloat3("Target", &target.x(), 0.05f)) {
                 trackball->set_target(target);
                 logger()->debug("TrackBall target updated (game_object_id={}, target=[{:.4f}, {:.4f}, {:.4f}]).",
