@@ -16,13 +16,11 @@ public:
         scene.scene_graph().update_world_transforms();
     }
 
-    PhysicsWorld& world() { return m_physics_world; }
+    PhysicsWorld&       world() { return m_physics_world; }
     const PhysicsWorld& world() const { return m_physics_world; }
 
 private:
-    void sync_scene_to_physics(framework::core::Scene& scene) {
-        (void)scene;
-    }
+    void sync_scene_to_physics(framework::core::Scene& scene) { (void)scene; }
 
     void sync_physics_to_scene(framework::core::Scene& scene) {
         const auto active_nodes = scene.scene_graph().active_nodes();
@@ -32,7 +30,7 @@ private:
                 continue;
             }
 
-            auto* rigid_body_component = game_object->get_component<framework::component::RigidBodyComponent>();
+            auto* rigid_body_component = game_object->get_component<framework::component::RigidBody>();
             if (rigid_body_component == nullptr || !rigid_body_component->enabled()) {
                 continue;
             }
@@ -41,7 +39,7 @@ private:
             }
 
             const auto& state = m_physics_world.get_rigid_body(rigid_body_component->rigid_body_id()).state();
-            scene.scene_graph().node(id).set_local_position(state.position);
+            scene.scene_graph().node(id).set_local_position(state.translation_state.position);
         }
     }
 

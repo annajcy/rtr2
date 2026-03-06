@@ -21,20 +21,15 @@ struct SphereShape {
 
 struct PlaneShape {
     pbpt::math::Normal3 normal;
-    pbpt::math::Float offset;
+    pbpt::math::Float   offset;
 };
 
-using ColliderShape = std::variant<
-    SphereShape, 
-    PlaneShape
->;    
+using ColliderShape = std::variant<SphereShape, PlaneShape>;
 
-struct Colider {
-    ColliderShape shape;
+struct Collider {
+    ColliderShape           shape;
     pbpt::geometry::Bounds3 aabb;
-    pbpt::geometry::Trans local_transform;
+    pbpt::geometry::Trans   local_transform;
 };
 
-
-}
-
+}  // namespace rtr::system::physics

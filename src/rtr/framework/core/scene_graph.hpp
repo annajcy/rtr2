@@ -3,12 +3,12 @@
 #include <pbpt/math/math.h>
 
 #include <algorithm>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
 
 #include "rtr/framework/core/types.hpp"
 
@@ -19,12 +19,12 @@ public:
     static constexpr GameObjectId kVirtualRootId = 0;
 
     struct NodeSnapshot {
-        GameObjectId id{core::kInvalidGameObjectId};
-        GameObjectId parent_id{core::kInvalidGameObjectId};
-        pbpt::math::Vec3 local_position{0.0f, 0.0f, 0.0f};
-        pbpt::math::Quat local_rotation{1.0f, 0.0f, 0.0f, 0.0f};
-        pbpt::math::Vec3 local_scale{1.0f, 1.0f, 1.0f};
-        bool is_enabled{true};
+        GameObjectId              id{core::kInvalidGameObjectId};
+        GameObjectId              parent_id{core::kInvalidGameObjectId};
+        pbpt::math::Vec3          local_position{0.0f, 0.0f, 0.0f};
+        pbpt::math::Quat          local_rotation{1.0f, 0.0f, 0.0f, 0.0f};
+        pbpt::math::Vec3          local_scale{1.0f, 1.0f, 1.0f};
+        bool                      is_enabled{true};
         std::vector<GameObjectId> children{};
     };
 
@@ -34,8 +34,8 @@ public:
     };
 
     struct NodeRecord {
-        GameObjectId id{core::kInvalidGameObjectId};
-        GameObjectId parent_id{kVirtualRootId};
+        GameObjectId              id{core::kInvalidGameObjectId};
+        GameObjectId              parent_id{kVirtualRootId};
         std::vector<GameObjectId> children{};
 
         pbpt::math::Vec3 local_position{0.0f, 0.0f, 0.0f};
@@ -50,43 +50,26 @@ public:
     class ConstNodeView {
     protected:
         const SceneGraph& m_graph;
-        GameObjectId m_id{core::kInvalidGameObjectId};
+        GameObjectId      m_id{core::kInvalidGameObjectId};
 
-        const SceneGraph& graph() const {
-            return m_graph;
-        }
+        const SceneGraph& graph() const { return m_graph; }
 
     public:
-        ConstNodeView(const SceneGraph& graph, GameObjectId id)
-            : m_graph(graph), m_id(id) {}
+        ConstNodeView(const SceneGraph& graph, GameObjectId id) : m_graph(graph), m_id(id) {}
 
-        bool valid() const {
-            return graph().has_node(m_id);
-        }
+        bool valid() const { return graph().has_node(m_id); }
 
-        GameObjectId id() const {
-            return m_id;
-        }
+        GameObjectId id() const { return m_id; }
 
-        GameObjectId parent_id() const {
-            return graph().checked_record(m_id).parent_id;
-        }
+        GameObjectId parent_id() const { return graph().checked_record(m_id).parent_id; }
 
-        const std::vector<GameObjectId>& children() const {
-            return graph().checked_record(m_id).children;
-        }
+        const std::vector<GameObjectId>& children() const { return graph().checked_record(m_id).children; }
 
-        const pbpt::math::Vec3& local_position() const {
-            return graph().checked_record(m_id).local_position;
-        }
+        const pbpt::math::Vec3& local_position() const { return graph().checked_record(m_id).local_position; }
 
-        const pbpt::math::Quat& local_rotation() const {
-            return graph().checked_record(m_id).local_rotation;
-        }
+        const pbpt::math::Quat& local_rotation() const { return graph().checked_record(m_id).local_rotation; }
 
-        const pbpt::math::Vec3& local_scale() const {
-            return graph().checked_record(m_id).local_scale;
-        }
+        const pbpt::math::Vec3& local_scale() const { return graph().checked_record(m_id).local_scale; }
 
         const pbpt::math::Mat4& world_matrix() const {
             if (graph().checked_record(m_id).dirty) {
@@ -96,122 +79,85 @@ public:
             return graph().checked_record(m_id).world_matrix;
         }
 
-        pbpt::math::Vec3 world_position() const {
-            return SceneGraph::extract_world_position(world_matrix());
-        }
+        pbpt::math::Vec3 world_position() const { return SceneGraph::extract_world_position(world_matrix()); }
 
-        pbpt::math::Quat world_rotation() const {
-            return SceneGraph::extract_world_rotation(world_matrix());
-        }
+        pbpt::math::Quat world_rotation() const { return SceneGraph::extract_world_rotation(world_matrix()); }
 
-        pbpt::math::Vec3 world_scale() const {
-            return SceneGraph::extract_world_scale(world_matrix());
-        }
+        pbpt::math::Vec3 world_scale() const { return SceneGraph::extract_world_scale(world_matrix()); }
 
-        bool dirty() const {
-            return graph().checked_record(m_id).dirty;
-        }
+        bool dirty() const { return graph().checked_record(m_id).dirty; }
 
-        bool is_enabled() const {
-            return graph().checked_record(m_id).is_enabled;
-        }
+        bool is_enabled() const { return graph().checked_record(m_id).is_enabled; }
 
         pbpt::math::Vec3 rotation_euler() const {
-            return pbpt::math::degrees(pbpt::math::eulerAngles(local_rotation()));
+            return pbpt::math::degrees(pbpt::math::euler_angles(local_rotation()));
         }
 
-        pbpt::math::Vec3 local_up() const {
-            return local_rotation() * pbpt::math::Vec3(0.0f, 1.0f, 0.0f);
-        }
+        pbpt::math::Vec3 local_up() const { return local_rotation() * pbpt::math::Vec3(0.0f, 1.0f, 0.0f); }
 
-        pbpt::math::Vec3 local_down() const {
-            return local_rotation() * pbpt::math::Vec3(0.0f, -1.0f, 0.0f);
-        }
+        pbpt::math::Vec3 local_down() const { return local_rotation() * pbpt::math::Vec3(0.0f, -1.0f, 0.0f); }
 
-        pbpt::math::Vec3 local_right() const {
-            return local_rotation() * pbpt::math::Vec3(1.0f, 0.0f, 0.0f);
-        }
+        pbpt::math::Vec3 local_right() const { return local_rotation() * pbpt::math::Vec3(1.0f, 0.0f, 0.0f); }
 
-        pbpt::math::Vec3 local_left() const {
-            return local_rotation() * pbpt::math::Vec3(-1.0f, 0.0f, 0.0f);
-        }
+        pbpt::math::Vec3 local_left() const { return local_rotation() * pbpt::math::Vec3(-1.0f, 0.0f, 0.0f); }
 
-        pbpt::math::Vec3 local_front() const {
-            return local_rotation() * pbpt::math::Vec3(0.0f, 0.0f, 1.0f);
-        }
+        pbpt::math::Vec3 local_front() const { return local_rotation() * pbpt::math::Vec3(0.0f, 0.0f, 1.0f); }
 
-        pbpt::math::Vec3 local_back() const {
-            return local_rotation() * pbpt::math::Vec3(0.0f, 0.0f, -1.0f);
-        }
+        pbpt::math::Vec3 local_back() const { return local_rotation() * pbpt::math::Vec3(0.0f, 0.0f, -1.0f); }
 
-        pbpt::math::Vec3 world_up() const {
-            return world_rotation() * pbpt::math::Vec3(0.0f, 1.0f, 0.0f);
-        }
+        pbpt::math::Vec3 world_up() const { return world_rotation() * pbpt::math::Vec3(0.0f, 1.0f, 0.0f); }
 
-        pbpt::math::Vec3 world_down() const {
-            return world_rotation() * pbpt::math::Vec3(0.0f, -1.0f, 0.0f);
-        }
+        pbpt::math::Vec3 world_down() const { return world_rotation() * pbpt::math::Vec3(0.0f, -1.0f, 0.0f); }
 
-        pbpt::math::Vec3 world_right() const {
-            return world_rotation() * pbpt::math::Vec3(1.0f, 0.0f, 0.0f);
-        }
+        pbpt::math::Vec3 world_right() const { return world_rotation() * pbpt::math::Vec3(1.0f, 0.0f, 0.0f); }
 
-        pbpt::math::Vec3 world_left() const {
-            return world_rotation() * pbpt::math::Vec3(-1.0f, 0.0f, 0.0f);
-        }
+        pbpt::math::Vec3 world_left() const { return world_rotation() * pbpt::math::Vec3(-1.0f, 0.0f, 0.0f); }
 
-        pbpt::math::Vec3 world_front() const {
-            return world_rotation() * pbpt::math::Vec3(0.0f, 0.0f, 1.0f);
-        }
+        pbpt::math::Vec3 world_front() const { return world_rotation() * pbpt::math::Vec3(0.0f, 0.0f, 1.0f); }
 
-        pbpt::math::Vec3 world_back() const {
-            return world_rotation() * pbpt::math::Vec3(0.0f, 0.0f, -1.0f);
-        }
+        pbpt::math::Vec3 world_back() const { return world_rotation() * pbpt::math::Vec3(0.0f, 0.0f, -1.0f); }
 
-        pbpt::math::Mat4 normal_matrix() const {
-            return pbpt::math::transpose(pbpt::math::inverse(world_matrix()));
-        }
+        pbpt::math::Mat4 normal_matrix() const { return pbpt::math::transpose(pbpt::math::inverse(world_matrix())); }
     };
 
     class NodeView : public ConstNodeView {
     private:
         SceneGraph& m_mutable_graph;
 
-        SceneGraph& graph() {
-            return m_mutable_graph;
-        }
+        SceneGraph& graph() { return m_mutable_graph; }
 
     public:
-        NodeView(SceneGraph& graph, GameObjectId id)
-            : ConstNodeView(graph, id), m_mutable_graph(graph) {}
+        NodeView(SceneGraph& graph, GameObjectId id) : ConstNodeView(graph, id), m_mutable_graph(graph) {}
 
         void set_local_position(const pbpt::math::Vec3& value) {
-            auto& scene_graph = graph();
-            auto& record = scene_graph.checked_record(m_id);
+            auto& scene_graph     = graph();
+            auto& record          = scene_graph.checked_record(m_id);
             record.local_position = value;
             scene_graph.mark_subtree_dirty(m_id);
         }
 
         void set_local_rotation(const pbpt::math::Quat& value) {
-            auto& scene_graph = graph();
-            auto& record = scene_graph.checked_record(m_id);
+            auto& scene_graph     = graph();
+            auto& record          = scene_graph.checked_record(m_id);
             record.local_rotation = value;
             scene_graph.mark_subtree_dirty(m_id);
         }
 
         void set_local_scale(const pbpt::math::Vec3& value) {
-            auto& scene_graph = graph();
-            auto& record = scene_graph.checked_record(m_id);
+            auto& scene_graph  = graph();
+            auto& record       = scene_graph.checked_record(m_id);
             record.local_scale = value;
             scene_graph.mark_subtree_dirty(m_id);
         }
 
         void set_local_model_matrix(const pbpt::math::Mat4& local_model_matrix) {
             pbpt::math::Vec3 scale = {
-                pbpt::math::length(pbpt::math::Vec3(local_model_matrix[0][0], local_model_matrix[1][0], local_model_matrix[2][0])),
-                pbpt::math::length(pbpt::math::Vec3(local_model_matrix[0][1], local_model_matrix[1][1], local_model_matrix[2][1])),
-                pbpt::math::length(pbpt::math::Vec3(local_model_matrix[0][2], local_model_matrix[1][2], local_model_matrix[2][2]))
-            };
+                pbpt::math::length(
+                    pbpt::math::Vec3(local_model_matrix[0][0], local_model_matrix[1][0], local_model_matrix[2][0])),
+                pbpt::math::length(
+                    pbpt::math::Vec3(local_model_matrix[0][1], local_model_matrix[1][1], local_model_matrix[2][1])),
+                pbpt::math::length(
+                    pbpt::math::Vec3(local_model_matrix[0][2], local_model_matrix[1][2], local_model_matrix[2][2]))};
 
             pbpt::math::Mat3 rotation_matrix = pbpt::math::Mat3(local_model_matrix);
             for (int r = 0; r < 3; ++r) {
@@ -227,27 +173,21 @@ public:
             set_local_scale(scale);
         }
 
-        void set_world_position(const pbpt::math::Vec3& value) {
-            graph().set_world_position_internal(m_id, value);
-        }
+        void set_world_position(const pbpt::math::Vec3& value) { graph().set_world_position_internal(m_id, value); }
 
-        void set_world_rotation(const pbpt::math::Quat& value) {
-            graph().set_world_rotation_internal(m_id, value);
-        }
+        void set_world_rotation(const pbpt::math::Quat& value) { graph().set_world_rotation_internal(m_id, value); }
 
-        void set_world_scale(const pbpt::math::Vec3& value) {
-            graph().set_world_scale_internal(m_id, value);
-        }
+        void set_world_scale(const pbpt::math::Vec3& value) { graph().set_world_scale_internal(m_id, value); }
 
         void look_at_direction_local(const pbpt::math::Vec3& target_direction_local) {
             if (pbpt::math::length(target_direction_local) < SceneGraph::kEpsilon) {
                 return;
             }
 
-            const pbpt::math::Vec3 direction = pbpt::math::normalize(target_direction_local);
+            const pbpt::math::Vec3 direction     = pbpt::math::normalize(target_direction_local);
             const pbpt::math::Vec3 current_front = local_front();
-            const float cross_len = pbpt::math::length(pbpt::math::cross(current_front, direction));
-            pbpt::math::Quat rotation = local_rotation();
+            const float            cross_len     = pbpt::math::length(pbpt::math::cross(current_front, direction));
+            pbpt::math::Quat       rotation      = local_rotation();
 
             if (cross_len < SceneGraph::kEpsilon) {
                 if (pbpt::math::dot(current_front, direction) < 0.0f) {
@@ -270,14 +210,13 @@ public:
                 graph().update_world_transforms();
             }
 
-            const auto& node_record = graph().checked_record(m_id);
+            const auto&            node_record = graph().checked_record(m_id);
             const pbpt::math::Quat parent_world_rotation =
                 (node_record.parent_id == SceneGraph::kVirtualRootId)
                     ? pbpt::math::Quat::identity()
                     : SceneGraph::extract_world_rotation(graph().checked_record(node_record.parent_id).world_matrix);
 
-            const pbpt::math::Vec3 target_direction_local =
-                parent_world_rotation.inversed() * target_direction_world;
+            const pbpt::math::Vec3 target_direction_local = parent_world_rotation.inversed() * target_direction_world;
             look_at_direction_local(target_direction_local);
         }
 
@@ -294,7 +233,7 @@ public:
         }
 
         void rotate(float angle, const pbpt::math::Vec3& axis) {
-            const pbpt::math::Quat q = pbpt::math::angleAxis(pbpt::math::radians(angle), axis);
+            const pbpt::math::Quat q = pbpt::math::angle_axis(pbpt::math::radians(angle), axis);
             set_local_rotation(q * local_rotation());
         }
     };
@@ -304,11 +243,11 @@ public:
         graph.m_nodes.clear();
 
         NodeRecord root{};
-        root.id = kVirtualRootId;
-        root.parent_id = kVirtualRootId;
+        root.id           = kVirtualRootId;
+        root.parent_id    = kVirtualRootId;
         root.world_matrix = pbpt::math::Mat4{1.0f};
-        root.dirty = false;
-        root.is_enabled = true;
+        root.dirty        = false;
+        root.is_enabled   = true;
         graph.m_nodes.emplace(kVirtualRootId, std::move(root));
 
         for (const auto& item : snapshot.nodes) {
@@ -316,14 +255,14 @@ public:
                 return std::nullopt;
             }
             NodeRecord record{};
-            record.id = item.id;
-            record.parent_id = item.parent_id;
+            record.id             = item.id;
+            record.parent_id      = item.parent_id;
             record.local_position = item.local_position;
             record.local_rotation = item.local_rotation;
-            record.local_scale = item.local_scale;
-            record.is_enabled = item.is_enabled;
-            record.children = item.children;
-            record.dirty = true;
+            record.local_scale    = item.local_scale;
+            record.is_enabled     = item.is_enabled;
+            record.children       = item.children;
+            record.dirty          = true;
             graph.m_nodes.emplace(item.id, std::move(record));
         }
 
@@ -361,8 +300,8 @@ public:
 
     static pbpt::math::Mat4 compose_local_matrix(const NodeRecord& node) {
         pbpt::math::Mat4 transform = pbpt::math::translate(pbpt::math::Mat4{1.0f}, node.local_position);
-        transform = transform * pbpt::math::mat4_cast(node.local_rotation);
-        transform = pbpt::math::scale(transform, node.local_scale);
+        transform                  = transform * pbpt::math::mat4_cast(node.local_rotation);
+        transform                  = pbpt::math::scale(transform, node.local_scale);
         return transform;
     }
 
@@ -371,15 +310,13 @@ public:
     }
 
     static pbpt::math::Vec3 extract_world_scale(const pbpt::math::Mat4& world_matrix) {
-        return {
-            pbpt::math::length(pbpt::math::Vec3(world_matrix[0][0], world_matrix[1][0], world_matrix[2][0])),
-            pbpt::math::length(pbpt::math::Vec3(world_matrix[0][1], world_matrix[1][1], world_matrix[2][1])),
-            pbpt::math::length(pbpt::math::Vec3(world_matrix[0][2], world_matrix[1][2], world_matrix[2][2]))
-        };
+        return {pbpt::math::length(pbpt::math::Vec3(world_matrix[0][0], world_matrix[1][0], world_matrix[2][0])),
+                pbpt::math::length(pbpt::math::Vec3(world_matrix[0][1], world_matrix[1][1], world_matrix[2][1])),
+                pbpt::math::length(pbpt::math::Vec3(world_matrix[0][2], world_matrix[1][2], world_matrix[2][2]))};
     }
 
     static pbpt::math::Quat extract_world_rotation(const pbpt::math::Mat4& world_matrix) {
-        pbpt::math::Vec3 scale = extract_world_scale(world_matrix);
+        pbpt::math::Vec3 scale           = extract_world_scale(world_matrix);
         pbpt::math::Mat3 rotation_matrix = pbpt::math::Mat3(world_matrix);
         for (int r = 0; r < 3; ++r) {
             rotation_matrix[r][0] /= scale.x();
@@ -390,16 +327,17 @@ public:
     }
 
 private:
-    static constexpr float kEpsilon = 1e-6f;
+    static constexpr float                       kEpsilon = 1e-6f;
     std::unordered_map<GameObjectId, NodeRecord> m_nodes{};
+    std::function<void(GameObjectId, bool)>      m_on_node_enabled_changed{};
 
     void remove_child_link(GameObjectId parent_id, GameObjectId child_id) {
         auto parent_it = m_nodes.find(parent_id);
         if (parent_it == m_nodes.end()) {
             return;
         }
-        auto& children = parent_it->second.children;
-        const auto it = std::remove(children.begin(), children.end(), child_id);
+        auto&      children = parent_it->second.children;
+        const auto it       = std::remove(children.begin(), children.end(), child_id);
         children.erase(it, children.end());
     }
 
@@ -434,7 +372,12 @@ private:
         if (it == m_nodes.end()) {
             return;
         }
-        it->second.is_enabled = enabled;
+        if (it->second.is_enabled != enabled) {
+            it->second.is_enabled = enabled;
+            if (m_on_node_enabled_changed) {
+                m_on_node_enabled_changed(id, enabled);
+            }
+        }
         for (const auto child_id : it->second.children) {
             set_enabled_recursive(child_id, enabled);
         }
@@ -457,11 +400,11 @@ private:
             return;
         }
 
-        NodeRecord& node = it->second;
-        const bool dirty = parent_dirty || node.dirty;
+        NodeRecord& node  = it->second;
+        const bool  dirty = parent_dirty || node.dirty;
         if (dirty) {
             node.world_matrix = parent_world * compose_local_matrix(node);
-            node.dirty = false;
+            node.dirty        = false;
         }
 
         for (const auto child_id : node.children) {
@@ -469,17 +412,13 @@ private:
         }
     }
 
-    void collect_active_recursive(
-        GameObjectId id,
-        bool parent_active,
-        std::vector<GameObjectId>& out
-    ) const {
+    void collect_active_recursive(GameObjectId id, bool parent_active, std::vector<GameObjectId>& out) const {
         auto it = m_nodes.find(id);
         if (it == m_nodes.end()) {
             return;
         }
-        const NodeRecord& node = it->second;
-        const bool active = parent_active && node.is_enabled;
+        const NodeRecord& node   = it->second;
+        const bool        active = parent_active && node.is_enabled;
         if (id != kVirtualRootId && active) {
             out.emplace_back(id);
         }
@@ -488,44 +427,45 @@ private:
         }
     }
 
-    
-
 public:
     SceneGraph() {
         NodeRecord root{};
-        root.id = kVirtualRootId;
-        root.parent_id = kVirtualRootId;
+        root.id           = kVirtualRootId;
+        root.parent_id    = kVirtualRootId;
         root.world_matrix = pbpt::math::Mat4{1.0f};
-        root.dirty = false;
-        root.is_enabled = true;
+        root.dirty        = false;
+        root.is_enabled   = true;
         m_nodes.emplace(kVirtualRootId, std::move(root));
     }
 
+    void set_on_node_enabled_changed(std::function<void(GameObjectId, bool)> cb) {
+        m_on_node_enabled_changed = std::move(cb);
+    }
+
     void set_world_position_internal(GameObjectId id, const pbpt::math::Vec3& world_pos) {
-        NodeRecord& node = checked_record(id);
-        const pbpt::math::Mat4 parent_world = (node.parent_id == kVirtualRootId)
-                                           ? pbpt::math::Mat4{1.0f}
-                                           : checked_record(node.parent_id).world_matrix;
+        NodeRecord&            node = checked_record(id);
+        const pbpt::math::Mat4 parent_world =
+            (node.parent_id == kVirtualRootId) ? pbpt::math::Mat4{1.0f} : checked_record(node.parent_id).world_matrix;
         const pbpt::math::Vec4 local = pbpt::math::inverse(parent_world) * pbpt::math::Vec4(world_pos, 1.0f);
-        node.local_position = pbpt::math::Vec3(local);
+        node.local_position          = pbpt::math::Vec3(local);
         mark_subtree_dirty_recursive(id);
     }
 
     void set_world_rotation_internal(GameObjectId id, const pbpt::math::Quat& world_rot) {
-        NodeRecord& node = checked_record(id);
+        NodeRecord&            node       = checked_record(id);
         const pbpt::math::Quat parent_rot = (node.parent_id == kVirtualRootId)
-                                         ? pbpt::math::Quat::identity()
-                                         : extract_world_rotation(checked_record(node.parent_id).world_matrix);
-        node.local_rotation = parent_rot.inversed() * world_rot;
+                                                ? pbpt::math::Quat::identity()
+                                                : extract_world_rotation(checked_record(node.parent_id).world_matrix);
+        node.local_rotation               = parent_rot.inversed() * world_rot;
         mark_subtree_dirty_recursive(id);
     }
 
     void set_world_scale_internal(GameObjectId id, const pbpt::math::Vec3& world_scale) {
-        NodeRecord& node = checked_record(id);
+        NodeRecord&            node         = checked_record(id);
         const pbpt::math::Vec3 parent_scale = (node.parent_id == kVirtualRootId)
-                                           ? pbpt::math::Vec3{1.0f, 1.0f, 1.0f}
-                                           : extract_world_scale(checked_record(node.parent_id).world_matrix);
-        node.local_scale = world_scale / parent_scale;
+                                                  ? pbpt::math::Vec3{1.0f, 1.0f, 1.0f}
+                                                  : extract_world_scale(checked_record(node.parent_id).world_matrix);
+        node.local_scale                    = world_scale / parent_scale;
         mark_subtree_dirty_recursive(id);
     }
 
@@ -545,9 +485,7 @@ public:
         return it->second;
     }
 
-    void mark_subtree_dirty(GameObjectId id) {
-        mark_subtree_dirty_recursive(id);
-    }
+    void mark_subtree_dirty(GameObjectId id) { mark_subtree_dirty_recursive(id); }
 
     bool register_node(GameObjectId id) {
         if (id == core::kInvalidGameObjectId || id == kVirtualRootId) {
@@ -558,18 +496,16 @@ public:
         }
 
         NodeRecord record{};
-        record.id = id;
-        record.parent_id = kVirtualRootId;
-        record.dirty = true;
+        record.id         = id;
+        record.parent_id  = kVirtualRootId;
+        record.dirty      = true;
         record.is_enabled = true;
         m_nodes.emplace(id, std::move(record));
         checked_record(kVirtualRootId).children.emplace_back(id);
         return true;
     }
 
-    bool has_node(GameObjectId id) const {
-        return m_nodes.contains(id);
-    }
+    bool has_node(GameObjectId id) const { return m_nodes.contains(id); }
 
     std::vector<GameObjectId> collect_subtree_postorder(GameObjectId root_id) const {
         std::vector<GameObjectId> ids;
@@ -617,8 +553,8 @@ public:
 
         update_world_transforms();
 
-        const pbpt::math::Vec3 world_pos = extract_world_position(checked_record(child).world_matrix);
-        const pbpt::math::Quat world_rot = extract_world_rotation(checked_record(child).world_matrix);
+        const pbpt::math::Vec3 world_pos   = extract_world_position(checked_record(child).world_matrix);
+        const pbpt::math::Quat world_rot   = extract_world_rotation(checked_record(child).world_matrix);
         const pbpt::math::Vec3 world_scale = extract_world_scale(checked_record(child).world_matrix);
 
         NodeRecord& child_node = checked_record(child);
@@ -664,13 +600,9 @@ public:
         return result;
     }
 
-    NodeView node(GameObjectId id) {
-        return NodeView(*this, id);
-    }
+    NodeView node(GameObjectId id) { return NodeView(*this, id); }
 
-    ConstNodeView node(GameObjectId id) const {
-        return ConstNodeView(*this, id);
-    }
+    ConstNodeView node(GameObjectId id) const { return ConstNodeView(*this, id); }
 
     Snapshot to_snapshot() const {
         Snapshot snapshot{};
@@ -688,18 +620,18 @@ public:
         snapshot.nodes.reserve(ids.size());
         for (const auto id : ids) {
             const NodeRecord& record = checked_record(id);
-            NodeSnapshot node{};
-            node.id = id;
-            node.parent_id = record.parent_id;
+            NodeSnapshot      node{};
+            node.id             = id;
+            node.parent_id      = record.parent_id;
             node.local_position = record.local_position;
             node.local_rotation = record.local_rotation;
-            node.local_scale = record.local_scale;
-            node.is_enabled = record.is_enabled;
-            node.children = record.children;
+            node.local_scale    = record.local_scale;
+            node.is_enabled     = record.is_enabled;
+            node.children       = record.children;
             snapshot.nodes.emplace_back(std::move(node));
         }
         return snapshot;
     }
 };
 
-} // namespace rtr::framework::core
+}  // namespace rtr::framework::core

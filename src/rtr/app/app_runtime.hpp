@@ -43,15 +43,15 @@ struct RuntimeResult {
 };
 
 struct RuntimeContext {
-    framework::core::World&          world;
-    resource::ResourceManager&       resources;
-    system::render::Renderer&        renderer;
-    system::input::InputSystem&      input;
-    system::physics::PhysicsSystem&  physics;
-    std::uint64_t                    frame_serial{0};
-    double                           delta_seconds{0.0};
-    std::function<void()>            request_stop{};
-    bool                             paused{false};
+    framework::core::World&         world;
+    resource::ResourceManager&      resources;
+    system::render::Renderer&       renderer;
+    system::input::InputSystem&     input_system;
+    system::physics::PhysicsSystem& physics_system;
+    std::uint64_t                   frame_serial{0};
+    double                          delta_seconds{0.0};
+    std::function<void()>           request_stop{};
+    bool                            paused{false};
 };
 
 struct RuntimeCallbacks {
@@ -78,11 +78,11 @@ private:
     AppRuntimeConfig m_config{};
     RuntimeCallbacks m_callbacks{};
 
-    resource::ResourceManager        m_resources;
-    system::physics::PhysicsSystem   m_physics;
-    framework::core::World           m_world;
-    system::render::Renderer         m_renderer;
-    system::input::InputSystem       m_input;
+    resource::ResourceManager      m_resources;
+    system::render::Renderer       m_renderer;
+    system::input::InputSystem     m_input_system;
+    system::physics::PhysicsSystem m_physics_system;  // must outlive m_world (components reference physics)
+    framework::core::World         m_world;
 
     bool          m_stop_requested{false};
     bool          m_paused{false};
@@ -93,38 +93,35 @@ public:
     explicit AppRuntime(AppRuntimeConfig config = {})
         : m_config(prepare_config(std::move(config))),
           m_resources(m_config.resource_root_dir),
-          m_physics(),
+          m_physics_system(),
           m_world(m_resources),
           m_renderer(static_cast<int>(m_config.window_width), static_cast<int>(m_config.window_height),
                      m_config.window_title),
-          m_input(&m_renderer.window()),
+          m_input_system(&m_renderer.window()),
           m_paused(m_config.start_paused) {
         logger()->info("AppRuntime initialized (window={}x{}, title='{}', frames_in_flight={}, paused={})",
-                       m_config.window_width, m_config.window_height, m_config.window_title,
-                       rhi::kFramesInFlight, m_paused);
+                       m_config.window_width, m_config.window_height, m_config.window_title, rhi::kFramesInFlight,
+                       m_paused);
     }
 
     const AppRuntimeConfig& config() const { return m_config; }
 
-    framework::core::World& world() { return m_world; }
+    framework::core::World&       world() { return m_world; }
     const framework::core::World& world() const { return m_world; }
 
-    resource::ResourceManager& resource_manager() { return m_resources; }
+    resource::ResourceManager&       resource_manager() { return m_resources; }
     const resource::ResourceManager& resource_manager() const { return m_resources; }
 
-    system::render::Renderer& renderer() { return m_renderer; }
+    system::render::Renderer&       renderer() { return m_renderer; }
     const system::render::Renderer& renderer() const { return m_renderer; }
 
-    system::input::InputSystem& input_system() { return m_input; }
-    const system::input::InputSystem& input_system() const { return m_input; }
+    system::input::InputSystem&       input_system() { return m_input_system; }
+    const system::input::InputSystem& input_system() const { return m_input_system; }
 
-    system::physics::PhysicsSystem& physics_system() { return m_physics; }
-    const system::physics::PhysicsSystem& physics_system() const { return m_physics; }
+    system::physics::PhysicsSystem&       physics_system() { return m_physics_system; }
+    const system::physics::PhysicsSystem& physics_system() const { return m_physics_system; }
 
-    system::render::RenderPipeline* pipeline() { return m_renderer.pipeline(); }
-    const system::render::RenderPipeline* pipeline() const { return m_renderer.pipeline(); }
-
-    void set_callbacks(RuntimeCallbacks callbacks) { m_callbacks = std::move(callbacks); }
+    void                    set_callbacks(RuntimeCallbacks callbacks) { m_callbacks = std::move(callbacks); }
     const RuntimeCallbacks& callbacks() const { return m_callbacks; }
 
     void set_pipeline(std::unique_ptr<system::render::RenderPipeline> pipeline) {
@@ -172,9 +169,10 @@ public:
             }
 
             while (!m_stop_requested && !m_renderer.window().is_should_close()) {
-                m_input.begin_frame();
+                m_input_system.begin_frame();
                 m_renderer.window().poll_events();
 
+                // callbacks may call request_stop(), so check it before doing any work.
                 if (m_callbacks.on_input) {
                     auto ctx = make_runtime_context(0.0);
                     m_callbacks.on_input(ctx);
@@ -208,7 +206,7 @@ public:
                             };
                             m_world.fixed_tick(fixed_ctx);
                             if (auto* active_scene = m_world.active_scene(); active_scene != nullptr) {
-                                m_physics.fixed_tick(*active_scene, fixed_ctx);
+                                m_physics_system.fixed_tick(*active_scene, fixed_ctx);
                             }
                             accumulator -= m_config.fixed_delta_seconds;
                             ++fixed_steps;
@@ -232,7 +230,7 @@ public:
                 m_renderer.pipeline()->prepare_frame(system::render::FramePrepareContext{
                     .world         = m_world,
                     .resources     = m_resources,
-                    .input         = m_input,
+                    .input         = m_input_system,
                     .frame_serial  = m_frame_serial,
                     .delta_seconds = frame_delta,
                 });
@@ -251,7 +249,7 @@ public:
 
                 // Keep per-frame mouse deltas available through update/render,
                 // then clear them at frame tail.
-                m_input.end_frame();
+                m_input_system.end_frame();
 
                 m_resources.tick(m_frame_serial);
                 ++m_frame_serial;
@@ -297,15 +295,15 @@ public:
 private:
     RuntimeContext make_runtime_context(double delta_seconds) {
         return RuntimeContext{
-            .world         = m_world,
-            .resources     = m_resources,
-            .renderer      = m_renderer,
-            .input         = m_input,
-            .physics       = m_physics,
-            .frame_serial  = m_frame_serial,
-            .delta_seconds = delta_seconds,
-            .request_stop  = [this]() { request_stop(); },
-            .paused        = m_paused,
+            .world          = m_world,
+            .resources      = m_resources,
+            .renderer       = m_renderer,
+            .input_system   = m_input_system,
+            .physics_system = m_physics_system,
+            .frame_serial   = m_frame_serial,
+            .delta_seconds  = delta_seconds,
+            .request_stop   = [this]() { request_stop(); },
+            .paused         = m_paused,
         };
     }
 };

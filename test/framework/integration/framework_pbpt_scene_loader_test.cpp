@@ -99,21 +99,21 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
     const auto xml_path = temp_dir.path / "scene.xml";
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <integrator type="simple_path">
-    <integer name="maxDepth" value="-1"/>
+    <integer name="max_depth" value="-1"/>
   </integrator>
   <sensor type="perspective">
-    <string name="fovAxis" value="smaller"/>
-    <float name="nearClip" value="0.1"/>
-    <float name="farClip" value="1000"/>
-    <float name="focusDistance" value="12"/>
-    <transform name="toWorld">
+    <string name="fov_axis" value="smaller"/>
+    <float name="near_clip" value="0.1"/>
+    <float name="far_clip" value="1000"/>
+    <float name="focus_distance" value="12"/>
+    <transform name="to_world">
       <matrix value="1,0,0,0, 0,1,0,0, 0,0,1,4, 0,0,0,1"/>
     </transform>
     <float name="fov" value="45"/>
-    <sampler type="ldsampler">
-      <integer name="sampleCount" value="8"/>
+    <sampler type="independent">
+      <integer name="sample_count" value="8"/>
     </sampler>
     <film type="hdrfilm">
       <integer name="width" value="320"/>
@@ -126,7 +126,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
   </bsdf>
   <shape type="obj" id="mesh_a">
     <string name="filename" value="meshes/tri.obj"/>
-    <transform name="toWorld">
+    <transform name="to_world">
       <matrix value="1,0,0,1, 0,1,0,2, 0,0,1,3, 0,0,0,1"/>
     </transform>
     <ref id="mat_white"/>
@@ -160,9 +160,9 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
     ASSERT_NE(camera_go, nullptr);
     EXPECT_EQ(result.imported_game_object_id_by_name.at("pbpt_camera"), camera_go->id());
 
-    const auto* renderer   = mesh_go->get_component<component::MeshRenderer>();
-    const auto* pbpt_mesh  = mesh_go->get_component<component::PbptMesh>();
-    const auto* pbpt_light = mesh_go->get_component<component::PbptLight>();
+    const auto* renderer    = mesh_go->get_component<component::MeshRenderer>();
+    const auto* pbpt_mesh   = mesh_go->get_component<component::PbptMesh>();
+    const auto* pbpt_light  = mesh_go->get_component<component::PbptLight>();
     const auto* point_light = mesh_go->get_component<component::light::PointLight>();
     ASSERT_NE(renderer, nullptr);
     ASSERT_NE(pbpt_mesh, nullptr);
@@ -210,9 +210,9 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsRgbReflectanceAndMapsToBaseColor) {
     const auto xml_path = temp_dir.path / "scene_rgb.xml";
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <integrator type="simple_path">
-    <integer name="maxDepth" value="-1"/>
+    <integer name="max_depth" value="-1"/>
   </integrator>
   <sensor type="perspective">
     <float name="fov" value="45"/>
@@ -256,9 +256,9 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsForInvalidMatrixElementCount) {
     const auto xml_path = temp_dir.path / "scene_invalid_matrix.xml";
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <integrator type="simple_path">
-    <integer name="maxDepth" value="-1"/>
+    <integer name="max_depth" value="-1"/>
   </integrator>
   <sensor type="perspective">
     <float name="fov" value="45"/>
@@ -272,7 +272,7 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsForInvalidMatrixElementCount) {
   </bsdf>
   <shape type="obj">
     <string name="filename" value="meshes/tri.obj"/>
-    <transform name="toWorld">
+    <transform name="to_world">
       <matrix value="1,0,0,1"/>
     </transform>
     <ref id="mat_white"/>
@@ -293,9 +293,9 @@ TEST(FrameworkPbptSceneLoaderTest, DisambiguatesDuplicateImportedNameBetweenCame
     const auto xml_path = temp_dir.path / "scene_duplicate_name.xml";
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <integrator type="simple_path">
-    <integer name="maxDepth" value="-1"/>
+    <integer name="max_depth" value="-1"/>
   </integrator>
   <sensor type="perspective">
     <float name="fov" value="45"/>
@@ -330,9 +330,9 @@ TEST(FrameworkPbptSceneLoaderTest, RecordsDefaultShapeNameWhenShapeIdMissing) {
     const auto xml_path = temp_dir.path / "scene_default_name.xml";
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <integrator type="simple_path">
-    <integer name="maxDepth" value="-1"/>
+    <integer name="max_depth" value="-1"/>
   </integrator>
   <sensor type="perspective">
     <float name="fov" value="45"/>
@@ -368,13 +368,13 @@ TEST(FrameworkPbptSceneLoaderTest, LookAtSensorAlignsWithRtrCameraFrontConventio
     const auto xml_path = temp_dir.path / "scene_lookat.xml";
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <integrator type="simple_path">
-    <integer name="maxDepth" value="-1"/>
+    <integer name="max_depth" value="-1"/>
   </integrator>
   <sensor type="perspective">
-    <transform name="toWorld">
-      <lookAt origin="0, 0, 0" target="0, 0, 1" up="0, 1, 0"/>
+    <transform name="to_world">
+      <lookat origin="0, 0, 0" target="0, 0, 1" up="0, 1, 0"/>
     </transform>
     <float name="fov" value="45"/>
     <film type="hdrfilm">
@@ -403,13 +403,13 @@ TEST(FrameworkPbptSceneLoaderTest, AttachesFreeLookControllerWhenInputStateProvi
     const auto xml_path = temp_dir.path / "scene_with_sensor.xml";
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <integrator type="simple_path">
-    <integer name="maxDepth" value="-1"/>
+    <integer name="max_depth" value="-1"/>
   </integrator>
   <sensor type="perspective">
-    <transform name="toWorld">
-      <lookAt origin="0, 0, 0" target="0, 0, 1" up="0, 1, 0"/>
+    <transform name="to_world">
+      <lookat origin="0, 0, 0" target="0, 0, 1" up="0, 1, 0"/>
     </transform>
     <float name="fov" value="45"/>
     <film type="hdrfilm">
@@ -422,7 +422,7 @@ TEST(FrameworkPbptSceneLoaderTest, AttachesFreeLookControllerWhenInputStateProvi
     core::Scene               scene(1);
     system::input::InputState input_state{};
     resource::ResourceManager resources(temp_dir.path);
-    LoadOptions         options{};
+    LoadOptions               options{};
     options.free_look_input_state = &input_state;
     (void)load_scene_summary(xml_path.string(), scene, resources, options);
 
@@ -442,9 +442,9 @@ TEST(FrameworkPbptSceneLoaderTest, RelativeMeshFilenameResolvesFromXmlDirectoryW
     write_text_file(mesh_path, "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <integrator type="simple_path">
-    <integer name="maxDepth" value="-1"/>
+    <integer name="max_depth" value="-1"/>
   </integrator>
   <sensor type="perspective">
     <float name="fov" value="45"/>
@@ -478,9 +478,9 @@ TEST(FrameworkPbptSceneLoaderTest, ImportWithCompatibleInfoMapsSubsetAndPreserve
     const auto xml_path = temp_dir.path / "scene.xml";
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <integrator type="simple_path">
-    <integer name="maxDepth" value="-1"/>
+    <integer name="max_depth" value="-1"/>
   </integrator>
   <sensor type="perspective">
     <float name="fov" value="45"/>
@@ -511,7 +511,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportWithCompatibleInfoMapsSubsetAndPreserve
 
     core::Scene               scene(1);
     resource::ResourceManager resources(temp_dir.path);
-    const auto package = pbpt_bridge::load_scene(xml_path.string(), scene, resources);
+    const auto                package = pbpt_bridge::load_scene(xml_path.string(), scene, resources);
 
     EXPECT_EQ(package.result.imported_shape_count, 1u);
     EXPECT_EQ(package.result.imported_light_shape_count, 1u);
@@ -540,9 +540,9 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsWhenSensorIsMissing) {
     const auto xml_path = temp_dir.path / "scene_missing_sensor.xml";
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <integrator type="simple_path">
-    <integer name="maxDepth" value="-1"/>
+    <integer name="max_depth" value="-1"/>
   </integrator>
   <bsdf type="diffuse" id="mat_white">
     <spectrum name="reflectance" value="400:0.7, 500:0.7, 600:0.7, 700:0.7"/>
@@ -567,7 +567,7 @@ TEST(FrameworkPbptSceneLoaderTest, ThrowsWhenIntegratorIsMissing) {
     const auto xml_path = temp_dir.path / "scene_missing_integrator.xml";
     write_text_file(xml_path,
                     R"XML(<?xml version="1.0" encoding="utf-8"?>
-<scene version="0.4.0">
+<scene version="3.0.0">
   <sensor type="perspective">
     <float name="fov" value="45"/>
     <film type="hdrfilm">

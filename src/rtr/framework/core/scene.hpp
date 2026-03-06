@@ -25,9 +25,9 @@ private:
     SceneId m_id{core::kInvalidSceneId};
     bool    m_enabled{true};
 
-    GameObjectId                             m_next_game_object_id{1};
-    SceneGraph                               m_scene_graph{};
-    std::vector<std::unique_ptr<GameObject>> m_game_objects{};
+    GameObjectId                                  m_next_game_object_id{1};
+    SceneGraph                                    m_scene_graph{};
+    std::vector<std::unique_ptr<GameObject>>      m_game_objects{};
     std::unordered_map<GameObjectId, GameObject*> m_game_object_by_id{};
     std::unordered_map<GameObjectId, std::string> m_game_object_name_by_id{};
     std::unordered_map<std::string, GameObjectId> m_game_object_id_by_name{};
@@ -41,7 +41,7 @@ private:
     }
 
     std::string make_unique_game_object_name(std::string_view requested_name,
-                                             GameObjectId ignore_id = core::kInvalidGameObjectId) const {
+                                             GameObjectId     ignore_id = core::kInvalidGameObjectId) const {
         std::string base_name = requested_name.empty() ? "GameObject" : std::string(requested_name);
         if (!is_name_occupied(base_name, ignore_id)) {
             return base_name;
@@ -55,12 +55,17 @@ private:
     }
 
 public:
-    explicit Scene(SceneId id = core::kInvalidSceneId)
-        : m_id(id) {}
+    explicit Scene(SceneId id = core::kInvalidSceneId) : m_id(id) {
+        m_scene_graph.set_on_node_enabled_changed([this](GameObjectId id, bool enabled) {
+            if (GameObject* const go = find_game_object(id)) {
+                go->on_node_enabled_changed(enabled);
+            }
+        });
+    }
 
-    Scene(const Scene&) = delete;
-    Scene& operator=(const Scene&) = delete;
-    Scene(Scene&&) noexcept = delete;
+    Scene(const Scene&)                = delete;
+    Scene& operator=(const Scene&)     = delete;
+    Scene(Scene&&) noexcept            = delete;
     Scene& operator=(Scene&&) noexcept = delete;
 
     SceneId id() const { return m_id; }
@@ -74,8 +79,8 @@ public:
 
     GameObject& create_game_object(std::string name = "GameObject") {
         std::string unique_name = make_unique_game_object_name(name);
-        auto game_object = std::make_unique<GameObject>(m_next_game_object_id++, m_scene_graph);
-        auto* ptr        = game_object.get();
+        auto        game_object = std::make_unique<GameObject>(m_next_game_object_id++, m_scene_graph);
+        auto*       ptr         = game_object.get();
         m_scene_graph.register_node(ptr->id());
         m_game_objects.emplace_back(std::move(game_object));
         m_game_object_by_id.emplace(ptr->id(), ptr);
@@ -135,17 +140,17 @@ public:
                             m_id);
             return false;
         }
-        const std::string old_name = name_it->second;
+        const std::string old_name    = name_it->second;
         const std::string unique_name = make_unique_game_object_name(new_name, id);
         if (old_name == unique_name) {
             return true;
         }
 
         m_game_object_id_by_name.erase(old_name);
-        name_it->second = unique_name;
+        name_it->second                       = unique_name;
         m_game_object_id_by_name[unique_name] = id;
-        logger()->debug("GameObject renamed (scene_id={}, game_object_id={}, old_name='{}', new_name='{}').", m_id,
-                        id, old_name, unique_name);
+        logger()->debug("GameObject renamed (scene_id={}, game_object_id={}, old_name='{}', new_name='{}').", m_id, id,
+                        old_name, unique_name);
         return true;
     }
 
@@ -176,11 +181,10 @@ public:
                 }
                 m_game_object_by_id.erase(by_id_it);
             }
-            const auto it =
-                std::find_if(m_game_objects.begin(), m_game_objects.end(),
-                             [victim_id](const std::unique_ptr<GameObject>& game_object) {
-                                 return game_object && game_object->id() == victim_id;
-                             });
+            const auto it = std::find_if(m_game_objects.begin(), m_game_objects.end(),
+                                         [victim_id](const std::unique_ptr<GameObject>& game_object) {
+                                             return game_object && game_object->id() == victim_id;
+                                         });
             if (it != m_game_objects.end()) {
                 m_game_objects.erase(it);
             }
@@ -188,7 +192,8 @@ public:
 
         const bool unregistered = m_scene_graph.unregister_subtree(id);
         logger()->info(
-            "GameObject subtree destroyed (scene_id={}, root_game_object_id={}, removed_count={}, success={}, remaining={})",
+            "GameObject subtree destroyed (scene_id={}, root_game_object_id={}, removed_count={}, success={}, "
+            "remaining={})",
             m_id, id, subtree_ids.size(), unregistered, m_game_objects.size());
         return unregistered;
     }
@@ -197,7 +202,7 @@ public:
 
     const std::vector<std::unique_ptr<GameObject>>& game_objects() const { return m_game_objects; }
 
-    SceneGraph& scene_graph() { return m_scene_graph; }
+    SceneGraph&       scene_graph() { return m_scene_graph; }
     const SceneGraph& scene_graph() const { return m_scene_graph; }
 
     void fixed_tick(const FixedTickContext& ctx) {

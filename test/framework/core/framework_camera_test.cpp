@@ -31,7 +31,8 @@ TEST(FrameworkCameraTest, PerspectiveProjectionMatchesGlmHelper) {
     camera.near_bound()   = 0.2f;
     camera.far_bound()    = 200.0f;
 
-    expect_mat4_near(camera.projection_matrix(), pbpt::math::perspective(pbpt::math::radians(60.0f), 2.0f, 0.2f, 200.0f));
+    expect_mat4_near(camera.projection_matrix(),
+                     pbpt::math::perspective(pbpt::math::radians(60.0f), 2.0f, 0.2f, 200.0f));
 }
 
 TEST(FrameworkCameraTest, OrthographicProjectionMatchesGlmHelper) {
@@ -57,8 +58,8 @@ TEST(FrameworkCameraTest, ViewMatrixUsesNodeWorldTransform) {
     go.node().set_local_position({1.0f, 2.0f, 3.0f});
     scene.scene_graph().update_world_transforms();
 
-    const pbpt::math::Mat4 expected = pbpt::math::lookAt(pbpt::math::Vec3(1.0f, 2.0f, 3.0f), pbpt::math::Vec3(1.0f, 2.0f, 2.0f),
-                                                          pbpt::math::Vec3(0.0f, 1.0f, 0.0f));
+    const pbpt::math::Mat4 expected = pbpt::math::lookAt(
+        pbpt::math::Vec3(1.0f, 2.0f, 3.0f), pbpt::math::Vec3(1.0f, 2.0f, 2.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f));
     expect_mat4_near(camera.view_matrix(), expected);
 }
 
@@ -69,8 +70,9 @@ TEST(FrameworkCameraTest, LookAtDirectionLocalAndWorldDifferWithParentRotation) 
     auto& camera    = camera_go.add_component<component::PerspectiveCamera>();
     ASSERT_TRUE(scene.scene_graph().set_parent(camera_go.id(), parent.id(), false));
 
-    scene.scene_graph().node(parent.id()).set_local_rotation(
-        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
+    scene.scene_graph()
+        .node(parent.id())
+        .set_local_rotation(pbpt::math::angle_axis(pbpt::math::radians(90.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
     scene.scene_graph().node(camera_go.id()).set_local_rotation(pbpt::math::Quat::identity());
 
     camera.camera_look_at_direction_local({0.0f, 0.0f, -1.0f});
@@ -103,8 +105,8 @@ TEST(FrameworkCameraTest, PerspectiveAdjustZoomMovesAlongFront) {
 
 TEST(FrameworkCameraTest, OrthographicAdjustZoomExpandsBoundsAroundCenter) {
     Scene scene(1);
-    auto& go     = scene.create_game_object("camera");
-    auto& camera = go.add_component<component::OrthographicCamera>();
+    auto& go              = scene.create_game_object("camera");
+    auto& camera          = go.add_component<component::OrthographicCamera>();
     camera.left_bound()   = -2.0f;
     camera.right_bound()  = 2.0f;
     camera.bottom_bound() = -1.0f;

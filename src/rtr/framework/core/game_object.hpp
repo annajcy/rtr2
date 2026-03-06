@@ -21,9 +21,9 @@ class GameObject {
 private:
     static std::shared_ptr<spdlog::logger> logger() { return utils::get_logger("framework.core.game_object"); }
 
-    GameObjectId m_id{core::kInvalidGameObjectId};
-    bool         m_components_destroyed{false};
-    SceneGraph&  m_scene_graph;
+    GameObjectId                                       m_id{core::kInvalidGameObjectId};
+    bool                                               m_components_destroyed{false};
+    SceneGraph&                                        m_scene_graph;
     std::vector<std::unique_ptr<component::Component>> m_components{};
 
 public:
@@ -37,25 +37,53 @@ public:
         }
     }
 
-    GameObject(const GameObject&) = delete;
+    GameObject(const GameObject&)            = delete;
     GameObject& operator=(const GameObject&) = delete;
-    GameObject(GameObject&&) = delete;
-    GameObject& operator=(GameObject&&) = delete;
+    GameObject(GameObject&&)                 = delete;
+    GameObject& operator=(GameObject&&)      = delete;
 
     GameObjectId id() const { return m_id; }
-    bool enabled() const { return node().is_enabled(); }
+    bool         enabled() const { return node().is_enabled(); }
+    void         set_enabled(bool enabled) { m_scene_graph.set_enabled(m_id, enabled); }
 
-    void set_enabled(bool enabled) {
-        m_scene_graph.set_enabled(m_id, enabled);
+    void set_component_enabled(component::Component* component, bool enabled) {
+        if (component == nullptr || component->m_enabled == enabled) {
+            return;
+        }
+        component->m_enabled = enabled;
+        if (this->enabled()) {
+            if (enabled) {
+                component->on_enable();
+            } else {
+                component->on_disable();
+            }
+        }
     }
 
-    SceneGraph::NodeView node() {
-        return m_scene_graph.node(m_id);
+    template <typename TComponent>
+    void set_component_enabled(bool enabled) {
+        static_assert(std::is_base_of_v<component::Component, TComponent>);
+        auto* found = get_component<TComponent>();
+        if (found) {
+            set_component_enabled(found, enabled);
+        }
     }
 
-    SceneGraph::ConstNodeView node() const {
-        return m_scene_graph.node(m_id);
+    void on_node_enabled_changed(bool enabled) {
+        for (const auto& component : m_components) {
+            if (component && component->enabled()) {
+                if (enabled) {
+                    component->on_enable();
+                } else {
+                    component->on_disable();
+                }
+            }
+        }
     }
+
+    SceneGraph::NodeView node() { return m_scene_graph.node(m_id); }
+
+    SceneGraph::ConstNodeView node() const { return m_scene_graph.node(m_id); }
 
     std::size_t component_count() const { return m_components.size(); }
 
@@ -65,6 +93,9 @@ public:
         }
         for (auto& component : m_components) {
             if (component) {
+                if (enabled() && component->enabled()) {
+                    component->on_disable();
+                }
                 component->on_destroy();
                 component.reset();
             }
@@ -85,6 +116,9 @@ public:
         }
         auto component = std::make_unique<TComponent>(*this, std::forward<TArgs>(args)...);
         component->on_awake();
+        if (enabled() && component->enabled()) {
+            component->on_enable();
+        }
         TComponent* instance = component.get();
         m_components.emplace_back(std::move(component));
         logger()->debug("Component added (game_object_id={}, component_type='{}', component_count={})", m_id,
@@ -124,9 +158,10 @@ public:
         static_assert(std::is_base_of_v<component::Component, TComponent>);
         auto* found = get_component<TComponent>();
         if (found == nullptr) {
-            logger()->error("component_or_throw failed: GameObject {} missing component type '{}'.",
-                            m_id, typeid(TComponent).name());
-            throw std::runtime_error(std::string("GameObject missing required component: ") + typeid(TComponent).name());
+            logger()->error("component_or_throw failed: GameObject {} missing component type '{}'.", m_id,
+                            typeid(TComponent).name());
+            throw std::runtime_error(std::string("GameObject missing required component: ") +
+                                     typeid(TComponent).name());
         }
         return *found;
     }
@@ -136,9 +171,10 @@ public:
         static_assert(std::is_base_of_v<component::Component, TComponent>);
         const auto* found = get_component<TComponent>();
         if (found == nullptr) {
-            logger()->error("component_or_throw failed: GameObject {} missing component type '{}'.",
-                            m_id, typeid(TComponent).name());
-            throw std::runtime_error(std::string("GameObject missing required component: ") + typeid(TComponent).name());
+            logger()->error("component_or_throw failed: GameObject {} missing component type '{}'.", m_id,
+                            typeid(TComponent).name());
+            throw std::runtime_error(std::string("GameObject missing required component: ") +
+                                     typeid(TComponent).name());
         }
         return *found;
     }

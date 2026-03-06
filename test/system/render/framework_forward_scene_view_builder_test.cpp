@@ -30,19 +30,17 @@ bool gpu_tests_enabled() {
 
 rhi::ContextCreateInfo make_context_create_info(rhi::Window& window) {
     rhi::ContextCreateInfo info{};
-    info.app_name = "FrameworkForwardSceneViewBuilderTest";
+    info.app_name            = "FrameworkForwardSceneViewBuilderTest";
     info.instance_extensions = window.required_extensions();
-    info.surface_creator = [&window](const vk::raii::Instance& instance) {
-        return window.create_vk_surface(instance);
-    };
+    info.surface_creator = [&window](const vk::raii::Instance& instance) { return window.create_vk_surface(instance); };
     info.enable_validation_layers = false;
     return info;
 }
 
 struct GpuHarness {
-    rhi::Window window;
+    rhi::Window  window;
     rhi::Context context;
-    rhi::Device device;
+    rhi::Device  device;
 
     GpuHarness()
         : window(640, 480, "framework_forward_scene_view_builder_test"),
@@ -109,7 +107,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, CollectsPointLightsAndCameraPos) {
     if (!gpu_tests_enabled()) {
         GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
     }
-    GpuHarness               harness;
+    GpuHarness                harness;
     core::Scene               scene(1);
     resource::ResourceManager resources{};
     auto&                     camera_go = scene.create_game_object("camera");
@@ -123,7 +121,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, CollectsPointLightsAndCameraPos) {
 
     auto& light_go_disabled = scene.create_game_object("light_disabled");
     auto& disabled_pl       = light_go_disabled.add_component<component::light::PointLight>();
-    disabled_pl.set_enabled(false);
+    light_go_disabled.set_component_enabled<component::light::PointLight>(false);
 
     auto& light_go2 = scene.create_game_object("light2");
     light_go2.node().set_world_position({2.0f, 0.0f, 0.0f});
@@ -154,7 +152,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ReturnsBlackFrameWhenNoActiveCamera) 
     if (!gpu_tests_enabled()) {
         GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
     }
-    GpuHarness               harness;
+    GpuHarness                harness;
     core::Scene               scene(1);
     resource::ResourceManager resources{};
     auto&                     go = scene.create_game_object("mesh");
@@ -169,7 +167,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ReturnsBlackFrameWhenMultipleActiveCa
     if (!gpu_tests_enabled()) {
         GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
     }
-    GpuHarness               harness;
+    GpuHarness                harness;
     core::Scene               scene(1);
     resource::ResourceManager resources{};
     add_active_camera(scene, "camera_a");
@@ -188,7 +186,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ExtractsOnlyActiveNodesWithMeshRender
     if (!gpu_tests_enabled()) {
         GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
     }
-    GpuHarness               harness;
+    GpuHarness                harness;
     core::Scene               scene(1);
     resource::ResourceManager resources{};
     add_active_camera(scene);
@@ -223,7 +221,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, DisabledMeshRendererIsExcludedFromRen
     if (!gpu_tests_enabled()) {
         GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
     }
-    GpuHarness               harness;
+    GpuHarness                harness;
     core::Scene               scene(1);
     resource::ResourceManager resources{};
     add_active_camera(scene);
@@ -235,7 +233,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, DisabledMeshRendererIsExcludedFromRen
 
     auto* renderer2 = obj2.get_component<component::MeshRenderer>();
     ASSERT_NE(renderer2, nullptr);
-    renderer2->set_enabled(false);
+    obj2.set_component_enabled<component::MeshRenderer>(false);
 
     const auto view = system::render::build_forward_scene_view(scene, resources, harness.device);
     ASSERT_EQ(view.renderables.size(), 1u);
@@ -246,7 +244,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ComputesModelAndNormalFromWorldTransf
     if (!gpu_tests_enabled()) {
         GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
     }
-    GpuHarness               harness;
+    GpuHarness                harness;
     core::Scene               scene(1);
     resource::ResourceManager resources{};
     add_active_camera(scene);
@@ -256,14 +254,14 @@ TEST(FrameworkForwardSceneViewBuilderTest, ComputesModelAndNormalFromWorldTransf
 
     auto node = mesh_go.node();
     node.set_local_position({1.0f, 2.0f, 3.0f});
-    node.set_local_rotation(pbpt::math::angleAxis(pbpt::math::radians(35.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
+    node.set_local_rotation(pbpt::math::angle_axis(pbpt::math::radians(35.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
     node.set_local_scale({2.0f, 1.5f, 0.5f});
 
     const auto view = system::render::build_forward_scene_view(scene, resources, harness.device);
     auto       it   = std::find_if(view.renderables.begin(), view.renderables.end(),
                                    [&](const system::render::ForwardSceneRenderable& renderable) {
-                                       return renderable.instance_id == static_cast<std::uint64_t>(mesh_go.id());
-                                   });
+                               return renderable.instance_id == static_cast<std::uint64_t>(mesh_go.id());
+                           });
     ASSERT_TRUE(it != view.renderables.end());
 
     const pbpt::math::Mat4 expected_model  = scene.scene_graph().node(mesh_go.id()).world_matrix();
@@ -276,7 +274,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, SupportsBaseColorPath) {
     if (!gpu_tests_enabled()) {
         GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
     }
-    GpuHarness               harness;
+    GpuHarness                harness;
     core::Scene               scene(1);
     resource::ResourceManager resources{};
     add_active_camera(scene);
@@ -308,7 +306,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ForwardGpuPackingUsesStableRowMajorOr
 
 TEST(FrameworkForwardSceneViewBuilderTest, PackedMatrixChainMatchesCpuClipComputation) {
     pbpt::math::Mat4 model = pbpt::math::translate(pbpt::math::Mat4{1.0f}, pbpt::math::Vec3{1.5f, -0.25f, 2.0f});
-    model                  = model * pbpt::math::mat4_cast(pbpt::math::angleAxis(
+    model                  = model * pbpt::math::mat4_cast(pbpt::math::angle_axis(
                         pbpt::math::radians(23.0f), pbpt::math::normalize(pbpt::math::Vec3{0.2f, 1.0f, 0.4f})));
     model                  = pbpt::math::scale(model, pbpt::math::Vec3{1.2f, 0.8f, 1.5f});
 

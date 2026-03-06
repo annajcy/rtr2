@@ -46,14 +46,12 @@ rtr::framework::component::Camera* find_unique_active_camera(rtr::framework::cor
 }  // namespace
 
 int main() {
-    constexpr uint32_t kWidth = 1280;
+    constexpr uint32_t kWidth  = 1280;
     constexpr uint32_t kHeight = 720;
 
     try {
-        rtr::app::AppRuntime runtime(
-            rtr::app::AppRuntimeConfig{.window_width = kWidth,
-                                       .window_height = kHeight,
-                                       .window_title = "RTR Physics PingPong Editor Demo"});
+        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
+            .window_width = kWidth, .window_height = kHeight, .window_title = "RTR Physics PingPong Editor Demo"});
 
         auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);
         editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
@@ -69,8 +67,8 @@ int main() {
 
         auto& scene = runtime.world().create_scene("physics_pingpong_scene");
 
-        auto& camera_go = scene.create_game_object("main_camera");
-        auto& camera = camera_go.add_component<rtr::framework::component::PerspectiveCamera>();
+        auto& camera_go       = scene.create_game_object("main_camera");
+        auto& camera          = camera_go.add_component<rtr::framework::component::PerspectiveCamera>();
         camera.aspect_ratio() = static_cast<float>(kWidth) / static_cast<float>(kHeight);
         camera.set_active(true);
         camera_go.node().set_local_position({0.0f, 1.6f, 8.0f});
@@ -84,38 +82,40 @@ int main() {
         point_light.set_intensity(60.0f);
         point_light.set_range(30.0f);
 
-        auto& bunny_go = scene.create_game_object("bunny_pingpong");
-        const auto bunny_mesh =
-            runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>("models/stanford_bunny.obj");
+        auto&      bunny_go   = scene.create_game_object("bunny_pingpong");
+        const auto bunny_mesh = runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(
+            "models/stanford_bunny.obj");
         (void)bunny_go.add_component<rtr::framework::component::MeshRenderer>(
             bunny_mesh, pbpt::math::Vec4{0.90f, 0.85f, 0.78f, 1.0f});
         bunny_go.node().set_local_position({0.0f, 0.0f, 0.0f});
         bunny_go.node().set_local_scale({10.0f, 10.0f, 10.0f});
 
-        auto& rigid_body = bunny_go.add_component<rtr::framework::component::RigidBodyComponent>(
+        auto& rigid_body = bunny_go.add_component<rtr::framework::component::RigidBody>(
             runtime.physics_system().world(), pbpt::math::Vec3{1.2f, 0.0f, 0.0f});
-        auto& ping_pong = bunny_go.add_component<rtr::framework::component::PingPongComponent>();
+        auto& ping_pong = bunny_go.add_component<rtr::framework::component::PingPong>();
         ping_pong.set_bounds(-2.0f, 2.0f);
         ping_pong.set_speed(1.2f);
         ping_pong.set_start_positive(true);
         ping_pong.apply_start_direction();
         rigid_body.set_position(bunny_go.node().world_position());
 
-        auto& ground_go = scene.create_game_object("ground");
-        const auto ground_mesh =
-            runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>("models/colored_quad.obj");
+        auto&      ground_go   = scene.create_game_object("ground");
+        const auto ground_mesh = runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(
+            "models/colored_quad.obj");
         (void)ground_go.add_component<rtr::framework::component::MeshRenderer>(
             ground_mesh, pbpt::math::Vec4{0.25f, 0.25f, 0.28f, 1.0f});
         ground_go.node().set_local_position({0.0f, -1.0f, 0.0f});
+        ground_go.node().set_local_rotation(
+            pbpt::math::angle_axis(pbpt::math::radians(-90.0f), pbpt::math::Vec3{1.0f, 0.0f, 0.0f}));
         ground_go.node().set_local_scale({15.0f, 15.0f, 1.0f});
 
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{
             .on_post_update =
                 [editor_host](rtr::app::RuntimeContext& ctx) {
                     editor_host->begin_frame(rtr::editor::EditorFrameData{
-                        .frame_serial = ctx.frame_serial,
+                        .frame_serial  = ctx.frame_serial,
                         .delta_seconds = ctx.delta_seconds,
-                        .paused = ctx.paused,
+                        .paused        = ctx.paused,
                     });
 
                     auto* active_scene = ctx.world.active_scene();
@@ -137,7 +137,7 @@ int main() {
                 },
             .on_pre_render =
                 [](rtr::app::RuntimeContext& ctx) {
-                    if (ctx.input.state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
+                    if (ctx.input_system.state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
                         ctx.renderer.window().close();
                     }
                 }});
