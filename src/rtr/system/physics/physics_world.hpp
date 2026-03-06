@@ -29,7 +29,7 @@ public:
         for (auto& [id, body] : m_rigid_bodies) {
             (void)id;
             auto& state = body.state();
-            state.position += state.linear_velocity * delta_seconds;
+            state.translation_state.position += state.translation_state.linear_velocity * delta_seconds;
         }
     }
 };

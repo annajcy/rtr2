@@ -10,20 +10,19 @@
 namespace rtr::system::physics::test {
 
 TEST(PhysicsSceneIntegrationTest, FixedTickIntegratesVelocityAndSyncsBackToSceneGraph) {
-    PhysicsSystem physics_system;
+    PhysicsSystem          physics_system;
     framework::core::Scene scene(1);
 
     auto& moving = scene.create_game_object("moving");
     moving.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
-    (void)moving.add_component<framework::component::RigidBodyComponent>(
-        physics_system.world(), pbpt::math::Vec3{1.0f, 0.0f, 0.0f}
-    );
+    (void)moving.add_component<framework::component::RigidBody>(physics_system.world(),
+                                                                pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
 
     for (std::uint64_t i = 0; i < 10; ++i) {
         physics_system.fixed_tick(scene, framework::core::FixedTickContext{
-                                            .fixed_delta_seconds = 0.1,
-                                            .fixed_tick_index    = i,
-                                        });
+                                             .fixed_delta_seconds = 0.1,
+                                             .fixed_tick_index    = i,
+                                         });
     }
 
     const auto pos = scene.scene_graph().node(moving.id()).local_position();
@@ -33,13 +32,12 @@ TEST(PhysicsSceneIntegrationTest, FixedTickIntegratesVelocityAndSyncsBackToScene
 }
 
 TEST(PhysicsSceneIntegrationTest, DestroyRemovesRigidBodyFromPhysicsWorld) {
-    PhysicsSystem physics_system;
+    PhysicsSystem          physics_system;
     framework::core::Scene scene(1);
 
-    auto& moving = scene.create_game_object("moving");
-    auto& rigid_body_component = moving.add_component<framework::component::RigidBodyComponent>(
-        physics_system.world(), pbpt::math::Vec3{0.0f, 0.0f, 0.0f}
-    );
+    auto& moving               = scene.create_game_object("moving");
+    auto& rigid_body_component = moving.add_component<framework::component::RigidBody>(
+        physics_system.world(), pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
     const auto rigid_body_id = rigid_body_component.rigid_body_id();
 
     EXPECT_TRUE(physics_system.world().has_rigid_body(rigid_body_id));

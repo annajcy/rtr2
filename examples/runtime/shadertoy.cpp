@@ -27,7 +27,7 @@ int main() {
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{
             .on_pre_render =
                 [](rtr::app::RuntimeContext& ctx) {
-                    if (ctx.input.state().key_down(rtr::system::input::KeyCode::Q)) {
+                    if (ctx.input_system.state().key_down(rtr::system::input::KeyCode::Q)) {
                         ctx.renderer.window().close();
                     }
                 },

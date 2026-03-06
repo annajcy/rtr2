@@ -125,7 +125,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildsXmlResultFromActiveNodesWithMeshAndPbpt
     auto& go_with_disabled_component = scene.create_game_object("disabled_component");
     (void)go_with_disabled_component.add_component<component::MeshRenderer>(create_test_mesh(resources));
     auto& disabled_pbpt = go_with_disabled_component.add_component<component::PbptMesh>();
-    disabled_pbpt.set_enabled(false);
+    go_with_disabled_component.set_component_enabled<component::PbptMesh>(false);
 
     auto& go_disabled = scene.create_game_object("disabled_go");
     (void)go_disabled.add_component<component::MeshRenderer>(create_test_mesh(resources));
@@ -137,7 +137,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildsXmlResultFromActiveNodesWithMeshAndPbpt
     const auto result = build_scene_result(scene, resources);
     ASSERT_EQ(result.scene.resources.shape_instances.size(), 1u);
 
-    const auto& shape = result.scene.resources.shape_instances.front();
+    const auto&       shape   = result.scene.resources.shape_instances.front();
     const std::string go_name = std::string(scene.game_object_name(go_ok.id()).value_or(""));
     EXPECT_EQ(shape.shape_id, go_name);
     EXPECT_EQ(shape.mesh_name, go_name);
@@ -187,7 +187,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildXmlResultUsesPbptLightSpectrumAndKeepsPa
     const auto identity = ::pbpt::geometry::Transform<float>::identity();
     const auto render_transform =
         ::pbpt::camera::RenderTransform<float>::from_camera_to_world(identity, ::pbpt::camera::RenderSpace::World);
-    std::vector<int>                         indices{0, 1, 2};
+    std::vector<int>                           indices{0, 1, 2};
     std::vector<::pbpt::math::Point<float, 3>> positions{
         {0.0f, 0.0f, 0.0f},
         {1.0f, 0.0f, 0.0f},
@@ -271,7 +271,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildXmlResultThrowsWhenMappedShapeIdAlsoInPa
     const auto identity = ::pbpt::geometry::Transform<float>::identity();
     const auto render_transform =
         ::pbpt::camera::RenderTransform<float>::from_camera_to_world(identity, ::pbpt::camera::RenderSpace::World);
-    std::vector<int>                         indices{0, 1, 2};
+    std::vector<int>                           indices{0, 1, 2};
     std::vector<::pbpt::math::Point<float, 3>> positions{
         {0.0f, 0.0f, 0.0f},
         {1.0f, 0.0f, 0.0f},

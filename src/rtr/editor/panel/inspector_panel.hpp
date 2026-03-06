@@ -67,7 +67,7 @@ private:
         if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool enabled = camera->enabled();
             if (ImGui::Checkbox("Enabled##camera", &enabled)) {
-                camera->set_enabled(enabled);
+                game_object.set_component_enabled<framework::component::Camera>(enabled);
                 logger()->debug("Camera enabled updated (game_object_id={}, enabled={}).", game_object.id(), enabled);
             }
 
@@ -157,7 +157,7 @@ private:
         if (ImGui::CollapsingHeader("MeshRenderer", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool enabled = mesh_renderer->enabled();
             if (ImGui::Checkbox("Enabled##mesh_renderer", &enabled)) {
-                mesh_renderer->set_enabled(enabled);
+                game_object.set_component_enabled<framework::component::MeshRenderer>(enabled);
                 logger()->debug("MeshRenderer enabled updated (game_object_id={}, enabled={}).", game_object.id(),
                                 enabled);
             }
@@ -183,7 +183,7 @@ private:
         if (ImGui::CollapsingHeader("PointLight", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool enabled = point_light->enabled();
             if (ImGui::Checkbox("Enabled##point_light", &enabled)) {
-                point_light->set_enabled(enabled);
+                game_object.set_component_enabled<framework::component::light::PointLight>(enabled);
                 logger()->debug("PointLight enabled updated (game_object_id={}, enabled={}).", game_object.id(),
                                 enabled);
             }
@@ -216,7 +216,7 @@ private:
     }
 
     static void draw_rigid_body_editor(framework::core::GameObject& game_object) {
-        auto* rigid_body = game_object.get_component<framework::component::RigidBodyComponent>();
+        auto* rigid_body = game_object.get_component<framework::component::RigidBody>();
         if (rigid_body == nullptr) {
             return;
         }
@@ -224,8 +224,9 @@ private:
         if (ImGui::CollapsingHeader("RigidBody", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool enabled = rigid_body->enabled();
             if (ImGui::Checkbox("Enabled##rigid_body", &enabled)) {
-                rigid_body->set_enabled(enabled);
-                logger()->debug("RigidBody enabled updated (game_object_id={}, enabled={}).", game_object.id(), enabled);
+                game_object.set_component_enabled<framework::component::RigidBody>(enabled);
+                logger()->debug("RigidBody enabled updated (game_object_id={}, enabled={}).", game_object.id(),
+                                enabled);
             }
 
             ImGui::Text("RigidBody ID: %llu", static_cast<unsigned long long>(rigid_body->rigid_body_id()));
@@ -252,7 +253,7 @@ private:
     }
 
     static void draw_ping_pong_editor(framework::core::GameObject& game_object) {
-        auto* ping_pong = game_object.get_component<framework::component::PingPongComponent>();
+        auto* ping_pong = game_object.get_component<framework::component::PingPong>();
         if (ping_pong == nullptr) {
             return;
         }
@@ -260,14 +261,14 @@ private:
         if (ImGui::CollapsingHeader("PingPong", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool enabled = ping_pong->enabled();
             if (ImGui::Checkbox("Enabled##ping_pong", &enabled)) {
-                ping_pong->set_enabled(enabled);
+                game_object.set_component_enabled<framework::component::PingPong>(enabled);
                 logger()->debug("PingPong enabled updated (game_object_id={}, enabled={}).", game_object.id(), enabled);
             }
 
-            float min_x = ping_pong->min_x();
-            float max_x = ping_pong->max_x();
-            float speed = ping_pong->speed();
-            bool dirty_bounds = false;
+            float min_x        = ping_pong->min_x();
+            float max_x        = ping_pong->max_x();
+            float speed        = ping_pong->speed();
+            bool  dirty_bounds = false;
 
             if (ImGui::DragFloat("Min X", &min_x, 0.05f)) {
                 dirty_bounds = true;
@@ -310,7 +311,7 @@ private:
         if (ImGui::CollapsingHeader("FreeLook Controller", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool enabled = free_look->enabled();
             if (ImGui::Checkbox("Enabled##free_look", &enabled)) {
-                free_look->set_enabled(enabled);
+                game_object.set_component_enabled<framework::component::FreeLookCameraController>(enabled);
                 logger()->debug("FreeLook enabled updated (game_object_id={}, enabled={}).", game_object.id(), enabled);
             }
 
@@ -354,7 +355,7 @@ private:
         if (ImGui::CollapsingHeader("TrackBall Controller", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool enabled = trackball->enabled();
             if (ImGui::Checkbox("Enabled##trackball", &enabled)) {
-                trackball->set_enabled(enabled);
+                game_object.set_component_enabled<framework::component::TrackBallCameraController>(enabled);
                 logger()->debug("TrackBall enabled updated (game_object_id={}, enabled={}).", game_object.id(),
                                 enabled);
             }

@@ -14,12 +14,12 @@ namespace rtr::framework::component::test {
 
 TEST(FrameworkPingPongComponentTest, FlipsVelocityAtBothBounds) {
     system::physics::PhysicsSystem physics_system;
-    core::Scene scene(1);
-    auto& go = scene.create_game_object("moving");
+    core::Scene                    scene(1);
+    auto&                          go = scene.create_game_object("moving");
     go.node().set_local_position({0.0f, 0.0f, 0.0f});
 
-    auto& rigid_body = go.add_component<RigidBodyComponent>(physics_system.world(), pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
-    auto& ping_pong = go.add_component<PingPongComponent>();
+    auto& rigid_body = go.add_component<RigidBody>(physics_system.world(), pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
+    auto& ping_pong  = go.add_component<PingPong>();
     ping_pong.set_bounds(-1.0f, 1.0f);
     ping_pong.set_speed(1.0f);
     ping_pong.set_start_positive(true);
@@ -37,18 +37,18 @@ TEST(FrameworkPingPongComponentTest, FlipsVelocityAtBothBounds) {
 
 TEST(FrameworkPingPongComponentTest, ThrowsWhenRigidBodyIsMissing) {
     core::Scene scene(1);
-    auto& go = scene.create_game_object("moving");
-    EXPECT_THROW((void)go.add_component<PingPongComponent>(), std::runtime_error);
+    auto&       go = scene.create_game_object("moving");
+    EXPECT_THROW((void)go.add_component<PingPong>(), std::runtime_error);
 }
 
 TEST(FrameworkPingPongComponentTest, UpdatedParametersAffectNextFixedTick) {
     system::physics::PhysicsSystem physics_system;
-    core::Scene scene(1);
-    auto& go = scene.create_game_object("moving");
+    core::Scene                    scene(1);
+    auto&                          go = scene.create_game_object("moving");
     go.node().set_local_position({0.0f, 0.0f, 0.0f});
 
-    auto& rigid_body = go.add_component<RigidBodyComponent>(physics_system.world(), pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
-    auto& ping_pong = go.add_component<PingPongComponent>();
+    auto& rigid_body = go.add_component<RigidBody>(physics_system.world(), pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
+    auto& ping_pong  = go.add_component<PingPong>();
 
     ping_pong.set_bounds(-0.2f, 0.2f);
     ping_pong.set_speed(3.0f);

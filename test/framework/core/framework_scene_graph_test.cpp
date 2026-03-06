@@ -13,12 +13,9 @@ namespace rtr::framework::core::test {
 
 class ThrowOnDestroyComponent final : public component::Component {
 public:
-    explicit ThrowOnDestroyComponent(core::GameObject& owner)
-        : Component(owner) {}
+    explicit ThrowOnDestroyComponent(core::GameObject& owner) : Component(owner) {}
 
-    void on_destroy() override {
-        throw std::runtime_error("destroy failed");
-    }
+    void on_destroy() override { throw std::runtime_error("destroy failed"); }
 };
 
 static void expect_vec3_near(const pbpt::math::Vec3& lhs, const pbpt::math::Vec3& rhs, float eps = 1e-5f) {
@@ -38,15 +35,15 @@ TEST(SceneGraphTest, CreateGameObjectRegistersNode) {
 TEST(SceneGraphTest, ChildOrderingFollowsInsertionOrder) {
     Scene scene(1);
     auto& parent = scene.create_game_object("parent");
-    auto& c1 = scene.create_game_object("c1");
-    auto& c2 = scene.create_game_object("c2");
-    auto& c3 = scene.create_game_object("c3");
+    auto& c1     = scene.create_game_object("c1");
+    auto& c2     = scene.create_game_object("c2");
+    auto& c3     = scene.create_game_object("c3");
 
     ASSERT_TRUE(scene.scene_graph().set_parent(c1.id(), parent.id()));
     ASSERT_TRUE(scene.scene_graph().set_parent(c2.id(), parent.id()));
     ASSERT_TRUE(scene.scene_graph().set_parent(c3.id(), parent.id()));
 
-    const auto& children = scene.scene_graph().node(parent.id()).children();
+    const auto&               children = scene.scene_graph().node(parent.id()).children();
     std::vector<GameObjectId> expected{c1.id(), c2.id(), c3.id()};
     EXPECT_EQ(children, expected);
 }
@@ -54,7 +51,7 @@ TEST(SceneGraphTest, ChildOrderingFollowsInsertionOrder) {
 TEST(SceneGraphTest, SetParentWorldStaysKeepsWorldPosition) {
     Scene scene(1);
     auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
+    auto& child  = scene.create_game_object("child");
 
     scene.scene_graph().node(parent.id()).set_local_position({10.0f, 0.0f, 0.0f});
     scene.scene_graph().node(child.id()).set_local_position({5.0f, 0.0f, 0.0f});
@@ -82,7 +79,7 @@ TEST(SceneGraphTest, RejectsCycleInHierarchy) {
 TEST(SceneGraphTest, ParentInactiveMakesChildInactive) {
     Scene scene(1);
     auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
+    auto& child  = scene.create_game_object("child");
     ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id()));
 
     parent.set_enabled(false);
@@ -95,8 +92,8 @@ TEST(SceneGraphTest, ParentInactiveMakesChildInactive) {
 
 TEST(SceneGraphTest, SetEnabledRecursivelyAffectsSubtree) {
     Scene scene(1);
-    auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
+    auto& parent     = scene.create_game_object("parent");
+    auto& child      = scene.create_game_object("child");
     auto& grandchild = scene.create_game_object("grandchild");
     ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id()));
     ASSERT_TRUE(scene.scene_graph().set_parent(grandchild.id(), child.id()));
@@ -114,8 +111,8 @@ TEST(SceneGraphTest, SetEnabledRecursivelyAffectsSubtree) {
 
 TEST(SceneGraphTest, DirtyFlagPropagatesToSubtree) {
     Scene scene(1);
-    auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
+    auto& parent     = scene.create_game_object("parent");
+    auto& child      = scene.create_game_object("child");
     auto& grandchild = scene.create_game_object("grandchild");
     ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id()));
     ASSERT_TRUE(scene.scene_graph().set_parent(grandchild.id(), child.id()));
@@ -134,12 +131,12 @@ TEST(SceneGraphTest, DirtyFlagPropagatesToSubtree) {
 TEST(SceneGraphTest, LookAtDirectionLocalAndWorldHaveDifferentSemanticsWithParentRotation) {
     Scene scene(1);
     auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
+    auto& child  = scene.create_game_object("child");
     ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id(), false));
 
-    scene.scene_graph().node(parent.id()).set_local_rotation(
-        pbpt::math::angleAxis(pbpt::math::radians(90.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f))
-    );
+    scene.scene_graph()
+        .node(parent.id())
+        .set_local_rotation(pbpt::math::angle_axis(pbpt::math::radians(90.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
 
     auto child_node = scene.scene_graph().node(child.id());
     child_node.set_local_rotation(pbpt::math::Quat::identity());
@@ -157,15 +154,15 @@ TEST(SceneGraphTest, LookAtDirectionLocalAndWorldHaveDifferentSemanticsWithParen
 }
 
 TEST(SceneGraphTest, DestroyGameObjectCascadesSubtreeDeletion) {
-    Scene scene(1);
-    auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
-    auto& grandchild = scene.create_game_object("grandchild");
-    auto& other = scene.create_game_object("other");
-    const GameObjectId parent_id = parent.id();
-    const GameObjectId child_id = child.id();
+    Scene              scene(1);
+    auto&              parent        = scene.create_game_object("parent");
+    auto&              child         = scene.create_game_object("child");
+    auto&              grandchild    = scene.create_game_object("grandchild");
+    auto&              other         = scene.create_game_object("other");
+    const GameObjectId parent_id     = parent.id();
+    const GameObjectId child_id      = child.id();
     const GameObjectId grandchild_id = grandchild.id();
-    const GameObjectId other_id = other.id();
+    const GameObjectId other_id      = other.id();
 
     ASSERT_TRUE(scene.scene_graph().set_parent(child_id, parent_id));
     ASSERT_TRUE(scene.scene_graph().set_parent(grandchild_id, child_id));
@@ -183,11 +180,11 @@ TEST(SceneGraphTest, DestroyGameObjectCascadesSubtreeDeletion) {
 }
 
 TEST(SceneGraphTest, DestroyPropagatesComponentDestroyException) {
-    Scene scene(1);
-    auto& parent = scene.create_game_object("parent");
-    auto& child = scene.create_game_object("child");
+    Scene              scene(1);
+    auto&              parent    = scene.create_game_object("parent");
+    auto&              child     = scene.create_game_object("child");
     const GameObjectId parent_id = parent.id();
-    const GameObjectId child_id = child.id();
+    const GameObjectId child_id  = child.id();
     ASSERT_TRUE(scene.scene_graph().set_parent(child_id, parent_id));
     (void)child.add_component<ThrowOnDestroyComponent>();
 
@@ -223,7 +220,7 @@ TEST(SceneGraphTest, SnapshotRoundTripPreservesHierarchyAndLocalTransform) {
     EXPECT_FALSE(restored.node(2).is_enabled());
 }
 
-} // namespace rtr::framework::core::test
+}  // namespace rtr::framework::core::test
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

@@ -118,10 +118,9 @@ private:
 
 public:
     OfflineRenderPanel(rtr::framework::integration::PbptOfflineRenderService& offline_render_service,
-                       rtr::app::AppRuntime& runtime,
-                       const rtr::framework::integration::LoadSummary& import_result, uint32_t scene_width,
-                       uint32_t scene_height, const std::string& scene_xml_path, const std::string& output_exr_path,
-                       const std::string& output_scene_xml_path)
+                       rtr::app::AppRuntime& runtime, const rtr::framework::integration::LoadSummary& import_result,
+                       uint32_t scene_width, uint32_t scene_height, const std::string& scene_xml_path,
+                       const std::string& output_exr_path, const std::string& output_scene_xml_path)
         : m_offline_render_service(offline_render_service),
           m_runtime(runtime),
           m_import_result(import_result),
@@ -158,7 +157,8 @@ public:
         ImGui::InputInt("SPP", &m_ui_state.spp);
         m_ui_state.spp = std::clamp(m_ui_state.spp, 1, 4096);
 
-        const auto export_resolution = resolve_export_resolution(m_runtime.renderer().window(), m_scene_width, m_scene_height);
+        const auto export_resolution =
+            resolve_export_resolution(m_runtime.renderer().window(), m_scene_width, m_scene_height);
         ImGui::Text("Window: %d x %d", export_resolution.window_w, export_resolution.window_h);
         ImGui::Text("Scale: %.2f x %.2f", export_resolution.scale_x, export_resolution.scale_y);
         ImGui::Text("Framebuffer: %d x %d", export_resolution.framebuffer_w, export_resolution.framebuffer_h);
@@ -211,14 +211,14 @@ public:
 
 int main() {
     try {
-        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
-            .window_width  = 1280,
-            .window_height = 720,
-            .window_title  = "RTR Framework Offline CBox",
+        rtr::app::AppRuntime                                  runtime(rtr::app::AppRuntimeConfig{
+                                             .window_width  = 1280,
+                                             .window_height = 720,
+                                             .window_title  = "RTR Framework Offline CBox",
         });
         rtr::framework::integration::PbptOfflineRenderService offline_render_service{};
 
-        auto& resource_manager = runtime.resource_manager();
+        auto&      resource_manager = runtime.resource_manager();
         const auto import_xml_path =
             (resource_manager.resource_root_dir() / kCboxSceneRootRel / kCboxSceneXmlFilename).string();
 
@@ -296,7 +296,7 @@ int main() {
                 },
             .on_pre_render =
                 [](rtr::app::RuntimeContext& ctx) {
-                    if (ctx.input.state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
+                    if (ctx.input_system.state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
                         ctx.renderer.window().close();
                     }
                 },
