@@ -22,29 +22,6 @@
 #include "rtr/framework/component/physics/rigid_body_component.hpp"
 #include "rtr/system/input/input_types.hpp"
 
-namespace {
-
-rtr::framework::component::Camera* find_unique_active_camera(rtr::framework::core::Scene& scene) {
-    rtr::framework::component::Camera* active_camera = nullptr;
-    for (const auto node_id : scene.scene_graph().active_nodes()) {
-        auto* go = scene.find_game_object(node_id);
-        if (go == nullptr || !go->enabled()) {
-            continue;
-        }
-        auto* camera = go->get_component<rtr::framework::component::Camera>();
-        if (camera == nullptr || !camera->enabled() || !camera->active()) {
-            continue;
-        }
-        if (active_camera != nullptr) {
-            return nullptr;
-        }
-        active_camera = camera;
-    }
-    return active_camera;
-}
-
-}  // namespace
-
 int main() {
     constexpr uint32_t kWidth  = 1280;
     constexpr uint32_t kHeight = 720;
@@ -123,7 +100,7 @@ int main() {
                         throw std::runtime_error("No active scene.");
                     }
 
-                    auto* active_camera = find_unique_active_camera(*active_scene);
+                    auto* active_camera = active_scene->find_game_object("main_camera")->get_component<rtr::framework::component::Camera>();
                     if (active_camera != nullptr) {
                         const auto [fb_w, fb_h] = ctx.renderer.window().framebuffer_size();
                         if (fb_w > 0 && fb_h > 0) {
