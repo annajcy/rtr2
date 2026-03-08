@@ -1,35 +1,37 @@
 #pragma once
 
+#include <optional>
 #include <variant>
-#include "pbpt/geometry/bounds.hpp"
-#include "pbpt/geometry/transform.hpp"
-#include "pbpt/math/basic/type_alias.hpp"
-#include "pbpt/math/spatial/normal.hpp"
-#include "pbpt/math/spatial/vector.hpp"
+
+#include <pbpt/math/math.h>
+
 #include "rtr/system/physics/type.hpp"
+
 namespace rtr::system::physics {
 
 enum class ColliderType {
-    Box,
     Sphere,
-    Capsule,
+    Box,
 };
 
 struct SphereShape {
-    pbpt::math::Float radius;
+    pbpt::math::Float radius{0.5f};
 };
 
-struct PlaneShape {
-    pbpt::math::Normal3 normal;
-    pbpt::math::Float   offset;
+struct BoxShape {
+    pbpt::math::Vec3 half_extents{0.5f, 0.5f, 0.5f};
 };
 
-using ColliderShape = std::variant<SphereShape, PlaneShape>;
+using ColliderShape = std::variant<SphereShape, BoxShape>;
 
 struct Collider {
-    ColliderShape           shape;
-    pbpt::geometry::Bounds3 aabb;
-    pbpt::geometry::Trans   local_transform;
+    ColliderShape               shape{SphereShape{}};
+    pbpt::math::Vec3            local_center{0.0f};
+    pbpt::math::Quat            local_rotation{pbpt::math::Quat::identity()};
+    pbpt::math::Vec3            world_position{0.0f};
+    pbpt::math::Quat            world_rotation{pbpt::math::Quat::identity()};
+    pbpt::math::Vec3            world_scale{1.0f, 1.0f, 1.0f};
+    std::optional<RigidBodyID>  rigid_body_id{};
 };
 
 }  // namespace rtr::system::physics

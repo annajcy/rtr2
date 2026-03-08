@@ -12,8 +12,10 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/camera_control/trackball_camera_controller.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
+#include "rtr/framework/component/physics/box_collider_component.hpp"
 #include "rtr/framework/component/physics/reset_position_component.hpp"
 #include "rtr/framework/component/physics/rigid_body_component.hpp"
+#include "rtr/framework/component/physics/sphere_collider_component.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/core/game_object.hpp"
@@ -280,6 +282,79 @@ private:
         }
     }
 
+    static void draw_sphere_collider_editor(framework::core::GameObject& game_object) {
+        auto* sphere = game_object.get_component<framework::component::SphereCollider>();
+        if (sphere == nullptr) {
+            return;
+        }
+
+        if (ImGui::CollapsingHeader("SphereCollider", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = sphere->enabled();
+            if (ImGui::Checkbox("Enabled##sphere_collider", &enabled)) {
+                game_object.set_component_enabled<framework::component::SphereCollider>(enabled);
+                logger()->debug("SphereCollider enabled updated (game_object_id={}, enabled={}).", game_object.id(),
+                                enabled);
+            }
+
+            float radius = sphere->radius();
+            if (ImGui::DragFloat("Radius", &radius, 0.01f, 0.01f, 1000.0f)) {
+                sphere->set_radius(std::max(0.01f, radius));
+                logger()->debug("SphereCollider radius updated (game_object_id={}, radius={:.4f}).", game_object.id(),
+                                sphere->radius());
+            }
+
+            pbpt::math::Vec3 center = sphere->local_center();
+            if (ImGui::DragFloat3("Local Center##sphere_collider", &center.x(), 0.05f)) {
+                sphere->set_local_center(center);
+                logger()->debug(
+                    "SphereCollider local_center updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), center.x(), center.y(), center.z());
+            }
+        }
+    }
+
+    static void draw_box_collider_editor(framework::core::GameObject& game_object) {
+        auto* box = game_object.get_component<framework::component::BoxCollider>();
+        if (box == nullptr) {
+            return;
+        }
+
+        if (ImGui::CollapsingHeader("BoxCollider", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = box->enabled();
+            if (ImGui::Checkbox("Enabled##box_collider", &enabled)) {
+                game_object.set_component_enabled<framework::component::BoxCollider>(enabled);
+                logger()->debug("BoxCollider enabled updated (game_object_id={}, enabled={}).", game_object.id(),
+                                enabled);
+            }
+
+            pbpt::math::Vec3 half_extents = box->half_extents();
+            if (ImGui::DragFloat3("Half Extents", &half_extents.x(), 0.05f, 0.01f, 1000.0f)) {
+                half_extents.x() = std::max(0.01f, half_extents.x());
+                half_extents.y() = std::max(0.01f, half_extents.y());
+                half_extents.z() = std::max(0.01f, half_extents.z());
+                box->set_half_extents(half_extents);
+                logger()->debug(
+                    "BoxCollider half_extents updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), half_extents.x(), half_extents.y(), half_extents.z());
+            }
+
+            pbpt::math::Vec3 center = box->local_center();
+            if (ImGui::DragFloat3("Local Center##box_collider", &center.x(), 0.05f)) {
+                box->set_local_center(center);
+                logger()->debug("BoxCollider local_center updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                                game_object.id(), center.x(), center.y(), center.z());
+            }
+
+            pbpt::math::Vec3 local_euler = pbpt::math::degrees(pbpt::math::euler_angles(box->local_rotation()));
+            if (ImGui::DragFloat3("Local Rotation (deg)", &local_euler.x(), 0.5f)) {
+                box->set_local_rotation(pbpt::math::Quat(pbpt::math::radians(local_euler)));
+                logger()->debug(
+                    "BoxCollider local_rotation updated (game_object_id={}, euler_deg=[{:.3f}, {:.3f}, {:.3f}]).",
+                    game_object.id(), local_euler.x(), local_euler.y(), local_euler.z());
+            }
+        }
+    }
+
     static void draw_reset_position_editor(framework::core::GameObject& game_object) {
         auto* reset_position = game_object.get_component<framework::component::ResetPosition>();
         if (reset_position == nullptr) {
@@ -486,6 +561,8 @@ public:
         draw_mesh_renderer_editor(*game_object);
         draw_point_light_editor(*game_object);
         draw_rigid_body_editor(*game_object);
+        draw_sphere_collider_editor(*game_object);
+        draw_box_collider_editor(*game_object);
         draw_reset_position_editor(*game_object);
         draw_free_look_editor(*game_object);
         draw_trackball_editor(*game_object);

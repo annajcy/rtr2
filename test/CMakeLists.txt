@@ -66,6 +66,10 @@ rtr_add_test(
     system/physics/physics_scene_integration_test.cpp
 )
 rtr_add_test(
+    test_collision_detection
+    system/physics/collision_detection_test.cpp
+)
+rtr_add_test(
     test_framework_forward_scene_view_builder
     system/render/framework_forward_scene_view_builder_test.cpp
     rtr::runtime
