@@ -21,6 +21,7 @@ target_link_libraries(rtr_runtime INTERFACE
 
 target_compile_definitions(rtr_runtime INTERFACE
   RTR_DEFAULT_SHADER_OUTPUT_DIR=\"${RTR_DEFAULT_SHADER_OUTPUT_DIR}\"
+  RTR_PROJECT_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"
 )
 
 if (RTR_BUILD_EDITOR)

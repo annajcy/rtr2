@@ -8,6 +8,9 @@ if (TARGET rtr_editor)
   add_executable(shadertoy_editor editor/shadertoy_editor.cpp)
   target_link_libraries(shadertoy_editor PRIVATE rtr::runtime rtr::editor)
 
+  add_executable(editable_shadertoy_editor editor/editable_shadertoy_editor.cpp)
+  target_link_libraries(editable_shadertoy_editor PRIVATE rtr::runtime rtr::editor)
+
   add_executable(gravity_reset_editor editor/gravity_reset_editor.cpp)
   target_link_libraries(gravity_reset_editor PRIVATE rtr::runtime rtr::editor)
 

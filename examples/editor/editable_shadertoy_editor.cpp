@@ -1,0 +1,79 @@
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+
+#include "rtr/app/app_runtime.hpp"
+#include "rtr/editor/core/editor_capture.hpp"
+#include "rtr/editor/core/editor_host.hpp"
+#include "rtr/editor/panel/editable_shadertoy_settings_panel.hpp"
+#include "rtr/editor/panel/hierarchy_panel.hpp"
+#include "rtr/editor/panel/inspector_panel.hpp"
+#include "rtr/editor/panel/logger_panel.hpp"
+#include "rtr/editor/panel/scene_view_panel.hpp"
+#include "rtr/editor/panel/stats_panel.hpp"
+#include "rtr/editor/render/editable_shadertoy_editor_pipeline.hpp"
+#include "rtr/system/input/input_types.hpp"
+
+int main() {
+    try {
+        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
+            .window_width = 1280,
+            .window_height = 720,
+            .window_title = "RTR Editable ShaderToy Editor",
+        });
+
+        auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);
+
+        auto editor_pipeline = std::make_unique<rtr::editor::render::EditableShaderToyEditorPipeline>(
+            runtime.renderer().build_pipeline_runtime(),
+            editor_host,
+            rtr::editor::render::EditableShaderToyEditorPipelineConfig{
+                .initial_shader_source_path = "shaders/editable_shadertoy_compute.slang",
+                .auto_reload_enabled = true,
+            }
+        );
+
+        editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::HierarchyPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::InspectorPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
+        editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
+        editor_host->register_panel(
+            std::make_unique<rtr::editor::EditableShaderToySettingsPanel>(editor_pipeline.get())
+        );
+
+        editor_host->set_panel_visible("hierarchy", false);
+        editor_host->set_panel_visible("inspector", false);
+
+        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), *editor_pipeline);
+        runtime.set_pipeline(std::move(editor_pipeline));
+
+        runtime.set_callbacks(rtr::app::RuntimeCallbacks{
+            .on_post_update =
+                [editor_host](rtr::app::RuntimeContext& ctx) {
+                    editor_host->begin_frame(rtr::editor::EditorFrameData{
+                        .frame_serial = ctx.frame_serial,
+                        .delta_seconds = ctx.delta_seconds,
+                        .paused = ctx.paused,
+                    });
+                },
+            .on_pre_render =
+                [](rtr::app::RuntimeContext& ctx) {
+                    if (ctx.input_system.state().key_down(rtr::system::input::KeyCode::ESCAPE)) {
+                        ctx.renderer.window().close();
+                    }
+                },
+        });
+
+        const auto result = runtime.run();
+        if (!result.ok) {
+            throw std::runtime_error(result.error_message);
+        }
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}

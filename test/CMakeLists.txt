@@ -94,6 +94,11 @@ rtr_add_test(
     system/render/render_pass_resource_state_test.cpp
     rtr::runtime
 )
+rtr_add_test(
+    test_editable_shadertoy_shader_compiler
+    system/render/editable_shadertoy_shader_compiler_test.cpp
+    rtr::runtime
+)
 rtr_add_integration_test(
     test_frame_scheduler_integration
     system/render/frame_scheduler_integration_test.cpp
