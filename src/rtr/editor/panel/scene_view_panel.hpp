@@ -10,6 +10,7 @@
 #include "imgui.h"
 
 #include "rtr/editor/core/editor_panel.hpp"
+#include "rtr/editor/core/scene_picking.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera/orthographic_camera.hpp"
 #include "rtr/framework/component/camera/perspective_camera.hpp"
@@ -75,6 +76,26 @@ private:
                 return "World";
         }
         return "Local";
+    }
+
+    static void sanitize_snap_settings(EditorGizmoState& gizmo) {
+        gizmo.translation_snap.x() = std::max(0.001f, gizmo.translation_snap.x());
+        gizmo.translation_snap.y() = std::max(0.001f, gizmo.translation_snap.y());
+        gizmo.translation_snap.z() = std::max(0.001f, gizmo.translation_snap.z());
+        gizmo.rotation_snap_degrees = std::max(0.1f, gizmo.rotation_snap_degrees);
+        gizmo.scale_snap = std::max(0.001f, gizmo.scale_snap);
+    }
+
+    static std::array<float, 3> current_snap_values(const EditorGizmoState& gizmo) {
+        switch (gizmo.operation) {
+            case EditorGizmoOperation::Translate:
+                return {gizmo.translation_snap.x(), gizmo.translation_snap.y(), gizmo.translation_snap.z()};
+            case EditorGizmoOperation::Rotate:
+                return {gizmo.rotation_snap_degrees, 0.0f, 0.0f};
+            case EditorGizmoOperation::Scale:
+                return {gizmo.scale_snap, 0.0f, 0.0f};
+        }
+        return {1.0f, 1.0f, 1.0f};
     }
 
     static ImGuizmo::OPERATION to_imguizmo_operation(EditorGizmoOperation operation) {
@@ -216,6 +237,7 @@ private:
     static void draw_gizmo_toolbar(EditorContext& ctx) {
         auto& gizmo = ctx.gizmo_state();
         const bool has_selection = ctx.selection().has_game_object();
+        sanitize_snap_settings(gizmo);
 
         ImGui::BeginDisabled(!has_selection);
         if (ImGui::RadioButton("Translate", gizmo.operation == EditorGizmoOperation::Translate)) {
@@ -238,8 +260,29 @@ private:
 
         if (has_selection) {
             ImGui::SameLine();
-            ImGui::TextDisabled("[%s | %s]", gizmo_operation_label(gizmo.operation), gizmo_mode_label(gizmo.mode));
+            ImGui::TextDisabled(
+                "[T Translate | R Rotate | Y Scale | F Mode] [%s | %s]",
+                gizmo_operation_label(gizmo.operation),
+                gizmo_mode_label(gizmo.mode)
+            );
         }
+
+        ImGui::SameLine();
+        ImGui::Checkbox("Snap", &gizmo.snap_enabled);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(140.0f);
+        switch (gizmo.operation) {
+            case EditorGizmoOperation::Translate:
+                ImGui::InputFloat3("Snap##translate", &gizmo.translation_snap.x());
+                break;
+            case EditorGizmoOperation::Rotate:
+                ImGui::InputFloat("Angle Snap##rotate", &gizmo.rotation_snap_degrees);
+                break;
+            case EditorGizmoOperation::Scale:
+                ImGui::InputFloat("Scale Snap##scale", &gizmo.scale_snap);
+                break;
+        }
+        sanitize_snap_settings(gizmo);
     }
 
     static void handle_gizmo_shortcuts(EditorContext& ctx, bool scene_focused) {
@@ -248,16 +291,16 @@ private:
         }
 
         auto& gizmo = ctx.gizmo_state();
-        if (ImGui::IsKeyPressed(ImGuiKey_W, false)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_T, false)) {
             gizmo.operation = EditorGizmoOperation::Translate;
         }
-        if (ImGui::IsKeyPressed(ImGuiKey_E, false)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_R, false)) {
             gizmo.operation = EditorGizmoOperation::Rotate;
         }
-        if (ImGui::IsKeyPressed(ImGuiKey_R, false)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Y, false)) {
             gizmo.operation = EditorGizmoOperation::Scale;
         }
-        if (ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_F, false)) {
             gizmo.mode = gizmo.mode == EditorGizmoMode::Local ? EditorGizmoMode::World : EditorGizmoMode::Local;
         }
     }
@@ -289,6 +332,8 @@ private:
         auto view = to_imguizmo_matrix(active_camera.view);
         auto proj = to_imguizmo_matrix(active_camera.proj);
         auto world = to_imguizmo_matrix(node.world_matrix());
+        const bool snap_active = ctx.gizmo_state().snap_enabled || ImGui::IsKeyDown(ImGuiKey_ModShift);
+        const auto snap = current_snap_values(ctx.gizmo_state());
 
         ImGuizmo::SetOrthographic(active_camera.orthographic);
         ImGuizmo::SetDrawlist();
@@ -298,7 +343,9 @@ private:
             proj.data(),
             to_imguizmo_operation(ctx.gizmo_state().operation),
             to_imguizmo_mode(ctx.gizmo_state().mode),
-            world.data()
+            world.data(),
+            nullptr,
+            snap_active ? snap.data() : nullptr
         );
 
         const bool gizmo_using =
@@ -317,6 +364,31 @@ private:
         }
 
         return gizmo_using;
+    }
+
+    static void apply_scene_picking(
+        EditorContext& ctx,
+        const ActiveCameraInfo& active_camera,
+        const EditorViewportRect& viewport_rect
+    ) {
+        auto* active_scene = ctx.world().active_scene();
+        if (active_scene == nullptr) {
+            return;
+        }
+
+        const auto pick_ray =
+            make_scene_pick_ray(viewport_rect, ImGui::GetMousePos(), active_camera.view, active_camera.proj);
+        if (!pick_ray.has_value()) {
+            return;
+        }
+
+        const auto result = pick_scene_game_object(ctx.resources(), *active_scene, *pick_ray);
+        if (!result.has_value()) {
+            ctx.clear_selection();
+            return;
+        }
+
+        ctx.set_selection(result->scene_id, result->game_object_id);
     }
 
     void publish_viewport_state(EditorContext& ctx, const EditorViewportRect& rect, bool hovered, bool focused, bool gizmo_using) const {
@@ -423,6 +495,7 @@ public:
         bool hovered = false;
         bool gizmo_using = false;
         EditorViewportRect viewport_rect{};
+        bool scene_pick_requested = false;
 
         if (texture_id != ImTextureID{} && texture_size.x > 0.0f && texture_size.y > 0.0f &&
             content_size.x > 0.0f && content_size.y > 0.0f) {
@@ -443,6 +516,7 @@ public:
             const ImVec2 image_min = ImGui::GetCursorScreenPos();
             ImGui::Image(texture_id, draw_size, ImVec2{0.0f, 1.0f}, ImVec2{1.0f, 0.0f});
             hovered = ImGui::IsItemHovered();
+            scene_pick_requested = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 
             viewport_rect = EditorViewportRect{
                 .x = image_min.x,
@@ -453,6 +527,9 @@ public:
 
             if (const auto active_camera = find_active_camera(ctx); active_camera.has_value()) {
                 gizmo_using = apply_gizmo_to_selection(ctx, *active_camera, viewport_rect);
+                if (scene_pick_requested && !ImGuizmo::IsOver() && !ImGuizmo::IsUsingAny()) {
+                    apply_scene_picking(ctx, *active_camera, viewport_rect);
+                }
             }
         } else {
             ImGui::TextDisabled("Scene texture is unavailable.");

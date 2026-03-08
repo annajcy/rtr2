@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "imgui.h"
+#include <pbpt/math/math.h>
 
 #include "rtr/framework/core/types.hpp"
 
@@ -35,6 +36,10 @@ struct EditorGizmoState {
     EditorGizmoOperation operation{EditorGizmoOperation::Translate};
     EditorGizmoMode mode{EditorGizmoMode::Local};
     EditorViewportRect viewport_rect{};
+    pbpt::math::Vec3 translation_snap{1.0f, 1.0f, 1.0f};
+    float rotation_snap_degrees{15.0f};
+    float scale_snap{0.1f};
+    bool snap_enabled{false};
     bool enabled{false};
     bool using_gizmo{false};
 };
