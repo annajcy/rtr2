@@ -35,5 +35,6 @@ if (RTR_BUILD_EDITOR)
   target_link_libraries(rtr_editor INTERFACE
     rtr_runtime
     imgui_vk
+    imguizmo::imguizmo
   )
 endif()

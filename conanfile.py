@@ -68,6 +68,7 @@ class RTRConan(ConanFile):
         self.requires("tinygltf/[>=2.8 <3]")
         if self.options.with_editor:
             self.requires("imgui/1.92.2b-docking", transitive_headers=True)
+            self.requires("imguizmo/0.20231114.1", transitive_headers=True)
         self.requires("stb/cci.20240531", transitive_headers=True)
         self.requires("spdlog/[>=1.13 <2]", transitive_headers=True)
         self.requires("vulkan-loader/[>=1.3]", transitive_headers=True)
@@ -150,4 +151,5 @@ class RTRConan(ConanFile):
             editor_component.requires = [
                 "runtime",
                 "imgui_vk",
+                "imguizmo::imguizmo",
             ]

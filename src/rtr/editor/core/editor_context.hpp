@@ -19,6 +19,7 @@ private:
     system::input::InputSystem&   m_input;
     EditorFrameData               m_frame_data{};
     EditorSelection               m_selection{};
+    EditorGizmoState              m_gizmo_state{};
     EditorServices                m_services{};
 
 public:
@@ -68,11 +69,16 @@ public:
         logger()->debug("Selection cleared (scene_id={}, game_object_id={}).", m_selection.scene_id,
                         m_selection.game_object_id);
         m_selection.clear();
+        m_gizmo_state.enabled = false;
     }
 
     EditorServices& services() { return m_services; }
 
     const EditorServices& services() const { return m_services; }
+
+    EditorGizmoState& gizmo_state() { return m_gizmo_state; }
+
+    const EditorGizmoState& gizmo_state() const { return m_gizmo_state; }
 
     void validate_selection() {
         if (!m_selection.has_game_object()) {
@@ -84,6 +90,7 @@ public:
         auto*      scene          = m_world.find_scene(scene_id);
         if (scene == nullptr || !scene->has_game_object(m_selection.game_object_id)) {
             m_selection.clear();
+            m_gizmo_state.enabled = false;
             logger()->debug("Selection invalidated and cleared (scene_id={}, game_object_id={}, scene_exists={}).",
                             scene_id, game_object_id, scene != nullptr);
         }

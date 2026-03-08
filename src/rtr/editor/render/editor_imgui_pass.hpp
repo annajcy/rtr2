@@ -65,6 +65,7 @@ private:
 
     bool m_scene_hovered{false};
     bool m_scene_focused{false};
+    bool m_scene_gizmo_using{false};
 
     system::render::RenderPipeline& m_owner_pipeline;
 
@@ -111,6 +112,9 @@ public:
     }
 
     bool wants_capture_mouse() const {
+        if (m_scene_gizmo_using) {
+            return true;
+        }
         if (m_scene_hovered) {
             return false;
         }
@@ -171,8 +175,15 @@ private:
         auto& services                   = m_editor_host->context().services();
         services.get_scene_texture_id    = [this]() { return m_current_scene_texture; };
         services.get_scene_texture_size  = [this]() { return m_current_scene_texture_size; };
+        services.set_scene_viewport_rect = [this](const editor::EditorViewportRect& rect) {
+            m_editor_host->context().gizmo_state().viewport_rect = rect;
+        };
         services.set_scene_hovered       = [this](bool hovered) { m_scene_hovered = hovered; };
         services.set_scene_focused       = [this](bool focused) { m_scene_focused = focused; };
+        services.set_scene_gizmo_using   = [this](bool using_gizmo) {
+            m_scene_gizmo_using = using_gizmo;
+            m_editor_host->context().gizmo_state().using_gizmo = using_gizmo;
+        };
         services.set_scene_viewport_size = [this](std::uint32_t width, std::uint32_t height) {
             m_owner_pipeline.publish_event<system::render::SceneViewportResizeEvent>(
                 system::render::SceneViewportResizeEvent{.width = width, .height = height}
@@ -187,9 +198,11 @@ private:
         auto& services                   = m_editor_host->context().services();
         services.get_scene_texture_id    = {};
         services.get_scene_texture_size  = {};
+        services.set_scene_viewport_rect = {};
         services.set_scene_viewport_size = {};
         services.set_scene_hovered       = {};
         services.set_scene_focused       = {};
+        services.set_scene_gizmo_using   = {};
     }
 
     void release_scene_textures() {

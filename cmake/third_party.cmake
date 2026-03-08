@@ -16,6 +16,7 @@ find_package(tinyobjloader  CONFIG REQUIRED)
 
 if (RTR_BUILD_EDITOR)
   find_package(imgui CONFIG REQUIRED)
+  find_package(imguizmo CONFIG REQUIRED)
 
   # build imgui with Vulkan and GLFW backends
   add_library(imgui_vk STATIC)

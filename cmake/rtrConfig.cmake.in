@@ -13,6 +13,7 @@ find_dependency(pbpt CONFIG REQUIRED)
 
 if("@RTR_CONFIG_BUILD_EDITOR@" STREQUAL "ON")
   find_dependency(imgui CONFIG REQUIRED)
+  find_dependency(imguizmo CONFIG REQUIRED)
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/rtrTargets.cmake")

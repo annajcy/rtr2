@@ -9,6 +9,36 @@
 
 namespace rtr::editor {
 
+struct EditorViewportRect {
+    float x{0.0f};
+    float y{0.0f};
+    float width{0.0f};
+    float height{0.0f};
+
+    bool valid() const {
+        return width > 0.0f && height > 0.0f;
+    }
+};
+
+enum class EditorGizmoOperation {
+    Translate,
+    Rotate,
+    Scale,
+};
+
+enum class EditorGizmoMode {
+    Local,
+    World,
+};
+
+struct EditorGizmoState {
+    EditorGizmoOperation operation{EditorGizmoOperation::Translate};
+    EditorGizmoMode mode{EditorGizmoMode::Local};
+    EditorViewportRect viewport_rect{};
+    bool enabled{false};
+    bool using_gizmo{false};
+};
+
 struct EditorSelection {
     framework::core::SceneId scene_id{framework::core::kInvalidSceneId};
     framework::core::GameObjectId game_object_id{framework::core::kInvalidGameObjectId};
@@ -35,8 +65,10 @@ struct EditorServices {
     std::function<ImTextureID()> get_scene_texture_id{};
     std::function<ImVec2()> get_scene_texture_size{};
     std::function<void(std::uint32_t, std::uint32_t)> set_scene_viewport_size{};
+    std::function<void(const EditorViewportRect&)> set_scene_viewport_rect{};
     std::function<void(bool)> set_scene_hovered{};
     std::function<void(bool)> set_scene_focused{};
+    std::function<void(bool)> set_scene_gizmo_using{};
 };
 
 } // namespace rtr::editor
