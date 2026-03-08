@@ -252,6 +252,31 @@ private:
             pbpt::math::Vec3 linear_velocity = rigid_body->linear_velocity();
             ImGui::Text("Linear Velocity: [%.4f, %.4f, %.4f]", linear_velocity.x(), linear_velocity.y(),
                         linear_velocity.z());
+
+            const pbpt::math::Vec3 orientation_euler = pbpt::math::degrees(pbpt::math::euler_angles(rigid_body->orientation()));
+            ImGui::Text("Orientation (deg): [%.3f, %.3f, %.3f]", orientation_euler.x(), orientation_euler.y(),
+                        orientation_euler.z());
+
+            const pbpt::math::Vec3 angular_velocity = rigid_body->angular_velocity();
+            ImGui::Text("Angular Velocity: [%.4f, %.4f, %.4f]", angular_velocity.x(), angular_velocity.y(),
+                        angular_velocity.z());
+
+            pbpt::math::Mat3 inverse_inertia_tensor_ref = rigid_body->inverse_inertia_tensor_ref();
+            pbpt::math::Vec3 inverse_inertia_diagonal = {
+                inverse_inertia_tensor_ref[0][0],
+                inverse_inertia_tensor_ref[1][1],
+                inverse_inertia_tensor_ref[2][2],
+            };
+            if (ImGui::DragFloat3("Inv Inertia Diag", &inverse_inertia_diagonal.x(), 0.01f, 0.0f, 1000.0f)) {
+                pbpt::math::Mat3 updated = pbpt::math::Mat3::zeros();
+                updated[0][0] = std::max(0.0f, inverse_inertia_diagonal.x());
+                updated[1][1] = std::max(0.0f, inverse_inertia_diagonal.y());
+                updated[2][2] = std::max(0.0f, inverse_inertia_diagonal.z());
+                rigid_body->set_inverse_inertia_tensor_ref(updated);
+                logger()->debug(
+                    "RigidBody inverse inertia diagonal updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), updated[0][0], updated[1][1], updated[2][2]);
+            }
         }
     }
 

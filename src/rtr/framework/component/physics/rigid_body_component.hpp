@@ -18,6 +18,7 @@ private:
     system::physics::RigidBodyID   m_rigid_body_id{};
     pbpt::math::Float              m_mass{1.0f};
     bool                           m_use_gravity{true};
+    pbpt::math::Mat3               m_inverse_inertia_tensor_ref{pbpt::math::Mat3::zeros()};
     bool                           m_registered{false};
 
     bool has_registered_body() const { return m_registered && m_physics_world.has_rigid_body(m_rigid_body_id); }
@@ -27,6 +28,17 @@ private:
             throw std::invalid_argument("RigidBody mass must be finite and positive.");
         }
         return mass;
+    }
+
+    static pbpt::math::Mat3 sanitize_inverse_inertia_tensor_ref(const pbpt::math::Mat3& inverse_inertia_tensor_ref) {
+        for (int row = 0; row < 3; ++row) {
+            for (int col = 0; col < 3; ++col) {
+                if (!std::isfinite(inverse_inertia_tensor_ref[row][col])) {
+                    throw std::invalid_argument("RigidBody inverse inertia tensor must be finite.");
+                }
+            }
+        }
+        return inverse_inertia_tensor_ref;
     }
 
     system::physics::RigidBody* physics_body() {
@@ -45,8 +57,13 @@ private:
 
 public:
     explicit RigidBody(core::GameObject& owner, system::physics::PhysicsWorld& world, pbpt::math::Float mass = 1.0f,
-                       bool use_gravity = true)
-        : Component(owner), m_physics_world(world), m_mass(sanitize_mass(mass)), m_use_gravity(use_gravity) {}
+                       bool use_gravity = true,
+                       const pbpt::math::Mat3& inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros())
+        : Component(owner),
+          m_physics_world(world),
+          m_mass(sanitize_mass(mass)),
+          m_use_gravity(use_gravity),
+          m_inverse_inertia_tensor_ref(sanitize_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref)) {}
 
     void on_awake() override {}
 
@@ -59,9 +76,12 @@ public:
         body.set_type(system::physics::RigidBodyType::Dynamic);
         body.set_awake(true);
         body.set_use_gravity(m_use_gravity);
+        body.set_inverse_inertia_tensor_ref(m_inverse_inertia_tensor_ref);
         body.state().mass                        = m_mass;
         body.state().translation.position        = owner().node().world_position();
         body.state().translation.linear_velocity = pbpt::math::Vec3(0.0f);
+        body.state().rotation.orientation        = owner().node().world_rotation();
+        body.state().rotation.angular_velocity   = pbpt::math::Vec3(0.0f);
         body.clear_forces();
         body.invalidate_integrator_state();
 
@@ -98,7 +118,7 @@ public:
             return;
         }
         body->state().translation.position = position;
-        body->invalidate_integrator_state();
+        body->invalidate_linear_integrator_state();
     }
 
     pbpt::math::Vec3 linear_velocity() const {
@@ -107,6 +127,30 @@ public:
             return pbpt::math::Vec3(0.0f);
         }
         return body->state().translation.linear_velocity;
+    }
+
+    pbpt::math::Quat orientation() const {
+        const auto* body = physics_body();
+        if (body == nullptr) {
+            return pbpt::math::Quat::identity();
+        }
+        return body->state().rotation.orientation;
+    }
+
+    void set_orientation(const pbpt::math::Quat& orientation) {
+        auto* body = physics_body();
+        if (body == nullptr) {
+            return;
+        }
+        body->state().rotation.orientation = pbpt::math::normalize(orientation);
+    }
+
+    pbpt::math::Vec3 angular_velocity() const {
+        const auto* body = physics_body();
+        if (body == nullptr) {
+            return pbpt::math::Vec3(0.0f);
+        }
+        return body->state().rotation.angular_velocity;
     }
 
     pbpt::math::Float mass() const {
@@ -134,10 +178,38 @@ public:
         }
     }
 
+    pbpt::math::Mat3 inverse_inertia_tensor_ref() const {
+        const auto* body = physics_body();
+        return body != nullptr ? body->inverse_inertia_tensor_ref() : m_inverse_inertia_tensor_ref;
+    }
+
+    void set_inverse_inertia_tensor_ref(const pbpt::math::Mat3& inverse_inertia_tensor_ref) {
+        m_inverse_inertia_tensor_ref = sanitize_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
+        if (auto* body = physics_body(); body != nullptr) {
+            body->set_inverse_inertia_tensor_ref(m_inverse_inertia_tensor_ref);
+        }
+    }
+
     void add_force(const pbpt::math::Vec3& force) {
         if (auto* body = physics_body(); body != nullptr) {
             body->state().forces.accumulated_force += force;
         }
+    }
+
+    void add_torque(const pbpt::math::Vec3& torque) {
+        if (auto* body = physics_body(); body != nullptr) {
+            body->state().forces.accumulated_torque += torque;
+        }
+    }
+
+    void add_force_at_point(const pbpt::math::Vec3& force, const pbpt::math::Vec3& world_point) {
+        auto* body = physics_body();
+        if (body == nullptr) {
+            return;
+        }
+        body->state().forces.accumulated_force += force;
+        const pbpt::math::Vec3 lever_arm = world_point - body->state().translation.position;
+        body->state().forces.accumulated_torque += pbpt::math::cross(lever_arm, force);
     }
 
     void clear_forces() {
@@ -149,6 +221,18 @@ public:
     void reset_dynamics() {
         if (auto* body = physics_body(); body != nullptr) {
             body->reset_dynamics();
+        }
+    }
+
+    void reset_translation_dynamics() {
+        if (auto* body = physics_body(); body != nullptr) {
+            body->reset_translation_dynamics();
+        }
+    }
+
+    void reset_rotational_dynamics() {
+        if (auto* body = physics_body(); body != nullptr) {
+            body->reset_rotational_dynamics();
         }
     }
 };

@@ -38,7 +38,7 @@ TEST(FrameworkResetPositionComponentTest, ResetsPositionWhenThresholdIsReached) 
     EXPECT_NEAR(position.z(), -0.5f, 1e-5f);
 }
 
-TEST(FrameworkResetPositionComponentTest, ResetClearsVelocityAndAccumulatedForce) {
+TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPreservesSpin) {
     system::physics::PhysicsSystem physics_system;
     core::Scene                    scene(1);
     auto&                          go = scene.create_game_object("falling");
@@ -48,11 +48,17 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsVelocityAndAccumulatedForce
     auto& reset_position = go.add_component<ResetPosition>();
     reset_position.set_threshold_y(-1.0f);
     reset_position.set_reset_position(pbpt::math::Vec3{0.0f, 2.0f, 0.0f});
+    pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
+    inverse_inertia_tensor_ref[1][1] = 1.0f;
+    rigid_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
 
     auto& physics_body = physics_system.world().get_rigid_body(rigid_body.rigid_body_id());
     physics_body.state().translation.linear_velocity = pbpt::math::Vec3{0.0f, -3.0f, 0.0f};
+    physics_body.state().rotation.angular_velocity   = pbpt::math::Vec3{0.0f, 2.0f, 0.0f};
     physics_body.state().forces.accumulated_force    = pbpt::math::Vec3{1.0f, -4.0f, 0.0f};
+    physics_body.state().forces.accumulated_torque   = pbpt::math::Vec3{0.0f, 3.0f, 0.0f};
     physics_body.initialize_half_step_linear_velocity(pbpt::math::Vec3{0.0f, -3.5f, 0.0f});
+    physics_body.initialize_half_step_angular_velocity(pbpt::math::Vec3{0.0f, 2.5f, 0.0f});
 
     rigid_body.set_position(pbpt::math::Vec3{0.0f, -1.5f, 0.0f});
     scene.fixed_tick(core::FixedTickContext{.fixed_delta_seconds = 0.1, .fixed_tick_index = 0});
@@ -61,10 +67,18 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsVelocityAndAccumulatedForce
     EXPECT_NEAR(velocity.x(), 0.0f, 1e-5f);
     EXPECT_NEAR(velocity.y(), 0.0f, 1e-5f);
     EXPECT_NEAR(velocity.z(), 0.0f, 1e-5f);
+    const auto angular_velocity = rigid_body.angular_velocity();
+    EXPECT_NEAR(angular_velocity.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(angular_velocity.y(), 2.0f, 1e-5f);
+    EXPECT_NEAR(angular_velocity.z(), 0.0f, 1e-5f);
     EXPECT_NEAR(physics_body.state().forces.accumulated_force.x(), 0.0f, 1e-5f);
     EXPECT_NEAR(physics_body.state().forces.accumulated_force.y(), 0.0f, 1e-5f);
     EXPECT_NEAR(physics_body.state().forces.accumulated_force.z(), 0.0f, 1e-5f);
-    EXPECT_FALSE(physics_body.half_step_initialized());
+    EXPECT_NEAR(physics_body.state().forces.accumulated_torque.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(physics_body.state().forces.accumulated_torque.y(), 3.0f, 1e-5f);
+    EXPECT_NEAR(physics_body.state().forces.accumulated_torque.z(), 0.0f, 1e-5f);
+    EXPECT_FALSE(physics_body.linear_half_step_initialized());
+    EXPECT_TRUE(physics_body.angular_half_step_initialized());
 }
 
 TEST(FrameworkResetPositionComponentTest, UpdatedParametersAffectNextFixedTick) {

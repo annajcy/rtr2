@@ -10,6 +10,9 @@ if (TARGET rtr_editor)
 
   add_executable(gravity_reset_editor editor/gravity_reset_editor.cpp)
   target_link_libraries(gravity_reset_editor PRIVATE rtr::runtime rtr::editor)
+
+  add_executable(gravity_spin_editor editor/gravity_spin_editor.cpp)
+  target_link_libraries(gravity_spin_editor PRIVATE rtr::runtime rtr::editor)
 endif()
 
 add_executable(shadertoy runtime/shadertoy.cpp)
@@ -17,3 +20,6 @@ target_link_libraries(shadertoy PRIVATE rtr::runtime)
 
 add_executable(gravity_reset runtime/gravity_reset.cpp)
 target_link_libraries(gravity_reset PRIVATE rtr::runtime)
+
+add_executable(torque_spin runtime/torque_spin.cpp)
+target_link_libraries(torque_spin PRIVATE rtr::runtime)

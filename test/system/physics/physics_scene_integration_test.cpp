@@ -94,6 +94,96 @@ TEST(PhysicsSceneIntegrationTest, FixedTickClearsAccumulatedForce) {
     EXPECT_NEAR(state.forces.accumulated_force.z(), 0.0f, 1e-5f);
 }
 
+TEST(PhysicsSceneIntegrationTest, TorqueUpdatesAngularVelocityAndSyncsRotation) {
+    PhysicsSystem          physics_system;
+    framework::core::Scene scene(1);
+
+    auto& spinning = scene.create_game_object("spinning");
+    auto& rigid_body = spinning.add_component<framework::component::RigidBody>(physics_system.world());
+    rigid_body.set_use_gravity(false);
+    pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
+    inverse_inertia_tensor_ref[1][1] = 1.0f;
+    rigid_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
+
+    for (std::uint64_t i = 0; i < 10; ++i) {
+        rigid_body.add_torque(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
+        physics_system.fixed_tick(scene, framework::core::FixedTickContext{
+                                             .fixed_delta_seconds = 0.1,
+                                             .fixed_tick_index    = i,
+                                         });
+    }
+
+    EXPECT_GT(rigid_body.angular_velocity().y(), 0.9f);
+    const auto rotation = scene.scene_graph().node(spinning.id()).local_rotation();
+    EXPECT_GT(std::abs(rotation.y()), 1e-3f);
+}
+
+TEST(PhysicsSceneIntegrationTest, ZeroInverseInertiaPreventsRotation) {
+    PhysicsSystem          physics_system;
+    framework::core::Scene scene(1);
+
+    auto& spinning = scene.create_game_object("spinning");
+    auto& rigid_body = spinning.add_component<framework::component::RigidBody>(physics_system.world());
+    rigid_body.set_use_gravity(false);
+
+    for (std::uint64_t i = 0; i < 10; ++i) {
+        rigid_body.add_torque(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
+        physics_system.fixed_tick(scene, framework::core::FixedTickContext{
+                                             .fixed_delta_seconds = 0.1,
+                                             .fixed_tick_index    = i,
+                                         });
+    }
+
+    EXPECT_NEAR(rigid_body.angular_velocity().y(), 0.0f, 1e-5f);
+    const auto rotation = scene.scene_graph().node(spinning.id()).local_rotation();
+    EXPECT_NEAR(rotation.w(), 1.0f, 1e-5f);
+    EXPECT_NEAR(rotation.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(rotation.y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(rotation.z(), 0.0f, 1e-5f);
+}
+
+TEST(PhysicsSceneIntegrationTest, ForceAtCenterProducesNoTorque) {
+    PhysicsSystem          physics_system;
+    framework::core::Scene scene(1);
+
+    auto& moving = scene.create_game_object("moving");
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics_system.world());
+    rigid_body.set_use_gravity(false);
+    pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
+    inverse_inertia_tensor_ref[1][1] = 1.0f;
+    rigid_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
+
+    rigid_body.add_force_at_point(pbpt::math::Vec3{1.0f, 0.0f, 0.0f}, rigid_body.position());
+    physics_system.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    EXPECT_GT(rigid_body.linear_velocity().x(), 0.0f);
+    EXPECT_NEAR(rigid_body.angular_velocity().y(), 0.0f, 1e-5f);
+}
+
+TEST(PhysicsSceneIntegrationTest, OffCenterForceProducesTranslationAndRotation) {
+    PhysicsSystem          physics_system;
+    framework::core::Scene scene(1);
+
+    auto& moving = scene.create_game_object("moving");
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics_system.world());
+    rigid_body.set_use_gravity(false);
+    pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
+    inverse_inertia_tensor_ref[1][1] = 1.0f;
+    rigid_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
+
+    rigid_body.add_force_at_point(pbpt::math::Vec3{1.0f, 0.0f, 0.0f}, pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
+    physics_system.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    EXPECT_GT(rigid_body.linear_velocity().x(), 0.0f);
+    EXPECT_GT(rigid_body.angular_velocity().y(), 0.0f);
+}
+
 TEST(PhysicsSceneIntegrationTest, ResetDynamicsAndPositionInvalidateLeapfrogStateSafely) {
     PhysicsSystem          physics_system;
     framework::core::Scene scene(1);
@@ -101,8 +191,12 @@ TEST(PhysicsSceneIntegrationTest, ResetDynamicsAndPositionInvalidateLeapfrogStat
     auto& moving = scene.create_game_object("moving");
     moving.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
     auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics_system.world());
+    pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
+    inverse_inertia_tensor_ref[1][1] = 1.0f;
+    rigid_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
 
     for (std::uint64_t i = 0; i < 5; ++i) {
+        rigid_body.add_torque(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
         physics_system.fixed_tick(scene, framework::core::FixedTickContext{
                                              .fixed_delta_seconds = 0.1,
                                              .fixed_tick_index    = i,
@@ -122,6 +216,29 @@ TEST(PhysicsSceneIntegrationTest, ResetDynamicsAndPositionInvalidateLeapfrogStat
     EXPECT_TRUE(std::isfinite(pos.y()));
     EXPECT_NEAR(pos.y(), 2.0f, 1e-5f);
     EXPECT_NEAR(rigid_body.linear_velocity().y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(rigid_body.angular_velocity().y(), 0.0f, 1e-5f);
+}
+
+TEST(PhysicsSceneIntegrationTest, SetOrientationNormalizesAndSyncsBackToSceneGraph) {
+    PhysicsSystem          physics_system;
+    framework::core::Scene scene(1);
+
+    auto& moving = scene.create_game_object("moving");
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics_system.world());
+    rigid_body.set_use_gravity(false);
+
+    const pbpt::math::Quat raw_orientation =
+        pbpt::math::angle_axis(pbpt::math::radians(90.0f), pbpt::math::Vec3{0.0f, 1.0f, 0.0f}) * 2.0f;
+    rigid_body.set_orientation(raw_orientation);
+    physics_system.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    const auto orientation = rigid_body.orientation();
+    EXPECT_NEAR(orientation.length(), 1.0f, 1e-5f);
+    const auto rotation = scene.scene_graph().node(moving.id()).local_rotation();
+    EXPECT_NEAR(rotation.length(), 1.0f, 1e-5f);
 }
 
 TEST(PhysicsSceneIntegrationTest, DestroyRemovesRigidBodyFromPhysicsWorld) {

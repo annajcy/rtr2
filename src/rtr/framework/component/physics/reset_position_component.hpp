@@ -46,7 +46,7 @@ public:
 
         if (m_rigid_body->position().y() <= m_threshold_y) {
             m_rigid_body->set_position(m_reset_position);
-            m_rigid_body->reset_dynamics();
+            m_rigid_body->reset_translation_dynamics();
         }
     }
 
