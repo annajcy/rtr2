@@ -18,7 +18,7 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/physics/ping_pong_component.hpp"
+#include "rtr/framework/component/physics/reset_position_component.hpp"
 #include "rtr/framework/component/physics/rigid_body_component.hpp"
 #include "rtr/system/input/input_types.hpp"
 
@@ -28,7 +28,7 @@ int main() {
 
     try {
         rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
-            .window_width = kWidth, .window_height = kHeight, .window_title = "RTR Physics PingPong Editor Demo"});
+            .window_width = kWidth, .window_height = kHeight, .window_title = "RTR Gravity Reset Editor Demo"});
 
         auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);
         editor_host->register_panel(std::make_unique<rtr::editor::SceneViewPanel>());
@@ -42,7 +42,7 @@ int main() {
         rtr::editor::bind_input_capture_to_editor(runtime.input_system(), *editor_pipeline);
         runtime.set_pipeline(std::move(editor_pipeline));
 
-        auto& scene = runtime.world().create_scene("physics_pingpong_scene");
+        auto& scene = runtime.world().create_scene("gravity_reset_scene");
 
         auto& camera_go       = scene.create_game_object("main_camera");
         auto& camera          = camera_go.add_component<rtr::framework::component::PerspectiveCamera>();
@@ -59,22 +59,18 @@ int main() {
         point_light.set_intensity(60.0f);
         point_light.set_range(30.0f);
 
-        auto&      bunny_go   = scene.create_game_object("bunny_pingpong");
+        auto&      bunny_go   = scene.create_game_object("bunny_reset");
         const auto bunny_mesh = runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(
             "models/stanford_bunny.obj");
         (void)bunny_go.add_component<rtr::framework::component::MeshRenderer>(
             bunny_mesh, pbpt::math::Vec4{0.90f, 0.85f, 0.78f, 1.0f});
-        bunny_go.node().set_local_position({0.0f, 0.0f, 0.0f});
+        bunny_go.node().set_local_position({0.0f, 2.0f, 0.0f});
         bunny_go.node().set_local_scale({10.0f, 10.0f, 10.0f});
 
-        auto& rigid_body = bunny_go.add_component<rtr::framework::component::RigidBody>(
-            runtime.physics_system().world(), pbpt::math::Vec3{1.2f, 0.0f, 0.0f});
-        auto& ping_pong = bunny_go.add_component<rtr::framework::component::PingPong>();
-        ping_pong.set_bounds(-2.0f, 2.0f);
-        ping_pong.set_speed(1.2f);
-        ping_pong.set_start_positive(true);
-        ping_pong.apply_start_direction();
-        rigid_body.set_position(bunny_go.node().world_position());
+        (void)bunny_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().world());
+        auto& reset_position = bunny_go.add_component<rtr::framework::component::ResetPosition>();
+        reset_position.set_threshold_y(-1.0f);
+        reset_position.set_reset_position(pbpt::math::Vec3{0.0f, 2.0f, 0.0f});
 
         auto&      ground_go   = scene.create_game_object("ground");
         const auto ground_mesh = runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(
@@ -100,7 +96,8 @@ int main() {
                         throw std::runtime_error("No active scene.");
                     }
 
-                    auto* active_camera = active_scene->find_game_object("main_camera")->get_component<rtr::framework::component::Camera>();
+                    auto* active_camera =
+                        active_scene->find_game_object("main_camera")->get_component<rtr::framework::component::Camera>();
                     if (active_camera != nullptr) {
                         const auto [fb_w, fb_h] = ctx.renderer.window().framebuffer_size();
                         if (fb_w > 0 && fb_h > 0) {

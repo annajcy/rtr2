@@ -259,7 +259,7 @@ int main() {
                         throw std::runtime_error("No active scene.");
                     }
 
-                    auto* active_camera = active_scene->find_game_object("main_camera")->get_component<rtr::framework::component::Camera>();
+                    auto* active_camera = active_scene->find_game_object("pbpt_camera")->get_component<rtr::framework::component::Camera>();
                     if (active_camera != nullptr) {
                         const auto [fb_w, fb_h] = ctx.renderer.window().framebuffer_size();
                         if (fb_w > 0 && fb_h > 0) {

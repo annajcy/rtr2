@@ -8,12 +8,12 @@ if (TARGET rtr_editor)
   add_executable(shadertoy_editor editor/shadertoy_editor.cpp)
   target_link_libraries(shadertoy_editor PRIVATE rtr::runtime rtr::editor)
 
-  add_executable(physics_ping_pong_editor editor/physics_ping_pong_editor.cpp)
-  target_link_libraries(physics_ping_pong_editor PRIVATE rtr::runtime rtr::editor)
+  add_executable(gravity_reset_editor editor/gravity_reset_editor.cpp)
+  target_link_libraries(gravity_reset_editor PRIVATE rtr::runtime rtr::editor)
 endif()
 
 add_executable(shadertoy runtime/shadertoy.cpp)
 target_link_libraries(shadertoy PRIVATE rtr::runtime)
 
-add_executable(physics_ping_pong runtime/physics_ping_pong.cpp)
-target_link_libraries(physics_ping_pong PRIVATE rtr::runtime)
+add_executable(gravity_reset runtime/gravity_reset.cpp)
+target_link_libraries(gravity_reset PRIVATE rtr::runtime)

@@ -10,14 +10,14 @@
     <float name="far_clip" value="2800" />
     <float name="focus_distance" value="1000" />
     <transform name="to_world">
-      <matrix value="1, 0, 0, 278, 0, 1, 0, 273, 0, 0, 1, -800, 0, 0, 0, 1" />
+      <matrix value="0.974671602, -0.00227971282, -0.223629296, 283.078186, 0, 0.999948025, -0.0101936311, 272.658112, 0.223640919, 0.00993544236, 0.974621058, -910.762878, 0, 0, 0, 1" />
     </transform>
     <film type="hdrfilm">
       <integer name="width" value="1280" />
       <integer name="height" value="720" />
     </film>
     <sampler type="independent">
-      <integer name="sample_count" value="256" />
+      <integer name="sample_count" value="16" />
     </sampler>
   </sensor>
   <bsdf id="rtr_mat_2" type="diffuse">

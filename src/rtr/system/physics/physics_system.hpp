@@ -39,7 +39,7 @@ private:
             }
 
             const auto& state = m_physics_world.get_rigid_body(rigid_body_component->rigid_body_id()).state();
-            scene.scene_graph().node(id).set_local_position(state.translation_state.position);
+            scene.scene_graph().node(id).set_local_position(state.translation.position);
         }
     }
 

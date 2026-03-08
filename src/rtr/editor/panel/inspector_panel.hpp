@@ -12,7 +12,7 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/camera_control/trackball_camera_controller.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
-#include "rtr/framework/component/physics/ping_pong_component.hpp"
+#include "rtr/framework/component/physics/reset_position_component.hpp"
 #include "rtr/framework/component/physics/rigid_body_component.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
@@ -242,62 +242,46 @@ private:
                                 game_object.id(), position.x(), position.y(), position.z());
             }
 
-            pbpt::math::Vec3 linear_velocity = rigid_body->linear_velocity();
-            if (ImGui::DragFloat3("Linear Velocity", &linear_velocity.x(), 0.05f)) {
-                rigid_body->set_linear_velocity(linear_velocity);
-                logger()->debug(
-                    "RigidBody linear_velocity updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
-                    game_object.id(), linear_velocity.x(), linear_velocity.y(), linear_velocity.z());
+            bool use_gravity = rigid_body->use_gravity();
+            if (ImGui::Checkbox("Use Gravity", &use_gravity)) {
+                rigid_body->set_use_gravity(use_gravity);
+                logger()->debug("RigidBody use_gravity updated (game_object_id={}, use_gravity={}).", game_object.id(),
+                                use_gravity);
             }
+
+            pbpt::math::Vec3 linear_velocity = rigid_body->linear_velocity();
+            ImGui::Text("Linear Velocity: [%.4f, %.4f, %.4f]", linear_velocity.x(), linear_velocity.y(),
+                        linear_velocity.z());
         }
     }
 
-    static void draw_ping_pong_editor(framework::core::GameObject& game_object) {
-        auto* ping_pong = game_object.get_component<framework::component::PingPong>();
-        if (ping_pong == nullptr) {
+    static void draw_reset_position_editor(framework::core::GameObject& game_object) {
+        auto* reset_position = game_object.get_component<framework::component::ResetPosition>();
+        if (reset_position == nullptr) {
             return;
         }
 
-        if (ImGui::CollapsingHeader("PingPong", ImGuiTreeNodeFlags_DefaultOpen)) {
-            bool enabled = ping_pong->enabled();
-            if (ImGui::Checkbox("Enabled##ping_pong", &enabled)) {
-                game_object.set_component_enabled<framework::component::PingPong>(enabled);
-                logger()->debug("PingPong enabled updated (game_object_id={}, enabled={}).", game_object.id(), enabled);
+        if (ImGui::CollapsingHeader("ResetPosition", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = reset_position->enabled();
+            if (ImGui::Checkbox("Enabled##reset_position", &enabled)) {
+                game_object.set_component_enabled<framework::component::ResetPosition>(enabled);
+                logger()->debug("ResetPosition enabled updated (game_object_id={}, enabled={}).", game_object.id(),
+                                enabled);
             }
 
-            float min_x        = ping_pong->min_x();
-            float max_x        = ping_pong->max_x();
-            float speed        = ping_pong->speed();
-            bool  dirty_bounds = false;
-
-            if (ImGui::DragFloat("Min X", &min_x, 0.05f)) {
-                dirty_bounds = true;
-            }
-            if (ImGui::DragFloat("Max X", &max_x, 0.05f)) {
-                dirty_bounds = true;
-            }
-            if (dirty_bounds) {
-                ping_pong->set_bounds(min_x, max_x);
-                logger()->debug("PingPong bounds updated (game_object_id={}, min_x={:.4f}, max_x={:.4f}).",
-                                game_object.id(), ping_pong->min_x(), ping_pong->max_x());
+            float threshold_y = reset_position->threshold_y();
+            if (ImGui::DragFloat("Threshold Y", &threshold_y, 0.05f)) {
+                reset_position->set_threshold_y(threshold_y);
+                logger()->debug("ResetPosition threshold_y updated (game_object_id={}, threshold_y={:.4f}).",
+                                game_object.id(), reset_position->threshold_y());
             }
 
-            if (ImGui::DragFloat("Speed", &speed, 0.05f, 0.0f, 100.0f)) {
-                ping_pong->set_speed(speed);
-                logger()->debug("PingPong speed updated (game_object_id={}, speed={:.4f}).", game_object.id(),
-                                ping_pong->speed());
-            }
-
-            bool start_positive = ping_pong->start_positive();
-            if (ImGui::Checkbox("Start Positive", &start_positive)) {
-                ping_pong->set_start_positive(start_positive);
-                logger()->debug("PingPong start_positive updated (game_object_id={}, start_positive={}).",
-                                game_object.id(), start_positive);
-            }
-
-            if (ImGui::Button("Apply Direction")) {
-                ping_pong->apply_start_direction();
-                logger()->debug("PingPong apply_start_direction called (game_object_id={}).", game_object.id());
+            pbpt::math::Vec3 reset_target = reset_position->reset_position();
+            if (ImGui::DragFloat3("Reset Position", &reset_target.x(), 0.05f)) {
+                reset_position->set_reset_position(reset_target);
+                logger()->debug(
+                    "ResetPosition target updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), reset_target.x(), reset_target.y(), reset_target.z());
             }
         }
     }
@@ -477,7 +461,7 @@ public:
         draw_mesh_renderer_editor(*game_object);
         draw_point_light_editor(*game_object);
         draw_rigid_body_editor(*game_object);
-        draw_ping_pong_editor(*game_object);
+        draw_reset_position_editor(*game_object);
         draw_free_look_editor(*game_object);
         draw_trackball_editor(*game_object);
 

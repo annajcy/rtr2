@@ -1,0 +1,53 @@
+#include <cstdlib>
+#include <iomanip>
+#include <iostream>
+#include <stdexcept>
+
+#include <pbpt/math/math.h>
+
+#include "rtr/framework/component/physics/reset_position_component.hpp"
+#include "rtr/framework/component/physics/rigid_body_component.hpp"
+#include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/core/tick_context.hpp"
+#include "rtr/system/physics/physics_system.hpp"
+
+int main() {
+    try {
+        rtr::system::physics::PhysicsSystem physics_system;
+        rtr::framework::core::Scene         scene(1);
+
+        auto& mover = scene.create_game_object("gravity_reset_mover");
+        mover.node().set_local_position(pbpt::math::Vec3{0.0f, 2.0f, 0.0f});
+
+        auto& rigid_body = mover.add_component<rtr::framework::component::RigidBody>(physics_system.world());
+        auto& reset = mover.add_component<rtr::framework::component::ResetPosition>();
+        reset.set_threshold_y(-1.0f);
+        reset.set_reset_position(pbpt::math::Vec3{0.0f, 2.0f, 0.0f});
+
+        constexpr double kFixedDt   = 1.0 / 30.0;
+        constexpr int    kTickCount = 180;
+
+        std::cout << "Gravity reset demo" << '\n';
+        std::cout << "tick,position_y,velocity_y" << '\n';
+
+        for (int tick = 0; tick < kTickCount; ++tick) {
+            scene.fixed_tick(rtr::framework::core::FixedTickContext{
+                .fixed_delta_seconds = kFixedDt,
+                .fixed_tick_index    = static_cast<std::uint64_t>(tick),
+            });
+            physics_system.fixed_tick(scene, rtr::framework::core::FixedTickContext{
+                                                 .fixed_delta_seconds = kFixedDt,
+                                                 .fixed_tick_index    = static_cast<std::uint64_t>(tick),
+                                             });
+
+            const auto& state = physics_system.world().get_rigid_body(rigid_body.rigid_body_id()).state();
+            std::cout << tick << ',' << std::fixed << std::setprecision(4) << state.translation.position.y() << ','
+                      << state.translation.linear_velocity.y() << '\n';
+        }
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}

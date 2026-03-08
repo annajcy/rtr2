@@ -139,8 +139,8 @@ rtr_add_test(
     framework/component/framework_pbpt_light_test.cpp
 )
 rtr_add_test(
-    test_framework_ping_pong_component
-    framework/component/framework_ping_pong_component_test.cpp
+    test_framework_reset_position_component
+    framework/component/framework_reset_position_component_test.cpp
 )
 rtr_add_test(
     test_pbpt_spectrum
