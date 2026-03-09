@@ -22,6 +22,14 @@ theme:
 
 repo_name: annajcy/rtr2
 
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
 plugins:
   - i18n:
       reconfigure_material: true
@@ -37,12 +45,18 @@ plugins:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
-  - Profiling on macOS: profiling-macos.md
-  - Slang Practice:
-      - Overview: slang-practice.md
-      - Slang Basics:
-          - Overview: slang-basics.md
-          - "Lesson 1: Editable ShaderToy and the Compute Minimum Loop": slang-compute-basics.md
-  - Architecture: architecture.md 
-  - Utils: utils.md
+  - Documentation:
+      - Overview: documentation/overview.md
+      - System:
+          - Physics:
+              - Overview: documentation/system/physics/overview.md
+              - Rigid Body Dynamics: documentation/system/physics/rigid-body-dynamics.md
+      - Utils: documentation/utils.md
+  - Profiling:
+      - MacOS: profiling/macos.md
+  - Slang Tutorial:
+      - Overview: slang-tutorial/overview.md
+      - Basics:
+          - Overview: slang-tutorial/basics/overview.md
+          - Lesson 1: slang-tutorial/basics/lesson-1.md
   - API: api/index.md

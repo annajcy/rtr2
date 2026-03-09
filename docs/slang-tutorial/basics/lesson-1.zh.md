@@ -6,8 +6,8 @@
 
 相关导航：
 
-- [Slang Practice](slang-practice.md)
-- [Slang Basics](slang-basics.md)
+- [Slang Practice](../overview.md)
+- [Slang Basics](overview.md)
 
 ## 今日目标
 

@@ -26,8 +26,8 @@
 
 阅读入口：
 
-- [第 1 节：Editable ShaderToy 与 Compute 最小闭环](slang-compute-basics.md)
+- [第 1 节：Editable ShaderToy 与 Compute 最小闭环](lesson-1.md)
 
 返回板块首页：
 
-- [Slang Practice](slang-practice.md)
+- [Slang Practice](../overview.md)

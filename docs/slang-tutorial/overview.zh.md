@@ -28,4 +28,4 @@
 
 进入当前 chapter：
 
-- [Slang Basics](slang-basics.md)
+- [Slang Basics](basics/overview.md)
