@@ -18,4 +18,6 @@ RTR2 is a modern real-time 3D rendering engine written in C++23, using Vulkan an
 
 Continue to [Getting Started](getting-started.md).
 
+See [Camera and Coordinate Conventions](documentation/system/render/camera-coordinate-conventions.md) for the canonical matrix and camera-space rules shared by PBPT and RTR2.
+
 See [API Documentation](api/index.md) for generated Doxygen references.

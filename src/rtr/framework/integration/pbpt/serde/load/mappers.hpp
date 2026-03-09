@@ -124,8 +124,8 @@ struct ThinLensPerspectiveImportMapper {
         sensor.to_world = compat_import_detail::to_mat4(ctx.pbpt_scene_result.scene.render_transform.camera_to_world());
         sensor.fov_degrees    = camera_pbpt.fov_degrees();
         sensor.fov_axis       = ::pbpt::camera::fov_axis_to_string(camera_pbpt.fov_axis());
-        sensor.near_clip      = -camera_pbpt.near_clip();
-        sensor.far_clip       = -camera_pbpt.far_clip();
+        sensor.near_clip      = camera_pbpt.near_clip();
+        sensor.far_clip       = camera_pbpt.far_clip();
         sensor.focus_distance = camera_pbpt.focal_distance();
         sensor.film_width     = camera_pbpt.width();
         sensor.film_height    = camera_pbpt.height();

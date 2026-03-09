@@ -143,7 +143,7 @@ inline ::pbpt::camera::AnyCamera<float> build_pbpt_camera(const component::Persp
 
     return ::pbpt::camera::ThinLensPerspectiveCamera<float>(
         ::pbpt::camera::AnyFilm<float>(std::move(film)), camera.fov_degrees(), ::pbpt::camera::FovAxis::Smaller,
-        -std::max(camera.near_bound(), 1e-4f), -std::max(camera.far_bound(), 1e-3f), 1000.0f);
+        std::max(camera.near_bound(), 1e-4f), std::max(camera.far_bound(), 1e-3f), 1000.0f);
 }
 
 }  // namespace rtr::framework::integration::compat_export_detail

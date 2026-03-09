@@ -22,17 +22,9 @@ public:
     const float& aspect_ratio() const { return m_aspect_ratio; }
 
     pbpt::math::Mat4 projection_matrix() const override {
-        const float near = std::abs(near_bound());
-        const float far = std::abs(far_bound());
-        const float tan_half = std::tan(pbpt::math::radians(m_fov_degrees) * 0.5f);
-
-        pbpt::math::Mat4 projection{};
-        projection[0][0] = 1.0f / (m_aspect_ratio * tan_half);
-        projection[1][1] = 1.0f / tan_half;
-        projection[2][2] = -(far + near) / (far - near);
-        projection[2][3] = -(2.0f * far * near) / (far - near);
-        projection[3][2] = -1.0f;
-        return projection;
+        const float near_z = -std::abs(near_bound());
+        const float far_z = -std::abs(far_bound());
+        return pbpt::math::perspective(pbpt::math::radians(m_fov_degrees), m_aspect_ratio, near_z, far_z);
     }
 
     void adjust_zoom(float delta_zoom) override {

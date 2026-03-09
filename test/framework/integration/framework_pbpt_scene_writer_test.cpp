@@ -110,6 +110,8 @@ TEST(FrameworkPbptSceneWriterTest, BuildsXmlResultFromActiveNodesWithMeshAndPbpt
     auto& camera_go = scene.create_game_object("camera");
     auto& camera    = camera_go.add_component<component::PerspectiveCamera>();
     camera.set_active(true);
+    camera.near_bound() = 0.25f;
+    camera.far_bound()  = 250.0f;
 
     auto&                    go_ok           = scene.create_game_object("");
     const auto               expected_handle = create_test_mesh(resources);
@@ -142,6 +144,10 @@ TEST(FrameworkPbptSceneWriterTest, BuildsXmlResultFromActiveNodesWithMeshAndPbpt
     EXPECT_EQ(shape.shape_id, go_name);
     EXPECT_EQ(shape.mesh_name, go_name);
     EXPECT_FALSE(shape.emission_spectrum_name.has_value());
+    ASSERT_TRUE(std::holds_alternative<::pbpt::camera::ThinLensPerspectiveCamera<float>>(result.scene.camera));
+    const auto& exported_camera = std::get<::pbpt::camera::ThinLensPerspectiveCamera<float>>(result.scene.camera);
+    EXPECT_NEAR(exported_camera.near_clip(), 0.25f, 1e-5f);
+    EXPECT_NEAR(exported_camera.far_clip(), 250.0f, 1e-5f);
     expect_mat4_near(pbpt_bridge::compat_export_detail::to_mat4(shape.object_to_world),
                      scene.scene_graph().node(go_ok.id()).world_matrix());
 }

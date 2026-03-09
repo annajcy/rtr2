@@ -48,6 +48,8 @@ nav:
   - Documentation:
       - Overview: documentation/overview.md
       - System:
+          - Render:
+              - Camera and Coordinates: documentation/system/render/camera-coordinate-conventions.md
           - Physics:
               - Overview: documentation/system/physics/overview.md
               - Rigid Body Dynamics: documentation/system/physics/rigid-body-dynamics.md

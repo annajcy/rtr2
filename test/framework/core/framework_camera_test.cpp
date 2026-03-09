@@ -21,7 +21,7 @@ static void expect_mat4_near(const pbpt::math::Mat4& lhs, const pbpt::math::Mat4
     }
 }
 
-TEST(FrameworkCameraTest, PerspectiveProjectionMatchesGlmHelper) {
+TEST(FrameworkCameraTest, PerspectiveProjectionMatchesPbptProjectionHelper) {
     Scene scene(1);
     auto& go     = scene.create_game_object("camera");
     auto& camera = go.add_component<component::PerspectiveCamera>();
@@ -31,16 +31,12 @@ TEST(FrameworkCameraTest, PerspectiveProjectionMatchesGlmHelper) {
     camera.near_bound()   = 0.2f;
     camera.far_bound()    = 200.0f;
 
-    pbpt::math::Mat4 expected{};
-    expected[0][0] = 1.0f / (2.0f * std::tan(pbpt::math::radians(60.0f) * 0.5f));
-    expected[1][1] = 1.0f / std::tan(pbpt::math::radians(60.0f) * 0.5f);
-    expected[2][2] = -(200.0f + 0.2f) / (200.0f - 0.2f);
-    expected[2][3] = -(2.0f * 200.0f * 0.2f) / (200.0f - 0.2f);
-    expected[3][2] = -1.0f;
+    const pbpt::math::Mat4 expected =
+        pbpt::math::perspective(pbpt::math::radians(60.0f), 2.0f, -0.2f, -200.0f);
     expect_mat4_near(camera.projection_matrix(), expected);
 }
 
-TEST(FrameworkCameraTest, OrthographicProjectionMatchesGlmHelper) {
+TEST(FrameworkCameraTest, OrthographicProjectionMatchesPbptProjectionHelper) {
     Scene scene(1);
     auto& go     = scene.create_game_object("camera");
     auto& camera = go.add_component<component::OrthographicCamera>();
@@ -49,14 +45,11 @@ TEST(FrameworkCameraTest, OrthographicProjectionMatchesGlmHelper) {
     camera.right_bound()  = 10.0f;
     camera.bottom_bound() = -4.0f;
     camera.top_bound()    = 4.0f;
-    camera.near_bound()   = -20.0f;
+    camera.near_bound()   = 20.0f;
     camera.far_bound()    = 30.0f;
 
-    pbpt::math::Mat4 expected = pbpt::math::Mat4::identity();
-    expected[0][0] = 2.0f / 20.0f;
-    expected[1][1] = 2.0f / 8.0f;
-    expected[2][2] = -2.0f / 50.0f;
-    expected[2][3] = -10.0f / 50.0f;
+    const pbpt::math::Mat4 expected =
+        pbpt::math::orthographic(-10.0f, 10.0f, -4.0f, 4.0f, -20.0f, -30.0f);
     expect_mat4_near(camera.projection_matrix(), expected);
 }
 

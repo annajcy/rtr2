@@ -313,7 +313,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, PackedMatrixChainMatchesCpuClipComput
     pbpt::math::Mat4 view = pbpt::math::look_at(pbpt::math::Vec3{4.0f, 3.0f, -7.0f},
                                                 pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
                                                 pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
-    pbpt::math::Mat4 proj = pbpt::math::perspective(pbpt::math::radians(45.0f), 1.3f, 0.1f, 100.0f);
+    pbpt::math::Mat4 proj = pbpt::math::perspective(pbpt::math::radians(45.0f), 1.3f, -0.1f, -100.0f);
     proj[1][1] *= -1.0f;
 
     const pbpt::math::Vec4 position{0.3f, -0.7f, 1.1f, 1.0f};

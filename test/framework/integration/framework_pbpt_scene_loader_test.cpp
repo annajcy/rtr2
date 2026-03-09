@@ -156,9 +156,12 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
     EXPECT_EQ(result.imported_game_object_id_by_name.at("mesh_a"), mesh_go->id());
     ASSERT_TRUE(result.imported_game_object_id_by_name.contains("pbpt_camera"));
     const core::GameObject* camera_go = nullptr;
-    ASSERT_NE(find_unique_active_camera(scene, &camera_go), nullptr);
+    const auto* imported_camera = dynamic_cast<const component::PerspectiveCamera*>(find_unique_active_camera(scene, &camera_go));
+    ASSERT_NE(imported_camera, nullptr);
     ASSERT_NE(camera_go, nullptr);
     EXPECT_EQ(result.imported_game_object_id_by_name.at("pbpt_camera"), camera_go->id());
+    EXPECT_NEAR(imported_camera->near_bound(), 0.1f, 1e-5f);
+    EXPECT_NEAR(imported_camera->far_bound(), 1000.0f, 1e-5f);
 
     const auto* renderer    = mesh_go->get_component<component::MeshRenderer>();
     const auto* pbpt_mesh   = mesh_go->get_component<component::PbptMesh>();
