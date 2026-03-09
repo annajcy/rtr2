@@ -19,18 +19,6 @@ struct Contact {
 
 namespace detail {
 
-inline pbpt::math::Vec3 abs_vec3(const pbpt::math::Vec3& value) {
-    return pbpt::math::Vec3{std::abs(value.x()), std::abs(value.y()), std::abs(value.z())};
-}
-
-inline pbpt::math::Vec3 hadamard(const pbpt::math::Vec3& lhs, const pbpt::math::Vec3& rhs) {
-    return pbpt::math::Vec3{lhs.x() * rhs.x(), lhs.y() * rhs.y(), lhs.z() * rhs.z()};
-}
-
-inline pbpt::math::Float max_component(const pbpt::math::Vec3& value) {
-    return std::max(value.x(), std::max(value.y(), value.z()));
-}
-
 struct WorldSphere {
     pbpt::math::Vec3  center{0.0f};
     pbpt::math::Float radius{0.5f};
@@ -44,20 +32,20 @@ struct WorldBox {
 
 inline WorldSphere world_sphere(const Collider& collider) {
     const auto* sphere = std::get_if<SphereShape>(&collider.shape);
-    const auto  scale  = abs_vec3(collider.world_scale);
+    const auto  scale  = collider.world_scale.abs();
     return WorldSphere{
         .center = collider.world_position,
-        .radius = sphere != nullptr ? sphere->radius * max_component(scale) : 0.0f,
+        .radius = sphere != nullptr ? sphere->radius * scale.max() : 0.0f,
     };
 }
 
 inline WorldBox world_box(const Collider& collider) {
     const auto* box   = std::get_if<BoxShape>(&collider.shape);
-    const auto  scale = abs_vec3(collider.world_scale);
+    const auto  scale = collider.world_scale.abs();
     return WorldBox{
         .center       = collider.world_position,
         .rotation     = pbpt::math::normalize(collider.world_rotation),
-        .half_extents = box != nullptr ? hadamard(box->half_extents, scale) : pbpt::math::Vec3{0.0f},
+        .half_extents = box != nullptr ? box->half_extents * scale : pbpt::math::Vec3{0.0f},
     };
 }
 
@@ -124,7 +112,7 @@ inline std::optional<Contact> collide_sphere_box(ColliderID sphere_id, const Col
         normal_local        = -(delta_local / distance);
         penetration         = sphere.radius - distance;
     } else {
-        const auto distance_to_face = box.half_extents - detail::abs_vec3(local_center);
+        const auto distance_to_face = box.half_extents - local_center.abs();
 
         int axis = 0;
         if (distance_to_face.y() < distance_to_face.x()) {

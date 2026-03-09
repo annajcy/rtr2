@@ -33,17 +33,6 @@ private:
         return std::isfinite(mass) && mass > 0.0f;
     }
 
-    static bool is_finite_matrix(const pbpt::math::Mat3& matrix) {
-        for (int row = 0; row < 3; ++row) {
-            for (int col = 0; col < 3; ++col) {
-                if (!std::isfinite(matrix[row][col])) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
     static pbpt::math::Quat integrate_orientation(const pbpt::math::Quat& orientation,
                                                   const pbpt::math::Vec3& angular_velocity,
                                                   float                   delta_seconds) {
@@ -51,10 +40,6 @@ private:
         const pbpt::math::Quat delta = (omega_quat * orientation) * (0.5f * delta_seconds);
         return pbpt::math::normalize(pbpt::math::Quat(orientation.w() + delta.w(), orientation.x() + delta.x(),
                                                       orientation.y() + delta.y(), orientation.z() + delta.z()));
-    }
-
-    static pbpt::math::Vec3 hadamard(const pbpt::math::Vec3& lhs, const pbpt::math::Vec3& rhs) {
-        return pbpt::math::Vec3{lhs.x() * rhs.x(), lhs.y() * rhs.y(), lhs.z() * rhs.z()};
     }
 
     bool has_dynamic_body(RigidBodyID body_id) const {
@@ -102,7 +87,7 @@ private:
 
         const auto& body  = body_it->second;
         const auto& state = body.state();
-        const auto  center = hadamard(collider.local_center, collider.world_scale);
+        const auto  center = collider.local_center * collider.world_scale;
         collider.world_position = state.translation.position + state.rotation.orientation * center;
         collider.world_rotation = pbpt::math::normalize(state.rotation.orientation * collider.local_rotation);
     }
@@ -130,7 +115,7 @@ private:
             BodyStepState step_state{};
             step_state.linear_acceleration = acceleration;
 
-            if (is_finite_matrix(body.inverse_inertia_tensor_ref())) {
+            if (body.inverse_inertia_tensor_ref().is_finite()) {
                 const auto inertia_world        = inverse_inertia_tensor_world(body);
                 const auto angular_acceleration = inertia_world * state.forces.accumulated_torque;
                 if (!body.angular_half_step_initialized()) {
@@ -261,13 +246,13 @@ private:
             const auto rel_normal_speed  = pbpt::math::dot(relative_velocity, normal);
 
             pbpt::math::Float angular_denom = 0.0f;
-            if (body_a != nullptr && is_finite_matrix(body_a->inverse_inertia_tensor_ref())) {
+            if (body_a != nullptr && body_a->inverse_inertia_tensor_ref().is_finite()) {
                 const auto r_a         = contact.point - body_a->state().translation.position;
                 const auto r_a_cross_n = pbpt::math::cross(r_a, normal);
                 angular_denom += pbpt::math::dot(
                     normal, pbpt::math::cross(inverse_inertia_tensor_world(*body_a) * r_a_cross_n, r_a));
             }
-            if (body_b != nullptr && is_finite_matrix(body_b->inverse_inertia_tensor_ref())) {
+            if (body_b != nullptr && body_b->inverse_inertia_tensor_ref().is_finite()) {
                 const auto r_b         = contact.point - body_b->state().translation.position;
                 const auto r_b_cross_n = pbpt::math::cross(r_b, normal);
                 angular_denom += pbpt::math::dot(
@@ -281,7 +266,7 @@ private:
 
                 if (body_a != nullptr) {
                     body_a->half_step_linear_velocity() -= impulse * inv_mass_a;
-                    if (is_finite_matrix(body_a->inverse_inertia_tensor_ref())) {
+                    if (body_a->inverse_inertia_tensor_ref().is_finite()) {
                         const auto r_a = contact.point - body_a->state().translation.position;
                         body_a->half_step_angular_velocity() -=
                             inverse_inertia_tensor_world(*body_a) * pbpt::math::cross(r_a, impulse);
@@ -289,7 +274,7 @@ private:
                 }
                 if (body_b != nullptr) {
                     body_b->half_step_linear_velocity() += impulse * inv_mass_b;
-                    if (is_finite_matrix(body_b->inverse_inertia_tensor_ref())) {
+                    if (body_b->inverse_inertia_tensor_ref().is_finite()) {
                         const auto r_b = contact.point - body_b->state().translation.position;
                         body_b->half_step_angular_velocity() +=
                             inverse_inertia_tensor_world(*body_b) * pbpt::math::cross(r_b, impulse);

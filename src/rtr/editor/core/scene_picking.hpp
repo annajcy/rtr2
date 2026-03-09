@@ -48,18 +48,6 @@ struct LocalMeshBounds {
 
 namespace detail {
 
-inline pbpt::math::Vec3 abs_vec3(const pbpt::math::Vec3& value) {
-    return {std::abs(value.x()), std::abs(value.y()), std::abs(value.z())};
-}
-
-inline pbpt::math::Vec3 hadamard(const pbpt::math::Vec3& lhs, const pbpt::math::Vec3& rhs) {
-    return {lhs.x() * rhs.x(), lhs.y() * rhs.y(), lhs.z() * rhs.z()};
-}
-
-inline float max_component(const pbpt::math::Vec3& value) {
-    return std::max(value.x(), std::max(value.y(), value.z()));
-}
-
 inline std::optional<float> intersect_ray_sphere(
     const ScenePickRay& ray,
     const pbpt::math::Vec3& center,
@@ -286,18 +274,18 @@ inline std::optional<ScenePickResult> pick_scene_game_object(
             const auto node = game_object->node();
             const pbpt::math::Vec3 scale = node.world_scale();
             const pbpt::math::Vec3 center =
-                node.world_position() + node.world_rotation() * detail::hadamard(sphere->local_center(), scale);
-            const float radius = sphere->radius() * detail::max_component(detail::abs_vec3(scale));
+                node.world_position() + node.world_rotation() * (sphere->local_center() * scale);
+            const float radius = sphere->radius() * scale.abs().max();
             hit_distance = detail::intersect_ray_sphere(ray, center, radius);
             hit_source = ScenePickHitSource::SphereCollider;
         } else if (const auto* box = game_object->get_component<framework::component::BoxCollider>();
                    box != nullptr && box->enabled()) {
             const auto node = game_object->node();
-            const pbpt::math::Vec3 scale = detail::abs_vec3(node.world_scale());
+            const pbpt::math::Vec3 scale = node.world_scale().abs();
             const pbpt::math::Vec3 center =
-                node.world_position() + node.world_rotation() * detail::hadamard(box->local_center(), node.world_scale());
+                node.world_position() + node.world_rotation() * (box->local_center() * node.world_scale());
             const pbpt::math::Quat rotation = pbpt::math::normalize(node.world_rotation() * box->local_rotation());
-            const pbpt::math::Vec3 half_extents = detail::hadamard(box->half_extents(), scale);
+            const pbpt::math::Vec3 half_extents = box->half_extents() * scale;
             hit_distance = detail::intersect_world_box(ray, center, rotation, half_extents);
             hit_source = ScenePickHitSource::BoxCollider;
         } else if (const auto* mesh_renderer = game_object->get_component<framework::component::MeshRenderer>();
