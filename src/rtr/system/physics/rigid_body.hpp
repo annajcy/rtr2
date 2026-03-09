@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cmath>
+#include <stdexcept>
+
 #include "pbpt/math/basic/type_alias.hpp"
 #include "pbpt/math/complex/quaternion.hpp"
 #include "pbpt/math/matrix/matrix.hpp"
@@ -49,12 +52,34 @@ private:
     RigidBodyState     m_state{};
     bool               m_is_awake{false};
     bool               m_use_gravity{true};
+    pbpt::math::Float  m_restitution{0.0f};
+    pbpt::math::Float  m_friction{0.0f};
     pbpt::math::Mat3   m_inverse_inertia_tensor_ref{pbpt::math::Mat3::zeros()};
+
+    static pbpt::math::Float sanitize_restitution(pbpt::math::Float restitution) {
+        if (!std::isfinite(restitution) || restitution < 0.0f || restitution > 1.0f) {
+            throw std::invalid_argument("RigidBody restitution must be finite and within [0, 1].");
+        }
+        return restitution;
+    }
+
+    static pbpt::math::Float sanitize_friction(pbpt::math::Float friction) {
+        if (!std::isfinite(friction) || friction < 0.0f) {
+            throw std::invalid_argument("RigidBody friction must be finite and non-negative.");
+        }
+        return friction;
+    }
 
 public:
     RigidBody() = default;
-    RigidBody(RigidBodyType type, const RigidBodyState& state, bool is_awake = true, bool use_gravity = true)
-        : m_type(type), m_state(state), m_is_awake(is_awake), m_use_gravity(use_gravity) {}
+    RigidBody(RigidBodyType type, const RigidBodyState& state, bool is_awake = true, bool use_gravity = true,
+              pbpt::math::Float restitution = 0.0f, pbpt::math::Float friction = 0.0f)
+        : m_type(type),
+          m_state(state),
+          m_is_awake(is_awake),
+          m_use_gravity(use_gravity),
+          m_restitution(sanitize_restitution(restitution)),
+          m_friction(sanitize_friction(friction)) {}
 
     void set_awake(bool awake) { m_is_awake = awake; }
     bool is_awake() const { return m_is_awake; }
@@ -67,6 +92,12 @@ public:
     }
 
     bool use_gravity() const { return m_use_gravity; }
+
+    void set_restitution(pbpt::math::Float restitution) { m_restitution = sanitize_restitution(restitution); }
+    pbpt::math::Float restitution() const { return m_restitution; }
+
+    void set_friction(pbpt::math::Float friction) { m_friction = sanitize_friction(friction); }
+    pbpt::math::Float friction() const { return m_friction; }
 
     void set_inverse_inertia_tensor_ref(const pbpt::math::Mat3& inverse_inertia_tensor_ref) {
         m_inverse_inertia_tensor_ref = inverse_inertia_tensor_ref;

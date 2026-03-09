@@ -252,7 +252,6 @@ private:
         const auto& sv = m_scene_view.value();
         if (sv.renderables.size() > kMaxRenderables)
             throw std::runtime_error("Renderable count exceeds ForwardEditorPipeline capacity.");
-
         auto& ubos = m_object_uniform_buffers[frame_index];
         auto& sets = m_object_sets[frame_index];
 

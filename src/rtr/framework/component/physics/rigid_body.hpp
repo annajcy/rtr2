@@ -19,6 +19,8 @@ private:
     system::physics::RigidBodyType m_type{system::physics::RigidBodyType::Dynamic};
     pbpt::math::Float              m_mass{1.0f};
     bool                           m_use_gravity{true};
+    pbpt::math::Float              m_restitution{0.0f};
+    pbpt::math::Float              m_friction{0.0f};
     pbpt::math::Mat3               m_inverse_inertia_tensor_ref{pbpt::math::Mat3::zeros()};
     bool                           m_registered{false};
 
@@ -42,6 +44,20 @@ private:
         return inverse_inertia_tensor_ref;
     }
 
+    static pbpt::math::Float sanitize_restitution(pbpt::math::Float restitution) {
+        if (!std::isfinite(restitution) || restitution < 0.0f || restitution > 1.0f) {
+            throw std::invalid_argument("RigidBody restitution must be finite and within [0, 1].");
+        }
+        return restitution;
+    }
+
+    static pbpt::math::Float sanitize_friction(pbpt::math::Float friction) {
+        if (!std::isfinite(friction) || friction < 0.0f) {
+            throw std::invalid_argument("RigidBody friction must be finite and non-negative.");
+        }
+        return friction;
+    }
+
     system::physics::RigidBody* physics_body() {
         if (!has_registered_body()) {
             return nullptr;
@@ -60,12 +76,16 @@ public:
     explicit RigidBody(core::GameObject& owner, system::physics::PhysicsWorld& world, pbpt::math::Float mass = 1.0f,
                        system::physics::RigidBodyType type = system::physics::RigidBodyType::Dynamic,
                        bool use_gravity = true,
-                       const pbpt::math::Mat3& inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros())
+                       const pbpt::math::Mat3& inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros(),
+                       pbpt::math::Float restitution = 0.0f,
+                       pbpt::math::Float friction = 0.0f)
         : Component(owner),
           m_physics_world(world),
           m_type(type),
           m_mass(sanitize_mass(mass)),
           m_use_gravity(use_gravity),
+          m_restitution(sanitize_restitution(restitution)),
+          m_friction(sanitize_friction(friction)),
           m_inverse_inertia_tensor_ref(sanitize_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref)) {}
 
     void on_awake() override {}
@@ -79,6 +99,8 @@ public:
         body.set_type(m_type);
         body.set_awake(true);
         body.set_use_gravity(m_use_gravity);
+        body.set_restitution(m_restitution);
+        body.set_friction(m_friction);
         body.set_inverse_inertia_tensor_ref(m_inverse_inertia_tensor_ref);
         body.state().mass                        = m_mass;
         body.state().translation.position        = owner().node().world_position();
@@ -188,6 +210,30 @@ public:
         m_use_gravity = use_gravity;
         if (auto* body = physics_body(); body != nullptr) {
             body->set_use_gravity(use_gravity);
+        }
+    }
+
+    pbpt::math::Float restitution() const {
+        const auto* body = physics_body();
+        return body != nullptr ? body->restitution() : m_restitution;
+    }
+
+    void set_restitution(pbpt::math::Float restitution) {
+        m_restitution = sanitize_restitution(restitution);
+        if (auto* body = physics_body(); body != nullptr) {
+            body->set_restitution(m_restitution);
+        }
+    }
+
+    pbpt::math::Float friction() const {
+        const auto* body = physics_body();
+        return body != nullptr ? body->friction() : m_friction;
+    }
+
+    void set_friction(pbpt::math::Float friction) {
+        m_friction = sanitize_friction(friction);
+        if (auto* body = physics_body(); body != nullptr) {
+            body->set_friction(m_friction);
         }
     }
 

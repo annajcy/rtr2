@@ -152,6 +152,10 @@ rtr_add_test(
     framework/component/framework_reset_position_component_test.cpp
 )
 rtr_add_test(
+    test_framework_rigid_body_component
+    framework/component/framework_rigid_body_component_test.cpp
+)
+rtr_add_test(
     test_framework_collider_component
     framework/component/framework_collider_component_test.cpp
 )

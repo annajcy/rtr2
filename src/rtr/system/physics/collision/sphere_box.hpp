@@ -37,11 +37,11 @@ struct ContactPairTrait<WorldSphere, WorldBox> {
             constexpr pbpt::math::Float kEpsilon = 1e-6f;
             if (dist_sq > kEpsilon) {
                 const auto distance = std::sqrt(dist_sq);
-                result.normal       = -(delta_local / distance);
+                result.normal       = -(box.rotation * (delta_local / distance));
                 result.penetration  = sphere.radius - distance;
             } else {
                 // 球心在盒子内部，无法确定法线方向，默认指向上方
-                result.normal      = pbpt::math::Vec3{0.0f, 1.0f, 0.0f};
+                result.normal      = box.rotation * pbpt::math::Vec3{0.0f, 1.0f, 0.0f};
                 result.penetration = sphere.radius;  // 穿透深度至少为一个球的半径
             }
             result.point = box.center + box.rotation * closest_local;

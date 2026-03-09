@@ -31,8 +31,13 @@ TEST(FrameworkCameraTest, PerspectiveProjectionMatchesGlmHelper) {
     camera.near_bound()   = 0.2f;
     camera.far_bound()    = 200.0f;
 
-    expect_mat4_near(camera.projection_matrix(),
-                     pbpt::math::perspective(pbpt::math::radians(60.0f), 2.0f, 0.2f, 200.0f));
+    pbpt::math::Mat4 expected{};
+    expected[0][0] = 1.0f / (2.0f * std::tan(pbpt::math::radians(60.0f) * 0.5f));
+    expected[1][1] = 1.0f / std::tan(pbpt::math::radians(60.0f) * 0.5f);
+    expected[2][2] = -(200.0f + 0.2f) / (200.0f - 0.2f);
+    expected[2][3] = -(2.0f * 200.0f * 0.2f) / (200.0f - 0.2f);
+    expected[3][2] = -1.0f;
+    expect_mat4_near(camera.projection_matrix(), expected);
 }
 
 TEST(FrameworkCameraTest, OrthographicProjectionMatchesGlmHelper) {
@@ -47,7 +52,12 @@ TEST(FrameworkCameraTest, OrthographicProjectionMatchesGlmHelper) {
     camera.near_bound()   = -20.0f;
     camera.far_bound()    = 30.0f;
 
-    expect_mat4_near(camera.projection_matrix(), pbpt::math::orthographic(-10.0f, 10.0f, -4.0f, 4.0f, -20.0f, 30.0f));
+    pbpt::math::Mat4 expected = pbpt::math::Mat4::identity();
+    expected[0][0] = 2.0f / 20.0f;
+    expected[1][1] = 2.0f / 8.0f;
+    expected[2][2] = -2.0f / 50.0f;
+    expected[2][3] = -10.0f / 50.0f;
+    expect_mat4_near(camera.projection_matrix(), expected);
 }
 
 TEST(FrameworkCameraTest, ViewMatrixUsesNodeWorldTransform) {
@@ -61,6 +71,28 @@ TEST(FrameworkCameraTest, ViewMatrixUsesNodeWorldTransform) {
     const pbpt::math::Mat4 expected = pbpt::math::look_at(
         pbpt::math::Vec3(1.0f, 2.0f, 3.0f), pbpt::math::Vec3(1.0f, 2.0f, 2.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f));
     expect_mat4_near(camera.view_matrix(), expected);
+}
+
+TEST(FrameworkCameraTest, PerspectiveProjectionKeepsForwardPointInsideDepthRange) {
+    Scene scene(1);
+    auto& go     = scene.create_game_object("camera");
+    auto& camera = go.add_component<component::PerspectiveCamera>();
+
+    camera.fov_degrees()  = 45.0f;
+    camera.aspect_ratio() = 16.0f / 9.0f;
+    camera.near_bound()   = 0.1f;
+    camera.far_bound()    = 100.0f;
+
+    go.node().set_world_position({0.0f, 1.0f, 6.0f});
+    camera.camera_look_at_point_world({0.0f, 0.0f, 0.0f});
+    scene.scene_graph().update_world_transforms();
+
+    const pbpt::math::Vec4 clip = camera.projection_matrix() * (camera.view_matrix() * pbpt::math::Vec4{0.0f, 0.0f, 0.0f, 1.0f});
+    const float            ndc_z = clip.z() / clip.w();
+
+    EXPECT_GT(clip.w(), 0.0f);
+    EXPECT_GE(ndc_z, 0.0f);
+    EXPECT_LE(ndc_z, 1.0f);
 }
 
 TEST(FrameworkCameraTest, LookAtDirectionLocalAndWorldDifferWithParentRotation) {

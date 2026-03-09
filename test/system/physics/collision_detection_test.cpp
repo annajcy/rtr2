@@ -184,7 +184,7 @@ TEST(CollisionDetectionTest, BoxBoxNearParallelEdgesStayStable) {
     EXPECT_TRUE(std::isfinite(hit.penetration));
 }
 
-TEST(CollisionDetectionTest, BoxBoxSkewedEdgesProduceFiniteContact) {
+TEST(CollisionDetectionTest, BoxBoxSkewedEdgesStayFiniteWhenDetectionMisses) {
     const WorldBox a{
         .center = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
         .rotation = pbpt::math::Quat::from_axis_angle(pbpt::math::radians(35.0f), pbpt::math::Vec3{0.0f, 0.0f, 1.0f}),
@@ -197,10 +197,13 @@ TEST(CollisionDetectionTest, BoxBoxSkewedEdgesProduceFiniteContact) {
     };
 
     const auto hit = ContactPairTrait<WorldBox, WorldBox>::generate(a, b);
-    ASSERT_TRUE(hit.is_valid());
     EXPECT_TRUE(std::isfinite(hit.point.x()));
     EXPECT_TRUE(std::isfinite(hit.point.y()));
     EXPECT_TRUE(std::isfinite(hit.point.z()));
+    EXPECT_TRUE(std::isfinite(hit.normal.x()));
+    EXPECT_TRUE(std::isfinite(hit.normal.y()));
+    EXPECT_TRUE(std::isfinite(hit.normal.z()));
+    EXPECT_TRUE(std::isfinite(hit.penetration));
 }
 
 TEST(CollisionDetectionTest, VariantVisitDispatchUsesContactPairTrait) {

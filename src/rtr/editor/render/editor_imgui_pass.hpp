@@ -248,6 +248,7 @@ private:
         entry.texture_size           = ImVec2{static_cast<float>(extent.width), static_cast<float>(extent.height)};
         m_current_scene_texture      = entry.texture_id;
         m_current_scene_texture_size = entry.texture_size;
+
     }
 };
 

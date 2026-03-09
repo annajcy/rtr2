@@ -12,6 +12,15 @@ struct ContactResult {
     pbpt::math::Float  penetration{0.0f};
 
     bool is_valid() const { return penetration > 0.0f; }
+
+    pbpt::math::Vec3 normalized_normal() const {
+        constexpr pbpt::math::Float kEpsilon = 1e-6f;
+        const auto length_sq = pbpt::math::dot(normal, normal);
+        if (length_sq <= kEpsilon * kEpsilon) {
+            return pbpt::math::Vec3{0.0f, 1.0f, 0.0f};
+        }
+        return normal / std::sqrt(length_sq);
+    }
 };
 
 struct Contact {

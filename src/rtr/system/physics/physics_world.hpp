@@ -39,6 +39,21 @@ private:
         return body.type() == RigidBodyType::Dynamic && body.is_awake() && state.is_mass_valid();
     }
 
+    static pbpt::math::Float solver_inverse_mass(const RigidBody& body) {
+        if (body.type() != RigidBodyType::Dynamic || !body.is_awake() || !body.state().is_mass_valid()) {
+            return 0.0f;
+        }
+        return body.state().inverse_mass();
+    }
+
+    static pbpt::math::Float combined_restitution(const RigidBody& body_a, const RigidBody& body_b) {
+        return std::max(body_a.restitution(), body_b.restitution());
+    }
+
+    static pbpt::math::Float combined_friction(const RigidBody& body_a, const RigidBody& body_b) {
+        return std::sqrt(body_a.friction() * body_b.friction());
+    }
+
     bool remove_body_index_entry(RigidBodyID body_id, ColliderID collider_id) {
         const auto [begin, end] = m_colliders_by_body.equal_range(body_id);
         for (auto it = begin; it != end; ++it) {
@@ -60,10 +75,9 @@ private:
         return body_index_removed;
     }
 
-
-    std::optional<Contact> generate_contact_from_pair(ColliderID a_id, ColliderID b_id) {
-        auto collider_a = get_world_collider(a_id);
-        auto collider_b = get_world_collider(b_id); 
+    std::optional<Contact> generate_contact_from_pair(ColliderID collider_id_a, ColliderID collider_id_b) {
+        auto collider_a = get_world_collider(collider_id_a);
+        auto collider_b = get_world_collider(collider_id_b); 
 
         ContactResult result;
         std::visit([&](auto&& collider_shape_a, auto&& collider_shape_b){
@@ -73,16 +87,139 @@ private:
         }, collider_a, collider_b);
 
         if (result.is_valid()) {
+            const auto& collider_record_a = get_collider(collider_id_a);
+            const auto& collider_record_b = get_collider(collider_id_b);
             return Contact{
-                .body_a = a_id,
-                .body_b = b_id,
-                .collider_a = a_id,
-                .collider_b = b_id,
+                .body_a = collider_record_a.rigid_body_id,
+                .body_b = collider_record_b.rigid_body_id,
+                .collider_a = collider_id_a,
+                .collider_b = collider_id_b,
                 .result = result
             };
         } else {
             return std::nullopt;
         }
+    }
+
+    void integrate_body(RigidBody& rb, float delta_seconds) {
+        if (rb.type() != RigidBodyType::Dynamic || !rb.is_awake()) {
+            return;
+        }
+
+        if (rb.use_gravity()) {
+            rb.state().forces.accumulated_force += gravity() * rb.state().mass;
+        }
+
+        const auto acc = rb.state().inverse_mass() * rb.state().forces.accumulated_force;
+        rb.state().translation.linear_velocity += acc * delta_seconds;
+        rb.state().translation.position += rb.state().translation.linear_velocity * delta_seconds;
+
+        const auto rotation_matrix = rb.state().rotation.orientation.to_mat3();
+        const auto inv_inertia_tensor =
+            rotation_matrix * rb.inverse_inertia_tensor_ref() * rotation_matrix.transposed();
+        const auto angular_acc = inv_inertia_tensor * rb.state().forces.accumulated_torque;
+        rb.state().rotation.angular_velocity += angular_acc * delta_seconds;
+
+        const auto angular_velocity_quat = pbpt::math::Quat(0.0f,
+                                                            rb.state().rotation.angular_velocity.x(),
+                                                            rb.state().rotation.angular_velocity.y(),
+                                                            rb.state().rotation.angular_velocity.z());
+        rb.state().rotation.orientation += 0.5f * delta_seconds * angular_velocity_quat * rb.state().rotation.orientation;
+        rb.state().rotation.orientation = pbpt::math::normalize(rb.state().rotation.orientation);
+    }
+
+    std::vector<Contact> collect_contacts() {
+        std::vector<Contact> contacts;
+        std::vector<ColliderID> collider_ids;
+        collider_ids.reserve(m_colliders.size());
+        for (const auto& [id, collider] : m_colliders) {
+            (void)collider;
+            collider_ids.push_back(id);
+        }
+
+        for (std::size_t i = 0; i < collider_ids.size(); ++i) {
+            for (std::size_t j = i + 1; j < collider_ids.size(); ++j) {
+                const auto collider_a_id = collider_ids[i];
+                const auto collider_b_id = collider_ids[j];
+                const auto& collider_a = get_collider(collider_a_id);
+                const auto& collider_b = get_collider(collider_b_id);
+                if (collider_a.rigid_body_id == collider_b.rigid_body_id) {
+                    continue;
+                }
+
+                if (!has_dynamic_body(collider_a.rigid_body_id) && !has_dynamic_body(collider_b.rigid_body_id)) {
+                    continue;
+                }
+
+                if (auto contact = generate_contact_from_pair(collider_a_id, collider_b_id); contact.has_value()) {
+                    contacts.push_back(*contact);
+                }
+            }
+        }
+
+        return contacts;
+    }
+
+    void apply_position_correction(const Contact& contact) {
+        auto& body_a = get_rigid_body(contact.body_a);
+        auto& body_b = get_rigid_body(contact.body_b);
+        const auto inv_mass_a = solver_inverse_mass(body_a);
+        const auto inv_mass_b = solver_inverse_mass(body_b);
+        const auto inv_mass_sum = inv_mass_a + inv_mass_b;
+        if (inv_mass_sum <= 0.0f || !contact.is_valid()) {
+            return;
+        }
+
+        const auto normal = contact.result.normalized_normal();
+        const auto correction = (contact.result.penetration / inv_mass_sum) * normal;
+        body_a.state().translation.position -= inv_mass_a * correction;
+        body_b.state().translation.position += inv_mass_b * correction;
+    }
+
+    void apply_velocity_impulses(const Contact& contact) {
+        auto& body_a = get_rigid_body(contact.body_a);
+        auto& body_b = get_rigid_body(contact.body_b);
+        const auto inv_mass_a = solver_inverse_mass(body_a);
+        const auto inv_mass_b = solver_inverse_mass(body_b);
+        const auto inv_mass_sum = inv_mass_a + inv_mass_b;
+        if (inv_mass_sum <= 0.0f || !contact.is_valid()) {
+            return;
+        }
+
+        const auto normal = contact.result.normalized_normal();
+        const auto relative_velocity =
+            body_b.state().translation.linear_velocity - body_a.state().translation.linear_velocity;
+        const auto normal_velocity = pbpt::math::dot(relative_velocity, normal);
+        if (normal_velocity >= 0.0f) {
+            return;
+        }
+
+        const auto normal_impulse_magnitude =
+            -((1.0f + combined_restitution(body_a, body_b)) * normal_velocity) / inv_mass_sum;
+        const auto normal_impulse = normal_impulse_magnitude * normal;
+        body_a.state().translation.linear_velocity -= inv_mass_a * normal_impulse;
+        body_b.state().translation.linear_velocity += inv_mass_b * normal_impulse;
+
+        const auto relative_velocity_after_normal =
+            body_b.state().translation.linear_velocity - body_a.state().translation.linear_velocity;
+        const auto tangent_velocity = relative_velocity_after_normal -
+                                      pbpt::math::dot(relative_velocity_after_normal, normal) * normal;
+        const auto tangent_speed_sq = pbpt::math::dot(tangent_velocity, tangent_velocity);
+        constexpr pbpt::math::Float kTangentEpsilon = 1e-6f;
+        if (tangent_speed_sq <= kTangentEpsilon * kTangentEpsilon) {
+            return;
+        }
+
+        const auto tangent = tangent_velocity / std::sqrt(tangent_speed_sq);
+        auto tangent_impulse_magnitude = -pbpt::math::dot(relative_velocity_after_normal, tangent) / inv_mass_sum;
+        const auto max_friction_impulse =
+            combined_friction(body_a, body_b) * std::abs(normal_impulse_magnitude);
+        tangent_impulse_magnitude = pbpt::math::clamp(
+            tangent_impulse_magnitude, -max_friction_impulse, max_friction_impulse);
+
+        const auto tangent_impulse = tangent_impulse_magnitude * tangent;
+        body_a.state().translation.linear_velocity -= inv_mass_a * tangent_impulse;
+        body_b.state().translation.linear_velocity += inv_mass_b * tangent_impulse;
     }
 
 public:
@@ -154,32 +291,21 @@ public:
     void set_gravity(const pbpt::math::Vec3& gravity) { m_gravity = gravity; }
 
     void tick(float delta_seconds) {
-        // update forces of dynamic bodies
-        for (auto &[id, rb]: m_rigid_bodies) {
-            if (rb.type() == RigidBodyType::Dynamic && rb.is_awake()) {
-                if (rb.use_gravity()) {
-                    rb.state().forces.accumulated_force += gravity() * rb.state().mass;
-                }
-            }
+        for (auto& [id, rb] : m_rigid_bodies) {
+            integrate_body(rb, delta_seconds);
+        }
 
-            // update acceleration and velocity
-            auto acc = rb.state().inverse_mass() * rb.state().forces.accumulated_force;
-            rb.state().translation.linear_velocity += acc * delta_seconds;
-            rb.state().translation.position += rb.state().translation.linear_velocity * delta_seconds;
+        const auto contacts = collect_contacts();
+        for (const auto& contact : contacts) {
+            apply_position_correction(contact);
+        }
+        for (const auto& contact : contacts) {
+            apply_velocity_impulses(contact);
+        }
 
-            //update angular dynamics
-            auto inv_inertia_tensor = rb.state().rotation.orientation.to_mat3() * rb.inverse_inertia_tensor_ref() * rb.state().rotation.orientation.to_mat3().transpose();
-            auto angular_acc = inv_inertia_tensor * rb.state().forces.accumulated_torque;
-            rb.state().rotation.angular_velocity += angular_acc * delta_seconds;
-            auto angular_velocity_quat = pbpt::math::Quat(0.0f, rb.state().rotation.angular_velocity.x(), rb.state().rotation.angular_velocity.y(), rb.state().rotation.angular_velocity.z());
-            rb.state().rotation.orientation += 0.5f * delta_seconds * angular_velocity_quat * rb.state().rotation.orientation;
-            rb.state().rotation.orientation = pbpt::math::normalize(rb.state().rotation.orientation);
-
-            // clear forces for next tick
+        for (auto& [id, rb] : m_rigid_bodies) {
+            (void)id;
             rb.clear_forces();
-
-            // handle collision
-            
         }
     }
 };

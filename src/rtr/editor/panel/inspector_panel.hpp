@@ -251,6 +251,22 @@ private:
                                 use_gravity);
             }
 
+            float restitution = rigid_body->restitution();
+            if (ImGui::DragFloat("Restitution", &restitution, 0.01f, 0.0f, 1.0f)) {
+                restitution = pbpt::math::clamp(restitution, 0.0f, 1.0f);
+                rigid_body->set_restitution(restitution);
+                logger()->debug("RigidBody restitution updated (game_object_id={}, restitution={:.4f}).",
+                                game_object.id(), restitution);
+            }
+
+            float friction = rigid_body->friction();
+            if (ImGui::DragFloat("Friction", &friction, 0.01f, 0.0f, 1000.0f)) {
+                friction = std::max(0.0f, friction);
+                rigid_body->set_friction(friction);
+                logger()->debug("RigidBody friction updated (game_object_id={}, friction={:.4f}).",
+                                game_object.id(), friction);
+            }
+
             pbpt::math::Vec3 linear_velocity = rigid_body->linear_velocity();
             ImGui::Text("Linear Velocity: [%.4f, %.4f, %.4f]", linear_velocity.x(), linear_velocity.y(),
                         linear_velocity.z());

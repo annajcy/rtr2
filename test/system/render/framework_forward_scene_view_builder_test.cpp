@@ -93,8 +93,8 @@ pbpt::math::Vec4 multiply_packed(const system::render::GpuMat4& matrix, const pb
     pbpt::math::Vec4 result{0.0f, 0.0f, 0.0f, 0.0f};
     for (int row = 0; row < 4; ++row) {
         float value = 0.0f;
-        for (int col = 0; col < 4; ++col) {
-            value += matrix.values[static_cast<std::size_t>(row * 4 + col)] * vector[col];
+        for (int column = 0; column < 4; ++column) {
+            value += matrix.values[static_cast<std::size_t>(row * 4 + column)] * vector[column];
         }
         result[row] = value;
     }
