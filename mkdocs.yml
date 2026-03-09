@@ -37,6 +37,12 @@ plugins:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Profiling on macOS: profiling-macos.md
+  - Slang Practice:
+      - Overview: slang-practice.md
+      - Slang Basics:
+          - Overview: slang-basics.md
+          - "Lesson 1: Editable ShaderToy and the Compute Minimum Loop": slang-compute-basics.md
   - Architecture: architecture.md 
   - Utils: utils.md
   - API: api/index.md
