@@ -86,6 +86,8 @@ int main() {
             pbpt::math::angle_axis(pbpt::math::radians(-90.0f), pbpt::math::Vec3{1.0f, 0.0f, 0.0f}) *
             pbpt::math::angle_axis(pbpt::math::radians(15.0f), pbpt::math::Vec3{0.0f, 0.0f, 1.0f}));
         floor_go.node().set_local_scale({10.0f, 10.0f, 1.0f});
+        auto& floor_body = floor_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().world());
+        floor_body.set_type(rtr::system::physics::RigidBodyType::Static);
         (void)floor_go.add_component<rtr::framework::component::BoxCollider>(
             runtime.physics_system().world(), pbpt::math::Vec3{0.5f, 0.5f, 0.05f});
 

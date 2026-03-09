@@ -49,6 +49,8 @@ private:
                 collider_component->sync_to_physics();
             }
         }
+
+        m_physics_world.sync_all_attached_colliders();
     }
 
     void sync_physics_to_scene(framework::core::Scene& scene) {

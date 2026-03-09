@@ -16,6 +16,7 @@ class RigidBody final : public Component {
 private:
     system::physics::PhysicsWorld& m_physics_world;
     system::physics::RigidBodyID   m_rigid_body_id{};
+    system::physics::RigidBodyType m_type{system::physics::RigidBodyType::Dynamic};
     pbpt::math::Float              m_mass{1.0f};
     bool                           m_use_gravity{true};
     pbpt::math::Mat3               m_inverse_inertia_tensor_ref{pbpt::math::Mat3::zeros()};
@@ -57,10 +58,12 @@ private:
 
 public:
     explicit RigidBody(core::GameObject& owner, system::physics::PhysicsWorld& world, pbpt::math::Float mass = 1.0f,
+                       system::physics::RigidBodyType type = system::physics::RigidBodyType::Dynamic,
                        bool use_gravity = true,
                        const pbpt::math::Mat3& inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros())
         : Component(owner),
           m_physics_world(world),
+          m_type(type),
           m_mass(sanitize_mass(mass)),
           m_use_gravity(use_gravity),
           m_inverse_inertia_tensor_ref(sanitize_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref)) {}
@@ -73,7 +76,7 @@ public:
         }
 
         system::physics::RigidBody body;
-        body.set_type(system::physics::RigidBodyType::Dynamic);
+        body.set_type(m_type);
         body.set_awake(true);
         body.set_use_gravity(m_use_gravity);
         body.set_inverse_inertia_tensor_ref(m_inverse_inertia_tensor_ref);
@@ -103,6 +106,19 @@ public:
     bool has_rigid_body() const { return has_registered_body(); }
 
     system::physics::RigidBodyID rigid_body_id() const { return m_rigid_body_id; }
+
+    system::physics::RigidBodyType type() const {
+        const auto* body = physics_body();
+        return body != nullptr ? body->type() : m_type;
+    }
+
+    void set_type(system::physics::RigidBodyType type) {
+        m_type = type;
+        if (auto* body = physics_body(); body != nullptr) {
+            body->set_type(type);
+            body->invalidate_integrator_state();
+        }
+    }
 
     pbpt::math::Vec3 position() const {
         const auto* body = physics_body();

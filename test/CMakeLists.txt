@@ -152,6 +152,10 @@ rtr_add_test(
     framework/component/framework_reset_position_component_test.cpp
 )
 rtr_add_test(
+    test_framework_collider_component
+    framework/component/framework_collider_component_test.cpp
+)
+rtr_add_test(
     test_pbpt_spectrum
     framework/component/pbpt_spectrum_test.cpp
 )

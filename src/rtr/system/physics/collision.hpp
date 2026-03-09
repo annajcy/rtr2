@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cmath>
-#include <optional>
-
 #include <pbpt/math/math.h>
 
 #include "rtr/system/physics/collider.hpp"
@@ -10,13 +8,13 @@
 namespace rtr::system::physics {
 
 struct Contact {
-    std::optional<RigidBodyID> body_a{};
-    std::optional<RigidBodyID> body_b{};
-    ColliderID                 collider_a{};
-    ColliderID                 collider_b{};
-    pbpt::math::Vec3           point{0.0f};
-    pbpt::math::Vec3           normal{0.0f, 1.0f, 0.0f};
-    pbpt::math::Float          penetration{0.0f};
+    RigidBodyID        body_a{kInvalidRigidBodyId};
+    RigidBodyID        body_b{kInvalidRigidBodyId};
+    ColliderID         collider_a{kInvalidColliderId};
+    ColliderID         collider_b{kInvalidColliderId};
+    pbpt::math::Vec3   point{0.0f};
+    pbpt::math::Vec3   normal{0.0f, 1.0f, 0.0f};
+    pbpt::math::Float  penetration{0.0f};
 };
 
 namespace detail {

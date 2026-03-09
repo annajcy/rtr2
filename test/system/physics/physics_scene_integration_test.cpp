@@ -250,11 +250,46 @@ TEST(PhysicsSceneIntegrationTest, DestroyRemovesRigidBodyFromPhysicsWorld) {
 
     auto& moving               = scene.create_game_object("moving");
     auto& rigid_body_component = moving.add_component<framework::component::RigidBody>(physics_system.world());
+    (void)moving.add_component<framework::component::SphereCollider>(physics_system.world(), 0.5f);
     const auto rigid_body_id = rigid_body_component.rigid_body_id();
+    const auto collider_ids  = physics_system.world().colliders_for_body(rigid_body_id);
+    ASSERT_EQ(collider_ids.size(), 1u);
 
     EXPECT_TRUE(physics_system.world().has_rigid_body(rigid_body_id));
+    EXPECT_TRUE(physics_system.world().has_collider(collider_ids.front()));
     EXPECT_TRUE(scene.destroy_game_object(moving.id()));
     EXPECT_FALSE(physics_system.world().has_rigid_body(rigid_body_id));
+    EXPECT_FALSE(physics_system.world().has_collider(collider_ids.front()));
+}
+
+TEST(PhysicsSceneIntegrationTest, StaticBodyTransformSyncsColliderOnNextFixedTick) {
+    PhysicsSystem          physics_system;
+    framework::core::Scene scene(1);
+
+    auto& wall = scene.create_game_object("wall");
+    wall.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
+    auto& wall_body = wall.add_component<framework::component::RigidBody>(physics_system.world());
+    wall_body.set_type(RigidBodyType::Static);
+    (void)wall.add_component<framework::component::BoxCollider>(
+        physics_system.world(), pbpt::math::Vec3{0.5f, 0.5f, 0.5f});
+
+    physics_system.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    wall.node().set_local_position(pbpt::math::Vec3{2.0f, 0.0f, 0.0f});
+    physics_system.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 1,
+                                     });
+
+    const auto wall_colliders = physics_system.world().colliders_for_body(wall_body.rigid_body_id());
+    ASSERT_EQ(wall_colliders.size(), 1u);
+    const auto& collider = physics_system.world().get_collider(wall_colliders.front());
+    EXPECT_NEAR(collider.world_position.x(), 2.0f, 1e-5f);
+    EXPECT_NEAR(collider.world_position.y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(collider.world_position.z(), 0.0f, 1e-5f);
 }
 
 TEST(PhysicsSceneIntegrationTest, DynamicSpheresCollideAndStayStoppedOnNextTick) {
@@ -264,13 +299,13 @@ TEST(PhysicsSceneIntegrationTest, DynamicSpheresCollideAndStayStoppedOnNextTick)
     auto& left = scene.create_game_object("left");
     left.node().set_local_position(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
     auto& left_body   = left.add_component<framework::component::RigidBody>(physics_system.world());
-    auto& left_sphere = left.add_component<framework::component::SphereCollider>(physics_system.world(), 0.5f);
+    (void)left.add_component<framework::component::SphereCollider>(physics_system.world(), 0.5f);
     left_body.set_use_gravity(false);
 
     auto& right = scene.create_game_object("right");
     right.node().set_local_position(pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
     auto& right_body   = right.add_component<framework::component::RigidBody>(physics_system.world());
-    auto& right_sphere = right.add_component<framework::component::SphereCollider>(physics_system.world(), 0.5f);
+    (void)right.add_component<framework::component::SphereCollider>(physics_system.world(), 0.5f);
     right_body.set_use_gravity(false);
 
     auto& left_physics_body  = physics_system.world().get_rigid_body(left_body.rigid_body_id());
@@ -294,10 +329,14 @@ TEST(PhysicsSceneIntegrationTest, DynamicSpheresCollideAndStayStoppedOnNextTick)
     EXPECT_NEAR(left_body.linear_velocity().x(), 0.0f, 1e-4f);
     EXPECT_NEAR(right_body.linear_velocity().x(), 0.0f, 1e-4f);
 
-    const auto sphere_contact = collide_sphere_sphere(left_sphere.collider_id(),
-                                                      physics_system.world().get_collider(left_sphere.collider_id()),
-                                                      right_sphere.collider_id(),
-                                                      physics_system.world().get_collider(right_sphere.collider_id()));
+    const auto left_colliders  = physics_system.world().colliders_for_body(left_body.rigid_body_id());
+    const auto right_colliders = physics_system.world().colliders_for_body(right_body.rigid_body_id());
+    ASSERT_EQ(left_colliders.size(), 1u);
+    ASSERT_EQ(right_colliders.size(), 1u);
+    const auto sphere_contact = collide_sphere_sphere(left_colliders.front(),
+                                                      physics_system.world().get_collider(left_colliders.front()),
+                                                      right_colliders.front(),
+                                                      physics_system.world().get_collider(right_colliders.front()));
     ASSERT_TRUE(sphere_contact.has_value());
     EXPECT_LE(sphere_contact->penetration, 0.05f);
 }
@@ -310,13 +349,15 @@ TEST(PhysicsSceneIntegrationTest, FallingSphereStaysNearStaticRotatedBoxSurface)
     floor.node().set_local_position(pbpt::math::Vec3{0.0f, -0.5f, 0.0f});
     floor.node().set_local_rotation(
         pbpt::math::angle_axis(pbpt::math::radians(15.0f), pbpt::math::Vec3{0.0f, 0.0f, 1.0f}));
-    auto& floor_box = floor.add_component<framework::component::BoxCollider>(
+    auto& floor_body = floor.add_component<framework::component::RigidBody>(physics_system.world());
+    floor_body.set_type(RigidBodyType::Static);
+    (void)floor.add_component<framework::component::BoxCollider>(
         physics_system.world(), pbpt::math::Vec3{2.5f, 0.25f, 2.5f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
     auto& sphere_body = sphere.add_component<framework::component::RigidBody>(physics_system.world());
-    auto& sphere_collider = sphere.add_component<framework::component::SphereCollider>(physics_system.world(), 0.5f);
+    (void)sphere.add_component<framework::component::SphereCollider>(physics_system.world(), 0.5f);
 
     for (std::uint64_t i = 0; i < 90; ++i) {
         physics_system.fixed_tick(scene, framework::core::FixedTickContext{
@@ -325,10 +366,14 @@ TEST(PhysicsSceneIntegrationTest, FallingSphereStaysNearStaticRotatedBoxSurface)
                                          });
     }
 
-    const auto contact = collide_sphere_box(sphere_collider.collider_id(),
-                                            physics_system.world().get_collider(sphere_collider.collider_id()),
-                                            floor_box.collider_id(),
-                                            physics_system.world().get_collider(floor_box.collider_id()));
+    const auto sphere_colliders = physics_system.world().colliders_for_body(sphere_body.rigid_body_id());
+    const auto floor_colliders  = physics_system.world().colliders_for_body(floor_body.rigid_body_id());
+    ASSERT_EQ(sphere_colliders.size(), 1u);
+    ASSERT_EQ(floor_colliders.size(), 1u);
+    const auto contact = collide_sphere_box(sphere_colliders.front(),
+                                            physics_system.world().get_collider(sphere_colliders.front()),
+                                            floor_colliders.front(),
+                                            physics_system.world().get_collider(floor_colliders.front()));
     ASSERT_TRUE(contact.has_value());
     EXPECT_LE(contact->penetration, 0.05f);
     EXPECT_GT(sphere_body.position().y(), -1.0f);
@@ -340,13 +385,15 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxClearsOnlyNormalVelocity
 
     auto& wall = scene.create_game_object("wall");
     wall.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
-    auto& wall_box = wall.add_component<framework::component::BoxCollider>(
+    auto& wall_body = wall.add_component<framework::component::RigidBody>(physics_system.world());
+    wall_body.set_type(RigidBodyType::Static);
+    (void)wall.add_component<framework::component::BoxCollider>(
         physics_system.world(), pbpt::math::Vec3{0.2f, 2.0f, 2.0f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
     auto& sphere_body = sphere.add_component<framework::component::RigidBody>(physics_system.world());
-    auto& sphere_collider = sphere.add_component<framework::component::SphereCollider>(physics_system.world(), 0.5f);
+    (void)sphere.add_component<framework::component::SphereCollider>(physics_system.world(), 0.5f);
     sphere_body.set_use_gravity(false);
 
     auto& physics_body = physics_system.world().get_rigid_body(sphere_body.rigid_body_id());
@@ -360,10 +407,14 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxClearsOnlyNormalVelocity
     EXPECT_NEAR(sphere_body.linear_velocity().x(), 0.0f, 1e-4f);
     EXPECT_NEAR(sphere_body.linear_velocity().y(), 1.0f, 1e-4f);
 
-    const auto contact = collide_sphere_box(sphere_collider.collider_id(),
-                                            physics_system.world().get_collider(sphere_collider.collider_id()),
-                                            wall_box.collider_id(),
-                                            physics_system.world().get_collider(wall_box.collider_id()));
+    const auto sphere_colliders = physics_system.world().colliders_for_body(sphere_body.rigid_body_id());
+    const auto wall_colliders   = physics_system.world().colliders_for_body(wall_body.rigid_body_id());
+    ASSERT_EQ(sphere_colliders.size(), 1u);
+    ASSERT_EQ(wall_colliders.size(), 1u);
+    const auto contact = collide_sphere_box(sphere_colliders.front(),
+                                            physics_system.world().get_collider(sphere_colliders.front()),
+                                            wall_colliders.front(),
+                                            physics_system.world().get_collider(wall_colliders.front()));
     ASSERT_TRUE(contact.has_value());
     EXPECT_LE(contact->penetration, 0.05f);
 }

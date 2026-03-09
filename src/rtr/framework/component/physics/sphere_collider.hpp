@@ -29,10 +29,6 @@ private:
         return center;
     }
 
-    static pbpt::math::Vec3 hadamard(const pbpt::math::Vec3& lhs, const pbpt::math::Vec3& rhs) {
-        return pbpt::math::Vec3{lhs.x() * rhs.x(), lhs.y() * rhs.y(), lhs.z() * rhs.z()};
-    }
-
 public:
     explicit SphereCollider(core::GameObject& owner, system::physics::PhysicsWorld& world,
                             pbpt::math::Float radius = 0.5f, const pbpt::math::Vec3& local_center = pbpt::math::Vec3{0.0f})
@@ -43,15 +39,13 @@ public:
     void on_awake() override { throw_if_owner_already_has_collider(); }
 
     void on_enable() override {
-        if (m_registered) {
-            sync_to_physics();
-            return;
+        auto& rigid_body = owner_rigid_body_or_throw();
+        if (!has_registered_collider()) {
+            system::physics::Collider collider;
+            collider.shape      = system::physics::SphereShape{.radius = m_radius};
+            m_collider_id       = m_physics_world.create_collider(rigid_body.rigid_body_id(), std::move(collider));
+            m_registered        = true;
         }
-
-        system::physics::Collider collider;
-        collider.shape = system::physics::SphereShape{.radius = m_radius};
-        m_collider_id  = m_physics_world.create_collider(std::move(collider));
-        m_registered   = true;
         sync_to_physics();
     }
 
@@ -60,34 +54,33 @@ public:
             return;
         }
         (void)m_physics_world.remove_collider(m_collider_id);
-        m_collider_id = system::physics::ColliderID{};
+        m_collider_id = system::physics::kInvalidColliderId;
         m_registered  = false;
     }
 
     void on_destroy() override {}
 
     void sync_to_physics() override {
+        if (!has_registered_collider()) {
+            auto* rigid_body = owner().get_component<RigidBody>();
+            if (rigid_body == nullptr || !rigid_body->has_rigid_body()) {
+                return;
+            }
+            system::physics::Collider collider;
+            collider.shape = system::physics::SphereShape{.radius = m_radius};
+            m_collider_id  = m_physics_world.create_collider(rigid_body->rigid_body_id(), std::move(collider));
+            m_registered   = true;
+        }
+
         auto* collider = physics_collider();
         if (collider == nullptr) {
             return;
         }
 
-        const auto node_scale = owner().node().world_scale();
-        const auto* rigid_body = owner().get_component<RigidBody>();
-        const bool  bound_to_body = rigid_body != nullptr && rigid_body->has_rigid_body();
-
-        collider->shape         = system::physics::SphereShape{.radius = m_radius};
-        collider->local_center  = m_local_center;
+        collider->shape          = system::physics::SphereShape{.radius = m_radius};
+        collider->local_center   = m_local_center;
         collider->local_rotation = pbpt::math::Quat::identity();
-        collider->world_scale   = node_scale;
-        collider->rigid_body_id = bound_to_body ? std::optional{rigid_body->rigid_body_id()} : std::nullopt;
-
-        const pbpt::math::Vec3 anchor_position =
-            bound_to_body ? rigid_body->position() : owner().node().world_position();
-        const pbpt::math::Quat anchor_rotation =
-            bound_to_body ? rigid_body->orientation() : owner().node().world_rotation();
-        collider->world_position = anchor_position + anchor_rotation * hadamard(m_local_center, node_scale);
-        collider->world_rotation = anchor_rotation;
+        collider->world_scale    = owner().node().world_scale();
     }
 
     pbpt::math::Float radius() const { return m_radius; }

@@ -1,8 +1,9 @@
 #pragma once
 
 #include <cmath>
-#include <optional>
+#include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <pbpt/math/math.h>
@@ -21,11 +22,12 @@ private:
         bool             has_angular_inertia{false};
     };
 
-    std::unordered_map<RigidBodyID, RigidBody>  m_rigid_bodies{};
-    std::unordered_map<ColliderID, Collider>    m_colliders{};
-    RigidBodyID                                 m_next_rigid_body_id{0};
-    ColliderID                                  m_next_collider_id{0};
-    pbpt::math::Vec3                            m_gravity{0.0f, -9.81f, 0.0f};
+    std::unordered_map<RigidBodyID, RigidBody>   m_rigid_bodies{};
+    std::unordered_map<ColliderID, Collider>     m_colliders{};
+    std::unordered_multimap<RigidBodyID, ColliderID> m_colliders_by_body{};
+    RigidBodyID                                  m_next_rigid_body_id{0};
+    ColliderID                                   m_next_collider_id{0};
+    pbpt::math::Vec3                             m_gravity{0.0f, -9.81f, 0.0f};
 
     static bool is_valid_mass(pbpt::math::Float mass) {
         return std::isfinite(mass) && mass > 0.0f;
@@ -55,15 +57,11 @@ private:
         return pbpt::math::Vec3{lhs.x() * rhs.x(), lhs.y() * rhs.y(), lhs.z() * rhs.z()};
     }
 
-    static pbpt::math::Vec3 abs_vec3(const pbpt::math::Vec3& value) {
-        return pbpt::math::Vec3{std::abs(value.x()), std::abs(value.y()), std::abs(value.z())};
-    }
-
-    bool has_dynamic_body(const std::optional<RigidBodyID>& body_id) const {
-        if (!body_id.has_value()) {
+    bool has_dynamic_body(RigidBodyID body_id) const {
+        if (body_id == kInvalidRigidBodyId) {
             return false;
         }
-        const auto it = m_rigid_bodies.find(*body_id);
+        const auto it = m_rigid_bodies.find(body_id);
         if (it == m_rigid_bodies.end()) {
             return false;
         }
@@ -77,31 +75,36 @@ private:
         return rotation_matrix * body.inverse_inertia_tensor_ref() * pbpt::math::transpose(rotation_matrix);
     }
 
-    void refresh_bound_collider_world_pose(Collider& collider) {
-        if (!collider.rigid_body_id.has_value()) {
+    void remove_body_index_entry(RigidBodyID body_id, ColliderID collider_id) {
+        const auto [begin, end] = m_colliders_by_body.equal_range(body_id);
+        for (auto it = begin; it != end; ++it) {
+            if (it->second == collider_id) {
+                m_colliders_by_body.erase(it);
+                return;
+            }
+        }
+    }
+
+    void remove_collider_internal(ColliderID id) {
+        const auto it = m_colliders.find(id);
+        if (it == m_colliders.end()) {
             return;
         }
-        const auto body_it = m_rigid_bodies.find(*collider.rigid_body_id);
+        remove_body_index_entry(it->second.rigid_body_id, id);
+        m_colliders.erase(it);
+    }
+
+    void refresh_attached_collider_world_pose(Collider& collider) {
+        const auto body_it = m_rigid_bodies.find(collider.rigid_body_id);
         if (body_it == m_rigid_bodies.end()) {
-            collider.rigid_body_id.reset();
-            return;
+            throw std::runtime_error("Collider owner body no longer exists.");
         }
 
-        const auto& body   = body_it->second;
-        const auto& state  = body.state();
+        const auto& body  = body_it->second;
+        const auto& state = body.state();
         const auto  center = hadamard(collider.local_center, collider.world_scale);
         collider.world_position = state.translation.position + state.rotation.orientation * center;
         collider.world_rotation = pbpt::math::normalize(state.rotation.orientation * collider.local_rotation);
-    }
-
-    void refresh_dynamic_colliders() {
-        for (auto& [collider_id, collider] : m_colliders) {
-            (void)collider_id;
-            if (!has_dynamic_body(collider.rigid_body_id)) {
-                continue;
-            }
-            refresh_bound_collider_world_pose(collider);
-        }
     }
 
     void integrate_forces_and_drift(float delta_seconds, std::unordered_map<RigidBodyID, BodyStepState>& step_states) {
@@ -128,7 +131,7 @@ private:
             step_state.linear_acceleration = acceleration;
 
             if (is_finite_matrix(body.inverse_inertia_tensor_ref())) {
-                const auto inertia_world = inverse_inertia_tensor_world(body);
+                const auto inertia_world        = inverse_inertia_tensor_world(body);
                 const auto angular_acceleration = inertia_world * state.forces.accumulated_torque;
                 if (!body.angular_half_step_initialized()) {
                     body.initialize_half_step_angular_velocity(
@@ -148,7 +151,7 @@ private:
 
     std::optional<Contact> generate_contact_for_pair(ColliderID a_id, const Collider& a, ColliderID b_id,
                                                      const Collider& b) const {
-        if (a.rigid_body_id.has_value() && b.rigid_body_id.has_value() && a.rigid_body_id == b.rigid_body_id) {
+        if (a.rigid_body_id == b.rigid_body_id) {
             return std::nullopt;
         }
 
@@ -217,9 +220,9 @@ private:
     }
 
     void solve_contacts(const std::vector<Contact>& contacts) {
-        constexpr pbpt::math::Float kPenetrationSlop    = 1e-3f;
-        constexpr pbpt::math::Float kCorrectionPercent  = 0.8f;
-        constexpr pbpt::math::Float kImpulseEpsilon     = 1e-6f;
+        constexpr pbpt::math::Float kPenetrationSlop   = 1e-3f;
+        constexpr pbpt::math::Float kCorrectionPercent = 0.8f;
+        constexpr pbpt::math::Float kImpulseEpsilon    = 1e-6f;
 
         for (const auto& contact : contacts) {
             const auto normal_length = pbpt::math::length(contact.normal);
@@ -228,19 +231,11 @@ private:
             }
             const auto normal = contact.normal / normal_length;
 
-            RigidBody* body_a = nullptr;
-            RigidBody* body_b = nullptr;
-            if (has_dynamic_body(contact.body_a)) {
-                body_a = &m_rigid_bodies.at(*contact.body_a);
-            }
-            if (has_dynamic_body(contact.body_b)) {
-                body_b = &m_rigid_bodies.at(*contact.body_b);
-            }
+            RigidBody* body_a = has_dynamic_body(contact.body_a) ? &m_rigid_bodies.at(contact.body_a) : nullptr;
+            RigidBody* body_b = has_dynamic_body(contact.body_b) ? &m_rigid_bodies.at(contact.body_b) : nullptr;
 
-            const pbpt::math::Float inv_mass_a =
-                body_a != nullptr ? (1.0f / body_a->state().mass) : 0.0f;
-            const pbpt::math::Float inv_mass_b =
-                body_b != nullptr ? (1.0f / body_b->state().mass) : 0.0f;
+            const pbpt::math::Float inv_mass_a = body_a != nullptr ? (1.0f / body_a->state().mass) : 0.0f;
+            const pbpt::math::Float inv_mass_b = body_b != nullptr ? (1.0f / body_b->state().mass) : 0.0f;
             const pbpt::math::Float inv_mass_sum = inv_mass_a + inv_mass_b;
             if (inv_mass_sum <= kImpulseEpsilon) {
                 continue;
@@ -267,13 +262,13 @@ private:
 
             pbpt::math::Float angular_denom = 0.0f;
             if (body_a != nullptr && is_finite_matrix(body_a->inverse_inertia_tensor_ref())) {
-                const auto r_a        = contact.point - body_a->state().translation.position;
+                const auto r_a         = contact.point - body_a->state().translation.position;
                 const auto r_a_cross_n = pbpt::math::cross(r_a, normal);
                 angular_denom += pbpt::math::dot(
                     normal, pbpt::math::cross(inverse_inertia_tensor_world(*body_a) * r_a_cross_n, r_a));
             }
             if (body_b != nullptr && is_finite_matrix(body_b->inverse_inertia_tensor_ref())) {
-                const auto r_b        = contact.point - body_b->state().translation.position;
+                const auto r_b         = contact.point - body_b->state().translation.position;
                 const auto r_b_cross_n = pbpt::math::cross(r_b, normal);
                 angular_denom += pbpt::math::dot(
                     normal, pbpt::math::cross(inverse_inertia_tensor_world(*body_b) * r_b_cross_n, r_b));
@@ -312,8 +307,11 @@ private:
                 body_b->state().translation.position += correction * inv_mass_b;
             }
 
-            if (body_a != nullptr || body_b != nullptr) {
-                refresh_dynamic_colliders();
+            if (body_a != nullptr) {
+                sync_attached_colliders(contact.body_a);
+            }
+            if (body_b != nullptr) {
+                sync_attached_colliders(contact.body_b);
             }
         }
     }
@@ -324,7 +322,8 @@ private:
         for (const auto& [id, step_state] : step_states) {
             auto& body  = m_rigid_bodies.at(id);
             auto& state = body.state();
-            state.translation.linear_velocity = body.half_step_linear_velocity() - step_state.linear_acceleration * half_dt;
+            state.translation.linear_velocity =
+                body.half_step_linear_velocity() - step_state.linear_acceleration * half_dt;
             if (step_state.has_angular_inertia) {
                 state.rotation.angular_velocity =
                     body.half_step_angular_velocity() - step_state.angular_acceleration * half_dt;
@@ -339,9 +338,16 @@ public:
         return id;
     }
 
-    ColliderID create_collider(Collider collider = Collider{}) {
+    ColliderID create_collider(RigidBodyID owner_body_id, Collider collider = Collider{}) {
+        if (!has_rigid_body(owner_body_id)) {
+            throw std::out_of_range("Collider owner body does not exist.");
+        }
+
         const ColliderID id = m_next_collider_id++;
-        m_colliders[id]     = std::move(collider);
+        collider.rigid_body_id = owner_body_id;
+        m_colliders[id]        = std::move(collider);
+        m_colliders_by_body.emplace(owner_body_id, id);
+        sync_attached_colliders(owner_body_id);
         return id;
     }
 
@@ -349,22 +355,56 @@ public:
     bool has_collider(ColliderID id) const { return m_colliders.count(id) > 0; }
 
     bool remove_rigid_body(RigidBodyID id) {
-        for (auto& [collider_id, collider] : m_colliders) {
-            (void)collider_id;
-            if (collider.rigid_body_id == id) {
-                collider.rigid_body_id.reset();
-            }
+        if (!has_rigid_body(id)) {
+            return false;
+        }
+
+        const auto collider_ids = colliders_for_body(id);
+        for (const auto collider_id : collider_ids) {
+            remove_collider_internal(collider_id);
         }
         return m_rigid_bodies.erase(id) > 0;
     }
 
-    bool remove_collider(ColliderID id) { return m_colliders.erase(id) > 0; }
+    bool remove_collider(ColliderID id) {
+        if (!has_collider(id)) {
+            return false;
+        }
+        remove_collider_internal(id);
+        return true;
+    }
 
     RigidBody& get_rigid_body(RigidBodyID id) { return m_rigid_bodies.at(id); }
     const RigidBody& get_rigid_body(RigidBodyID id) const { return m_rigid_bodies.at(id); }
 
     Collider& get_collider(ColliderID id) { return m_colliders.at(id); }
     const Collider& get_collider(ColliderID id) const { return m_colliders.at(id); }
+
+    std::vector<ColliderID> colliders_for_body(RigidBodyID id) const {
+        std::vector<ColliderID> result;
+        const auto [begin, end] = m_colliders_by_body.equal_range(id);
+        for (auto it = begin; it != end; ++it) {
+            result.push_back(it->second);
+        }
+        return result;
+    }
+
+    void sync_attached_colliders(RigidBodyID body_id) {
+        const auto [begin, end] = m_colliders_by_body.equal_range(body_id);
+        for (auto it = begin; it != end; ++it) {
+            auto collider_it = m_colliders.find(it->second);
+            if (collider_it != m_colliders.end()) {
+                refresh_attached_collider_world_pose(collider_it->second);
+            }
+        }
+    }
+
+    void sync_all_attached_colliders() {
+        for (const auto& [body_id, body] : m_rigid_bodies) {
+            (void)body;
+            sync_attached_colliders(body_id);
+        }
+    }
 
     const pbpt::math::Vec3& gravity() const { return m_gravity; }
     void set_gravity(const pbpt::math::Vec3& gravity) { m_gravity = gravity; }
@@ -374,10 +414,10 @@ public:
         step_states.reserve(m_rigid_bodies.size());
 
         integrate_forces_and_drift(delta_seconds, step_states);
-        refresh_dynamic_colliders();
+        sync_all_attached_colliders();
         const auto contacts = generate_contacts();
         solve_contacts(contacts);
-        refresh_dynamic_colliders();
+        sync_all_attached_colliders();
         update_observable_velocities(delta_seconds, step_states);
 
         for (auto& [id, body] : m_rigid_bodies) {

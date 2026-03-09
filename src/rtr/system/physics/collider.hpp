@@ -1,6 +1,5 @@
 #pragma once
 
-#include <optional>
 #include <variant>
 
 #include <pbpt/math/math.h>
@@ -25,13 +24,13 @@ struct BoxShape {
 using ColliderShape = std::variant<SphereShape, BoxShape>;
 
 struct Collider {
-    ColliderShape               shape{SphereShape{}};
-    pbpt::math::Vec3            local_center{0.0f};
-    pbpt::math::Quat            local_rotation{pbpt::math::Quat::identity()};
-    pbpt::math::Vec3            world_position{0.0f};
-    pbpt::math::Quat            world_rotation{pbpt::math::Quat::identity()};
-    pbpt::math::Vec3            world_scale{1.0f, 1.0f, 1.0f};
-    std::optional<RigidBodyID>  rigid_body_id{};
+    ColliderShape      shape{SphereShape{}};
+    pbpt::math::Vec3   local_center{0.0f};
+    pbpt::math::Quat   local_rotation{pbpt::math::Quat::identity()};
+    pbpt::math::Vec3   world_position{0.0f};
+    pbpt::math::Quat   world_rotation{pbpt::math::Quat::identity()};
+    pbpt::math::Vec3   world_scale{1.0f, 1.0f, 1.0f};
+    RigidBodyID        rigid_body_id{kInvalidRigidBodyId};
 };
 
 }  // namespace rtr::system::physics

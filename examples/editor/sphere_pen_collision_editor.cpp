@@ -84,6 +84,8 @@ int main() {
             go.node().set_local_rotation(rotation);
             go.node().set_local_scale(scale);
             (void)go.add_component<rtr::framework::component::MeshRenderer>(quad_mesh, color);
+            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().world());
+            rigid_body.set_type(rtr::system::physics::RigidBodyType::Static);
             (void)go.add_component<rtr::framework::component::BoxCollider>(
                 runtime.physics_system().world(), pbpt::math::Vec3{0.5f, 0.5f, 0.05f});
         };
@@ -93,9 +95,9 @@ int main() {
                   pbpt::math::Vec3{8.0f, 8.0f, 1.0f}, pbpt::math::Vec4{0.22f, 0.25f, 0.28f, 1.0f});
         add_panel("back_wall", pbpt::math::Vec3{0.0f, 0.0f, -4.0f}, pbpt::math::Quat::identity(),
                   pbpt::math::Vec3{8.0f, 2.0f, 1.0f}, pbpt::math::Vec4{0.25f, 0.29f, 0.33f, 1.0f});
-        add_panel("front_wall", pbpt::math::Vec3{0.0f, 0.0f, 4.0f},
-                  pbpt::math::angle_axis(pbpt::math::radians(180.0f), pbpt::math::Vec3{0.0f, 1.0f, 0.0f}),
-                  pbpt::math::Vec3{8.0f, 2.0f, 1.0f}, pbpt::math::Vec4{0.25f, 0.29f, 0.33f, 1.0f});
+        // add_panel("front_wall", pbpt::math::Vec3{0.0f, 0.0f, 4.0f},
+        //           pbpt::math::angle_axis(pbpt::math::radians(180.0f), pbpt::math::Vec3{0.0f, 1.0f, 0.0f}),
+        //           pbpt::math::Vec3{8.0f, 2.0f, 1.0f}, pbpt::math::Vec4{0.25f, 0.29f, 0.33f, 1.0f});
         add_panel("left_wall", pbpt::math::Vec3{-4.0f, 0.0f, 0.0f},
                   pbpt::math::angle_axis(pbpt::math::radians(90.0f), pbpt::math::Vec3{0.0f, 1.0f, 0.0f}),
                   pbpt::math::Vec3{8.0f, 2.0f, 1.0f}, pbpt::math::Vec4{0.20f, 0.24f, 0.27f, 1.0f});
