@@ -286,10 +286,12 @@ TEST(PhysicsSceneIntegrationTest, StaticBodyTransformSyncsColliderOnNextFixedTic
 
     const auto wall_colliders = physics_system.world().colliders_for_body(wall_body.rigid_body_id());
     ASSERT_EQ(wall_colliders.size(), 1u);
-    const auto& collider = physics_system.world().get_collider(wall_colliders.front());
-    EXPECT_NEAR(collider.world_position.x(), 2.0f, 1e-5f);
-    EXPECT_NEAR(collider.world_position.y(), 0.0f, 1e-5f);
-    EXPECT_NEAR(collider.world_position.z(), 0.0f, 1e-5f);
+    const auto world_collider = physics_system.world().get_world_collider(wall_colliders.front());
+    const auto* world_box = std::get_if<WorldBox>(&world_collider);
+    ASSERT_NE(world_box, nullptr);
+    EXPECT_NEAR(world_box->center.x(), 2.0f, 1e-5f);
+    EXPECT_NEAR(world_box->center.y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(world_box->center.z(), 0.0f, 1e-5f);
 }
 
 TEST(PhysicsSceneIntegrationTest, DynamicSpheresCollideAndStayStoppedOnNextTick) {
@@ -333,12 +335,15 @@ TEST(PhysicsSceneIntegrationTest, DynamicSpheresCollideAndStayStoppedOnNextTick)
     const auto right_colliders = physics_system.world().colliders_for_body(right_body.rigid_body_id());
     ASSERT_EQ(left_colliders.size(), 1u);
     ASSERT_EQ(right_colliders.size(), 1u);
-    const auto sphere_contact = collide_sphere_sphere(left_colliders.front(),
-                                                      physics_system.world().get_collider(left_colliders.front()),
-                                                      right_colliders.front(),
-                                                      physics_system.world().get_collider(right_colliders.front()));
-    ASSERT_TRUE(sphere_contact.has_value());
-    EXPECT_LE(sphere_contact->penetration, 0.05f);
+    const auto left_world_collider = physics_system.world().get_world_collider(left_colliders.front());
+    const auto right_world_collider = physics_system.world().get_world_collider(right_colliders.front());
+    const auto* left_sphere = std::get_if<WorldSphere>(&left_world_collider);
+    const auto* right_sphere = std::get_if<WorldSphere>(&right_world_collider);
+    ASSERT_NE(left_sphere, nullptr);
+    ASSERT_NE(right_sphere, nullptr);
+    const auto sphere_contact = ContactPairTrait<WorldSphere, WorldSphere>::generate(*left_sphere, *right_sphere);
+    ASSERT_TRUE(sphere_contact.is_valid());
+    EXPECT_LE(sphere_contact.penetration, 0.05f);
 }
 
 TEST(PhysicsSceneIntegrationTest, FallingSphereStaysNearStaticRotatedBoxSurface) {
@@ -370,12 +375,15 @@ TEST(PhysicsSceneIntegrationTest, FallingSphereStaysNearStaticRotatedBoxSurface)
     const auto floor_colliders  = physics_system.world().colliders_for_body(floor_body.rigid_body_id());
     ASSERT_EQ(sphere_colliders.size(), 1u);
     ASSERT_EQ(floor_colliders.size(), 1u);
-    const auto contact = collide_sphere_box(sphere_colliders.front(),
-                                            physics_system.world().get_collider(sphere_colliders.front()),
-                                            floor_colliders.front(),
-                                            physics_system.world().get_collider(floor_colliders.front()));
-    ASSERT_TRUE(contact.has_value());
-    EXPECT_LE(contact->penetration, 0.05f);
+    const auto sphere_world_collider = physics_system.world().get_world_collider(sphere_colliders.front());
+    const auto floor_world_collider = physics_system.world().get_world_collider(floor_colliders.front());
+    const auto* world_sphere = std::get_if<WorldSphere>(&sphere_world_collider);
+    const auto* world_box = std::get_if<WorldBox>(&floor_world_collider);
+    ASSERT_NE(world_sphere, nullptr);
+    ASSERT_NE(world_box, nullptr);
+    const auto contact = ContactPairTrait<WorldSphere, WorldBox>::generate(*world_sphere, *world_box);
+    ASSERT_TRUE(contact.is_valid());
+    EXPECT_LE(contact.penetration, 0.05f);
     EXPECT_GT(sphere_body.position().y(), -1.0f);
 }
 
@@ -411,12 +419,15 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxClearsOnlyNormalVelocity
     const auto wall_colliders   = physics_system.world().colliders_for_body(wall_body.rigid_body_id());
     ASSERT_EQ(sphere_colliders.size(), 1u);
     ASSERT_EQ(wall_colliders.size(), 1u);
-    const auto contact = collide_sphere_box(sphere_colliders.front(),
-                                            physics_system.world().get_collider(sphere_colliders.front()),
-                                            wall_colliders.front(),
-                                            physics_system.world().get_collider(wall_colliders.front()));
-    ASSERT_TRUE(contact.has_value());
-    EXPECT_LE(contact->penetration, 0.05f);
+    const auto sphere_world_collider = physics_system.world().get_world_collider(sphere_colliders.front());
+    const auto wall_world_collider = physics_system.world().get_world_collider(wall_colliders.front());
+    const auto* world_sphere = std::get_if<WorldSphere>(&sphere_world_collider);
+    const auto* world_box = std::get_if<WorldBox>(&wall_world_collider);
+    ASSERT_NE(world_sphere, nullptr);
+    ASSERT_NE(world_box, nullptr);
+    const auto contact = ContactPairTrait<WorldSphere, WorldBox>::generate(*world_sphere, *world_box);
+    ASSERT_TRUE(contact.is_valid());
+    EXPECT_LE(contact.penetration, 0.05f);
 }
 
 }  // namespace rtr::system::physics::test

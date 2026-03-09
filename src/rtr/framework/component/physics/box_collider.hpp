@@ -90,10 +90,10 @@ public:
             return;
         }
 
-        collider->shape          = system::physics::BoxShape{.half_extents = m_half_extents};
-        collider->local_center   = m_local_center;
-        collider->local_rotation = m_local_rotation;
-        collider->world_scale    = owner().node().world_scale();
+        collider->shape                    = system::physics::BoxShape{.half_extents = m_half_extents};
+        collider->local_transform.position = m_local_center;
+        collider->local_transform.rotation = m_local_rotation;
+        collider->local_transform.scale    = pbpt::math::Vec3(1.0f);
     }
 
     pbpt::math::Vec3 half_extents() const { return m_half_extents; }

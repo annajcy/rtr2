@@ -37,10 +37,10 @@ private:
             if (rigid_body_component != nullptr && rigid_body_component->enabled() &&
                 m_physics_world.has_rigid_body(rigid_body_component->rigid_body_id())) {
                 auto& body = m_physics_world.get_rigid_body(rigid_body_component->rigid_body_id());
+                body.state().scale = game_object->node().world_scale();
                 if (body.type() != RigidBodyType::Dynamic) {
                     body.state().translation.position = game_object->node().world_position();
                     body.state().rotation.orientation = game_object->node().world_rotation();
-                    body.invalidate_integrator_state();
                 }
             }
 
@@ -49,8 +49,6 @@ private:
                 collider_component->sync_to_physics();
             }
         }
-
-        m_physics_world.sync_all_attached_colliders();
     }
 
     void sync_physics_to_scene(framework::core::Scene& scene) {
@@ -77,6 +75,7 @@ private:
             const auto& state = body.state();
             scene.scene_graph().node(id).set_local_position(state.translation.position);
             scene.scene_graph().node(id).set_local_rotation(state.rotation.orientation);
+            scene.scene_graph().node(id).set_local_scale(state.scale);
         }
     }
 

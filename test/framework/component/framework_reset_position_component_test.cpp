@@ -57,8 +57,6 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPrese
     physics_body.state().rotation.angular_velocity   = pbpt::math::Vec3{0.0f, 2.0f, 0.0f};
     physics_body.state().forces.accumulated_force    = pbpt::math::Vec3{1.0f, -4.0f, 0.0f};
     physics_body.state().forces.accumulated_torque   = pbpt::math::Vec3{0.0f, 3.0f, 0.0f};
-    physics_body.initialize_half_step_linear_velocity(pbpt::math::Vec3{0.0f, -3.5f, 0.0f});
-    physics_body.initialize_half_step_angular_velocity(pbpt::math::Vec3{0.0f, 2.5f, 0.0f});
 
     rigid_body.set_position(pbpt::math::Vec3{0.0f, -1.5f, 0.0f});
     scene.fixed_tick(core::FixedTickContext{.fixed_delta_seconds = 0.1, .fixed_tick_index = 0});
@@ -77,8 +75,6 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPrese
     EXPECT_NEAR(physics_body.state().forces.accumulated_torque.x(), 0.0f, 1e-5f);
     EXPECT_NEAR(physics_body.state().forces.accumulated_torque.y(), 3.0f, 1e-5f);
     EXPECT_NEAR(physics_body.state().forces.accumulated_torque.z(), 0.0f, 1e-5f);
-    EXPECT_FALSE(physics_body.linear_half_step_initialized());
-    EXPECT_TRUE(physics_body.angular_half_step_initialized());
 }
 
 TEST(FrameworkResetPositionComponentTest, UpdatedParametersAffectNextFixedTick) {

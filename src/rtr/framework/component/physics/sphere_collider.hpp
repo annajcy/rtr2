@@ -77,10 +77,10 @@ public:
             return;
         }
 
-        collider->shape          = system::physics::SphereShape{.radius = m_radius};
-        collider->local_center   = m_local_center;
-        collider->local_rotation = pbpt::math::Quat::identity();
-        collider->world_scale    = owner().node().world_scale();
+        collider->shape                    = system::physics::SphereShape{.radius = m_radius};
+        collider->local_transform.position = m_local_center;
+        collider->local_transform.rotation = pbpt::math::Quat::identity();
+        collider->local_transform.scale    = pbpt::math::Vec3(1.0f);
     }
 
     pbpt::math::Float radius() const { return m_radius; }

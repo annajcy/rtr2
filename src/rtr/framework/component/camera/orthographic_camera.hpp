@@ -33,7 +33,7 @@ public:
     const float& top_bound() const { return m_top_bound; }
 
     pbpt::math::Mat4 projection_matrix() const override {
-        return pbpt::math::ortho(m_left_bound, m_right_bound, m_bottom_bound, m_top_bound, near_bound(), far_bound());
+        return pbpt::math::orthographic(m_left_bound, m_right_bound, m_bottom_bound, m_top_bound, near_bound(), far_bound());
     }
 
     void adjust_zoom(float delta_zoom) override {

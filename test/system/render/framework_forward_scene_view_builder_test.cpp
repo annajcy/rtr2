@@ -254,7 +254,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ComputesModelAndNormalFromWorldTransf
 
     auto node = mesh_go.node();
     node.set_local_position({1.0f, 2.0f, 3.0f});
-    node.set_local_rotation(pbpt::math::angle_axis(pbpt::math::radians(35.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
+    node.set_local_rotation(pbpt::math::Quat::from_axis_angle(pbpt::math::radians(35.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
     node.set_local_scale({2.0f, 1.5f, 0.5f});
 
     const auto view = system::render::build_forward_scene_view(scene, resources, harness.device);
@@ -305,13 +305,14 @@ TEST(FrameworkForwardSceneViewBuilderTest, ForwardGpuPackingUsesStableRowMajorOr
 }
 
 TEST(FrameworkForwardSceneViewBuilderTest, PackedMatrixChainMatchesCpuClipComputation) {
-    pbpt::math::Mat4 model = pbpt::math::translate(pbpt::math::Mat4{1.0f}, pbpt::math::Vec3{1.5f, -0.25f, 2.0f});
-    model                  = model * pbpt::math::mat4_cast(pbpt::math::angle_axis(
+    pbpt::math::Mat4 model = pbpt::math::translate(pbpt::math::Vec3{1.5f, -0.25f, 2.0f});
+    model                  = model * pbpt::math::rotate(pbpt::math::Quat::from_axis_angle(
                         pbpt::math::radians(23.0f), pbpt::math::normalize(pbpt::math::Vec3{0.2f, 1.0f, 0.4f})));
-    model                  = pbpt::math::scale(model, pbpt::math::Vec3{1.2f, 0.8f, 1.5f});
+    model                  = model * pbpt::math::scale(pbpt::math::Vec3{1.2f, 0.8f, 1.5f});
 
-    pbpt::math::Mat4 view = pbpt::math::lookAt(pbpt::math::Vec3{4.0f, 3.0f, -7.0f}, pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
-                                               pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
+    pbpt::math::Mat4 view = pbpt::math::look_at(pbpt::math::Vec3{4.0f, 3.0f, -7.0f},
+                                                pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+                                                pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
     pbpt::math::Mat4 proj = pbpt::math::perspective(pbpt::math::radians(45.0f), 1.3f, 0.1f, 100.0f);
     proj[1][1] *= -1.0f;
 

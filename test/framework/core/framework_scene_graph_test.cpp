@@ -118,14 +118,14 @@ TEST(SceneGraphTest, DirtyFlagPropagatesToSubtree) {
     ASSERT_TRUE(scene.scene_graph().set_parent(grandchild.id(), child.id()));
 
     scene.scene_graph().update_world_transforms();
-    EXPECT_FALSE(scene.scene_graph().node(parent.id()).dirty());
-    EXPECT_FALSE(scene.scene_graph().node(child.id()).dirty());
-    EXPECT_FALSE(scene.scene_graph().node(grandchild.id()).dirty());
+    EXPECT_FALSE(scene.scene_graph().node(parent.id()).is_dirty());
+    EXPECT_FALSE(scene.scene_graph().node(child.id()).is_dirty());
+    EXPECT_FALSE(scene.scene_graph().node(grandchild.id()).is_dirty());
 
     scene.scene_graph().node(child.id()).set_local_position({1.0f, 2.0f, 3.0f});
-    EXPECT_FALSE(scene.scene_graph().node(parent.id()).dirty());
-    EXPECT_TRUE(scene.scene_graph().node(child.id()).dirty());
-    EXPECT_TRUE(scene.scene_graph().node(grandchild.id()).dirty());
+    EXPECT_FALSE(scene.scene_graph().node(parent.id()).is_dirty());
+    EXPECT_TRUE(scene.scene_graph().node(child.id()).is_dirty());
+    EXPECT_TRUE(scene.scene_graph().node(grandchild.id()).is_dirty());
 }
 
 TEST(SceneGraphTest, LookAtDirectionLocalAndWorldHaveDifferentSemanticsWithParentRotation) {
@@ -136,7 +136,7 @@ TEST(SceneGraphTest, LookAtDirectionLocalAndWorldHaveDifferentSemanticsWithParen
 
     scene.scene_graph()
         .node(parent.id())
-        .set_local_rotation(pbpt::math::angle_axis(pbpt::math::radians(90.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
+        .set_local_rotation(pbpt::math::Quat::from_axis_angle(pbpt::math::radians(90.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
 
     auto child_node = scene.scene_graph().node(child.id());
     child_node.set_local_rotation(pbpt::math::Quat::identity());

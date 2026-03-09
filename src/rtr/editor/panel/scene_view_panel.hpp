@@ -325,7 +325,7 @@ private:
         }
 
         auto node = game_object->node();
-        if (!node.valid()) {
+        if (!node.is_valid()) {
             return false;
         }
 

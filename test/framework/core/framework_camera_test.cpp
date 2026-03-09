@@ -47,7 +47,7 @@ TEST(FrameworkCameraTest, OrthographicProjectionMatchesGlmHelper) {
     camera.near_bound()   = -20.0f;
     camera.far_bound()    = 30.0f;
 
-    expect_mat4_near(camera.projection_matrix(), pbpt::math::ortho(-10.0f, 10.0f, -4.0f, 4.0f, -20.0f, 30.0f));
+    expect_mat4_near(camera.projection_matrix(), pbpt::math::orthographic(-10.0f, 10.0f, -4.0f, 4.0f, -20.0f, 30.0f));
 }
 
 TEST(FrameworkCameraTest, ViewMatrixUsesNodeWorldTransform) {
@@ -58,7 +58,7 @@ TEST(FrameworkCameraTest, ViewMatrixUsesNodeWorldTransform) {
     go.node().set_local_position({1.0f, 2.0f, 3.0f});
     scene.scene_graph().update_world_transforms();
 
-    const pbpt::math::Mat4 expected = pbpt::math::lookAt(
+    const pbpt::math::Mat4 expected = pbpt::math::look_at(
         pbpt::math::Vec3(1.0f, 2.0f, 3.0f), pbpt::math::Vec3(1.0f, 2.0f, 2.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f));
     expect_mat4_near(camera.view_matrix(), expected);
 }
@@ -72,7 +72,7 @@ TEST(FrameworkCameraTest, LookAtDirectionLocalAndWorldDifferWithParentRotation) 
 
     scene.scene_graph()
         .node(parent.id())
-        .set_local_rotation(pbpt::math::angle_axis(pbpt::math::radians(90.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
+        .set_local_rotation(pbpt::math::Quat::from_axis_angle(pbpt::math::radians(90.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
     scene.scene_graph().node(camera_go.id()).set_local_rotation(pbpt::math::Quat::identity());
 
     camera.camera_look_at_direction_local({0.0f, 0.0f, -1.0f});

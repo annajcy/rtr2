@@ -85,8 +85,8 @@ public:
         body.state().translation.linear_velocity = pbpt::math::Vec3(0.0f);
         body.state().rotation.orientation        = owner().node().world_rotation();
         body.state().rotation.angular_velocity   = pbpt::math::Vec3(0.0f);
+        body.state().scale                       = owner().node().world_scale();
         body.clear_forces();
-        body.invalidate_integrator_state();
 
         m_rigid_body_id = m_physics_world.create_rigid_body(std::move(body));
         m_registered    = true;
@@ -116,7 +116,6 @@ public:
         m_type = type;
         if (auto* body = physics_body(); body != nullptr) {
             body->set_type(type);
-            body->invalidate_integrator_state();
         }
     }
 
@@ -134,7 +133,6 @@ public:
             return;
         }
         body->state().translation.position = position;
-        body->invalidate_linear_integrator_state();
     }
 
     pbpt::math::Vec3 linear_velocity() const {
@@ -178,7 +176,6 @@ public:
         m_mass = sanitize_mass(mass);
         if (auto* body = physics_body(); body != nullptr) {
             body->state().mass = m_mass;
-            body->invalidate_integrator_state();
         }
     }
 
