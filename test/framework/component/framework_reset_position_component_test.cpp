@@ -4,8 +4,8 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/physics/reset_position_component.hpp"
-#include "rtr/framework/component/physics/rigid_body_component.hpp"
+#include "rtr/framework/component/physics/reset_position.hpp"
+#include "rtr/framework/component/physics/rigid_body.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/system/physics/physics_system.hpp"

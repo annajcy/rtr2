@@ -8,7 +8,7 @@
 
 namespace rtr::framework::component {
 
-class ColliderComponent : public Component {
+class Collider : public Component {
 protected:
     system::physics::PhysicsWorld& m_physics_world;
     system::physics::ColliderID    m_collider_id{};
@@ -31,13 +31,13 @@ protected:
     }
 
     void throw_if_owner_already_has_collider() const {
-        if (owner().get_component<ColliderComponent>() != nullptr) {
-            throw std::runtime_error("GameObject already has a collider component.");
+        if (owner().get_component<Collider>() != nullptr) {
+            throw std::runtime_error("GameObject already has a collider.");
         }
     }
 
 public:
-    explicit ColliderComponent(core::GameObject& owner, system::physics::PhysicsWorld& world)
+    explicit Collider(core::GameObject& owner, system::physics::PhysicsWorld& world)
         : Component(owner), m_physics_world(world) {}
 
     bool has_collider() const { return has_registered_collider(); }

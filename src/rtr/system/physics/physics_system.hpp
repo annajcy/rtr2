@@ -1,9 +1,9 @@
 #pragma once
 
-#include "rtr/framework/component/physics/box_collider_component.hpp"
-#include "rtr/framework/component/physics/collider_component.hpp"
-#include "rtr/framework/component/physics/rigid_body_component.hpp"
-#include "rtr/framework/component/physics/sphere_collider_component.hpp"
+#include "rtr/framework/component/physics/box_collider.hpp"
+#include "rtr/framework/component/physics/collider.hpp"
+#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/system/physics/physics_world.hpp"
@@ -44,7 +44,7 @@ private:
                 }
             }
 
-            auto* collider_component = game_object->get_component<framework::component::ColliderComponent>();
+            auto* collider_component = game_object->get_component<framework::component::Collider>();
             if (collider_component != nullptr && collider_component->enabled()) {
                 collider_component->sync_to_physics();
             }

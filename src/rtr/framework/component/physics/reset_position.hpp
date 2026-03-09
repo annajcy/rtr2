@@ -6,7 +6,7 @@
 #include <pbpt/math/math.h>
 
 #include "rtr/framework/component/component.hpp"
-#include "rtr/framework/component/physics/rigid_body_component.hpp"
+#include "rtr/framework/component/physics/rigid_body.hpp"
 #include "rtr/framework/core/game_object.hpp"
 
 namespace rtr::framework::component {

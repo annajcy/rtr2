@@ -4,9 +4,9 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/physics/box_collider_component.hpp"
-#include "rtr/framework/component/physics/rigid_body_component.hpp"
-#include "rtr/framework/component/physics/sphere_collider_component.hpp"
+#include "rtr/framework/component/physics/box_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/system/physics/collision.hpp"

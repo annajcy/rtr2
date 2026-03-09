@@ -20,9 +20,9 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/physics/box_collider_component.hpp"
-#include "rtr/framework/component/physics/rigid_body_component.hpp"
-#include "rtr/framework/component/physics/sphere_collider_component.hpp"
+#include "rtr/framework/component/physics/box_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/sphere_collider.hpp"
 #include "rtr/system/input/input_types.hpp"
 
 namespace {

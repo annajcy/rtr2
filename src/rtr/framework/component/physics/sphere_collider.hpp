@@ -5,12 +5,12 @@
 
 #include <pbpt/math/math.h>
 
-#include "rtr/framework/component/physics/collider_component.hpp"
-#include "rtr/framework/component/physics/rigid_body_component.hpp"
+#include "rtr/framework/component/physics/collider.hpp"
+#include "rtr/framework/component/physics/rigid_body.hpp"
 
 namespace rtr::framework::component {
 
-class SphereCollider final : public ColliderComponent {
+class SphereCollider final : public Collider {
 private:
     pbpt::math::Float m_radius{0.5f};
     pbpt::math::Vec3  m_local_center{0.0f};
@@ -36,7 +36,7 @@ private:
 public:
     explicit SphereCollider(core::GameObject& owner, system::physics::PhysicsWorld& world,
                             pbpt::math::Float radius = 0.5f, const pbpt::math::Vec3& local_center = pbpt::math::Vec3{0.0f})
-        : ColliderComponent(owner, world),
+        : Collider(owner, world),
           m_radius(sanitize_radius(radius)),
           m_local_center(sanitize_center(local_center)) {}
 

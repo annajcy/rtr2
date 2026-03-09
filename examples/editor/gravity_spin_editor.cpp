@@ -18,8 +18,8 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/physics/reset_position_component.hpp"
-#include "rtr/framework/component/physics/rigid_body_component.hpp"
+#include "rtr/framework/component/physics/reset_position.hpp"
+#include "rtr/framework/component/physics/rigid_body.hpp"
 #include "rtr/system/input/input_types.hpp"
 
 int main() {
