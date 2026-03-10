@@ -298,7 +298,22 @@ private:
         }
     }
 
-    static void draw_sphere_collider_editor(framework::core::GameObject& game_object) {
+    static void draw_sphere_collider_gizmo_controls(EditorContext& ctx, framework::core::GameObject& game_object) {
+        auto& gizmo = ctx.gizmo_state();
+        const bool editing = gizmo.target == EditorGizmoTarget::SphereColliderLocal;
+        if (editing) {
+            ImGui::TextDisabled("Editing: SphereCollider local transform");
+            if (ImGui::Button("Stop Editing Collider##sphere_collider")) {
+                gizmo.target = EditorGizmoTarget::GameObjectTransform;
+                logger()->debug("SphereCollider gizmo editing disabled (game_object_id={}).", game_object.id());
+            }
+        } else if (ImGui::Button("Edit With Gizmo##sphere_collider")) {
+            gizmo.target = EditorGizmoTarget::SphereColliderLocal;
+            logger()->debug("SphereCollider gizmo editing enabled (game_object_id={}).", game_object.id());
+        }
+    }
+
+    static void draw_sphere_collider_editor(EditorContext& ctx, framework::core::GameObject& game_object) {
         auto* sphere = game_object.get_component<framework::component::SphereCollider>();
         if (sphere == nullptr) {
             return;
@@ -319,17 +334,53 @@ private:
                                 sphere->radius());
             }
 
-            pbpt::math::Vec3 center = sphere->local_center();
-            if (ImGui::DragFloat3("Local Center##sphere_collider", &center.x(), 0.05f)) {
-                sphere->set_local_center(center);
+            draw_sphere_collider_gizmo_controls(ctx, game_object);
+
+            pbpt::math::Vec3 local_position = sphere->local_position();
+            if (ImGui::DragFloat3("Local Position##sphere_collider", &local_position.x(), 0.05f)) {
+                sphere->set_local_position(local_position);
                 logger()->debug(
-                    "SphereCollider local_center updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
-                    game_object.id(), center.x(), center.y(), center.z());
+                    "SphereCollider local_position updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), local_position.x(), local_position.y(), local_position.z());
+            }
+
+            pbpt::math::Vec3 local_euler = pbpt::math::degrees(pbpt::math::euler_angles(sphere->local_rotation()));
+            if (ImGui::DragFloat3("Local Rotation (deg)##sphere_collider", &local_euler.x(), 0.5f)) {
+                sphere->set_local_rotation(pbpt::math::Quat(pbpt::math::radians(local_euler)));
+                logger()->debug(
+                    "SphereCollider local_rotation updated (game_object_id={}, euler_deg=[{:.3f}, {:.3f}, {:.3f}]).",
+                    game_object.id(), local_euler.x(), local_euler.y(), local_euler.z());
+            }
+
+            pbpt::math::Vec3 local_scale = sphere->local_scale();
+            if (ImGui::DragFloat3("Local Scale##sphere_collider", &local_scale.x(), 0.02f, 0.001f, 1000.0f)) {
+                local_scale.x() = std::max(local_scale.x(), 0.001f);
+                local_scale.y() = std::max(local_scale.y(), 0.001f);
+                local_scale.z() = std::max(local_scale.z(), 0.001f);
+                sphere->set_local_scale(local_scale);
+                logger()->debug(
+                    "SphereCollider local_scale updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), local_scale.x(), local_scale.y(), local_scale.z());
             }
         }
     }
 
-    static void draw_box_collider_editor(framework::core::GameObject& game_object) {
+    static void draw_box_collider_gizmo_controls(EditorContext& ctx, framework::core::GameObject& game_object) {
+        auto& gizmo = ctx.gizmo_state();
+        const bool editing = gizmo.target == EditorGizmoTarget::BoxColliderLocal;
+        if (editing) {
+            ImGui::TextDisabled("Editing: BoxCollider local transform");
+            if (ImGui::Button("Stop Editing Collider##box_collider")) {
+                gizmo.target = EditorGizmoTarget::GameObjectTransform;
+                logger()->debug("BoxCollider gizmo editing disabled (game_object_id={}).", game_object.id());
+            }
+        } else if (ImGui::Button("Edit With Gizmo##box_collider")) {
+            gizmo.target = EditorGizmoTarget::BoxColliderLocal;
+            logger()->debug("BoxCollider gizmo editing enabled (game_object_id={}).", game_object.id());
+        }
+    }
+
+    static void draw_box_collider_editor(EditorContext& ctx, framework::core::GameObject& game_object) {
         auto* box = game_object.get_component<framework::component::BoxCollider>();
         if (box == nullptr) {
             return;
@@ -354,11 +405,14 @@ private:
                     game_object.id(), half_extents.x(), half_extents.y(), half_extents.z());
             }
 
-            pbpt::math::Vec3 center = box->local_center();
-            if (ImGui::DragFloat3("Local Center##box_collider", &center.x(), 0.05f)) {
-                box->set_local_center(center);
-                logger()->debug("BoxCollider local_center updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
-                                game_object.id(), center.x(), center.y(), center.z());
+            draw_box_collider_gizmo_controls(ctx, game_object);
+
+            pbpt::math::Vec3 local_position = box->local_position();
+            if (ImGui::DragFloat3("Local Position##box_collider", &local_position.x(), 0.05f)) {
+                box->set_local_position(local_position);
+                logger()->debug(
+                    "BoxCollider local_position updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), local_position.x(), local_position.y(), local_position.z());
             }
 
             pbpt::math::Vec3 local_euler = pbpt::math::degrees(pbpt::math::euler_angles(box->local_rotation()));
@@ -367,6 +421,17 @@ private:
                 logger()->debug(
                     "BoxCollider local_rotation updated (game_object_id={}, euler_deg=[{:.3f}, {:.3f}, {:.3f}]).",
                     game_object.id(), local_euler.x(), local_euler.y(), local_euler.z());
+            }
+
+            pbpt::math::Vec3 local_scale = box->local_scale();
+            if (ImGui::DragFloat3("Local Scale##box_collider", &local_scale.x(), 0.02f, 0.001f, 1000.0f)) {
+                local_scale.x() = std::max(local_scale.x(), 0.001f);
+                local_scale.y() = std::max(local_scale.y(), 0.001f);
+                local_scale.z() = std::max(local_scale.z(), 0.001f);
+                box->set_local_scale(local_scale);
+                logger()->debug(
+                    "BoxCollider local_scale updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), local_scale.x(), local_scale.y(), local_scale.z());
             }
         }
     }
@@ -577,8 +642,8 @@ public:
         draw_mesh_renderer_editor(*game_object);
         draw_point_light_editor(*game_object);
         draw_rigid_body_editor(*game_object);
-        draw_sphere_collider_editor(*game_object);
-        draw_box_collider_editor(*game_object);
+        draw_sphere_collider_editor(ctx, *game_object);
+        draw_box_collider_editor(ctx, *game_object);
         draw_reset_position_editor(*game_object);
         draw_free_look_editor(*game_object);
         draw_trackball_editor(*game_object);

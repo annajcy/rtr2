@@ -195,6 +195,16 @@ if (TARGET rtr_editor)
         rtr::editor
     )
     rtr_add_test(
+        test_editor_scene_picking
+        editor/editor_scene_picking_test.cpp
+        rtr::editor
+    )
+    rtr_add_test(
+        test_editor_scene_view_overlay
+        editor/editor_scene_view_overlay_test.cpp
+        rtr::editor
+    )
+    rtr_add_test(
         test_editor_pipeline_bridge
         editor/editor_pipeline_bridge_test.cpp
         rtr::editor

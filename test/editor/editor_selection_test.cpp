@@ -45,9 +45,10 @@ TEST(EditorSelectionTest, KeepsValidSelection) {
     EXPECT_TRUE(ctx.selection().has_game_object());
     EXPECT_EQ(ctx.selection().scene_id, scene.id());
     EXPECT_EQ(ctx.selection().game_object_id, go.id());
+    EXPECT_EQ(ctx.gizmo_state().target, EditorGizmoTarget::GameObjectTransform);
 }
 
-TEST(EditorSelectionTest, ClearsSelectionWhenGameObjectDestroyed) {
+TEST(EditorSelectionTest, ClearsColliderGizmoTargetWhenSelectionChanges) {
     require_gpu_tests_enabled();
 
     app::AppRuntime runtime(app::AppRuntimeConfig{
@@ -64,11 +65,62 @@ TEST(EditorSelectionTest, ClearsSelectionWhenGameObjectDestroyed) {
 
     EditorContext ctx(world, runtime.resource_manager(), runtime.renderer(), runtime.input_system());
     ctx.set_selection(scene.id(), go.id());
+    ctx.gizmo_state().target = EditorGizmoTarget::SphereColliderLocal;
+
+    auto& other = keep_alive_scene.create_game_object("other");
+    ctx.set_selection(keep_alive_scene.id(), other.id());
+
+    EXPECT_EQ(ctx.gizmo_state().target, EditorGizmoTarget::GameObjectTransform);
+}
+
+TEST(EditorSelectionTest, ClearsColliderGizmoTargetWhenSelectionClearedExplicitly) {
+    require_gpu_tests_enabled();
+
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_selection_test",
+        .auto_init_logging = false,
+    });
+    auto& world = runtime.world();
+    auto& scene = world.create_scene("main");
+    auto& keep_alive_scene = world.create_scene("keep_alive");
+    auto& go = scene.create_game_object("node");
+    (void)keep_alive_scene;
+
+    EditorContext ctx(world, runtime.resource_manager(), runtime.renderer(), runtime.input_system());
+    ctx.set_selection(scene.id(), go.id());
+    ctx.gizmo_state().target = EditorGizmoTarget::BoxColliderLocal;
+    ctx.clear_selection();
+
+    EXPECT_FALSE(ctx.selection().has_game_object());
+    EXPECT_EQ(ctx.gizmo_state().target, EditorGizmoTarget::GameObjectTransform);
+}
+
+TEST(EditorSelectionTest, ClearsColliderGizmoTargetWhenGameObjectDestroyed) {
+    require_gpu_tests_enabled();
+
+    app::AppRuntime runtime(app::AppRuntimeConfig{
+        .window_width = 320,
+        .window_height = 240,
+        .window_title = "editor_selection_test",
+        .auto_init_logging = false,
+    });
+    auto& world = runtime.world();
+    auto& scene = world.create_scene("main");
+    auto& keep_alive_scene = world.create_scene("keep_alive");
+    auto& go = scene.create_game_object("node");
+    (void)keep_alive_scene;
+
+    EditorContext ctx(world, runtime.resource_manager(), runtime.renderer(), runtime.input_system());
+    ctx.set_selection(scene.id(), go.id());
+    ctx.gizmo_state().target = EditorGizmoTarget::SphereColliderLocal;
 
     ASSERT_TRUE(scene.destroy_game_object(go.id()));
     ctx.validate_selection();
 
     EXPECT_FALSE(ctx.selection().has_game_object());
+    EXPECT_EQ(ctx.gizmo_state().target, EditorGizmoTarget::GameObjectTransform);
 }
 
 TEST(EditorSelectionTest, ClearsSelectionWhenSceneDestroyed) {
@@ -88,12 +140,14 @@ TEST(EditorSelectionTest, ClearsSelectionWhenSceneDestroyed) {
 
     EditorContext ctx(world, runtime.resource_manager(), runtime.renderer(), runtime.input_system());
     ctx.set_selection(scene.id(), go.id());
+    ctx.gizmo_state().target = EditorGizmoTarget::BoxColliderLocal;
 
     ASSERT_TRUE(world.set_active_scene("keep_alive"));
     ASSERT_TRUE(world.destroy_scene(scene.id()));
     ctx.validate_selection();
 
     EXPECT_FALSE(ctx.selection().has_game_object());
+    EXPECT_EQ(ctx.gizmo_state().target, EditorGizmoTarget::GameObjectTransform);
 }
 
 } // namespace rtr::editor::test

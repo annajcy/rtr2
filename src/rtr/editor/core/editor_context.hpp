@@ -51,6 +51,8 @@ public:
 
     const EditorSelection& selection() const { return m_selection; }
 
+    void reset_gizmo_target() { m_gizmo_state.target = EditorGizmoTarget::GameObjectTransform; }
+
     void set_selection(framework::core::SceneId scene_id, framework::core::GameObjectId game_object_id) {
         if (m_selection.scene_id == scene_id && m_selection.game_object_id == game_object_id) {
             return;
@@ -60,6 +62,7 @@ public:
             m_selection.scene_id, m_selection.game_object_id, scene_id, game_object_id);
         m_selection.scene_id       = scene_id;
         m_selection.game_object_id = game_object_id;
+        reset_gizmo_target();
     }
 
     void clear_selection() {
@@ -70,6 +73,7 @@ public:
                         m_selection.game_object_id);
         m_selection.clear();
         m_gizmo_state.enabled = false;
+        reset_gizmo_target();
     }
 
     EditorServices& services() { return m_services; }
@@ -91,6 +95,7 @@ public:
         if (scene == nullptr || !scene->has_game_object(m_selection.game_object_id)) {
             m_selection.clear();
             m_gizmo_state.enabled = false;
+            reset_gizmo_target();
             logger()->debug("Selection invalidated and cleared (scene_id={}, game_object_id={}, scene_exists={}).",
                             scene_id, game_object_id, scene != nullptr);
         }

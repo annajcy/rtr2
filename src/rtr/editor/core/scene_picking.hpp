@@ -272,18 +272,18 @@ inline std::optional<ScenePickResult> pick_scene_game_object(
         if (const auto* sphere = game_object->get_component<framework::component::SphereCollider>();
             sphere != nullptr && sphere->enabled()) {
             const auto node = game_object->node();
-            const pbpt::math::Vec3 scale = node.world_scale();
+            const pbpt::math::Vec3 scale = sphere->local_scale() * node.world_scale();
             const pbpt::math::Vec3 center =
-                node.world_position() + node.world_rotation() * (sphere->local_center() * scale);
+                node.world_position() + node.world_rotation() * (sphere->local_position() * node.world_scale());
             const float radius = sphere->radius() * scale.abs().max();
             hit_distance = detail::intersect_ray_sphere(ray, center, radius);
             hit_source = ScenePickHitSource::SphereCollider;
         } else if (const auto* box = game_object->get_component<framework::component::BoxCollider>();
                    box != nullptr && box->enabled()) {
             const auto node = game_object->node();
-            const pbpt::math::Vec3 scale = node.world_scale().abs();
+            const pbpt::math::Vec3 scale = (box->local_scale() * node.world_scale()).abs();
             const pbpt::math::Vec3 center =
-                node.world_position() + node.world_rotation() * (box->local_center() * node.world_scale());
+                node.world_position() + node.world_rotation() * (box->local_position() * node.world_scale());
             const pbpt::math::Quat rotation = pbpt::math::normalize(node.world_rotation() * box->local_rotation());
             const pbpt::math::Vec3 half_extents = box->half_extents() * scale;
             hit_distance = detail::intersect_world_box(ray, center, rotation, half_extents);

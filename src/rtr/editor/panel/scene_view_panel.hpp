@@ -4,19 +4,178 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <optional>
+#include <unordered_map>
+#include <vector>
 
-#include "ImGuizmo.h"
 #include "imgui.h"
+#include "ImGuizmo.h"
 
 #include "rtr/editor/core/editor_panel.hpp"
 #include "rtr/editor/core/scene_picking.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera/orthographic_camera.hpp"
 #include "rtr/framework/component/camera/perspective_camera.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/physics/box_collider.hpp"
+#include "rtr/framework/component/physics/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
+#include "rtr/resource/resource_manager.hpp"
+#include "rtr/utils/obj_types.hpp"
 
 namespace rtr::editor {
+
+namespace scene_view_detail {
+
+struct MeshEdge {
+    std::uint32_t a{0};
+    std::uint32_t b{0};
+
+    bool operator==(const MeshEdge& other) const = default;
+};
+
+inline std::uint64_t mesh_edge_key(std::uint32_t a, std::uint32_t b) {
+    const auto [min_index, max_index] = std::minmax(a, b);
+    return (static_cast<std::uint64_t>(min_index) << 32u) | static_cast<std::uint64_t>(max_index);
+}
+
+inline std::vector<MeshEdge> build_unique_mesh_edges(const utils::ObjMeshData& mesh) {
+    std::vector<MeshEdge> edges{};
+    if (mesh.indices.size() < 3u) {
+        return edges;
+    }
+
+    std::unordered_map<std::uint64_t, MeshEdge> unique_edges{};
+    unique_edges.reserve(mesh.indices.size());
+
+    const auto add_edge = [&](std::uint32_t a, std::uint32_t b) {
+        const auto [min_index, max_index] = std::minmax(a, b);
+        unique_edges.try_emplace(mesh_edge_key(min_index, max_index), MeshEdge{.a = min_index, .b = max_index});
+    };
+
+    for (std::size_t i = 0; i + 2u < mesh.indices.size(); i += 3u) {
+        const std::uint32_t i0 = mesh.indices[i + 0u];
+        const std::uint32_t i1 = mesh.indices[i + 1u];
+        const std::uint32_t i2 = mesh.indices[i + 2u];
+        add_edge(i0, i1);
+        add_edge(i1, i2);
+        add_edge(i2, i0);
+    }
+
+    edges.reserve(unique_edges.size());
+    for (const auto& [_, edge] : unique_edges) {
+        edges.push_back(edge);
+    }
+    std::sort(edges.begin(), edges.end(), [](const MeshEdge& lhs, const MeshEdge& rhs) {
+        return lhs.a == rhs.a ? lhs.b < rhs.b : lhs.a < rhs.a;
+    });
+    return edges;
+}
+
+inline const std::vector<MeshEdge>& cached_mesh_edges(resource::ResourceManager& resources, resource::MeshHandle mesh_handle) {
+    static std::unordered_map<std::uint64_t, std::vector<MeshEdge>> cache{};
+
+    const auto it = cache.find(mesh_handle.value);
+    if (it != cache.end()) {
+        return it->second;
+    }
+
+    const auto& mesh = resources.cpu<resource::MeshResourceKind>(mesh_handle);
+    const auto [inserted_it, _] = cache.emplace(mesh_handle.value, build_unique_mesh_edges(mesh));
+    return inserted_it->second;
+}
+
+inline std::optional<ImVec2> project_world_to_viewport(
+    const pbpt::math::Vec3& world_position,
+    const pbpt::math::Mat4& view,
+    const pbpt::math::Mat4& proj,
+    const EditorViewportRect& viewport_rect
+) {
+    constexpr float kClipEpsilon = 1e-6f;
+    const pbpt::math::Vec4 clip = proj * (view * pbpt::math::Vec4(world_position, 1.0f));
+
+    if (!std::isfinite(clip.x()) || !std::isfinite(clip.y()) || !std::isfinite(clip.z()) || !std::isfinite(clip.w()) ||
+        clip.w() <= kClipEpsilon) {
+        return std::nullopt;
+    }
+
+    const float inv_w = 1.0f / clip.w();
+    const float ndc_x = clip.x() * inv_w;
+    const float ndc_y = clip.y() * inv_w;
+
+    if (!std::isfinite(ndc_x) || !std::isfinite(ndc_y)) {
+        return std::nullopt;
+    }
+
+    const float screen_x = viewport_rect.x + ((ndc_x * 0.5f) + 0.5f) * viewport_rect.width;
+    const float screen_y = viewport_rect.y + ((-ndc_y * 0.5f) + 0.5f) * viewport_rect.height;
+    if (!std::isfinite(screen_x) || !std::isfinite(screen_y)) {
+        return std::nullopt;
+    }
+
+    return ImVec2{screen_x, screen_y};
+}
+
+inline pbpt::math::Float sphere_world_radius(
+    pbpt::math::Float base_radius,
+    const pbpt::math::Vec3& local_scale,
+    const pbpt::math::Vec3& world_scale
+) {
+    return base_radius * (local_scale * world_scale).abs().max();
+}
+
+inline pbpt::math::Vec3 box_world_half_extents(
+    const pbpt::math::Vec3& base_half_extents,
+    const pbpt::math::Vec3& local_scale,
+    const pbpt::math::Vec3& world_scale
+) {
+    return base_half_extents * local_scale * world_scale;
+}
+
+inline std::vector<pbpt::math::Vec3> build_sphere_ring_points(
+    const pbpt::math::Vec3& center,
+    pbpt::math::Float radius,
+    const pbpt::math::Vec3& axis_a,
+    const pbpt::math::Vec3& axis_b,
+    std::size_t segments
+) {
+    constexpr float kTau = 6.28318530717958647692f;
+
+    std::vector<pbpt::math::Vec3> points{};
+    if (segments == 0u || radius <= 0.0f) {
+        return points;
+    }
+
+    const auto tangent_a = pbpt::math::normalize(axis_a);
+    const auto tangent_b = pbpt::math::normalize(axis_b);
+
+    points.reserve(segments);
+    for (std::size_t i = 0; i < segments; ++i) {
+        const float angle = kTau * static_cast<float>(i) / static_cast<float>(segments);
+        points.push_back(center + radius * (std::cos(angle) * tangent_a + std::sin(angle) * tangent_b));
+    }
+    return points;
+}
+
+inline std::array<pbpt::math::Vec3, 8> build_box_corners(
+    const pbpt::math::Vec3& center,
+    const pbpt::math::Quat& rotation,
+    const pbpt::math::Vec3& half_extents
+) {
+    return {
+        center + rotation * pbpt::math::Vec3{-half_extents.x(), -half_extents.y(), -half_extents.z()},
+        center + rotation * pbpt::math::Vec3{ half_extents.x(), -half_extents.y(), -half_extents.z()},
+        center + rotation * pbpt::math::Vec3{ half_extents.x(),  half_extents.y(), -half_extents.z()},
+        center + rotation * pbpt::math::Vec3{-half_extents.x(),  half_extents.y(), -half_extents.z()},
+        center + rotation * pbpt::math::Vec3{-half_extents.x(), -half_extents.y(),  half_extents.z()},
+        center + rotation * pbpt::math::Vec3{ half_extents.x(), -half_extents.y(),  half_extents.z()},
+        center + rotation * pbpt::math::Vec3{ half_extents.x(),  half_extents.y(),  half_extents.z()},
+        center + rotation * pbpt::math::Vec3{-half_extents.x(),  half_extents.y(),  half_extents.z()},
+    };
+}
+
+}  // namespace scene_view_detail
 
 class SceneViewPanel final : public IEditorPanel {
 private:
@@ -120,6 +279,10 @@ private:
         return ImGuizmo::LOCAL;
     }
 
+    static EditorGizmoOperation resolved_gizmo_operation(const EditorGizmoState& gizmo) {
+        return gizmo.operation;
+    }
+
     static std::array<float, 16> to_imguizmo_matrix(const pbpt::math::Mat4& matrix) {
         std::array<float, 16> values{};
         for (int row = 0; row < 4; ++row) {
@@ -138,6 +301,271 @@ private:
             }
         }
         return matrix;
+    }
+
+    static pbpt::math::Vec3 safe_divide_by_scale(
+        const pbpt::math::Vec3& value,
+        const pbpt::math::Vec3& scale,
+        const pbpt::math::Vec3& fallback
+    ) {
+        constexpr float kScaleEpsilon = 1e-6f;
+        pbpt::math::Vec3 result = fallback;
+        for (int axis = 0; axis < 3; ++axis) {
+            if (std::abs(scale[axis]) > kScaleEpsilon) {
+                result[axis] = value[axis] / scale[axis];
+            }
+        }
+        return result;
+    }
+
+    static pbpt::math::Vec3 clamp_positive_scale(
+        const pbpt::math::Vec3& scale,
+        const pbpt::math::Vec3& fallback
+    ) {
+        constexpr float kMinScale = 0.001f;
+        pbpt::math::Vec3 result = scale;
+        for (int axis = 0; axis < 3; ++axis) {
+            if (!std::isfinite(result[axis])) {
+                result[axis] = fallback[axis];
+            }
+            result[axis] = std::max(result[axis], kMinScale);
+        }
+        return result;
+    }
+
+    static pbpt::math::Vec3 collider_world_position(const auto& node, const pbpt::math::Vec3& local_position) {
+        return node.world_position() + node.world_rotation() * (local_position * node.world_scale());
+    }
+
+    static pbpt::math::Vec3 local_position_from_world_position(
+        const auto& node,
+        const pbpt::math::Vec3& world_position,
+        const pbpt::math::Vec3& fallback
+    ) {
+        const auto unscaled_local_position =
+            node.world_rotation().inversed() * (world_position - node.world_position());
+        return safe_divide_by_scale(unscaled_local_position, node.world_scale(), fallback);
+    }
+
+    static pbpt::math::Vec3 collider_world_scale(const auto& node, const pbpt::math::Vec3& local_scale) {
+        return (node.world_scale() * local_scale).abs();
+    }
+
+    static pbpt::math::Vec3 local_scale_from_world_scale(
+        const auto& node,
+        const pbpt::math::Vec3& world_scale,
+        const pbpt::math::Vec3& fallback
+    ) {
+        return clamp_positive_scale(
+            safe_divide_by_scale(world_scale, node.world_scale().abs(), fallback),
+            fallback
+        );
+    }
+
+    static void draw_projected_segment(
+        ImDrawList* draw_list,
+        const pbpt::math::Vec3& world_a,
+        const pbpt::math::Vec3& world_b,
+        const ActiveCameraInfo& active_camera,
+        const EditorViewportRect& viewport_rect,
+        ImU32 color,
+        float thickness
+    ) {
+        const auto screen_a =
+            scene_view_detail::project_world_to_viewport(world_a, active_camera.view, active_camera.proj, viewport_rect);
+        const auto screen_b =
+            scene_view_detail::project_world_to_viewport(world_b, active_camera.view, active_camera.proj, viewport_rect);
+        if (!screen_a.has_value() || !screen_b.has_value()) {
+            return;
+        }
+
+        draw_list->AddLine(*screen_a, *screen_b, color, thickness);
+    }
+
+    static void draw_mesh_outline(
+        ImDrawList* draw_list,
+        EditorContext& ctx,
+        const auto& node,
+        const framework::component::MeshRenderer& mesh_renderer,
+        const ActiveCameraInfo& active_camera,
+        const EditorViewportRect& viewport_rect
+    ) {
+        constexpr ImU32 kMeshOutlineColor = IM_COL32(64, 220, 255, 255);
+        constexpr float kMeshOutlineThickness = 1.5f;
+
+        const auto mesh_handle = mesh_renderer.mesh_handle();
+        if (!mesh_handle.is_valid() || !ctx.resources().alive<resource::MeshResourceKind>(mesh_handle)) {
+            return;
+        }
+
+        const auto& cpu_mesh = ctx.resources().cpu<resource::MeshResourceKind>(mesh_handle);
+        const auto& edges = scene_view_detail::cached_mesh_edges(ctx.resources(), mesh_handle);
+        const auto& world_matrix = node.world_matrix();
+
+        for (const auto& edge : edges) {
+            if (edge.a >= cpu_mesh.vertices.size() || edge.b >= cpu_mesh.vertices.size()) {
+                continue;
+            }
+
+            const pbpt::math::Vec4 clip_a = world_matrix * pbpt::math::Vec4(cpu_mesh.vertices[edge.a].position, 1.0f);
+            const pbpt::math::Vec4 clip_b = world_matrix * pbpt::math::Vec4(cpu_mesh.vertices[edge.b].position, 1.0f);
+            const pbpt::math::Vec3 world_a{clip_a.x(), clip_a.y(), clip_a.z()};
+            const pbpt::math::Vec3 world_b{clip_b.x(), clip_b.y(), clip_b.z()};
+            draw_projected_segment(
+                draw_list,
+                world_a,
+                world_b,
+                active_camera,
+                viewport_rect,
+                kMeshOutlineColor,
+                kMeshOutlineThickness
+            );
+        }
+    }
+
+    static void draw_sphere_collider_outline(
+        ImDrawList* draw_list,
+        const auto& node,
+        const framework::component::SphereCollider& sphere_collider,
+        const ActiveCameraInfo& active_camera,
+        const EditorViewportRect& viewport_rect
+    ) {
+        constexpr ImU32 kColliderOutlineColor = IM_COL32(255, 170, 64, 255);
+        constexpr float kColliderOutlineThickness = 2.0f;
+        constexpr std::size_t kSphereSegments = 48u;
+
+        const pbpt::math::Vec3 center = collider_world_position(node, sphere_collider.local_position());
+        const float radius = scene_view_detail::sphere_world_radius(
+            sphere_collider.radius(),
+            sphere_collider.local_scale(),
+            node.world_scale()
+        );
+        if (radius <= 0.0f) {
+            return;
+        }
+
+        const auto ring_xy = scene_view_detail::build_sphere_ring_points(
+            center, radius, pbpt::math::Vec3{1.0f, 0.0f, 0.0f}, pbpt::math::Vec3{0.0f, 1.0f, 0.0f}, kSphereSegments);
+        const auto ring_yz = scene_view_detail::build_sphere_ring_points(
+            center, radius, pbpt::math::Vec3{0.0f, 1.0f, 0.0f}, pbpt::math::Vec3{0.0f, 0.0f, 1.0f}, kSphereSegments);
+        const auto ring_xz = scene_view_detail::build_sphere_ring_points(
+            center, radius, pbpt::math::Vec3{1.0f, 0.0f, 0.0f}, pbpt::math::Vec3{0.0f, 0.0f, 1.0f}, kSphereSegments);
+
+        const auto draw_ring = [&](const std::vector<pbpt::math::Vec3>& ring) {
+            for (std::size_t i = 0; i < ring.size(); ++i) {
+                const pbpt::math::Vec3& world_a = ring[i];
+                const pbpt::math::Vec3& world_b = ring[(i + 1u) % ring.size()];
+                draw_projected_segment(
+                    draw_list,
+                    world_a,
+                    world_b,
+                    active_camera,
+                    viewport_rect,
+                    kColliderOutlineColor,
+                    kColliderOutlineThickness
+                );
+            }
+        };
+
+        draw_ring(ring_xy);
+        draw_ring(ring_yz);
+        draw_ring(ring_xz);
+    }
+
+    static void draw_box_collider_outline(
+        ImDrawList* draw_list,
+        const auto& node,
+        const framework::component::BoxCollider& box_collider,
+        const ActiveCameraInfo& active_camera,
+        const EditorViewportRect& viewport_rect
+    ) {
+        constexpr ImU32 kColliderOutlineColor = IM_COL32(255, 170, 64, 255);
+        constexpr float kColliderOutlineThickness = 2.0f;
+        constexpr std::array<std::pair<int, int>, 12> kBoxEdges{{
+            {0, 1}, {1, 2}, {2, 3}, {3, 0},
+            {4, 5}, {5, 6}, {6, 7}, {7, 4},
+            {0, 4}, {1, 5}, {2, 6}, {3, 7},
+        }};
+
+        const pbpt::math::Vec3 center = collider_world_position(node, box_collider.local_position());
+        const pbpt::math::Quat rotation = pbpt::math::normalize(node.world_rotation() * box_collider.local_rotation());
+        const pbpt::math::Vec3 half_extents = scene_view_detail::box_world_half_extents(
+            box_collider.half_extents(),
+            box_collider.local_scale(),
+            node.world_scale()
+        );
+        const auto corners = scene_view_detail::build_box_corners(center, rotation, half_extents);
+
+        for (const auto [a, b] : kBoxEdges) {
+            draw_projected_segment(
+                draw_list,
+                corners[static_cast<std::size_t>(a)],
+                corners[static_cast<std::size_t>(b)],
+                active_camera,
+                viewport_rect,
+                kColliderOutlineColor,
+                kColliderOutlineThickness
+            );
+        }
+    }
+
+    static void draw_selection_overlay(
+        EditorContext& ctx,
+        const ActiveCameraInfo& active_camera,
+        const EditorViewportRect& viewport_rect
+    ) {
+        auto* active_scene = ctx.world().active_scene();
+        const auto& selection = ctx.selection();
+        if (active_scene == nullptr ||
+            !selection.has_game_object() ||
+            selection.scene_id != active_scene->id() ||
+            !viewport_rect.valid()) {
+            return;
+        }
+
+        auto* game_object = active_scene->find_game_object(selection.game_object_id);
+        if (game_object == nullptr || !game_object->enabled()) {
+            return;
+        }
+
+        const auto node = game_object->node();
+        if (!node.is_valid()) {
+            return;
+        }
+
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        if (draw_list == nullptr) {
+            return;
+        }
+
+        draw_list->PushClipRect(
+            ImVec2{viewport_rect.x, viewport_rect.y},
+            ImVec2{viewport_rect.x + viewport_rect.width, viewport_rect.y + viewport_rect.height},
+            true
+        );
+
+        switch (ctx.gizmo_state().target) {
+            case EditorGizmoTarget::GameObjectTransform:
+                if (const auto* mesh_renderer = game_object->get_component<framework::component::MeshRenderer>();
+                    mesh_renderer != nullptr && mesh_renderer->enabled()) {
+                    draw_mesh_outline(draw_list, ctx, node, *mesh_renderer, active_camera, viewport_rect);
+                }
+                break;
+            case EditorGizmoTarget::SphereColliderLocal:
+                if (const auto* sphere_collider = game_object->get_component<framework::component::SphereCollider>();
+                    sphere_collider != nullptr && sphere_collider->enabled()) {
+                    draw_sphere_collider_outline(draw_list, node, *sphere_collider, active_camera, viewport_rect);
+                }
+                break;
+            case EditorGizmoTarget::BoxColliderLocal:
+                if (const auto* box_collider = game_object->get_component<framework::component::BoxCollider>();
+                    box_collider != nullptr && box_collider->enabled()) {
+                    draw_box_collider_outline(draw_list, node, *box_collider, active_camera, viewport_rect);
+                }
+                break;
+        }
+
+        draw_list->PopClipRect();
     }
 
     static ImVec2 fit_size_to_aspect(ImVec2 content_size, float aspect_ratio) {
@@ -329,11 +757,57 @@ private:
             return false;
         }
 
+        auto gizmo_target = ctx.gizmo_state().target;
+        auto* sphere_collider = game_object->get_component<framework::component::SphereCollider>();
+        auto* box_collider = game_object->get_component<framework::component::BoxCollider>();
+        if (gizmo_target == EditorGizmoTarget::SphereColliderLocal &&
+            (sphere_collider == nullptr || !sphere_collider->enabled())) {
+            ctx.reset_gizmo_target();
+            gizmo_target = ctx.gizmo_state().target;
+        }
+        if (gizmo_target == EditorGizmoTarget::BoxColliderLocal &&
+            (box_collider == nullptr || !box_collider->enabled())) {
+            ctx.reset_gizmo_target();
+            gizmo_target = ctx.gizmo_state().target;
+        }
+
         auto view = to_imguizmo_matrix(active_camera.view);
         auto proj = to_imguizmo_matrix(active_camera.proj);
-        auto world = to_imguizmo_matrix(node.world_matrix());
+        pbpt::math::Mat4 gizmo_world_matrix = node.world_matrix();
+        switch (gizmo_target) {
+            case EditorGizmoTarget::SphereColliderLocal:
+                gizmo_world_matrix = pbpt::math::compose_trs(
+                    collider_world_position(node, sphere_collider->local_position()),
+                    pbpt::math::normalize(node.world_rotation() * sphere_collider->local_rotation()),
+                    collider_world_scale(node, sphere_collider->local_scale())
+                );
+                break;
+            case EditorGizmoTarget::BoxColliderLocal:
+                gizmo_world_matrix = pbpt::math::compose_trs(
+                    collider_world_position(node, box_collider->local_position()),
+                    pbpt::math::normalize(node.world_rotation() * box_collider->local_rotation()),
+                    collider_world_scale(node, box_collider->local_scale())
+                );
+                break;
+            case EditorGizmoTarget::GameObjectTransform:
+                break;
+        }
+
+        auto world = to_imguizmo_matrix(gizmo_world_matrix);
         const bool snap_active = ctx.gizmo_state().snap_enabled || ImGui::IsKeyDown(ImGuiKey_ModShift);
-        const auto snap = current_snap_values(ctx.gizmo_state());
+        auto resolved_operation = resolved_gizmo_operation(ctx.gizmo_state());
+        const auto snap = current_snap_values(EditorGizmoState{
+            .operation = resolved_operation,
+            .mode = ctx.gizmo_state().mode,
+            .target = ctx.gizmo_state().target,
+            .viewport_rect = ctx.gizmo_state().viewport_rect,
+            .translation_snap = ctx.gizmo_state().translation_snap,
+            .rotation_snap_degrees = ctx.gizmo_state().rotation_snap_degrees,
+            .scale_snap = ctx.gizmo_state().scale_snap,
+            .snap_enabled = ctx.gizmo_state().snap_enabled,
+            .enabled = ctx.gizmo_state().enabled,
+            .using_gizmo = ctx.gizmo_state().using_gizmo,
+        });
 
         ImGuizmo::SetOrthographic(active_camera.orthographic);
         ImGuizmo::SetDrawlist();
@@ -341,7 +815,7 @@ private:
         ImGuizmo::Manipulate(
             view.data(),
             proj.data(),
-            to_imguizmo_operation(ctx.gizmo_state().operation),
+            to_imguizmo_operation(resolved_operation),
             to_imguizmo_mode(ctx.gizmo_state().mode),
             world.data(),
             nullptr,
@@ -354,12 +828,45 @@ private:
 
         if (ImGuizmo::IsUsing()) {
             const pbpt::math::Mat4 manipulated_world = from_imguizmo_matrix(world.data());
-            if (node.parent_id() == framework::core::SceneGraph::kVirtualRootId) {
-                node.set_local_model_matrix(manipulated_world);
-            } else {
-                const pbpt::math::Mat4 parent_world = active_scene->scene_graph().node(node.parent_id()).world_matrix();
-                const pbpt::math::Mat4 local = pbpt::math::inverse(parent_world) * manipulated_world;
-                node.set_local_model_matrix(local);
+            switch (gizmo_target) {
+                case EditorGizmoTarget::SphereColliderLocal: {
+                    const auto world_position = pbpt::math::extract_translation(manipulated_world);
+                    sphere_collider->set_local_position(
+                        local_position_from_world_position(node, world_position, sphere_collider->local_position())
+                    );
+                    sphere_collider->set_local_rotation(pbpt::math::normalize(
+                        node.world_rotation().inversed() * pbpt::math::extract_rotation(manipulated_world)
+                    ));
+                    sphere_collider->set_local_scale(
+                        local_scale_from_world_scale(node, pbpt::math::extract_scale(manipulated_world),
+                                                     sphere_collider->local_scale())
+                    );
+                    break;
+                }
+                case EditorGizmoTarget::BoxColliderLocal: {
+                    const auto world_position = pbpt::math::extract_translation(manipulated_world);
+                    box_collider->set_local_position(
+                        local_position_from_world_position(node, world_position, box_collider->local_position())
+                    );
+                    box_collider->set_local_rotation(pbpt::math::normalize(
+                        node.world_rotation().inversed() * pbpt::math::extract_rotation(manipulated_world)
+                    ));
+                    box_collider->set_local_scale(
+                        local_scale_from_world_scale(node, pbpt::math::extract_scale(manipulated_world),
+                                                     box_collider->local_scale())
+                    );
+                    break;
+                }
+                case EditorGizmoTarget::GameObjectTransform:
+                    if (node.parent_id() == framework::core::SceneGraph::kVirtualRootId) {
+                        node.set_local_model_matrix(manipulated_world);
+                    } else {
+                        const pbpt::math::Mat4 parent_world =
+                            active_scene->scene_graph().node(node.parent_id()).world_matrix();
+                        const pbpt::math::Mat4 local = pbpt::math::inverse(parent_world) * manipulated_world;
+                        node.set_local_model_matrix(local);
+                    }
+                    break;
             }
         }
 
@@ -527,6 +1034,7 @@ public:
 
             if (const auto active_camera = find_active_camera(ctx); active_camera.has_value()) {
                 gizmo_using = apply_gizmo_to_selection(ctx, *active_camera, viewport_rect);
+                draw_selection_overlay(ctx, *active_camera, viewport_rect);
                 if (scene_pick_requested && !ImGuizmo::IsOver() && !ImGuizmo::IsUsingAny()) {
                     apply_scene_picking(ctx, *active_camera, viewport_rect);
                 }

@@ -32,9 +32,16 @@ enum class EditorGizmoMode {
     World,
 };
 
+enum class EditorGizmoTarget {
+    GameObjectTransform,
+    SphereColliderLocal,
+    BoxColliderLocal,
+};
+
 struct EditorGizmoState {
     EditorGizmoOperation operation{EditorGizmoOperation::Translate};
     EditorGizmoMode mode{EditorGizmoMode::Local};
+    EditorGizmoTarget target{EditorGizmoTarget::GameObjectTransform};
     EditorViewportRect viewport_rect{};
     pbpt::math::Vec3 translation_snap{1.0f, 1.0f, 1.0f};
     float rotation_snap_degrees{15.0f};
