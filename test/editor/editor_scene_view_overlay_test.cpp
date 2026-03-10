@@ -64,6 +64,15 @@ TEST(EditorSceneViewOverlayTest, ProjectWorldPointRejectsNonFiniteClipCoordinate
     EXPECT_FALSE(screen.has_value());
 }
 
+TEST(EditorSceneViewOverlayTest, ImGuizmoProjectionMatrixRemovesVulkanYFlip) {
+    const pbpt::math::Mat4 vulkan_projection =
+        pbpt::math::scale(pbpt::math::Vec3{1.0f, -1.0f, 1.0f}) * pbpt::math::Mat4::identity();
+
+    const auto imguizmo_projection = scene_view_detail::imguizmo_projection_matrix(vulkan_projection);
+
+    EXPECT_EQ(imguizmo_projection, pbpt::math::Mat4::identity());
+}
+
 TEST(EditorSceneViewOverlayTest, SphereAndBoxWorldSizeHelpersMatchColliderFormula) {
     const float sphere_radius = scene_view_detail::sphere_world_radius(
         0.5f,

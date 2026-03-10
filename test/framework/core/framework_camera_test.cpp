@@ -32,6 +32,7 @@ TEST(FrameworkCameraTest, PerspectiveProjectionMatchesPbptProjectionHelper) {
     camera.far_bound()    = 200.0f;
 
     const pbpt::math::Mat4 expected =
+        pbpt::math::scale(pbpt::math::Vec3{1.0f, -1.0f, 1.0f}) *
         pbpt::math::perspective(pbpt::math::radians(60.0f), 2.0f, -0.2f, -200.0f);
     expect_mat4_near(camera.projection_matrix(), expected);
 }
@@ -49,6 +50,7 @@ TEST(FrameworkCameraTest, OrthographicProjectionMatchesPbptProjectionHelper) {
     camera.far_bound()    = 30.0f;
 
     const pbpt::math::Mat4 expected =
+        pbpt::math::scale(pbpt::math::Vec3{1.0f, -1.0f, 1.0f}) *
         pbpt::math::orthographic(-10.0f, 10.0f, -4.0f, 4.0f, -20.0f, -30.0f);
     expect_mat4_near(camera.projection_matrix(), expected);
 }

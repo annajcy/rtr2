@@ -109,12 +109,18 @@ inline std::optional<ImVec2> project_world_to_viewport(
     }
 
     const float screen_x = viewport_rect.x + ((ndc_x * 0.5f) + 0.5f) * viewport_rect.width;
-    const float screen_y = viewport_rect.y + ((-ndc_y * 0.5f) + 0.5f) * viewport_rect.height;
+    const float screen_y = viewport_rect.y + ((ndc_y * 0.5f) + 0.5f) * viewport_rect.height;
     if (!std::isfinite(screen_x) || !std::isfinite(screen_y)) {
         return std::nullopt;
     }
 
     return ImVec2{screen_x, screen_y};
+}
+
+inline pbpt::math::Mat4 imguizmo_projection_matrix(const pbpt::math::Mat4& projection_matrix) {
+    // Rendering uses a Vulkan-style Y-flipped projection, but ImGuizmo expects the
+    // canonical camera projection and performs its own screen-space mapping.
+    return pbpt::math::scale(pbpt::math::Vec3{1.0f, -1.0f, 1.0f}) * projection_matrix;
 }
 
 inline pbpt::math::Float sphere_world_radius(
@@ -772,7 +778,7 @@ private:
         }
 
         auto view = to_imguizmo_matrix(active_camera.view);
-        auto proj = to_imguizmo_matrix(active_camera.proj);
+        auto proj = to_imguizmo_matrix(scene_view_detail::imguizmo_projection_matrix(active_camera.proj));
         pbpt::math::Mat4 gizmo_world_matrix = node.world_matrix();
         switch (gizmo_target) {
             case EditorGizmoTarget::SphereColliderLocal:
@@ -1021,7 +1027,7 @@ public:
             });
 
             const ImVec2 image_min = ImGui::GetCursorScreenPos();
-            ImGui::Image(texture_id, draw_size, ImVec2{0.0f, 1.0f}, ImVec2{1.0f, 0.0f});
+            ImGui::Image(texture_id, draw_size, ImVec2{0.0f, 0.0f}, ImVec2{1.0f, 1.0f});
             hovered = ImGui::IsItemHovered();
             scene_pick_requested = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 

@@ -212,7 +212,7 @@ inline std::optional<ScenePickRay> make_scene_pick_ray(
     }
 
     const float ndc_x = u * 2.0f - 1.0f;
-    const float ndc_y = 1.0f - v * 2.0f;
+    const float ndc_y = v * 2.0f - 1.0f;
 
     const pbpt::math::Mat4 inv_view_proj = pbpt::math::inverse(proj * view);
     pbpt::math::Vec4 near_h = inv_view_proj * pbpt::math::Vec4(ndc_x, ndc_y, 0.0f, 1.0f);

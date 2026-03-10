@@ -32,7 +32,8 @@ public:
     pbpt::math::Mat4 projection_matrix() const override {
         const float near_z = -std::abs(near_bound());
         const float far_z = -std::abs(far_bound());
-        return pbpt::math::orthographic(m_left_bound, m_right_bound, m_bottom_bound, m_top_bound, near_z, far_z);
+        return pbpt::math::scale(pbpt::math::Vec3{1.0f, -1.0f, 1.0f}) *
+            pbpt::math::orthographic(m_left_bound, m_right_bound, m_bottom_bound, m_top_bound, near_z, far_z);
     }
 
     void adjust_zoom(float delta_zoom) override {
