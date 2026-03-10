@@ -48,8 +48,11 @@ Classic object-oriented component system for extending GameObject functionality.
 
 ### Integration (`src/rtr/framework/integration`)
 
-Bridging logic between different engine modules and external libraries.
+Bridging logic between the framework and downstream systems or external libraries.
 
+- **System Integration:**
+    - Scene-to-physics synchronization helpers.
+    - Scene-to-render extraction builders.
 - **PBPT Integration:** 
     - `pbpt_scene_importer.hpp`: Loads assets from PBPT's XML format into the engine.
     - `pbpt_scene_export_builder.hpp`: Exports the real-time scene to the path tracer.

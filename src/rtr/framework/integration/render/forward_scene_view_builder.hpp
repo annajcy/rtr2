@@ -4,23 +4,23 @@
 #include <stdexcept>
 
 #include "rtr/framework/component/camera/camera.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
+#include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/device.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 #include "rtr/utils/log.hpp"
 
-namespace rtr::system::render {
+namespace rtr::framework::integration::render {
 
-inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& scene,
-                                                 resource::ResourceManager&    resources,
-                                                 rhi::Device&                  device) {
-    ForwardSceneView view{};
+inline system::render::ForwardSceneView build_forward_scene_view(const core::Scene& scene,
+                                                                 resource::ResourceManager& resources,
+                                                                 rhi::Device& device) {
+    system::render::ForwardSceneView view{};
     bool has_camera_data = false;
     bool has_multiple_active_cameras = false;
-    auto logger = utils::get_logger("system.render.forward_scene_view_builder");
+    auto logger = utils::get_logger("framework.integration.render.forward_scene_view_builder");
 
     const auto active_nodes = scene.scene_graph().active_nodes();
     view.renderables.reserve(active_nodes.size());
@@ -30,9 +30,9 @@ inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& s
         if (go == nullptr) {
             continue;
         }
-        const auto* camera        = go->get_component<framework::component::Camera>();
-        const auto* mesh_renderer = go->get_component<framework::component::MeshRenderer>();
-        const auto* point_light   = go->get_component<framework::component::light::PointLight>();
+        const auto* camera        = go->get_component<component::Camera>();
+        const auto* mesh_renderer = go->get_component<component::MeshRenderer>();
+        const auto* point_light   = go->get_component<component::light::PointLight>();
 
         const auto             node  = scene.scene_graph().node(id);
         const pbpt::math::Mat4 model = node.world_matrix();
@@ -48,8 +48,9 @@ inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& s
             view.camera.world_pos = node.world_position();
         }
 
-        if (point_light != nullptr && point_light->enabled() && view.point_lights.size() < kMaxPointLights) {
-            ForwardScenePointLight pl{};
+        if (point_light != nullptr && point_light->enabled() &&
+            view.point_lights.size() < system::render::kMaxPointLights) {
+            system::render::ForwardScenePointLight pl{};
             pl.position          = node.world_position();
             pl.intensity         = point_light->intensity;
             pl.color             = point_light->color;
@@ -63,18 +64,20 @@ inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& s
             continue;
         }
 
-        const pbpt::math::Mat4     normal      = pbpt::math::transpose(pbpt::math::inverse(model));
+        const pbpt::math::Mat4 normal = pbpt::math::transpose(pbpt::math::inverse(model));
         const resource::MeshHandle mesh_handle = mesh_renderer->mesh_handle();
         if (!mesh_handle.is_valid()) {
             throw std::runtime_error("MeshRenderer mesh handle is invalid.");
         }
         auto& mesh = resources.require_gpu<rtr::resource::MeshResourceKind>(mesh_handle, device);
 
-        view.renderables.emplace_back(ForwardSceneRenderable{.instance_id = static_cast<std::uint64_t>(id),
-                                                             .mesh        = mesh,
-                                                             .base_color  = mesh_renderer->base_color(),
-                                                             .model       = model,
-                                                             .normal      = normal});
+        view.renderables.emplace_back(system::render::ForwardSceneRenderable{
+            .instance_id = static_cast<std::uint64_t>(id),
+            .mesh        = mesh,
+            .base_color  = mesh_renderer->base_color(),
+            .model       = model,
+            .normal      = normal,
+        });
     }
 
     if (!has_camera_data || has_multiple_active_cameras) {
@@ -90,4 +93,4 @@ inline ForwardSceneView build_forward_scene_view(const framework::core::Scene& s
     return view;
 }
 
-}  // namespace rtr::system::render
+}  // namespace rtr::framework::integration::render

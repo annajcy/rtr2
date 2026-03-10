@@ -9,28 +9,29 @@
 #include "rtr/framework/component/physics/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
-#include "rtr/system/physics/physics_system.hpp"
+#include "rtr/framework/integration/physics/scene_physics_sync.hpp"
+#include "rtr/system/physics/physics_world.hpp"
 
 int main() {
     try {
-        rtr::system::physics::PhysicsSystem physics_system;
-        rtr::framework::core::Scene         scene(1);
+        rtr::system::physics::PhysicsWorld physics_world;
+        rtr::framework::core::Scene        scene(1);
 
         auto& left = scene.create_game_object("left_sphere");
         left.node().set_local_position(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
-        auto& left_body = left.add_component<rtr::framework::component::RigidBody>(physics_system.world());
-        (void)left.add_component<rtr::framework::component::SphereCollider>(physics_system.world(), 0.5f);
+        auto& left_body = left.add_component<rtr::framework::component::RigidBody>(physics_world);
+        (void)left.add_component<rtr::framework::component::SphereCollider>(physics_world, 0.5f);
         left_body.set_use_gravity(false);
 
         auto& right = scene.create_game_object("right_sphere");
         right.node().set_local_position(pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
-        auto& right_body = right.add_component<rtr::framework::component::RigidBody>(physics_system.world());
-        (void)right.add_component<rtr::framework::component::SphereCollider>(physics_system.world(), 0.5f);
+        auto& right_body = right.add_component<rtr::framework::component::RigidBody>(physics_world);
+        (void)right.add_component<rtr::framework::component::SphereCollider>(physics_world, 0.5f);
         right_body.set_use_gravity(false);
 
-        physics_system.world().get_rigid_body(left_body.rigid_body_id()).state().translation.linear_velocity =
+        physics_world.get_rigid_body(left_body.rigid_body_id()).state().translation.linear_velocity =
             pbpt::math::Vec3{1.0f, 0.0f, 0.0f};
-        physics_system.world().get_rigid_body(right_body.rigid_body_id()).state().translation.linear_velocity =
+        physics_world.get_rigid_body(right_body.rigid_body_id()).state().translation.linear_velocity =
             pbpt::math::Vec3{-1.0f, 0.0f, 0.0f};
 
         constexpr double kFixedDt   = 0.1;
@@ -40,10 +41,13 @@ int main() {
         std::cout << "tick,left_x,left_vx,right_x,right_vx" << '\n';
 
         for (int tick = 0; tick < kTickCount; ++tick) {
-            physics_system.fixed_tick(scene, rtr::framework::core::FixedTickContext{
-                                                 .fixed_delta_seconds = kFixedDt,
-                                                 .fixed_tick_index    = static_cast<std::uint64_t>(tick),
-                                             });
+            const rtr::framework::core::FixedTickContext fixed_ctx{
+                .fixed_delta_seconds = kFixedDt,
+                .fixed_tick_index    = static_cast<std::uint64_t>(tick),
+            };
+            rtr::framework::integration::physics::sync_scene_to_physics(scene, physics_world);
+            physics_world.tick(static_cast<float>(fixed_ctx.fixed_delta_seconds));
+            rtr::framework::integration::physics::sync_physics_to_scene(scene, physics_world);
 
             std::cout << tick << ',' << std::fixed << std::setprecision(4) << left_body.position().x() << ','
                       << left_body.linear_velocity().x() << ',' << right_body.position().x() << ','

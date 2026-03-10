@@ -11,10 +11,11 @@
 
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/world.hpp"
+#include "rtr/framework/integration/physics/scene_physics_sync.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/frame_constants.hpp"
 #include "rtr/system/input/input_system.hpp"
-#include "rtr/system/physics/physics_system.hpp"
+#include "rtr/system/physics/physics_world.hpp"
 #include "rtr/system/render/render_pipeline.hpp"
 #include "rtr/system/render/renderer.hpp"
 #include "rtr/utils/log.hpp"
@@ -47,7 +48,7 @@ struct RuntimeContext {
     resource::ResourceManager&      resources;
     system::render::Renderer&       renderer;
     system::input::InputSystem&     input_system;
-    system::physics::PhysicsSystem& physics_system;
+    system::physics::PhysicsWorld&  physics_world;
     std::uint64_t                   frame_serial{0};
     double                          delta_seconds{0.0};
     std::function<void()>           request_stop{};
@@ -81,7 +82,7 @@ private:
     resource::ResourceManager      m_resources;
     system::render::Renderer       m_renderer;
     system::input::InputSystem     m_input_system;
-    system::physics::PhysicsSystem m_physics_system;  // must outlive m_world (components reference physics)
+    system::physics::PhysicsWorld  m_physics_world;
     framework::core::World         m_world;
 
     bool          m_stop_requested{false};
@@ -93,11 +94,11 @@ public:
     explicit AppRuntime(AppRuntimeConfig config = {})
         : m_config(prepare_config(std::move(config))),
           m_resources(m_config.resource_root_dir),
-          m_physics_system(),
-          m_world(m_resources),
           m_renderer(static_cast<int>(m_config.window_width), static_cast<int>(m_config.window_height),
                      m_config.window_title),
           m_input_system(&m_renderer.window()),
+          m_physics_world(),
+          m_world(m_resources),
           m_paused(m_config.start_paused) {
         logger()->info("AppRuntime initialized (window={}x{}, title='{}', frames_in_flight={}, paused={})",
                        m_config.window_width, m_config.window_height, m_config.window_title, rhi::kFramesInFlight,
@@ -118,8 +119,8 @@ public:
     system::input::InputSystem&       input_system() { return m_input_system; }
     const system::input::InputSystem& input_system() const { return m_input_system; }
 
-    system::physics::PhysicsSystem&       physics_system() { return m_physics_system; }
-    const system::physics::PhysicsSystem& physics_system() const { return m_physics_system; }
+    system::physics::PhysicsWorld&       physics_world() { return m_physics_world; }
+    const system::physics::PhysicsWorld& physics_world() const { return m_physics_world; }
 
     void                    set_callbacks(RuntimeCallbacks callbacks) { m_callbacks = std::move(callbacks); }
     const RuntimeCallbacks& callbacks() const { return m_callbacks; }
@@ -206,7 +207,9 @@ public:
                             };
                             m_world.fixed_tick(fixed_ctx);
                             if (auto* active_scene = m_world.active_scene(); active_scene != nullptr) {
-                                m_physics_system.fixed_tick(*active_scene, fixed_ctx);
+                                framework::integration::physics::sync_scene_to_physics(*active_scene, m_physics_world);
+                                m_physics_world.tick(static_cast<float>(fixed_ctx.fixed_delta_seconds));
+                                framework::integration::physics::sync_physics_to_scene(*active_scene, m_physics_world);
                             }
                             accumulator -= m_config.fixed_delta_seconds;
                             ++fixed_steps;
@@ -299,7 +302,7 @@ private:
             .resources      = m_resources,
             .renderer       = m_renderer,
             .input_system   = m_input_system,
-            .physics_system = m_physics_system,
+            .physics_world  = m_physics_world,
             .frame_serial   = m_frame_serial,
             .delta_seconds  = delta_seconds,
             .request_stop   = [this]() { request_stop(); },

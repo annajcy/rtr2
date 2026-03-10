@@ -12,12 +12,12 @@
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/integration/render/forward_scene_view_builder.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/context.hpp"
 #include "rtr/rhi/device.hpp"
 #include "rtr/rhi/window.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
-#include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
 
 namespace rtr::framework::integration::test {
 
@@ -135,7 +135,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, CollectsPointLightsAndCameraPos) {
     auto& light_go5 = scene.create_game_object("light5");
     light_go5.add_component<component::light::PointLight>().set_intensity(50.0f);
 
-    const auto view = system::render::build_forward_scene_view(scene, resources, harness.device);
+    const auto view = render::build_forward_scene_view(scene, resources, harness.device);
 
     EXPECT_FLOAT_EQ(view.camera.world_pos.x(), 10.0f);
     EXPECT_FLOAT_EQ(view.camera.world_pos.y(), 20.0f);
@@ -158,7 +158,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ReturnsBlackFrameWhenNoActiveCamera) 
     auto&                     go = scene.create_game_object("mesh");
     add_renderer(go, resources);
 
-    const auto view = system::render::build_forward_scene_view(scene, resources, harness.device);
+    const auto view = render::build_forward_scene_view(scene, resources, harness.device);
     EXPECT_TRUE(view.renderables.empty());
     EXPECT_TRUE(view.point_lights.empty());
 }
@@ -177,7 +177,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ReturnsBlackFrameWhenMultipleActiveCa
     auto& light_go = scene.create_game_object("light");
     (void)light_go.add_component<component::light::PointLight>();
 
-    const auto view = system::render::build_forward_scene_view(scene, resources, harness.device);
+    const auto view = render::build_forward_scene_view(scene, resources, harness.device);
     EXPECT_TRUE(view.renderables.empty());
     EXPECT_TRUE(view.point_lights.empty());
 }
@@ -205,7 +205,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ExtractsOnlyActiveNodesWithMeshRender
 
     parent.set_enabled(false);
 
-    const auto                 view = system::render::build_forward_scene_view(scene, resources, harness.device);
+    const auto                 view = render::build_forward_scene_view(scene, resources, harness.device);
     std::vector<std::uint64_t> ids{};
     ids.reserve(view.renderables.size());
     for (const auto& renderable : view.renderables) {
@@ -235,7 +235,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, DisabledMeshRendererIsExcludedFromRen
     ASSERT_NE(renderer2, nullptr);
     obj2.set_component_enabled<component::MeshRenderer>(false);
 
-    const auto view = system::render::build_forward_scene_view(scene, resources, harness.device);
+    const auto view = render::build_forward_scene_view(scene, resources, harness.device);
     ASSERT_EQ(view.renderables.size(), 1u);
     EXPECT_EQ(view.renderables[0].instance_id, static_cast<std::uint64_t>(obj1.id()));
 }
@@ -257,7 +257,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ComputesModelAndNormalFromWorldTransf
     node.set_local_rotation(pbpt::math::Quat::from_axis_angle(pbpt::math::radians(35.0f), pbpt::math::Vec3(0.0f, 1.0f, 0.0f)));
     node.set_local_scale({2.0f, 1.5f, 0.5f});
 
-    const auto view = system::render::build_forward_scene_view(scene, resources, harness.device);
+    const auto view = render::build_forward_scene_view(scene, resources, harness.device);
     auto       it   = std::find_if(view.renderables.begin(), view.renderables.end(),
                                    [&](const system::render::ForwardSceneRenderable& renderable) {
                                return renderable.instance_id == static_cast<std::uint64_t>(mesh_go.id());
@@ -282,7 +282,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, SupportsBaseColorPath) {
     auto& mesh_go = scene.create_game_object("mesh");
     add_renderer_with_color(mesh_go, resources);
 
-    const auto view = system::render::build_forward_scene_view(scene, resources, harness.device);
+    const auto view = render::build_forward_scene_view(scene, resources, harness.device);
     ASSERT_EQ(view.renderables.size(), 1u);
     EXPECT_EQ(view.renderables[0].base_color, pbpt::math::Vec4(0.3f, 0.4f, 0.5f, 1.0f));
 }

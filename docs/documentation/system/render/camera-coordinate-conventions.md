@@ -139,7 +139,7 @@ ndc       = clip.xyz / clip.w
 
 Relevant files:
 
-- scene collection: [`src/rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp`](https://github.com/annajcy/rtr2/blob/main/src/rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp)
+- scene collection: [`src/rtr/framework/integration/render/forward_scene_view_builder.hpp`](https://github.com/annajcy/rtr2/blob/main/src/rtr/framework/integration/render/forward_scene_view_builder.hpp)
 - UBO packing: [`src/rtr/system/render/pipeline/forward/forward_pipeline.hpp`](https://github.com/annajcy/rtr2/blob/main/src/rtr/system/render/pipeline/forward/forward_pipeline.hpp)
 - shader application: [`shaders/vert_buffer.slang`](https://github.com/annajcy/rtr2/blob/main/shaders/vert_buffer.slang)
 

@@ -67,7 +67,7 @@ int main() {
         bunny_go.node().set_local_position({0.0f, 2.0f, 0.0f});
         bunny_go.node().set_local_scale({10.0f, 10.0f, 10.0f});
 
-        (void)bunny_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().world());
+        (void)bunny_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_world());
         auto& reset_position = bunny_go.add_component<rtr::framework::component::ResetPosition>();
         reset_position.set_threshold_y(-1.0f);
         reset_position.set_reset_position(pbpt::math::Vec3{0.0f, 2.0f, 0.0f});

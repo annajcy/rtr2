@@ -8,7 +8,7 @@
 #include "rtr/framework/component/physics/rigid_body.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
-#include "rtr/system/physics/physics_system.hpp"
+#include "rtr/system/physics/physics_world.hpp"
 
 namespace rtr::framework::component::test {
 
@@ -19,12 +19,12 @@ TEST(FrameworkResetPositionComponentTest, ThrowsWhenRigidBodyIsMissing) {
 }
 
 TEST(FrameworkResetPositionComponentTest, ResetsPositionWhenThresholdIsReached) {
-    system::physics::PhysicsSystem physics_system;
-    core::Scene                    scene(1);
-    auto&                          go = scene.create_game_object("falling");
+    system::physics::PhysicsWorld physics_world;
+    core::Scene                   scene(1);
+    auto&                         go = scene.create_game_object("falling");
     go.node().set_local_position({0.0f, 2.0f, 0.0f});
 
-    auto& rigid_body     = go.add_component<RigidBody>(physics_system.world());
+    auto& rigid_body     = go.add_component<RigidBody>(physics_world);
     auto& reset_position = go.add_component<ResetPosition>();
     reset_position.set_threshold_y(-1.0f);
     reset_position.set_reset_position(pbpt::math::Vec3{0.5f, 3.0f, -0.5f});
@@ -39,12 +39,12 @@ TEST(FrameworkResetPositionComponentTest, ResetsPositionWhenThresholdIsReached) 
 }
 
 TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPreservesSpin) {
-    system::physics::PhysicsSystem physics_system;
-    core::Scene                    scene(1);
-    auto&                          go = scene.create_game_object("falling");
+    system::physics::PhysicsWorld physics_world;
+    core::Scene                   scene(1);
+    auto&                         go = scene.create_game_object("falling");
     go.node().set_local_position({0.0f, 2.0f, 0.0f});
 
-    auto& rigid_body     = go.add_component<RigidBody>(physics_system.world());
+    auto& rigid_body     = go.add_component<RigidBody>(physics_world);
     auto& reset_position = go.add_component<ResetPosition>();
     reset_position.set_threshold_y(-1.0f);
     reset_position.set_reset_position(pbpt::math::Vec3{0.0f, 2.0f, 0.0f});
@@ -52,7 +52,7 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPrese
     inverse_inertia_tensor_ref[1][1] = 1.0f;
     rigid_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
 
-    auto& physics_body = physics_system.world().get_rigid_body(rigid_body.rigid_body_id());
+    auto& physics_body = physics_world.get_rigid_body(rigid_body.rigid_body_id());
     physics_body.state().translation.linear_velocity = pbpt::math::Vec3{0.0f, -3.0f, 0.0f};
     physics_body.state().rotation.angular_velocity   = pbpt::math::Vec3{0.0f, 2.0f, 0.0f};
     physics_body.state().forces.accumulated_force    = pbpt::math::Vec3{1.0f, -4.0f, 0.0f};
@@ -78,12 +78,12 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPrese
 }
 
 TEST(FrameworkResetPositionComponentTest, UpdatedParametersAffectNextFixedTick) {
-    system::physics::PhysicsSystem physics_system;
-    core::Scene                    scene(1);
-    auto&                          go = scene.create_game_object("falling");
+    system::physics::PhysicsWorld physics_world;
+    core::Scene                   scene(1);
+    auto&                         go = scene.create_game_object("falling");
     go.node().set_local_position({0.0f, 2.0f, 0.0f});
 
-    auto& rigid_body     = go.add_component<RigidBody>(physics_system.world());
+    auto& rigid_body     = go.add_component<RigidBody>(physics_world);
     auto& reset_position = go.add_component<ResetPosition>();
     reset_position.set_threshold_y(-0.2f);
     reset_position.set_reset_position(pbpt::math::Vec3{1.0f, 4.0f, 0.0f});

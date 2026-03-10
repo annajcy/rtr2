@@ -121,7 +121,7 @@ Start from:
 
 - `src/rtr/editor/render/forward_editor_pipeline.hpp`
 - `src/rtr/system/render/pipeline/forward/forward_pass.hpp`
-- `src/rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp`
+- `src/rtr/framework/integration/render/forward_scene_view_builder.hpp`
 
 Questions to ask:
 

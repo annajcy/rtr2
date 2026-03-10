@@ -139,7 +139,7 @@ ndc       = clip.xyz / clip.w
 
 相关文件：
 
-- 场景收集：[`src/rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp`](https://github.com/annajcy/rtr2/blob/main/src/rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp)
+- 场景收集：[`src/rtr/framework/integration/render/forward_scene_view_builder.hpp`](https://github.com/annajcy/rtr2/blob/main/src/rtr/framework/integration/render/forward_scene_view_builder.hpp)
 - UBO 打包：[`src/rtr/system/render/pipeline/forward/forward_pipeline.hpp`](https://github.com/annajcy/rtr2/blob/main/src/rtr/system/render/pipeline/forward/forward_pipeline.hpp)
 - Shader 乘法链：[`shaders/vert_buffer.slang`](https://github.com/annajcy/rtr2/blob/main/shaders/vert_buffer.slang)
 

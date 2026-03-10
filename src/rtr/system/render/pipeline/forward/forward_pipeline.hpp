@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "rtr/framework/integration/render/forward_scene_view_builder.hpp"
 #include "rtr/framework/core/world.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/buffer.hpp"
@@ -23,7 +24,6 @@
 #include "rtr/system/render/pass/present_pass.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pass.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
-#include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
 #include "rtr/system/render/render_pipeline.hpp"
 #include "rtr/system/render/render_resource_state.hpp"
 #include "rtr/system/render/scene_target_controller.hpp"
@@ -141,7 +141,7 @@ public:
         auto* active_scene = ctx.world.active_scene();
         if (!active_scene)
             throw std::runtime_error("ForwardPipeline::prepare_frame: no active scene.");
-        m_scene_view = build_forward_scene_view(*active_scene, ctx.resources, m_device);
+        m_scene_view = framework::integration::render::build_forward_scene_view(*active_scene, ctx.resources, m_device);
     }
 
     void on_resize(int /*w*/, int /*h*/) override {}

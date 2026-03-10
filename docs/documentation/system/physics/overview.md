@@ -6,9 +6,9 @@ This section describes the custom physics engine (`rtr::system::physics`) used i
 
 The physics module's architecture is divided into the following main layers and components:
 
-1. **`PhysicsSystem` (Bridge between Physics and Scene)**
-   - **Responsibility**: Connects the underlying independent physics world with the upper-level framework components (ECS-structured `GameObject`, mainly `RigidBody` and `Collider` components).
-   - **Interaction Flow**: In the engine's fixed time step (`fixed_tick`), it sequentially calls `sync_scene_to_physics()` (syncs node poses to colliders and kinematic rigid bodies), `m_physics_world.tick()` for simulation stepping, and finally `sync_physics_to_scene()` to sync the latest poses of dynamic rigid bodies back to the scene nodes.
+1. **`scene_physics_sync.hpp` (Framework-to-Physics Adapter)**
+   - **Responsibility**: Connects the independent physics world with upper-level framework components (`GameObject`, mainly `RigidBody` and `Collider` components).
+   - **Interaction Flow**: The runtime performs `sync_scene_to_physics()` before stepping the world, then calls `PhysicsWorld::tick()`, and finally applies `sync_physics_to_scene()` so dynamic rigid body poses are written back to scene nodes.
 2. **`PhysicsWorld` (Core Physics Sandbox)**
    - **Responsibility**: Maintains all rigid body structures (`RigidBody`) and collider structures (`Collider`), acting as the core object where physical simulation occurs.
    - **Core Pipeline (`tick`)**: In each frame's time update, it sequentially executes force and displacement integration (`integrate_forces_and_drift`), collision detection (`generate_contacts`), collision constraint solving (`solve_contacts`), and finally updates externally observable velocities (`update_observable_velocities`).

@@ -13,6 +13,7 @@
 #include "rtr/editor/core/editor_capture.hpp"
 #include "rtr/editor/core/editor_host.hpp"
 #include "rtr/editor/render/editor_imgui_pass.hpp"
+#include "rtr/framework/integration/render/forward_scene_view_builder.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/descriptor.hpp"
@@ -22,7 +23,6 @@
 #include "rtr/system/render/pipeline/forward/forward_pass.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"  // GpuMat4, pack_mat4_row_major, ForwardSceneView types
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
-#include "rtr/system/render/pipeline/forward/forward_scene_view_builder.hpp"
 #include "rtr/system/render/render_pipeline.hpp"
 #include "rtr/system/render/render_resource_state.hpp"
 #include "rtr/system/render/scene_target_controller.hpp"
@@ -119,7 +119,7 @@ public:
         auto* scene = ctx.world.active_scene();
         if (!scene)
             throw std::runtime_error("ForwardEditorPipeline::prepare_frame: no active scene.");
-        m_scene_view = system::render::build_forward_scene_view(*scene, ctx.resources, m_device);
+        m_scene_view = framework::integration::render::build_forward_scene_view(*scene, ctx.resources, m_device);
     }
 
     void on_resize(int /*w*/, int /*h*/) override {}

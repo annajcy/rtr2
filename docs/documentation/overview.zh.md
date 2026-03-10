@@ -48,8 +48,11 @@
 
 ### 集成（`src/rtr/framework/integration`）
 
-不同引擎模块与外部库之间的桥接逻辑。
+框架层与下游系统或外部库之间的桥接逻辑。
 
+- **系统集成：**
+    - 场景到物理系统的同步辅助逻辑。
+    - 场景到渲染视图的提取构建器。
 - **PBPT 集成：**
     - `pbpt_scene_importer.hpp`：将 PBPT XML 格式的资产加载到引擎中。
     - `pbpt_scene_export_builder.hpp`：将实时场景导出到路径追踪器。

@@ -6,9 +6,9 @@
 
 整个物理模块的架构分为以下几个主要层次和组件：
 
-1. **`PhysicsSystem` (物理与场景的桥梁)**
-   - **指责**：该类负责将底层的独立物理世界与上层的框架组件（ECS 结构的 `GameObject`，主要是 `RigidBody` 和 `Collider` 组件）连接起来。
-   - **交互流程**：在引擎的固定时间步 (`fixed_tick`) 中，它依次调用 `sync_scene_to_physics()`（将场景中节点的位姿同步给碰撞体和运动学刚体）、`m_physics_world.tick()` 进行模拟步进，最后调用 `sync_physics_to_scene()` 将受物理驱动的动态（Dynamic）刚体的最新位姿同步回场景节点中。
+1. **`scene_physics_sync.hpp`（场景到物理的适配层）**
+   - **职责**：负责将底层独立物理世界与上层框架组件（ECS 结构的 `GameObject`，主要是 `RigidBody` 和 `Collider` 组件）连接起来。
+   - **交互流程**：运行时先调用 `sync_scene_to_physics()`（将场景节点位姿同步给碰撞体和非 Dynamic 刚体），再执行 `PhysicsWorld::tick()`，最后调用 `sync_physics_to_scene()` 将受物理驱动的动态刚体位姿同步回场景节点。
 2. **`PhysicsWorld` (核心物理沙盒)**
    - **指责**：负责维护所有的刚体结构 (`RigidBody`) 和碰撞体结构 (`Collider`)，是发生物理模拟本身的核心对象。
    - **核心管线 (`tick`)**：每一帧的时间更新中，顺序执行力与位移积分 (`integrate_forces_and_drift`)、碰撞检测 (`generate_contacts`)、碰撞点求解约束 (`solve_contacts`)，及最终外部可观测速度的更新 (`update_observable_velocities`)。
