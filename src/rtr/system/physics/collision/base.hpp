@@ -1,8 +1,8 @@
 #pragma once
 
 #include <pbpt/math/math.h>
+#include "rtr/system/physics/type.hpp"
 
-#include "rtr/system/physics/collider.hpp"
 
 namespace rtr::system::physics {
 

@@ -4,7 +4,6 @@
 #include <stdexcept>
 
 #include "rtr/system/render/frame_context.hpp"
-#include "vulkan/vulkan.hpp"
 
 namespace rtr::system::render {
 

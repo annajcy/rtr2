@@ -4,7 +4,6 @@
 
 #include <cstdint>
 #include <vector>
-#include <array>
 
 #include "rtr/rhi/mesh.hpp"
 

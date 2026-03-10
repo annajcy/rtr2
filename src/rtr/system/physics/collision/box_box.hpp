@@ -5,6 +5,7 @@
 #include <limits>
 #include <utility>
 
+#include "rtr/system/physics/collider.hpp"
 #include "rtr/system/physics/collision/base.hpp"
 
 namespace rtr::system::physics::detail {

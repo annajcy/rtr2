@@ -1,10 +1,8 @@
 #pragma once
 
-#include <stdexcept>
 #include <array>
 #include <vector>
 
-#include "rtr/rhi/descriptor.hpp"
 #include "rtr/rhi/mesh.hpp"
 #include "rtr/rhi/texture.hpp"
 #include "rtr/system/render/frame_context.hpp"

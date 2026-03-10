@@ -2,13 +2,11 @@
 
 #include <array>
 #include <cstdint>
-#include <filesystem>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "rtr/editor/core/editor_capture.hpp"
 #include "rtr/editor/core/editor_host.hpp"

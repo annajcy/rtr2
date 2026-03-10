@@ -4,10 +4,8 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
-#include <stdexcept>
 
 #include "rtr/rhi/buffer.hpp"
-#include "rtr/rhi/descriptor.hpp"
 #include "rtr/rhi/texture.hpp"
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/render_pass.hpp"

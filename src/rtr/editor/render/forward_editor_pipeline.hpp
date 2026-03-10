@@ -14,7 +14,6 @@
 #include "rtr/editor/core/editor_host.hpp"
 #include "rtr/editor/render/editor_imgui_pass.hpp"
 #include "rtr/framework/integration/render/forward_scene_view_builder.hpp"
-#include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/descriptor.hpp"
 #include "rtr/rhi/mesh.hpp"
@@ -26,7 +25,6 @@
 #include "rtr/system/render/render_pipeline.hpp"
 #include "rtr/system/render/render_resource_state.hpp"
 #include "rtr/system/render/scene_target_controller.hpp"
-#include "rtr/utils/log.hpp"
 #include "vulkan/vulkan.hpp"
 
 // ============================================================================

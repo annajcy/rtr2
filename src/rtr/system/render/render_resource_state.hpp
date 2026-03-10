@@ -6,7 +6,6 @@
 #include <utility>
 
 #include "rtr/rhi/texture.hpp"
-#include "vulkan/vulkan.hpp"
 
 namespace rtr::system::render {
 

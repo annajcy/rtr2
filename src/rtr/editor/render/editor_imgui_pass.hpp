@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
-#include <vector>
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -18,7 +17,6 @@
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/render_pass.hpp"
 #include "rtr/system/render/render_pipeline.hpp"
-#include "vulkan/vulkan.hpp"
 
 namespace rtr::editor::render {
 
