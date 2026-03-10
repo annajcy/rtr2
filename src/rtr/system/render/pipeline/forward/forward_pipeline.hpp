@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "rtr/framework/core/world.hpp"
 #include "rtr/framework/integration/render/forward_scene_view_builder.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/descriptor.hpp"
@@ -134,8 +135,11 @@ public:
 
     ~ForwardPipeline() override = default;
 
-    void prepare_scene(const framework::core::Scene& scene, resource::ResourceManager& resources) {
-        m_scene_view = framework::integration::render::build_forward_scene_view(scene, resources, m_device);
+    void prepare_frame(const FramePrepareContext& ctx) override {
+        auto* scene = ctx.world.active_scene();
+        if (!scene)
+            throw std::runtime_error("ForwardPipeline::prepare_frame: no active scene.");
+        prepare_scene(*scene, ctx.resources);
     }
 
     void on_resize(int /*w*/, int /*h*/) override {}
@@ -190,6 +194,10 @@ public:
     }
 
 private:
+    void prepare_scene(const framework::core::Scene& scene, resource::ResourceManager& resources) {
+        m_scene_view = framework::integration::render::build_forward_scene_view(scene, resources, m_device);
+    }
+
     static rhi::ShaderModule build_shader_module(
         rhi::Device& device,
         const std::filesystem::path& shader_path,

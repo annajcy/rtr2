@@ -109,6 +109,11 @@ public:
 
     void on_resize(int /*w*/, int /*h*/) override {}
 
+    void prepare_frame(const system::render::FramePrepareContext& /*ctx*/) override {
+        check_and_reload_shader();
+    }
+
+private:
     void check_and_reload_shader() {
         const auto reload_result = m_reload_controller.check_for_reload();
         if (!reload_result.should_compile) {
@@ -150,6 +155,7 @@ public:
         }
     }
 
+public:
     void handle_swapchain_state_change(const system::render::FrameScheduler::SwapchainState& state,
                                        const system::render::SwapchainChangeSummary& diff) override {
         if (diff.depth_format_changed) {

@@ -13,6 +13,7 @@
 #include "rtr/editor/core/editor_capture.hpp"
 #include "rtr/editor/core/editor_host.hpp"
 #include "rtr/editor/render/editor_imgui_pass.hpp"
+#include "rtr/framework/core/world.hpp"
 #include "rtr/framework/integration/render/forward_scene_view_builder.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/descriptor.hpp"
@@ -113,8 +114,11 @@ public:
     bool wants_imgui_capture_mouse() const override { return m_editor_pass.wants_capture_mouse(); }
     bool wants_imgui_capture_keyboard() const override { return m_editor_pass.wants_capture_keyboard(); }
 
-    void prepare_scene(const framework::core::Scene& scene, resource::ResourceManager& resources) {
-        m_scene_view = framework::integration::render::build_forward_scene_view(scene, resources, m_device);
+    void prepare_frame(const system::render::FramePrepareContext& ctx) override {
+        auto* scene = ctx.world.active_scene();
+        if (!scene)
+            throw std::runtime_error("ForwardEditorPipeline::prepare_frame: no active scene.");
+        prepare_scene(*scene, ctx.resources);
     }
 
     void on_resize(int /*w*/, int /*h*/) override {}
@@ -201,6 +205,10 @@ public:
     }
 
 private:
+    void prepare_scene(const framework::core::Scene& scene, resource::ResourceManager& resources) {
+        m_scene_view = framework::integration::render::build_forward_scene_view(scene, resources, m_device);
+    }
+
     static rhi::ShaderModule build_shader_module(
         rhi::Device& device,
         const std::filesystem::path& shader_path,

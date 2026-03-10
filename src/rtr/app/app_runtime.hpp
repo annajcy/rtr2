@@ -12,7 +12,6 @@
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/world.hpp"
 #include "rtr/framework/integration/physics/scene_physics_sync.hpp"
-#include "rtr/framework/integration/render/scene_render_sync.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/frame_constants.hpp"
 #include "rtr/system/input/input_system.hpp"
@@ -91,8 +90,6 @@ private:
     std::uint64_t m_frame_serial{0};
     std::uint64_t m_fixed_tick_index{0};
 
-    std::function<void(const framework::integration::render::RenderFrameContext&)> m_frame_integration{};
-
 public:
     explicit AppRuntime(AppRuntimeConfig config = {})
         : m_config(prepare_config(std::move(config))),
@@ -128,21 +125,14 @@ public:
     void                    set_callbacks(RuntimeCallbacks callbacks) { m_callbacks = std::move(callbacks); }
     const RuntimeCallbacks& callbacks() const { return m_callbacks; }
 
-    template <typename T>
-    void set_pipeline(std::unique_ptr<T> pipeline) {
-        static_assert(std::is_base_of_v<system::render::RenderPipeline, T>,
-                      "T must derive from RenderPipeline.");
+    void set_pipeline(std::unique_ptr<system::render::RenderPipeline> pipeline) {
         auto log = logger();
         if (!pipeline) {
             log->error("set_pipeline received null pipeline.");
-            throw std::invalid_argument("AppRuntime::set_pipeline: null pipeline.");
+            throw std::runtime_error("AppRuntime set_pipeline received null pipeline.");
         }
-        T* raw = pipeline.get();
         m_renderer.set_pipeline(std::move(pipeline));
-        m_frame_integration = [raw](const framework::integration::render::RenderFrameContext& ctx) {
-            framework::integration::render::sync_scene_to_render(*raw, ctx);
-        };
-        log->info("Pipeline set.");
+        log->info("Pipeline bound to runtime.");
     }
 
     void request_stop() { m_stop_requested = true; }
@@ -239,15 +229,13 @@ public:
                     m_callbacks.on_post_update(ctx);
                 }
 
-                if (m_frame_integration) {
-                    m_frame_integration(framework::integration::render::RenderFrameContext{
-                        .world         = m_world,
-                        .resources     = m_resources,
-                        .input         = m_input_system,
-                        .frame_serial  = m_frame_serial,
-                        .delta_seconds = frame_delta,
-                    });
-                }
+                m_renderer.pipeline()->prepare_frame(system::render::FramePrepareContext{
+                    .world         = m_world,
+                    .resources     = m_resources,
+                    .input         = m_input_system,
+                    .frame_serial  = m_frame_serial,
+                    .delta_seconds = frame_delta,
+                });
 
                 if (m_callbacks.on_pre_render) {
                     auto ctx = make_runtime_context(frame_delta);
