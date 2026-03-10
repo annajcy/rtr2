@@ -37,6 +37,16 @@ private:
     system::physics::PhysicsWorld m_world{};
 };
 
+pbpt::math::Mat3 diagonal_inverse_inertia(const pbpt::math::Float x,
+                                          const pbpt::math::Float y,
+                                          const pbpt::math::Float z) {
+    pbpt::math::Mat3 result = pbpt::math::Mat3::zeros();
+    result[0][0]            = x;
+    result[1][1]            = y;
+    result[2][2]            = z;
+    return result;
+}
+
 }  // namespace
 
 TEST(PhysicsSceneIntegrationTest, FixedTickAppliesGravityAndSyncsBackToSceneGraph) {
@@ -438,6 +448,9 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxClearsOnlyNormalVelocity
 
     EXPECT_NEAR(sphere_body.linear_velocity().x(), 0.0f, 1e-4f);
     EXPECT_NEAR(sphere_body.linear_velocity().y(), 1.0f, 1e-4f);
+    EXPECT_NEAR(sphere_body.angular_velocity().x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(sphere_body.angular_velocity().y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(sphere_body.angular_velocity().z(), 0.0f, 1e-5f);
 
     const auto sphere_colliders = physics.world().colliders_for_body(sphere_body.rigid_body_id());
     const auto wall_colliders   = physics.world().colliders_for_body(wall_body.rigid_body_id());
@@ -451,6 +464,36 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxClearsOnlyNormalVelocity
     ASSERT_NE(world_box, nullptr);
     const auto contact = ContactPairTrait<WorldSphere, WorldBox>::generate(*world_sphere, *world_box);
     EXPECT_FALSE(contact.is_valid() && contact.penetration > 0.05f);
+}
+
+TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticFloorFrictionProducesAngularVelocity) {
+    PhysicsStepper         physics;
+    framework::core::Scene scene(1);
+
+    auto& floor = scene.create_game_object("floor");
+    floor.node().set_local_position(pbpt::math::Vec3{0.0f, -0.5f, 0.0f});
+    (void)floor.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f);
+    (void)floor.add_component<framework::component::BoxCollider>(
+        physics.world(), pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
+
+    auto& sphere = scene.create_game_object("sphere");
+    sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 0.2f, 0.0f});
+    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.25f);
+    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+
+    auto& physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
+    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, -1.0f, 0.0f};
+
+    physics.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    EXPECT_NEAR(sphere_body.linear_velocity().y(), 0.0f, 1e-4f);
+    EXPECT_LT(sphere_body.linear_velocity().x(), 2.0f);
+    EXPECT_GT(std::abs(sphere_body.angular_velocity().z()), 1e-4f);
 }
 
 TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxUsesMaxRestitutionForBounce) {
@@ -511,6 +554,37 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticFloorFrictionReducesTangent
     EXPECT_NEAR(sphere_body.linear_velocity().y(), 0.0f, 1e-4f);
 }
 
+TEST(PhysicsSceneIntegrationTest, ZeroInverseInertiaKeepsCollisionFromAddingAngularVelocity) {
+    PhysicsStepper         physics;
+    framework::core::Scene scene(1);
+
+    auto& floor = scene.create_game_object("floor");
+    floor.node().set_local_position(pbpt::math::Vec3{0.0f, -0.5f, 0.0f});
+    (void)floor.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f);
+    (void)floor.add_component<framework::component::BoxCollider>(
+        physics.world(), pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
+
+    auto& sphere = scene.create_game_object("sphere");
+    sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 0.2f, 0.0f});
+    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 0.25f);
+    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+
+    auto& physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
+    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, -1.0f, 0.0f};
+
+    physics.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    EXPECT_NEAR(sphere_body.angular_velocity().x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(sphere_body.angular_velocity().y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(sphere_body.angular_velocity().z(), 0.0f, 1e-5f);
+    EXPECT_LT(sphere_body.linear_velocity().x(), 2.0f);
+}
+
 TEST(PhysicsSceneIntegrationTest, ZeroFrictionPreservesTangentialVelocity) {
     PhysicsStepper         physics;
     framework::core::Scene scene(1);
@@ -538,6 +612,40 @@ TEST(PhysicsSceneIntegrationTest, ZeroFrictionPreservesTangentialVelocity) {
 
     EXPECT_NEAR(sphere_body.linear_velocity().x(), 2.0f, 1e-4f);
     EXPECT_NEAR(sphere_body.linear_velocity().y(), 0.0f, 1e-4f);
+}
+
+TEST(PhysicsSceneIntegrationTest, DynamicBodiesOffCenterCollisionProducesFiniteAngularVelocity) {
+    PhysicsStepper         physics;
+    framework::core::Scene scene(1);
+
+    auto& box = scene.create_game_object("box");
+    auto& box_body = box.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.36f);
+    (void)box.add_component<framework::component::BoxCollider>(
+        physics.world(), pbpt::math::Vec3{0.2f, 2.0f, 2.0f});
+
+    auto& sphere = scene.create_game_object("sphere");
+    sphere.node().set_local_position(pbpt::math::Vec3{-1.0f, 0.6f, 0.0f});
+    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.25f);
+    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+
+    auto& sphere_physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
+    sphere_physics_body.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, -1.0f, 0.0f};
+
+    physics.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.25,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    EXPECT_TRUE(std::isfinite(sphere_body.linear_velocity().x()));
+    EXPECT_TRUE(std::isfinite(sphere_body.linear_velocity().y()));
+    EXPECT_TRUE(std::isfinite(box_body.linear_velocity().x()));
+    EXPECT_TRUE(std::isfinite(box_body.linear_velocity().y()));
+    EXPECT_TRUE(std::isfinite(sphere_body.angular_velocity().z()));
+    EXPECT_TRUE(std::isfinite(box_body.angular_velocity().z()));
+    EXPECT_GT(std::abs(sphere_body.angular_velocity().z()), 1e-4f);
+    EXPECT_GT(std::abs(box_body.angular_velocity().z()), 1e-4f);
 }
 
 }  // namespace rtr::framework::integration::physics::test

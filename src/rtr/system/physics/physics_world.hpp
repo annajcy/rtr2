@@ -53,6 +53,54 @@ private:
         return std::sqrt(body_a.friction() * body_b.friction());
     }
 
+    static pbpt::math::Mat3 inverse_inertia_tensor_world(const RigidBody& body) {
+        if (solver_inverse_mass(body) <= 0.0f) {
+            return pbpt::math::Mat3::zeros();
+        }
+
+        const auto rotation_matrix = body.state().rotation.orientation.to_mat3();
+        return rotation_matrix * body.inverse_inertia_tensor_ref() * rotation_matrix.transposed();
+    }
+
+    static pbpt::math::Vec3 contact_arm(const RigidBody& body, const pbpt::math::Vec3& contact_point) {
+        return contact_point - body.state().translation.position;
+    }
+
+    static pbpt::math::Vec3 contact_point_velocity(const RigidBody& body, const pbpt::math::Vec3& r) {
+        return body.state().translation.linear_velocity + pbpt::math::cross(body.state().rotation.angular_velocity, r);
+    }
+
+    static pbpt::math::Mat3 effective_mass_matrix(const pbpt::math::Float inv_mass_a,
+                                                  const pbpt::math::Float inv_mass_b,
+                                                  const pbpt::math::Mat3& inv_inertia_a,
+                                                  const pbpt::math::Mat3& inv_inertia_b,
+                                                  const pbpt::math::Vec3& r_a,
+                                                  const pbpt::math::Vec3& r_b) {
+        const auto identity = pbpt::math::Mat3::identity();
+        const auto r_a_star = pbpt::math::cross_matrix(r_a);
+        const auto r_b_star = pbpt::math::cross_matrix(r_b);
+        return (inv_mass_a + inv_mass_b) * identity - r_a_star * inv_inertia_a * r_a_star -
+               r_b_star * inv_inertia_b * r_b_star;
+    }
+
+    static pbpt::math::Float directional_effective_mass(const pbpt::math::Mat3& effective_mass,
+                                                        const pbpt::math::Vec3& direction) {
+        return pbpt::math::dot(direction, effective_mass * direction);
+    }
+
+    static void apply_impulse_at_contact(RigidBody& body,
+                                         const pbpt::math::Vec3& impulse,
+                                         const pbpt::math::Vec3& r,
+                                         const pbpt::math::Float inv_mass,
+                                         const pbpt::math::Mat3& inv_inertia_tensor) {
+        if (inv_mass <= 0.0f) {
+            return;
+        }
+
+        body.state().translation.linear_velocity += inv_mass * impulse;
+        body.state().rotation.angular_velocity += inv_inertia_tensor * pbpt::math::cross(r, impulse);
+    }
+
     bool remove_body_index_entry(RigidBodyID body_id, ColliderID collider_id) {
         const auto [begin, end] = m_colliders_by_body.equal_range(body_id);
         for (auto it = begin; it != end; ++it) {
@@ -185,40 +233,59 @@ private:
             return;
         }
 
+        constexpr pbpt::math::Float kImpulseDenominatorEpsilon = 1e-6f;
+        constexpr pbpt::math::Float kTangentEpsilon = 1e-6f;
         const auto normal = contact.result.normalized_normal();
+        const auto contact_point  = contact.result.point;
+        const auto r_a            = contact_arm(body_a, contact_point);
+        const auto r_b            = contact_arm(body_b, contact_point);
+        const auto inv_inertia_a  = inverse_inertia_tensor_world(body_a);
+        const auto inv_inertia_b  = inverse_inertia_tensor_world(body_b);
+        const auto effective_mass = effective_mass_matrix(inv_mass_a, inv_mass_b, inv_inertia_a, inv_inertia_b, r_a, r_b);
+
         const auto relative_velocity =
-            body_b.state().translation.linear_velocity - body_a.state().translation.linear_velocity;
+            contact_point_velocity(body_b, r_b) - contact_point_velocity(body_a, r_a);
         const auto normal_velocity = pbpt::math::dot(relative_velocity, normal);
         if (normal_velocity >= 0.0f) {
             return;
         }
 
+        const auto normal_effective_mass = directional_effective_mass(effective_mass, normal);
+        if (normal_effective_mass <= kImpulseDenominatorEpsilon) {
+            return;
+        }
+
         const auto normal_impulse_magnitude =
-            -((1.0f + combined_restitution(body_a, body_b)) * normal_velocity) / inv_mass_sum;
+            -((1.0f + combined_restitution(body_a, body_b)) * normal_velocity) / normal_effective_mass;
         const auto normal_impulse = normal_impulse_magnitude * normal;
-        body_a.state().translation.linear_velocity -= inv_mass_a * normal_impulse;
-        body_b.state().translation.linear_velocity += inv_mass_b * normal_impulse;
+        apply_impulse_at_contact(body_a, -normal_impulse, r_a, inv_mass_a, inv_inertia_a);
+        apply_impulse_at_contact(body_b, normal_impulse, r_b, inv_mass_b, inv_inertia_b);
 
         const auto relative_velocity_after_normal =
-            body_b.state().translation.linear_velocity - body_a.state().translation.linear_velocity;
+            contact_point_velocity(body_b, r_b) - contact_point_velocity(body_a, r_a);
         const auto tangent_velocity = relative_velocity_after_normal -
                                       pbpt::math::dot(relative_velocity_after_normal, normal) * normal;
         const auto tangent_speed_sq = pbpt::math::dot(tangent_velocity, tangent_velocity);
-        constexpr pbpt::math::Float kTangentEpsilon = 1e-6f;
         if (tangent_speed_sq <= kTangentEpsilon * kTangentEpsilon) {
             return;
         }
 
         const auto tangent = tangent_velocity / std::sqrt(tangent_speed_sq);
-        auto tangent_impulse_magnitude = -pbpt::math::dot(relative_velocity_after_normal, tangent) / inv_mass_sum;
+        const auto tangent_effective_mass = directional_effective_mass(effective_mass, tangent);
+        if (tangent_effective_mass <= kImpulseDenominatorEpsilon) {
+            return;
+        }
+
+        auto tangent_impulse_magnitude =
+            -pbpt::math::dot(relative_velocity_after_normal, tangent) / tangent_effective_mass;
         const auto max_friction_impulse =
             combined_friction(body_a, body_b) * std::abs(normal_impulse_magnitude);
         tangent_impulse_magnitude = pbpt::math::clamp(
             tangent_impulse_magnitude, -max_friction_impulse, max_friction_impulse);
 
         const auto tangent_impulse = tangent_impulse_magnitude * tangent;
-        body_a.state().translation.linear_velocity -= inv_mass_a * tangent_impulse;
-        body_b.state().translation.linear_velocity += inv_mass_b * tangent_impulse;
+        apply_impulse_at_contact(body_a, -tangent_impulse, r_a, inv_mass_a, inv_inertia_a);
+        apply_impulse_at_contact(body_b, tangent_impulse, r_b, inv_mass_b, inv_inertia_b);
     }
 
 public:

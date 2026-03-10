@@ -22,6 +22,9 @@ if (TARGET rtr_editor)
 
   add_executable(sphere_pen_collision_editor editor/sphere_pen_collision_editor.cpp)
   target_link_libraries(sphere_pen_collision_editor PRIVATE rtr::runtime rtr::editor)
+
+  add_executable(physics_showcase_editor editor/physics_showcase_editor.cpp)
+  target_link_libraries(physics_showcase_editor PRIVATE rtr::runtime rtr::editor)
 endif()
 
 add_executable(shadertoy runtime/shadertoy.cpp)
