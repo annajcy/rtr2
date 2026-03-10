@@ -115,22 +115,22 @@ TEST(FrameworkPbptSceneWriterTest, BuildsXmlResultFromActiveNodesWithMeshAndPbpt
 
     auto&                    go_ok           = scene.create_game_object("");
     const auto               expected_handle = create_test_mesh(resources);
-    auto&                    renderer        = go_ok.add_component<component::MeshRenderer>(expected_handle);
+    auto&                    renderer        = go_ok.add_component<component::MeshRenderer>(resources, expected_handle);
     const component::PbptRgb reflectance     = make_test_rgb(0.2f);
     renderer.set_base_color(::pbpt::math::Vec4(reflectance.r, reflectance.g, reflectance.b, 1.0f));
     (void)go_ok.add_component<component::PbptMesh>();
     go_ok.node().set_local_position({1.0f, 2.0f, 3.0f});
 
     auto& go_without_pbpt = scene.create_game_object("mesh_only");
-    (void)go_without_pbpt.add_component<component::MeshRenderer>(create_test_mesh(resources));
+    (void)go_without_pbpt.add_component<component::MeshRenderer>(resources, create_test_mesh(resources));
 
     auto& go_with_disabled_component = scene.create_game_object("disabled_component");
-    (void)go_with_disabled_component.add_component<component::MeshRenderer>(create_test_mesh(resources));
+    (void)go_with_disabled_component.add_component<component::MeshRenderer>(resources, create_test_mesh(resources));
     auto& disabled_pbpt = go_with_disabled_component.add_component<component::PbptMesh>();
     go_with_disabled_component.set_component_enabled<component::PbptMesh>(false);
 
     auto& go_disabled = scene.create_game_object("disabled_go");
-    (void)go_disabled.add_component<component::MeshRenderer>(create_test_mesh(resources));
+    (void)go_disabled.add_component<component::MeshRenderer>(resources, create_test_mesh(resources));
     (void)go_disabled.add_component<component::PbptMesh>();
     go_disabled.set_enabled(false);
 
@@ -161,7 +161,7 @@ TEST(FrameworkPbptSceneWriterTest, ThrowsWhenPbptLightExistsWithoutPbptMesh) {
     camera.set_active(true);
 
     auto& go = scene.create_game_object("light_only");
-    (void)go.add_component<component::MeshRenderer>(create_test_mesh(resources));
+    (void)go.add_component<component::MeshRenderer>(resources, create_test_mesh(resources));
     (void)go.add_component<component::PbptLight>();
 
     EXPECT_THROW((void)build_scene_result(scene, resources), std::runtime_error);
@@ -176,7 +176,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildXmlResultUsesPbptLightSpectrumAndKeepsPa
     camera.set_active(true);
 
     auto& mapped_go = scene.create_game_object("mapped_light_go");
-    (void)mapped_go.add_component<component::MeshRenderer>(create_test_mesh(resources));
+    (void)mapped_go.add_component<component::MeshRenderer>(resources, create_test_mesh(resources));
     (void)mapped_go.add_component<component::PbptMesh>();
     auto& light = mapped_go.add_component<component::PbptLight>();
     light.set_radiance_spectrum({
@@ -327,7 +327,7 @@ TEST(FrameworkPbptSceneWriterTest, BuildXmlResultSuffixesMappedMaterialWhenNameC
 
     auto&      mapped_go       = scene.create_game_object("mapped_go");
     const auto expected_handle = create_test_mesh(resources);
-    auto&      renderer        = mapped_go.add_component<component::MeshRenderer>(expected_handle);
+    auto&      renderer        = mapped_go.add_component<component::MeshRenderer>(resources, expected_handle);
     renderer.set_base_color(::pbpt::math::Vec4(0.5f, 0.5f, 0.5f, 1.0f));
     (void)mapped_go.add_component<component::PbptMesh>();
 

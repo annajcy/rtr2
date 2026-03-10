@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <string>
 #include <stdexcept>
 
 #include "pbpt/math/basic/type_alias.hpp"
@@ -54,6 +55,8 @@ private:
     bool               m_use_gravity{true};
     pbpt::math::Float  m_restitution{0.0f};
     pbpt::math::Float  m_friction{0.0f};
+    pbpt::math::Float  m_linear_decay{1.0f};
+    pbpt::math::Float  m_angular_decay{1.0f};
     pbpt::math::Mat3   m_inverse_inertia_tensor_ref{pbpt::math::Mat3::zeros()};
 
     static pbpt::math::Float sanitize_restitution(pbpt::math::Float restitution) {
@@ -70,16 +73,26 @@ private:
         return friction;
     }
 
+    static pbpt::math::Float sanitize_decay(pbpt::math::Float decay, const char* label) {
+        if (!std::isfinite(decay) || decay < 0.0f || decay > 1.0f) {
+            throw std::invalid_argument(std::string(label) + " must be finite and within [0, 1].");
+        }
+        return decay;
+    }
+
 public:
     RigidBody() = default;
     RigidBody(RigidBodyType type, const RigidBodyState& state, bool is_awake = true, bool use_gravity = true,
-              pbpt::math::Float restitution = 0.0f, pbpt::math::Float friction = 0.0f)
+              pbpt::math::Float restitution = 0.0f, pbpt::math::Float friction = 0.0f,
+              pbpt::math::Float linear_decay = 1.0f, pbpt::math::Float angular_decay = 1.0f)
         : m_type(type),
           m_state(state),
           m_is_awake(is_awake),
           m_use_gravity(use_gravity),
           m_restitution(sanitize_restitution(restitution)),
-          m_friction(sanitize_friction(friction)) {}
+          m_friction(sanitize_friction(friction)),
+          m_linear_decay(sanitize_decay(linear_decay, "RigidBody linear_decay")),
+          m_angular_decay(sanitize_decay(angular_decay, "RigidBody angular_decay")) {}
 
     void set_awake(bool awake) { m_is_awake = awake; }
     bool is_awake() const { return m_is_awake; }
@@ -98,6 +111,16 @@ public:
 
     void set_friction(pbpt::math::Float friction) { m_friction = sanitize_friction(friction); }
     pbpt::math::Float friction() const { return m_friction; }
+
+    void set_linear_decay(pbpt::math::Float linear_decay) {
+        m_linear_decay = sanitize_decay(linear_decay, "RigidBody linear_decay");
+    }
+    pbpt::math::Float linear_decay() const { return m_linear_decay; }
+
+    void set_angular_decay(pbpt::math::Float angular_decay) {
+        m_angular_decay = sanitize_decay(angular_decay, "RigidBody angular_decay");
+    }
+    pbpt::math::Float angular_decay() const { return m_angular_decay; }
 
     void set_inverse_inertia_tensor_ref(const pbpt::math::Mat3& inverse_inertia_tensor_ref) {
         m_inverse_inertia_tensor_ref = inverse_inertia_tensor_ref;

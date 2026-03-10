@@ -67,11 +67,11 @@ resource::MeshHandle create_test_mesh(resource::ResourceManager& resources) {
 }
 
 void add_renderer(framework::core::GameObject& go, resource::ResourceManager& resources) {
-    (void)go.add_component<component::MeshRenderer>(create_test_mesh(resources));
+    (void)go.add_component<component::MeshRenderer>(resources, create_test_mesh(resources));
 }
 
 void add_renderer_with_color(framework::core::GameObject& go, resource::ResourceManager& resources) {
-    (void)go.add_component<component::MeshRenderer>(create_test_mesh(resources),
+    (void)go.add_component<component::MeshRenderer>(resources, create_test_mesh(resources),
                                                     pbpt::math::Vec4{0.3f, 0.4f, 0.5f, 1.0f});
 }
 

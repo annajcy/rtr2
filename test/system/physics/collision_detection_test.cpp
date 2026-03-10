@@ -257,6 +257,71 @@ TEST(CollisionDetectionTest, VariantVisitDispatchUsesBoxBoxTrait) {
     EXPECT_GT(result.penetration, 0.0f);
 }
 
+TEST(CollisionDetectionTest, MeshPlaneReportsAverageContactPointAndPenetration) {
+    const WorldMesh mesh{
+        .vertices = {
+            pbpt::math::Vec3{0.2f, -0.3f, 0.0f},
+            pbpt::math::Vec3{0.4f, -0.1f, 0.0f},
+            pbpt::math::Vec3{0.0f, 0.2f, 0.0f},
+        },
+    };
+    const WorldPlane plane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    const auto hit = ContactPairTrait<WorldMesh, WorldPlane>::generate(mesh, plane);
+    ASSERT_TRUE(hit.is_valid());
+    EXPECT_NEAR(hit.point.x(), 0.3f, 1e-5f);
+    EXPECT_NEAR(hit.point.y(), -0.2f, 1e-5f);
+    EXPECT_NEAR(hit.normal.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(hit.normal.y(), -1.0f, 1e-5f);
+    EXPECT_NEAR(hit.penetration, 0.2f, 1e-5f);
+}
+
+TEST(CollisionDetectionTest, MeshPlaneReturnsInvalidWithoutPenetratingVertices) {
+    const WorldMesh mesh{
+        .vertices = {
+            pbpt::math::Vec3{-0.1f, 0.2f, 0.0f},
+            pbpt::math::Vec3{0.1f, 0.3f, 0.0f},
+            pbpt::math::Vec3{0.0f, 0.4f, 0.0f},
+        },
+    };
+    const WorldPlane plane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    EXPECT_FALSE((ContactPairTrait<WorldMesh, WorldPlane>::generate(mesh, plane).is_valid()));
+}
+
+TEST(CollisionDetectionTest, ReversedMeshPlanePairFlipsNormalAndPreservesPoint) {
+    const WorldMesh mesh{
+        .vertices = {
+            pbpt::math::Vec3{0.2f, -0.2f, 0.0f},
+            pbpt::math::Vec3{0.4f, -0.2f, 0.0f},
+            pbpt::math::Vec3{0.6f, 0.2f, 0.0f},
+        },
+    };
+    const WorldPlane plane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    const auto forward = ContactPairTrait<WorldMesh, WorldPlane>::generate(mesh, plane);
+    const auto reverse = ContactPairTrait<WorldPlane, WorldMesh>::generate(plane, mesh);
+
+    ASSERT_TRUE(forward.is_valid());
+    ASSERT_TRUE(reverse.is_valid());
+    EXPECT_NEAR(forward.point.x(), reverse.point.x(), 1e-5f);
+    EXPECT_NEAR(forward.point.y(), reverse.point.y(), 1e-5f);
+    EXPECT_NEAR(forward.point.z(), reverse.point.z(), 1e-5f);
+    EXPECT_NEAR(forward.penetration, reverse.penetration, 1e-5f);
+    EXPECT_NEAR(forward.normal.x(), -reverse.normal.x(), 1e-5f);
+    EXPECT_NEAR(forward.normal.y(), -reverse.normal.y(), 1e-5f);
+    EXPECT_NEAR(forward.normal.z(), -reverse.normal.z(), 1e-5f);
+}
+
 }  // namespace rtr::system::physics::test
 
 int main(int argc, char** argv) {

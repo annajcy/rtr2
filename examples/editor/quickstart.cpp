@@ -62,7 +62,8 @@ int main() {
                                      const pbpt::math::Vec4& base_color) {
             const auto mesh_handle =
                 runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(mesh_path);
-            (void)go.add_component<rtr::framework::component::MeshRenderer>(mesh_handle, base_color);
+            (void)go.add_component<rtr::framework::component::MeshRenderer>(
+                runtime.resource_manager(), mesh_handle, base_color);
         };
 
         auto& go_a = scene.create_game_object("mesh_a");

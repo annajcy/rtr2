@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <string>
 #include <stdexcept>
 #include <utility>
 
@@ -21,6 +22,8 @@ private:
     bool                           m_use_gravity{true};
     pbpt::math::Float              m_restitution{0.0f};
     pbpt::math::Float              m_friction{0.0f};
+    pbpt::math::Float              m_linear_decay{1.0f};
+    pbpt::math::Float              m_angular_decay{1.0f};
     pbpt::math::Mat3               m_inverse_inertia_tensor_ref{pbpt::math::Mat3::zeros()};
     bool                           m_registered{false};
 
@@ -58,6 +61,13 @@ private:
         return friction;
     }
 
+    static pbpt::math::Float sanitize_decay(pbpt::math::Float decay, const char* label) {
+        if (!std::isfinite(decay) || decay < 0.0f || decay > 1.0f) {
+            throw std::invalid_argument(std::string(label) + " must be finite and within [0, 1].");
+        }
+        return decay;
+    }
+
     system::physics::RigidBody* physics_body() {
         if (!has_registered_body()) {
             return nullptr;
@@ -78,7 +88,9 @@ public:
                        bool use_gravity = true,
                        const pbpt::math::Mat3& inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros(),
                        pbpt::math::Float restitution = 0.0f,
-                       pbpt::math::Float friction = 0.0f)
+                       pbpt::math::Float friction = 0.0f,
+                       pbpt::math::Float linear_decay = 1.0f,
+                       pbpt::math::Float angular_decay = 1.0f)
         : Component(owner),
           m_physics_world(world),
           m_type(type),
@@ -86,6 +98,8 @@ public:
           m_use_gravity(use_gravity),
           m_restitution(sanitize_restitution(restitution)),
           m_friction(sanitize_friction(friction)),
+          m_linear_decay(sanitize_decay(linear_decay, "RigidBody linear_decay")),
+          m_angular_decay(sanitize_decay(angular_decay, "RigidBody angular_decay")),
           m_inverse_inertia_tensor_ref(sanitize_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref)) {}
 
     void on_awake() override {}
@@ -101,6 +115,8 @@ public:
         body.set_use_gravity(m_use_gravity);
         body.set_restitution(m_restitution);
         body.set_friction(m_friction);
+        body.set_linear_decay(m_linear_decay);
+        body.set_angular_decay(m_angular_decay);
         body.set_inverse_inertia_tensor_ref(m_inverse_inertia_tensor_ref);
         body.state().mass                        = m_mass;
         body.state().translation.position        = owner().node().world_position();
@@ -165,6 +181,14 @@ public:
         return body->state().translation.linear_velocity;
     }
 
+    void set_linear_velocity(const pbpt::math::Vec3& linear_velocity) {
+        auto* body = physics_body();
+        if (body == nullptr) {
+            return;
+        }
+        body->state().translation.linear_velocity = linear_velocity;
+    }
+
     pbpt::math::Quat orientation() const {
         const auto* body = physics_body();
         if (body == nullptr) {
@@ -187,6 +211,14 @@ public:
             return pbpt::math::Vec3(0.0f);
         }
         return body->state().rotation.angular_velocity;
+    }
+
+    void set_angular_velocity(const pbpt::math::Vec3& angular_velocity) {
+        auto* body = physics_body();
+        if (body == nullptr) {
+            return;
+        }
+        body->state().rotation.angular_velocity = angular_velocity;
     }
 
     pbpt::math::Float mass() const {
@@ -234,6 +266,30 @@ public:
         m_friction = sanitize_friction(friction);
         if (auto* body = physics_body(); body != nullptr) {
             body->set_friction(m_friction);
+        }
+    }
+
+    pbpt::math::Float linear_decay() const {
+        const auto* body = physics_body();
+        return body != nullptr ? body->linear_decay() : m_linear_decay;
+    }
+
+    void set_linear_decay(pbpt::math::Float linear_decay) {
+        m_linear_decay = sanitize_decay(linear_decay, "RigidBody linear_decay");
+        if (auto* body = physics_body(); body != nullptr) {
+            body->set_linear_decay(m_linear_decay);
+        }
+    }
+
+    pbpt::math::Float angular_decay() const {
+        const auto* body = physics_body();
+        return body != nullptr ? body->angular_decay() : m_angular_decay;
+    }
+
+    void set_angular_decay(pbpt::math::Float angular_decay) {
+        m_angular_decay = sanitize_decay(angular_decay, "RigidBody angular_decay");
+        if (auto* body = physics_body(); body != nullptr) {
+            body->set_angular_decay(m_angular_decay);
         }
     }
 

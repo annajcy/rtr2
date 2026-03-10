@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 
 #include "imgui.h"
@@ -12,7 +13,9 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/camera_control/trackball_camera_controller.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
+#include "rtr/framework/component/physics/plane_collider.hpp"
 #include "rtr/framework/component/physics/box_collider.hpp"
+#include "rtr/framework/component/physics/mesh_collider.hpp"
 #include "rtr/framework/component/physics/reset_position.hpp"
 #include "rtr/framework/component/physics/rigid_body.hpp"
 #include "rtr/framework/component/physics/sphere_collider.hpp"
@@ -267,6 +270,22 @@ private:
                                 game_object.id(), friction);
             }
 
+            float linear_decay = rigid_body->linear_decay();
+            if (ImGui::DragFloat("Linear Decay", &linear_decay, 0.001f, 0.0f, 1.0f)) {
+                linear_decay = pbpt::math::clamp(linear_decay, 0.0f, 1.0f);
+                rigid_body->set_linear_decay(linear_decay);
+                logger()->debug("RigidBody linear_decay updated (game_object_id={}, linear_decay={:.4f}).",
+                                game_object.id(), linear_decay);
+            }
+
+            float angular_decay = rigid_body->angular_decay();
+            if (ImGui::DragFloat("Angular Decay", &angular_decay, 0.001f, 0.0f, 1.0f)) {
+                angular_decay = pbpt::math::clamp(angular_decay, 0.0f, 1.0f);
+                rigid_body->set_angular_decay(angular_decay);
+                logger()->debug("RigidBody angular_decay updated (game_object_id={}, angular_decay={:.4f}).",
+                                game_object.id(), angular_decay);
+            }
+
             pbpt::math::Vec3 linear_velocity = rigid_body->linear_velocity();
             ImGui::Text("Linear Velocity: [%.4f, %.4f, %.4f]", linear_velocity.x(), linear_velocity.y(),
                         linear_velocity.z());
@@ -431,6 +450,102 @@ private:
                 box->set_local_scale(local_scale);
                 logger()->debug(
                     "BoxCollider local_scale updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), local_scale.x(), local_scale.y(), local_scale.z());
+            }
+        }
+    }
+
+    static void draw_plane_collider_editor(framework::core::GameObject& game_object) {
+        auto* plane = game_object.get_component<framework::component::PlaneCollider>();
+        if (plane == nullptr) {
+            return;
+        }
+
+        if (ImGui::CollapsingHeader("PlaneCollider", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = plane->enabled();
+            if (ImGui::Checkbox("Enabled##plane_collider", &enabled)) {
+                game_object.set_component_enabled<framework::component::PlaneCollider>(enabled);
+                logger()->debug("PlaneCollider enabled updated (game_object_id={}, enabled={}).", game_object.id(),
+                                enabled);
+            }
+
+            pbpt::math::Vec3 normal_local = plane->normal_local();
+            if (ImGui::DragFloat3("Normal##plane_collider", &normal_local.x(), 0.01f, -1.0f, 1.0f)) {
+                const bool finite = std::isfinite(normal_local.x()) && std::isfinite(normal_local.y()) &&
+                                    std::isfinite(normal_local.z());
+                if (finite && pbpt::math::dot(normal_local, normal_local) > 1e-12f) {
+                    plane->set_normal_local(normal_local);
+                    normal_local = plane->normal_local();
+                    logger()->debug(
+                        "PlaneCollider normal_local updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                        game_object.id(), normal_local.x(), normal_local.y(), normal_local.z());
+                }
+            }
+
+            pbpt::math::Vec3 local_position = plane->local_position();
+            if (ImGui::DragFloat3("Local Position##plane_collider", &local_position.x(), 0.05f)) {
+                plane->set_local_position(local_position);
+                logger()->debug(
+                    "PlaneCollider local_position updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), local_position.x(), local_position.y(), local_position.z());
+            }
+
+            pbpt::math::Vec3 local_euler = pbpt::math::degrees(pbpt::math::euler_angles(plane->local_rotation()));
+            if (ImGui::DragFloat3("Local Rotation (deg)##plane_collider", &local_euler.x(), 0.5f)) {
+                plane->set_local_rotation(pbpt::math::Quat(pbpt::math::radians(local_euler)));
+                logger()->debug(
+                    "PlaneCollider local_rotation updated (game_object_id={}, euler_deg=[{:.3f}, {:.3f}, {:.3f}]).",
+                    game_object.id(), local_euler.x(), local_euler.y(), local_euler.z());
+            }
+        }
+    }
+
+    static void draw_mesh_collider_editor(framework::core::GameObject& game_object) {
+        auto* mesh = game_object.get_component<framework::component::MeshCollider>();
+        if (mesh == nullptr) {
+            return;
+        }
+
+        if (ImGui::CollapsingHeader("MeshCollider", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = mesh->enabled();
+            if (ImGui::Checkbox("Enabled##mesh_collider", &enabled)) {
+                game_object.set_component_enabled<framework::component::MeshCollider>(enabled);
+                logger()->debug("MeshCollider enabled updated (game_object_id={}, enabled={}).", game_object.id(),
+                                enabled);
+            }
+
+            if (const auto* mesh_renderer = game_object.get_component<framework::component::MeshRenderer>();
+                mesh_renderer != nullptr) {
+                ImGui::Text("Mesh Handle: %llu",
+                            static_cast<unsigned long long>(mesh_renderer->mesh_handle().value));
+            } else {
+                ImGui::TextDisabled("MeshRenderer is required on the same GameObject.");
+            }
+
+            pbpt::math::Vec3 local_position = mesh->local_position();
+            if (ImGui::DragFloat3("Local Position##mesh_collider", &local_position.x(), 0.05f)) {
+                mesh->set_local_position(local_position);
+                logger()->debug(
+                    "MeshCollider local_position updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
+                    game_object.id(), local_position.x(), local_position.y(), local_position.z());
+            }
+
+            pbpt::math::Vec3 local_euler = pbpt::math::degrees(pbpt::math::euler_angles(mesh->local_rotation()));
+            if (ImGui::DragFloat3("Local Rotation (deg)##mesh_collider", &local_euler.x(), 0.5f)) {
+                mesh->set_local_rotation(pbpt::math::Quat(pbpt::math::radians(local_euler)));
+                logger()->debug(
+                    "MeshCollider local_rotation updated (game_object_id={}, euler_deg=[{:.3f}, {:.3f}, {:.3f}]).",
+                    game_object.id(), local_euler.x(), local_euler.y(), local_euler.z());
+            }
+
+            pbpt::math::Vec3 local_scale = mesh->local_scale();
+            if (ImGui::DragFloat3("Local Scale##mesh_collider", &local_scale.x(), 0.02f, 0.001f, 1000.0f)) {
+                local_scale.x() = std::max(0.001f, local_scale.x());
+                local_scale.y() = std::max(0.001f, local_scale.y());
+                local_scale.z() = std::max(0.001f, local_scale.z());
+                mesh->set_local_scale(local_scale);
+                logger()->debug(
+                    "MeshCollider local_scale updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
                     game_object.id(), local_scale.x(), local_scale.y(), local_scale.z());
             }
         }
@@ -644,6 +759,8 @@ public:
         draw_rigid_body_editor(*game_object);
         draw_sphere_collider_editor(ctx, *game_object);
         draw_box_collider_editor(ctx, *game_object);
+        draw_plane_collider_editor(*game_object);
+        draw_mesh_collider_editor(*game_object);
         draw_reset_position_editor(*game_object);
         draw_free_look_editor(*game_object);
         draw_trackball_editor(*game_object);

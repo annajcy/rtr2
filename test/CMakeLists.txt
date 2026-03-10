@@ -64,6 +64,7 @@ rtr_add_test(
 rtr_add_test(
     test_physics_scene_integration
     framework/integration/framework_physics_scene_sync_test.cpp
+    rtr::runtime
 )
 rtr_add_test(
     test_collision_detection
@@ -138,14 +139,17 @@ rtr_add_test(
 rtr_add_test(
     test_framework_mesh_renderer
     framework/component/framework_mesh_renderer_test.cpp
+    rtr::runtime
 )
 rtr_add_test(
     test_framework_pbpt_mesh
     framework/component/framework_pbpt_mesh_test.cpp
+    rtr::runtime
 )
 rtr_add_test(
     test_framework_pbpt_light
     framework/component/framework_pbpt_light_test.cpp
+    rtr::runtime
 )
 rtr_add_test(
     test_framework_reset_position_component
@@ -158,6 +162,12 @@ rtr_add_test(
 rtr_add_test(
     test_framework_collider_component
     framework/component/framework_collider_component_test.cpp
+    rtr::runtime
+)
+rtr_add_test(
+    test_angry_bunny_controller
+    framework/component/angry_bunny_controller_test.cpp
+    rtr::runtime
 )
 rtr_add_test(
     test_pbpt_spectrum

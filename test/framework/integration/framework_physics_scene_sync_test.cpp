@@ -4,12 +4,16 @@
 
 #include "gtest/gtest.h"
 
+#include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/physics/box_collider.hpp"
+#include "rtr/framework/component/physics/mesh_collider.hpp"
+#include "rtr/framework/component/physics/plane_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body.hpp"
 #include "rtr/framework/component/physics/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/integration/physics/scene_physics_sync.hpp"
+#include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/physics/collision.hpp"
 #include "rtr/system/physics/physics_world.hpp"
 
@@ -45,6 +49,17 @@ pbpt::math::Mat3 diagonal_inverse_inertia(const pbpt::math::Float x,
     result[1][1]            = y;
     result[2][2]            = z;
     return result;
+}
+
+utils::ObjMeshData make_offcenter_triangle_mesh() {
+    utils::ObjMeshData mesh{};
+    mesh.vertices = {
+        {.position = pbpt::math::Vec3{0.2f, -0.2f, 0.0f}},
+        {.position = pbpt::math::Vec3{0.4f, -0.2f, 0.0f}},
+        {.position = pbpt::math::Vec3{0.6f, 0.2f, 0.0f}},
+    };
+    mesh.indices = {0, 1, 2};
+    return mesh;
 }
 
 }  // namespace
@@ -646,6 +661,35 @@ TEST(PhysicsSceneIntegrationTest, DynamicBodiesOffCenterCollisionProducesFiniteA
     EXPECT_TRUE(std::isfinite(box_body.angular_velocity().z()));
     EXPECT_GT(std::abs(sphere_body.angular_velocity().z()), 1e-4f);
     EXPECT_GT(std::abs(box_body.angular_velocity().z()), 1e-4f);
+}
+
+TEST(PhysicsSceneIntegrationTest, DynamicMeshCollidesWithStaticPlaneAndGeneratesAngularVelocity) {
+    PhysicsStepper            physics;
+    resource::ResourceManager resources;
+    framework::core::Scene    scene(1);
+    const auto mesh_handle = resources.create<resource::MeshResourceKind>(make_offcenter_triangle_mesh());
+
+    auto& floor = scene.create_game_object("floor");
+    auto& floor_body = floor.add_component<framework::component::RigidBody>(physics.world());
+    floor_body.set_type(RigidBodyType::Static);
+    (void)floor.add_component<framework::component::PlaneCollider>(
+        physics.world(), pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
+
+    auto& mesh_go = scene.create_game_object("mesh");
+    mesh_go.node().set_local_position(pbpt::math::Vec3{0.0f, 0.1f, 0.0f});
+    auto& mesh_body = mesh_go.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.25f);
+    (void)mesh_go.add_component<framework::component::MeshRenderer>(resources, mesh_handle);
+    (void)mesh_go.add_component<framework::component::MeshCollider>(physics.world());
+    mesh_body.set_linear_velocity(pbpt::math::Vec3{0.0f, -1.0f, 0.0f});
+
+    physics.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    EXPECT_GT(mesh_body.linear_velocity().y(), -0.25f);
+    EXPECT_GT(std::abs(mesh_body.angular_velocity().z()), 1e-4f);
 }
 
 }  // namespace rtr::framework::integration::physics::test

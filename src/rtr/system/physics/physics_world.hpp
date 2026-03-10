@@ -159,6 +159,7 @@ private:
 
         const auto acc = rb.state().inverse_mass() * rb.state().forces.accumulated_force;
         rb.state().translation.linear_velocity += acc * delta_seconds;
+        rb.state().translation.linear_velocity *= rb.linear_decay();
         rb.state().translation.position += rb.state().translation.linear_velocity * delta_seconds;
 
         const auto rotation_matrix = rb.state().rotation.orientation.to_mat3();
@@ -166,6 +167,7 @@ private:
             rotation_matrix * rb.inverse_inertia_tensor_ref() * rotation_matrix.transposed();
         const auto angular_acc = inv_inertia_tensor * rb.state().forces.accumulated_torque;
         rb.state().rotation.angular_velocity += angular_acc * delta_seconds;
+        rb.state().rotation.angular_velocity *= rb.angular_decay();
 
         const auto angular_velocity_quat = pbpt::math::Quat(0.0f,
                                                             rb.state().rotation.angular_velocity.x(),

@@ -2,13 +2,32 @@
 
 #include "gtest/gtest.h"
 
+#include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/physics/box_collider.hpp"
+#include "rtr/framework/component/physics/mesh_collider.hpp"
+#include "rtr/framework/component/physics/plane_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body.hpp"
 #include "rtr/framework/component/physics/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
+#include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/physics/physics_world.hpp"
 
 namespace rtr::framework::component::test {
+
+namespace {
+
+utils::ObjMeshData make_triangle_mesh() {
+    utils::ObjMeshData mesh{};
+    mesh.vertices = {
+        {.position = pbpt::math::Vec3{0.2f, -0.2f, 0.0f}},
+        {.position = pbpt::math::Vec3{0.4f, -0.2f, 0.0f}},
+        {.position = pbpt::math::Vec3{0.6f, 0.2f, 0.0f}},
+    };
+    mesh.indices = {0, 1, 2};
+    return mesh;
+}
+
+}  // namespace
 
 TEST(FrameworkColliderComponentTest, SphereColliderThrowsWhenRigidBodyIsMissing) {
     system::physics::PhysicsWorld physics_world;
@@ -25,6 +44,24 @@ TEST(FrameworkColliderComponentTest, BoxColliderThrowsWhenRigidBodyIsMissing) {
     auto& go = scene.create_game_object("box");
     EXPECT_THROW((void)go.add_component<BoxCollider>(physics_world, pbpt::math::Vec3{1.0f, 1.0f, 1.0f}),
                  std::runtime_error);
+}
+
+TEST(FrameworkColliderComponentTest, PlaneColliderThrowsWhenRigidBodyIsMissing) {
+    system::physics::PhysicsWorld physics_world;
+    core::Scene                   scene(1);
+
+    auto& go = scene.create_game_object("plane");
+    EXPECT_THROW((void)go.add_component<PlaneCollider>(physics_world), std::runtime_error);
+}
+
+TEST(FrameworkColliderComponentTest, MeshColliderThrowsWhenMeshRendererIsMissing) {
+    system::physics::PhysicsWorld physics_world;
+    resource::ResourceManager     resources;
+    core::Scene                   scene(1);
+
+    auto& go = scene.create_game_object("mesh");
+    (void)go.add_component<RigidBody>(physics_world);
+    EXPECT_THROW((void)go.add_component<MeshCollider>(physics_world), std::runtime_error);
 }
 
 TEST(FrameworkColliderComponentTest, StaticRigidBodyCanOwnBoxColliderAndDestroyRemovesCollider) {
@@ -101,6 +138,49 @@ TEST(FrameworkColliderComponentTest, BoxColliderSyncsFullLocalTransformToPhysics
     EXPECT_NEAR(collider.local_transform.rotation.x(), box.local_rotation().x(), 1e-5f);
     EXPECT_NEAR(collider.local_transform.rotation.y(), box.local_rotation().y(), 1e-5f);
     EXPECT_NEAR(collider.local_transform.rotation.z(), box.local_rotation().z(), 1e-5f);
+}
+
+TEST(FrameworkColliderComponentTest, PlaneColliderSyncsWorldNormalWithNodeRotation) {
+    system::physics::PhysicsWorld physics_world;
+    core::Scene                   scene(1);
+
+    auto& go = scene.create_game_object("plane");
+    go.node().set_local_rotation(
+        pbpt::math::angle_axis(pbpt::math::radians(90.0f), pbpt::math::Vec3{0.0f, 1.0f, 0.0f}));
+    auto& rigid_body = go.add_component<RigidBody>(physics_world);
+    rigid_body.set_type(system::physics::RigidBodyType::Static);
+    (void)go.add_component<PlaneCollider>(physics_world, pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
+
+    const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
+    ASSERT_EQ(collider_ids.size(), 1u);
+    const auto world_collider = physics_world.get_world_collider(collider_ids.front());
+    const auto* world_plane = std::get_if<system::physics::WorldPlane>(&world_collider);
+    ASSERT_NE(world_plane, nullptr);
+    EXPECT_NEAR(world_plane->normal.x(), 1.0f, 1e-5f);
+    EXPECT_NEAR(world_plane->normal.y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(world_plane->normal.z(), 0.0f, 1e-5f);
+}
+
+TEST(FrameworkColliderComponentTest, MeshColliderReadsLocalVerticesFromMeshRenderer) {
+    system::physics::PhysicsWorld physics_world;
+    resource::ResourceManager     resources;
+    core::Scene                   scene(1);
+    const auto mesh_handle = resources.create<resource::MeshResourceKind>(make_triangle_mesh());
+
+    auto& go = scene.create_game_object("mesh");
+    auto& rigid_body = go.add_component<RigidBody>(physics_world);
+    auto& mesh_renderer = go.add_component<MeshRenderer>(resources, mesh_handle);
+    auto& mesh = go.add_component<MeshCollider>(physics_world);
+
+    const auto local_vertices = mesh_renderer.local_vertices();
+    ASSERT_EQ(local_vertices.size(), 3u);
+    const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
+    ASSERT_EQ(collider_ids.size(), 1u);
+    const auto& collider = physics_world.get_collider(collider_ids.front());
+    const auto* mesh_shape = std::get_if<system::physics::MeshShape>(&collider.shape);
+    ASSERT_NE(mesh_shape, nullptr);
+    ASSERT_EQ(mesh_shape->local_vertices.size(), 3u);
+    EXPECT_NEAR(mesh_shape->local_vertices[0].x(), 0.2f, 1e-5f);
 }
 
 }  // namespace rtr::framework::component::test

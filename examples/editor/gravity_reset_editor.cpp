@@ -63,7 +63,7 @@ int main() {
         const auto bunny_mesh = runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(
             "models/stanford_bunny.obj");
         (void)bunny_go.add_component<rtr::framework::component::MeshRenderer>(
-            bunny_mesh, pbpt::math::Vec4{0.90f, 0.85f, 0.78f, 1.0f});
+            runtime.resource_manager(), bunny_mesh, pbpt::math::Vec4{0.90f, 0.85f, 0.78f, 1.0f});
         bunny_go.node().set_local_position({0.0f, 2.0f, 0.0f});
         bunny_go.node().set_local_scale({10.0f, 10.0f, 10.0f});
 
@@ -76,7 +76,7 @@ int main() {
         const auto ground_mesh = runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(
             "models/colored_quad.obj");
         (void)ground_go.add_component<rtr::framework::component::MeshRenderer>(
-            ground_mesh, pbpt::math::Vec4{0.25f, 0.25f, 0.28f, 1.0f});
+            runtime.resource_manager(), ground_mesh, pbpt::math::Vec4{0.25f, 0.25f, 0.28f, 1.0f});
         ground_go.node().set_local_position({0.0f, -1.0f, 0.0f});
         ground_go.node().set_local_rotation(
             pbpt::math::angle_axis(pbpt::math::radians(-90.0f), pbpt::math::Vec3{1.0f, 0.0f, 0.0f}));
