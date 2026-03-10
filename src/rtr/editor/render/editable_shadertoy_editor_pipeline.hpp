@@ -109,7 +109,7 @@ public:
 
     void on_resize(int /*w*/, int /*h*/) override {}
 
-    void prepare_frame(const system::render::FramePrepareContext& /*ctx*/) override {
+    void check_and_reload_shader() {
         const auto reload_result = m_reload_controller.check_for_reload();
         if (!reload_result.should_compile) {
             return;

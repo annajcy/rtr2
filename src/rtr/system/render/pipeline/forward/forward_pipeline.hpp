@@ -14,7 +14,6 @@
 #include <vector>
 
 #include "rtr/framework/integration/render/forward_scene_view_builder.hpp"
-#include "rtr/framework/core/world.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/descriptor.hpp"
 #include "rtr/rhi/mesh.hpp"
@@ -135,11 +134,8 @@ public:
 
     ~ForwardPipeline() override = default;
 
-    void prepare_frame(const FramePrepareContext& ctx) override {
-        auto* active_scene = ctx.world.active_scene();
-        if (!active_scene)
-            throw std::runtime_error("ForwardPipeline::prepare_frame: no active scene.");
-        m_scene_view = framework::integration::render::build_forward_scene_view(*active_scene, ctx.resources, m_device);
+    void prepare_scene(const framework::core::Scene& scene, resource::ResourceManager& resources) {
+        m_scene_view = framework::integration::render::build_forward_scene_view(scene, resources, m_device);
     }
 
     void on_resize(int /*w*/, int /*h*/) override {}

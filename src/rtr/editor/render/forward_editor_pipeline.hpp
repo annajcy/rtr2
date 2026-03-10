@@ -113,11 +113,8 @@ public:
     bool wants_imgui_capture_mouse() const override { return m_editor_pass.wants_capture_mouse(); }
     bool wants_imgui_capture_keyboard() const override { return m_editor_pass.wants_capture_keyboard(); }
 
-    void prepare_frame(const system::render::FramePrepareContext& ctx) override {
-        auto* scene = ctx.world.active_scene();
-        if (!scene)
-            throw std::runtime_error("ForwardEditorPipeline::prepare_frame: no active scene.");
-        m_scene_view = framework::integration::render::build_forward_scene_view(*scene, ctx.resources, m_device);
+    void prepare_scene(const framework::core::Scene& scene, resource::ResourceManager& resources) {
+        m_scene_view = framework::integration::render::build_forward_scene_view(scene, resources, m_device);
     }
 
     void on_resize(int /*w*/, int /*h*/) override {}

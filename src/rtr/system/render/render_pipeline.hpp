@@ -11,7 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "rtr/resource/resource_fwd.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/context.hpp"
 #include "rtr/rhi/device.hpp"
@@ -23,14 +22,6 @@
 #include "rtr/utils/event_center.hpp"
 #include "vulkan/vulkan_enums.hpp"
 
-namespace rtr::framework::core {
-class World;
-}
-
-namespace rtr::system::input {
-class InputSystem;
-}
-
 namespace rtr::system::render {
 
 struct PipelineRuntime {
@@ -41,14 +32,6 @@ struct PipelineRuntime {
     vk::Format color_format{vk::Format::eUndefined};
     vk::Format depth_format{vk::Format::eUndefined};
     std::filesystem::path shader_root_dir{};
-};
-
-struct FramePrepareContext {
-    framework::core::World& world;
-    resource::ResourceManager& resources;
-    system::input::InputSystem& input;
-    std::uint64_t frame_serial{0};
-    double delta_seconds{0.0};
 };
 
 struct SceneViewportResizeEvent {
@@ -96,9 +79,6 @@ public:
     virtual ~RenderPipeline() = default;
 
     virtual void render(FrameContext& ctx) = 0;
-    virtual void prepare_frame(const FramePrepareContext& ctx) {
-        (void)ctx;
-    }
 
     virtual void on_resize(int width, int height) {
         (void)width;
