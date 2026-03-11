@@ -273,3 +273,11 @@ rtr_add_test(
     resource/resource_manager_generic_kinds_test.cpp
     rtr::runtime
 )
+
+# mcp
+rtr_add_test(
+    test_mcp_bridge_core
+    mcp/bridge_core_test.cpp
+    rtr::runtime
+    nlohmann_json::nlohmann_json
+)

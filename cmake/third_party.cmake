@@ -8,6 +8,7 @@ endif()
 
 find_package(VulkanLoader   CONFIG REQUIRED)
 find_package(glfw3          CONFIG REQUIRED)
+find_package(nlohmann_json  CONFIG REQUIRED)
 find_package(TinyGLTF       CONFIG REQUIRED)
 find_package(stb            CONFIG REQUIRED)
 find_package(spdlog         CONFIG REQUIRED)

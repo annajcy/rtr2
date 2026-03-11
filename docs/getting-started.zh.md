@@ -35,3 +35,7 @@ RTR_RUN_GPU_TESTS=1 ctest --test-dir build/Debug -C Debug -L integration
 ```bash
 uv run mkdocs build
 ```
+
+## Headless MCP
+
+如果你要通过 HTTP MCP 进行 headless 场景搭建和 PBPT 离线渲染，请查看 [Headless MCP](headless-mcp.md)。

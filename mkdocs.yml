@@ -45,6 +45,7 @@ plugins:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Headless MCP: headless-mcp.md
   - Documentation:
       - Overview: documentation/overview.md
       - System:

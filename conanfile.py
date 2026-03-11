@@ -65,6 +65,7 @@ class RTRConan(ConanFile):
 
     def requirements(self):
         self.requires("glfw/3.4", transitive_headers=True)
+        self.requires("nlohmann_json/[>=3.11 <4]", transitive_headers=True)
         self.requires("tinygltf/[>=2.8 <3]")
         if self.options.with_editor:
             self.requires("imgui/1.92.2b-docking", transitive_headers=True)

@@ -151,6 +151,103 @@ Run command:
 ./build/Debug/examples/framework_offline_cbox_main
 ```
 
+## Headless MCP
+
+RTR2 now ships a headless HTTP MCP stack for scene authoring and PBPT offline rendering without opening a window.
+
+Build the bridge helper:
+```bash
+cmake --build --preset conan-debug --target rtr_mcp_bridge
+```
+
+Start the MCP server:
+```bash
+uv run rtr-mcp
+```
+
+The MCP endpoint is fixed to:
+```text
+http://127.0.0.1:8000/mcp
+```
+
+This server is HTTP-only and listens on `127.0.0.1` only.
+
+If the helper binary lives outside the default `build/**/rtr_mcp_bridge` search paths, set:
+```bash
+export RTR_MCP_BRIDGE_BIN=/absolute/path/to/rtr_mcp_bridge
+```
+
+Example client config should point to the HTTP endpoint above rather than `stdio`.
+
+### Minimal SceneSpec
+
+`scene_replace` accepts a declarative `scene_spec` object with `perspective_camera`, `mesh_object`, and
+`emissive_mesh_object` nodes:
+
+```json
+{
+  "scene_name": "mcp_demo",
+  "nodes": [
+    {
+      "type": "perspective_camera",
+      "name": "camera",
+      "active": true,
+      "fov_degrees": 50.0,
+      "near": 0.1,
+      "far": 200.0,
+      "transform": {
+        "position": {"x": 0.0, "y": 1.0, "z": 6.0},
+        "rotation_quat": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0},
+        "scale": {"x": 1.0, "y": 1.0, "z": 1.0}
+      }
+    },
+    {
+      "type": "mesh_object",
+      "name": "bunny",
+      "mesh_path": "models/stanford_bunny.obj",
+      "base_color": {"x": 0.9, "y": 0.8, "z": 0.7, "w": 1.0},
+      "pbpt_mesh": true
+    },
+    {
+      "type": "emissive_mesh_object",
+      "name": "light_quad",
+      "mesh_path": "models/colored_quad.obj",
+      "base_color": {"x": 1.0, "y": 1.0, "z": 1.0, "w": 1.0},
+      "radiance_spectrum": [
+        {"lambda_nm": 400.0, "value": 4.0},
+        {"lambda_nm": 500.0, "value": 4.0},
+        {"lambda_nm": 600.0, "value": 4.0},
+        {"lambda_nm": 700.0, "value": 4.0}
+      ]
+    }
+  ]
+}
+```
+
+### Offline Render Flow
+
+Typical MCP sequence over HTTP:
+
+1. `session_create`
+2. `scene_replace`
+3. `scene_export_pbpt`
+4. `offline_render` with `action="start"`
+5. `offline_render` with `action="status"`
+
+Example `offline_render` request payload:
+
+```json
+{
+  "session_id": "session_1",
+  "action": "start",
+  "scene_xml_path": "/tmp/rtr_mcp/runtime_scene.xml",
+  "output_exr_path": "/tmp/rtr_mcp/runtime_output.exr",
+  "spp": 16,
+  "film_width": 512,
+  "film_height": 512
+}
+```
+
 # PBPT integration
 
 Initialize the PBPT submodule:

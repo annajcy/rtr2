@@ -24,6 +24,15 @@ target_compile_definitions(rtr_runtime INTERFACE
   RTR_PROJECT_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"
 )
 
+add_executable(rtr_mcp_bridge mcp_bridge_main.cpp)
+target_link_libraries(rtr_mcp_bridge PRIVATE
+  rtr::runtime
+  nlohmann_json::nlohmann_json
+)
+target_compile_definitions(rtr_mcp_bridge PRIVATE
+  RTR_MCP_BRIDGE_VERSION=\"0.1.0\"
+)
+
 if (RTR_BUILD_EDITOR)
   add_library(rtr_editor INTERFACE)
   add_library(rtr::editor ALIAS rtr_editor)

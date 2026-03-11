@@ -34,4 +34,8 @@ RTR_RUN_GPU_TESTS=1 ctest --test-dir build/Debug -C Debug -L integration
 
 ```bash
 uv run mkdocs build
-``` 
+```
+
+## Headless MCP
+
+For HTTP-based headless scene authoring and PBPT offline rendering, see [Headless MCP](headless-mcp.md).
