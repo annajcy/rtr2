@@ -95,6 +95,54 @@ TEST(CollisionDetectionTest, ReversedSphereBoxPairFlipsNormalAndPreservesPenetra
     EXPECT_NEAR(forward.normal.z(), -reverse.normal.z(), 1e-5f);
 }
 
+TEST(CollisionDetectionTest, SpherePlaneReportsIntersectionAndSeparation) {
+    const WorldSphere sphere{
+        .center = pbpt::math::Vec3{0.0f, 0.25f, 0.0f},
+        .radius = 0.5f,
+    };
+    auto plane = WorldPlane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    const auto hit = ContactPairTrait<WorldSphere, WorldPlane>::generate(sphere, plane);
+    ASSERT_TRUE(hit.is_valid());
+    EXPECT_NEAR(hit.point.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(hit.point.y(), -0.25f, 1e-5f);
+    EXPECT_NEAR(hit.point.z(), 0.0f, 1e-5f);
+    EXPECT_NEAR(hit.normal.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(hit.normal.y(), -1.0f, 1e-5f);
+    EXPECT_NEAR(hit.normal.z(), 0.0f, 1e-5f);
+    EXPECT_NEAR(hit.penetration, 0.25f, 1e-5f);
+
+    plane.point = pbpt::math::Vec3{0.0f, -1.0f, 0.0f};
+    EXPECT_FALSE((ContactPairTrait<WorldSphere, WorldPlane>::generate(sphere, plane).is_valid()));
+}
+
+TEST(CollisionDetectionTest, ReversedSpherePlanePairFlipsNormalAndPreservesPenetrationAndPoint) {
+    const WorldSphere sphere{
+        .center = pbpt::math::Vec3{0.0f, 0.2f, 0.0f},
+        .radius = 0.5f,
+    };
+    const WorldPlane plane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    const auto forward = ContactPairTrait<WorldSphere, WorldPlane>::generate(sphere, plane);
+    const auto reverse = ContactPairTrait<WorldPlane, WorldSphere>::generate(plane, sphere);
+
+    ASSERT_TRUE(forward.is_valid());
+    ASSERT_TRUE(reverse.is_valid());
+    EXPECT_NEAR(forward.point.x(), reverse.point.x(), 1e-5f);
+    EXPECT_NEAR(forward.point.y(), reverse.point.y(), 1e-5f);
+    EXPECT_NEAR(forward.point.z(), reverse.point.z(), 1e-5f);
+    EXPECT_NEAR(forward.penetration, reverse.penetration, 1e-5f);
+    EXPECT_NEAR(forward.normal.x(), -reverse.normal.x(), 1e-5f);
+    EXPECT_NEAR(forward.normal.y(), -reverse.normal.y(), 1e-5f);
+    EXPECT_NEAR(forward.normal.z(), -reverse.normal.z(), 1e-5f);
+}
+
 TEST(CollisionDetectionTest, BoxBoxReportsIntersectionAndSeparation) {
     const WorldBox a{
         .center = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
@@ -241,6 +289,138 @@ TEST(CollisionDetectionTest, VariantVisitDispatchUsesBoxBoxTrait) {
         .center = pbpt::math::Vec3{1.5f, 0.0f, 0.0f},
         .rotation = pbpt::math::Quat::identity(),
         .half_extents = pbpt::math::Vec3{1.0f, 1.0f, 1.0f},
+    };
+
+    ContactResult result{};
+    std::visit(
+        [&](auto&& shape_a, auto&& shape_b) {
+            result = ContactPairTrait<
+                std::decay_t<decltype(shape_a)>,
+                std::decay_t<decltype(shape_b)>>::generate(shape_a, shape_b);
+        },
+        collider_a,
+        collider_b);
+
+    EXPECT_TRUE(result.is_valid());
+    EXPECT_GT(result.penetration, 0.0f);
+}
+
+TEST(CollisionDetectionTest, VariantVisitDispatchUsesSpherePlaneTrait) {
+    const WorldCollider collider_a = WorldSphere{
+        .center = pbpt::math::Vec3{0.0f, 0.25f, 0.0f},
+        .radius = 0.5f,
+    };
+    const WorldCollider collider_b = WorldPlane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    ContactResult result{};
+    std::visit(
+        [&](auto&& shape_a, auto&& shape_b) {
+            result = ContactPairTrait<
+                std::decay_t<decltype(shape_a)>,
+                std::decay_t<decltype(shape_b)>>::generate(shape_a, shape_b);
+        },
+        collider_a,
+        collider_b);
+
+    EXPECT_TRUE(result.is_valid());
+    EXPECT_GT(result.penetration, 0.0f);
+}
+
+TEST(CollisionDetectionTest, BoxPlaneReportsIntersectionForAxisAlignedBox) {
+    const WorldBox box{
+        .center = pbpt::math::Vec3{0.0f, 0.25f, 0.0f},
+        .rotation = pbpt::math::Quat::identity(),
+        .half_extents = pbpt::math::Vec3{0.5f, 0.5f, 0.5f},
+    };
+    const WorldPlane plane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    const auto hit = ContactPairTrait<WorldBox, WorldPlane>::generate(box, plane);
+    ASSERT_TRUE(hit.is_valid());
+    EXPECT_NEAR(hit.point.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(hit.point.y(), -0.25f, 1e-5f);
+    EXPECT_NEAR(hit.point.z(), 0.0f, 1e-5f);
+    EXPECT_NEAR(hit.normal.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(hit.normal.y(), -1.0f, 1e-5f);
+    EXPECT_NEAR(hit.normal.z(), 0.0f, 1e-5f);
+    EXPECT_NEAR(hit.penetration, 0.25f, 1e-5f);
+}
+
+TEST(CollisionDetectionTest, RotatedBoxPlaneProducesFiniteContact) {
+    const WorldBox box{
+        .center = pbpt::math::Vec3{0.0f, 0.1f, 0.0f},
+        .rotation = pbpt::math::Quat::from_axis_angle(pbpt::math::radians(25.0f), pbpt::math::Vec3{0.0f, 0.0f, 1.0f}),
+        .half_extents = pbpt::math::Vec3{1.0f, 0.25f, 0.75f},
+    };
+    const WorldPlane plane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    const auto hit = ContactPairTrait<WorldBox, WorldPlane>::generate(box, plane);
+    ASSERT_TRUE(hit.is_valid());
+    EXPECT_TRUE(std::isfinite(hit.point.x()));
+    EXPECT_TRUE(std::isfinite(hit.point.y()));
+    EXPECT_TRUE(std::isfinite(hit.point.z()));
+    EXPECT_TRUE(std::isfinite(hit.normal.x()));
+    EXPECT_TRUE(std::isfinite(hit.normal.y()));
+    EXPECT_TRUE(std::isfinite(hit.normal.z()));
+    EXPECT_TRUE(std::isfinite(hit.penetration));
+}
+
+TEST(CollisionDetectionTest, BoxPlaneReturnsInvalidWithoutPenetratingVertices) {
+    const WorldBox box{
+        .center = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+        .rotation = pbpt::math::Quat::identity(),
+        .half_extents = pbpt::math::Vec3{0.25f, 0.25f, 0.25f},
+    };
+    const WorldPlane plane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    EXPECT_FALSE((ContactPairTrait<WorldBox, WorldPlane>::generate(box, plane).is_valid()));
+}
+
+TEST(CollisionDetectionTest, ReversedBoxPlanePairFlipsNormalAndPreservesPenetrationAndPoint) {
+    const WorldBox box{
+        .center = pbpt::math::Vec3{0.2f, 0.25f, -0.1f},
+        .rotation = pbpt::math::Quat::identity(),
+        .half_extents = pbpt::math::Vec3{0.5f, 0.5f, 0.5f},
+    };
+    const WorldPlane plane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    const auto forward = ContactPairTrait<WorldBox, WorldPlane>::generate(box, plane);
+    const auto reverse = ContactPairTrait<WorldPlane, WorldBox>::generate(plane, box);
+
+    ASSERT_TRUE(forward.is_valid());
+    ASSERT_TRUE(reverse.is_valid());
+    EXPECT_NEAR(forward.point.x(), reverse.point.x(), 1e-5f);
+    EXPECT_NEAR(forward.point.y(), reverse.point.y(), 1e-5f);
+    EXPECT_NEAR(forward.point.z(), reverse.point.z(), 1e-5f);
+    EXPECT_NEAR(forward.penetration, reverse.penetration, 1e-5f);
+    EXPECT_NEAR(forward.normal.x(), -reverse.normal.x(), 1e-5f);
+    EXPECT_NEAR(forward.normal.y(), -reverse.normal.y(), 1e-5f);
+    EXPECT_NEAR(forward.normal.z(), -reverse.normal.z(), 1e-5f);
+}
+
+TEST(CollisionDetectionTest, VariantVisitDispatchUsesBoxPlaneTrait) {
+    const WorldCollider collider_a = WorldBox{
+        .center = pbpt::math::Vec3{0.0f, 0.25f, 0.0f},
+        .rotation = pbpt::math::Quat::identity(),
+        .half_extents = pbpt::math::Vec3{0.5f, 0.5f, 0.5f},
+    };
+    const WorldCollider collider_b = WorldPlane{
+        .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+        .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
     };
 
     ContactResult result{};

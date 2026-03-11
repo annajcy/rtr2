@@ -692,6 +692,94 @@ TEST(PhysicsSceneIntegrationTest, DynamicMeshCollidesWithStaticPlaneAndGenerates
     EXPECT_GT(std::abs(mesh_body.angular_velocity().z()), 1e-4f);
 }
 
+TEST(PhysicsSceneIntegrationTest, DynamicSphereCollidesWithStaticPlaneAndCorrectsNormalVelocity) {
+    PhysicsStepper         physics;
+    framework::core::Scene scene(1);
+
+    auto& floor = scene.create_game_object("floor");
+    (void)floor.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f);
+    (void)floor.add_component<framework::component::PlaneCollider>(
+        physics.world(), pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
+
+    auto& sphere = scene.create_game_object("sphere");
+    sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 0.2f, 0.0f});
+    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 0.25f);
+    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+    sphere_body.set_linear_velocity(pbpt::math::Vec3{2.0f, -1.0f, 0.0f});
+
+    physics.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    EXPECT_TRUE(std::isfinite(sphere_body.position().x()));
+    EXPECT_TRUE(std::isfinite(sphere_body.position().y()));
+    EXPECT_TRUE(std::isfinite(sphere_body.position().z()));
+    EXPECT_TRUE(std::isfinite(sphere_body.linear_velocity().x()));
+    EXPECT_TRUE(std::isfinite(sphere_body.linear_velocity().y()));
+    EXPECT_GT(sphere_body.linear_velocity().y(), -0.25f);
+
+    const auto sphere_colliders = physics.world().colliders_for_body(sphere_body.rigid_body_id());
+    ASSERT_EQ(sphere_colliders.size(), 1u);
+    const auto sphere_world_collider = physics.world().get_world_collider(sphere_colliders.front());
+    const auto* world_sphere = std::get_if<WorldSphere>(&sphere_world_collider);
+    ASSERT_NE(world_sphere, nullptr);
+    const auto contact = ContactPairTrait<WorldSphere, system::physics::WorldPlane>::generate(
+        *world_sphere,
+        system::physics::WorldPlane{
+            .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+            .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+        });
+    EXPECT_FALSE(contact.is_valid() && contact.penetration > 0.05f);
+}
+
+TEST(PhysicsSceneIntegrationTest, DynamicBoxCollidesWithStaticPlaneAndGeneratesAngularVelocity) {
+    PhysicsStepper         physics;
+    framework::core::Scene scene(1);
+
+    auto& floor = scene.create_game_object("floor");
+    (void)floor.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f);
+    (void)floor.add_component<framework::component::PlaneCollider>(
+        physics.world(), pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
+
+    auto& box = scene.create_game_object("box");
+    box.node().set_local_position(pbpt::math::Vec3{0.5f, 0.1f, 0.0f});
+    auto& box_body = box.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.25f);
+    (void)box.add_component<framework::component::BoxCollider>(
+        physics.world(), pbpt::math::Vec3{0.4f, 0.25f, 0.4f});
+    box_body.set_linear_velocity(pbpt::math::Vec3{2.0f, -1.0f, 0.0f});
+
+    physics.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    EXPECT_TRUE(std::isfinite(box_body.position().x()));
+    EXPECT_TRUE(std::isfinite(box_body.position().y()));
+    EXPECT_TRUE(std::isfinite(box_body.linear_velocity().x()));
+    EXPECT_TRUE(std::isfinite(box_body.linear_velocity().y()));
+    EXPECT_TRUE(std::isfinite(box_body.angular_velocity().z()));
+    EXPECT_GT(box_body.linear_velocity().y(), -0.25f);
+    EXPECT_GT(std::abs(box_body.angular_velocity().z()), 1e-4f);
+
+    const auto box_colliders = physics.world().colliders_for_body(box_body.rigid_body_id());
+    ASSERT_EQ(box_colliders.size(), 1u);
+    const auto box_world_collider = physics.world().get_world_collider(box_colliders.front());
+    const auto* world_box = std::get_if<WorldBox>(&box_world_collider);
+    ASSERT_NE(world_box, nullptr);
+    const auto contact = ContactPairTrait<WorldBox, system::physics::WorldPlane>::generate(
+        *world_box,
+        system::physics::WorldPlane{
+            .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+            .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+        });
+    EXPECT_FALSE(contact.is_valid() && contact.penetration > 0.05f);
+}
+
 }  // namespace rtr::framework::integration::physics::test
 
 int main(int argc, char** argv) {
