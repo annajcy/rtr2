@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <type_traits>
@@ -13,17 +15,80 @@
 #include "rtr/system/physics/collider.hpp"
 #include "rtr/system/physics/collision.hpp"
 #include "rtr/system/physics/rigid_body.hpp"
+#include "rtr/utils/log.hpp"
 
 namespace rtr::system::physics {
 
 class PhysicsWorld {
 private:
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("system.physics.world");
+    }
+
+    static const char* rigid_body_type_name(RigidBodyType type) {
+        switch (type) {
+        case RigidBodyType::Static:
+            return "Static";
+        case RigidBodyType::Dynamic:
+            return "Dynamic";
+        case RigidBodyType::Kinematic:
+            return "Kinematic";
+        }
+        return "Unknown";
+    }
+
+    static const char* collider_type_name(const ColliderShape& shape) {
+        return std::visit(
+            [](const auto& collider_shape) -> const char* {
+                using Shape = std::decay_t<decltype(collider_shape)>;
+                if constexpr (std::is_same_v<Shape, SphereShape>) {
+                    return "Sphere";
+                } else if constexpr (std::is_same_v<Shape, BoxShape>) {
+                    return "Box";
+                } else if constexpr (std::is_same_v<Shape, PlaneShape>) {
+                    return "Plane";
+                } else if constexpr (std::is_same_v<Shape, MeshShape>) {
+                    return "Mesh";
+                }
+                return "Unknown";
+            },
+            shape
+        );
+    }
+
+    static void log_contact_trace(const std::shared_ptr<spdlog::logger>& log,
+                                  std::uint32_t iteration,
+                                  const Contact& contact) {
+        if (!log->should_log(spdlog::level::trace)) {
+            return;
+        }
+
+        const auto normal = contact.result.normalized_normal();
+        log->trace(
+            "Contact detected (iteration={}, body_a={}, body_b={}, collider_a={}, collider_b={}, penetration={:.6f}, "
+            "point=[{:.4f}, {:.4f}, {:.4f}], normal=[{:.4f}, {:.4f}, {:.4f}]).",
+            iteration,
+            contact.body_a,
+            contact.body_b,
+            contact.collider_a,
+            contact.collider_b,
+            contact.result.penetration,
+            contact.result.point.x(),
+            contact.result.point.y(),
+            contact.result.point.z(),
+            normal.x(),
+            normal.y(),
+            normal.z()
+        );
+    }
+
     std::unordered_map<RigidBodyID, RigidBody>   m_rigid_bodies{};
     std::unordered_map<ColliderID, Collider>     m_colliders{};
     std::unordered_multimap<RigidBodyID, ColliderID> m_colliders_by_body{};
     RigidBodyID                                  m_next_rigid_body_id{0};
     ColliderID                                   m_next_collider_id{0};
     pbpt::math::Vec3                             m_gravity{0.0f, -9.81f, 0.0f};
+    std::uint32_t                                m_solver_iterations{8};
 
     bool has_dynamic_body(RigidBodyID body_id) const {
         if (body_id == kInvalidRigidBodyId) {
@@ -291,14 +356,23 @@ private:
     }
 
 public:
+    static constexpr std::uint32_t kDefaultSolverIterations = 8;
+
     RigidBodyID create_rigid_body(RigidBody rigid_body = RigidBody{}) {
         const RigidBodyID id = m_next_rigid_body_id++;
         m_rigid_bodies[id]   = std::move(rigid_body);
+        logger()->debug("Rigid body created (rigid_body_id={}, type={}, awake={}, mass={}, body_count={}).",
+                        id,
+                        rigid_body_type_name(m_rigid_bodies.at(id).type()),
+                        m_rigid_bodies.at(id).is_awake(),
+                        m_rigid_bodies.at(id).state().mass,
+                        m_rigid_bodies.size());
         return id;
     }
 
     ColliderID create_collider(RigidBodyID owner_body_id, Collider collider = Collider{}) {
         if (!has_rigid_body(owner_body_id)) {
+            logger()->error("create_collider failed: owner rigid body {} does not exist.", owner_body_id);
             throw std::out_of_range("Collider owner body does not exist.");
         }
 
@@ -306,6 +380,11 @@ public:
         collider.rigid_body_id = owner_body_id;
         m_colliders[id]        = std::move(collider);
         m_colliders_by_body.emplace(owner_body_id, id);
+        logger()->debug("Collider created (collider_id={}, owner_rigid_body_id={}, type={}, collider_count={}).",
+                        id,
+                        owner_body_id,
+                        collider_type_name(m_colliders.at(id).shape),
+                        m_colliders.size());
         return id;
     }
 
@@ -314,6 +393,7 @@ public:
 
     bool remove_rigid_body(RigidBodyID id) {
         if (!has_rigid_body(id)) {
+            logger()->warn("remove_rigid_body ignored: rigid body {} does not exist.", id);
             return false;
         }
 
@@ -321,14 +401,27 @@ public:
         for (const auto collider_id : collider_ids) {
             remove_collider_internal(collider_id);
         }
-        return m_rigid_bodies.erase(id) > 0;
+        const auto removed = m_rigid_bodies.erase(id) > 0;
+        if (removed) {
+            logger()->debug("Rigid body removed (rigid_body_id={}, removed_colliders={}, body_count={}).",
+                            id,
+                            collider_ids.size(),
+                            m_rigid_bodies.size());
+        }
+        return removed;
     }
 
     bool remove_collider(ColliderID id) {
         if (!has_collider(id)) {
+            logger()->debug("remove_collider ignored: collider {} does not exist.", id);
             return false;
         }
+        const auto owner_body_id = get_collider(id).rigid_body_id;
         remove_collider_internal(id);
+        logger()->debug("Collider removed (collider_id={}, owner_rigid_body_id={}, collider_count={}).",
+                        id,
+                        owner_body_id,
+                        m_colliders.size());
         return true;
     }
 
@@ -356,25 +449,72 @@ public:
     }
 
     const pbpt::math::Vec3& gravity() const { return m_gravity; }
-    void set_gravity(const pbpt::math::Vec3& gravity) { m_gravity = gravity; }
+    void set_gravity(const pbpt::math::Vec3& gravity) {
+        m_gravity = gravity;
+        logger()->info("Gravity updated to [{:.3f}, {:.3f}, {:.3f}].", gravity.x(), gravity.y(), gravity.z());
+    }
+    std::uint32_t solver_iterations() const { return m_solver_iterations; }
+
+    void set_solver_iterations(std::uint32_t iterations) {
+        if (iterations == 0) {
+            logger()->error("set_solver_iterations failed: iterations must be greater than zero.");
+            throw std::invalid_argument("PhysicsWorld solver_iterations must be greater than zero.");
+        }
+        m_solver_iterations = iterations;
+        logger()->info("Solver iterations updated to {}.", m_solver_iterations);
+    }
 
     void tick(float delta_seconds) {
+        auto log = logger();
         for (auto& [id, rb] : m_rigid_bodies) {
             integrate_body(rb, delta_seconds);
         }
 
-        const auto contacts = collect_contacts();
-        for (const auto& contact : contacts) {
-            apply_position_correction(contact);
-        }
-        for (const auto& contact : contacts) {
-            apply_velocity_impulses(contact);
+        // Recompute contacts every sweep so the solver uses current penetration, point, and normal data.
+        std::size_t last_contact_count = 0;
+        std::size_t max_contact_count = 0;
+        std::uint32_t sweeps_executed = 0;
+        pbpt::math::Float max_penetration = 0.0f;
+        for (std::uint32_t iteration = 0; iteration < m_solver_iterations; ++iteration) {
+            const auto contacts = collect_contacts();
+            if (contacts.empty()) {
+                break;
+            }
+            last_contact_count = contacts.size();
+            max_contact_count = std::max(max_contact_count, contacts.size());
+            ++sweeps_executed;
+            for (const auto& contact : contacts) {
+                max_penetration = std::max(max_penetration, contact.result.penetration);
+                log_contact_trace(log, iteration, contact);
+                apply_position_correction(contact);
+            }
+            for (const auto& contact : contacts) {
+                apply_velocity_impulses(contact);
+            }
         }
 
         for (auto& [id, rb] : m_rigid_bodies) {
             (void)id;
             rb.clear_forces();
         }
+
+        if (sweeps_executed > 0 && log->should_log(spdlog::level::debug)) {
+            log->debug("Collision solve summary (delta_seconds={:.6f}, sweeps_executed={}, max_contact_count={}, "
+                       "last_contact_count={}, max_penetration={:.6f}).",
+                       delta_seconds,
+                       sweeps_executed,
+                       max_contact_count,
+                       last_contact_count,
+                       max_penetration);
+        }
+
+        log->trace("Physics tick completed (delta_seconds={:.6f}, sweeps_executed={}, last_contact_count={}, "
+                   "rigid_body_count={}, collider_count={}).",
+                   delta_seconds,
+                   sweeps_executed,
+                   last_contact_count,
+                   m_rigid_bodies.size(),
+                   m_colliders.size());
     }
 };
 

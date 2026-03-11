@@ -22,6 +22,7 @@
 #include "rtr/rhi/window.hpp"
 #include "rtr/system/input/input_state.hpp"
 #include "rtr/system/input/input_types.hpp"
+#include "rtr/system/physics/physics_world.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::utils::test {
@@ -314,6 +315,87 @@ TEST(LogSystemTest, FrameworkCoreLifecycleLogsAreWritten) {
     EXPECT_TRUE(file_contains(log_file, "[framework.core.world]"));
     EXPECT_TRUE(file_contains(log_file, "[framework.core.scene]"));
     EXPECT_TRUE(file_contains(log_file, "[framework.core.game_object]"));
+
+    shutdown_logging();
+}
+
+TEST(LogSystemTest, PhysicsWorldLifecycleLogsAreWritten) {
+    shutdown_logging();
+    TempDir temp_dir{};
+    const auto log_file = temp_dir.path / "rtr.log";
+
+    LogConfig config{};
+    config.enable_console = false;
+    config.enable_file = true;
+    config.file_path = log_file.string();
+    config.level = LogLevel::trace;
+    init_logging(config);
+
+    system::physics::PhysicsWorld world{};
+    world.set_gravity(pbpt::math::Vec3{0.0f, -3.5f, 0.0f});
+    world.set_solver_iterations(4);
+
+    system::physics::RigidBody body{};
+    body.set_type(system::physics::RigidBodyType::Dynamic);
+    body.set_awake(true);
+    body.state().mass = 2.0f;
+    const auto body_id = world.create_rigid_body(body);
+    const auto collider_id = world.create_collider(body_id, system::physics::Collider{});
+    world.tick(1.0f / 60.0f);
+    EXPECT_TRUE(world.remove_collider(collider_id));
+    EXPECT_TRUE(world.remove_rigid_body(body_id));
+
+    get_logger("system.physics.world")->flush();
+
+    EXPECT_TRUE(file_contains(log_file, "[system.physics.world]"));
+    EXPECT_TRUE(file_contains(log_file, "Gravity updated"));
+    EXPECT_TRUE(file_contains(log_file, "Solver iterations updated"));
+    EXPECT_TRUE(file_contains(log_file, "Rigid body created"));
+    EXPECT_TRUE(file_contains(log_file, "Collider created"));
+    EXPECT_TRUE(file_contains(log_file, "Physics tick completed"));
+
+    shutdown_logging();
+}
+
+TEST(LogSystemTest, PhysicsWorldCollisionLogsAreWritten) {
+    shutdown_logging();
+    TempDir temp_dir{};
+    const auto log_file = temp_dir.path / "rtr.log";
+
+    LogConfig config{};
+    config.enable_console = false;
+    config.enable_file = true;
+    config.file_path = log_file.string();
+    config.level = LogLevel::trace;
+    init_logging(config);
+
+    system::physics::PhysicsWorld world{};
+    world.set_solver_iterations(2);
+
+    system::physics::RigidBody body_a{};
+    body_a.set_type(system::physics::RigidBodyType::Dynamic);
+    body_a.set_awake(true);
+    body_a.set_use_gravity(false);
+    body_a.state().mass = 1.0f;
+    body_a.state().translation.position = pbpt::math::Vec3{0.0f, 0.0f, 0.0f};
+
+    system::physics::RigidBody body_b{};
+    body_b.set_type(system::physics::RigidBodyType::Dynamic);
+    body_b.set_awake(true);
+    body_b.set_use_gravity(false);
+    body_b.state().mass = 1.0f;
+    body_b.state().translation.position = pbpt::math::Vec3{0.8f, 0.0f, 0.0f};
+
+    const auto body_a_id = world.create_rigid_body(body_a);
+    const auto body_b_id = world.create_rigid_body(body_b);
+    (void)world.create_collider(body_a_id, system::physics::Collider{});
+    (void)world.create_collider(body_b_id, system::physics::Collider{});
+    world.tick(1.0f / 60.0f);
+
+    get_logger("system.physics.world")->flush();
+
+    EXPECT_TRUE(file_contains(log_file, "Collision solve summary"));
+    EXPECT_TRUE(file_contains(log_file, "Contact detected"));
 
     shutdown_logging();
 }

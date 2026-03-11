@@ -692,6 +692,67 @@ TEST(PhysicsSceneIntegrationTest, DynamicMeshCollidesWithStaticPlaneAndGenerates
     EXPECT_GT(std::abs(mesh_body.angular_velocity().z()), 1e-4f);
 }
 
+TEST(PhysicsSceneIntegrationTest, SolverIterationsReducePenetrationAcrossStackedContacts) {
+    PhysicsStepper         physics;
+    framework::core::Scene scene(1);
+    physics.world().set_solver_iterations(8);
+
+    auto& floor = scene.create_game_object("floor");
+    (void)floor.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.0f);
+    (void)floor.add_component<framework::component::PlaneCollider>(
+        physics.world(), pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
+
+    auto& lower = scene.create_game_object("lower");
+    lower.node().set_local_position(pbpt::math::Vec3{0.0f, 0.45f, 0.0f});
+    auto& lower_body = lower.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Dynamic, true, pbpt::math::Mat3::zeros(), 0.0f, 0.0f);
+    (void)lower.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+
+    auto& upper = scene.create_game_object("upper");
+    upper.node().set_local_position(pbpt::math::Vec3{0.0f, 1.30f, 0.0f});
+    auto& upper_body = upper.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Dynamic, true, pbpt::math::Mat3::zeros(), 0.0f, 0.0f);
+    (void)upper.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+
+    for (std::uint64_t i = 0; i < 180; ++i) {
+        physics.fixed_tick(scene, framework::core::FixedTickContext{
+                                             .fixed_delta_seconds = 1.0 / 120.0,
+                                             .fixed_tick_index    = i,
+                                         });
+    }
+
+    EXPECT_TRUE(std::isfinite(lower_body.position().y()));
+    EXPECT_TRUE(std::isfinite(upper_body.position().y()));
+    EXPECT_TRUE(std::isfinite(lower_body.linear_velocity().y()));
+    EXPECT_TRUE(std::isfinite(upper_body.linear_velocity().y()));
+
+    const auto lower_colliders = physics.world().colliders_for_body(lower_body.rigid_body_id());
+    const auto upper_colliders = physics.world().colliders_for_body(upper_body.rigid_body_id());
+    ASSERT_EQ(lower_colliders.size(), 1u);
+    ASSERT_EQ(upper_colliders.size(), 1u);
+
+    const auto lower_world_collider = physics.world().get_world_collider(lower_colliders.front());
+    const auto upper_world_collider = physics.world().get_world_collider(upper_colliders.front());
+    const auto* lower_sphere = std::get_if<WorldSphere>(&lower_world_collider);
+    const auto* upper_sphere = std::get_if<WorldSphere>(&upper_world_collider);
+    ASSERT_NE(lower_sphere, nullptr);
+    ASSERT_NE(upper_sphere, nullptr);
+
+    const auto floor_contact = ContactPairTrait<WorldSphere, system::physics::WorldPlane>::generate(
+        *lower_sphere,
+        system::physics::WorldPlane{
+            .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+            .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
+        });
+    const auto stacked_contact = ContactPairTrait<WorldSphere, WorldSphere>::generate(*lower_sphere, *upper_sphere);
+
+    EXPECT_FALSE(floor_contact.is_valid() && floor_contact.penetration > 0.02f);
+    EXPECT_FALSE(stacked_contact.is_valid() && stacked_contact.penetration > 0.02f);
+    EXPECT_LT(std::abs(lower_body.linear_velocity().y()), 0.2f);
+    EXPECT_LT(std::abs(upper_body.linear_velocity().y()), 0.2f);
+}
+
 TEST(PhysicsSceneIntegrationTest, DynamicSphereCollidesWithStaticPlaneAndCorrectsNormalVelocity) {
     PhysicsStepper         physics;
     framework::core::Scene scene(1);
