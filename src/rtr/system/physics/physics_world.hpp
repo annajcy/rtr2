@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <numeric>
 #include <optional>
 #include <stdexcept>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <variant>
@@ -57,28 +59,35 @@ private:
     }
 
     static void log_contact_trace(const std::shared_ptr<spdlog::logger>& log,
+                                  std::string_view phase,
                                   std::uint32_t iteration,
-                                  const Contact& contact) {
+                                  const SolverContact& contact) {
         if (!log->should_log(spdlog::level::trace)) {
             return;
         }
 
-        const auto normal = contact.result.normalized_normal();
         log->trace(
-            "Contact detected (iteration={}, body_a={}, body_b={}, collider_a={}, collider_b={}, penetration={:.6f}, "
-            "point=[{:.4f}, {:.4f}, {:.4f}], normal=[{:.4f}, {:.4f}, {:.4f}]).",
+            "Solver contact state (phase={}, iteration={}, body_a={}, body_b={}, collider_a={}, collider_b={}, "
+            "penetration={:.6f}, point=[{:.4f}, {:.4f}, {:.4f}], normal=[{:.4f}, {:.4f}, {:.4f}], "
+            "tangent=[{:.4f}, {:.4f}, {:.4f}], normal_impulse_sum={:.6f}, tangent_impulse_sum={:.6f}).",
+            phase,
             iteration,
             contact.body_a,
             contact.body_b,
             contact.collider_a,
             contact.collider_b,
-            contact.result.penetration,
-            contact.result.point.x(),
-            contact.result.point.y(),
-            contact.result.point.z(),
-            normal.x(),
-            normal.y(),
-            normal.z()
+            contact.penetration,
+            contact.point.x(),
+            contact.point.y(),
+            contact.point.z(),
+            contact.normal.x(),
+            contact.normal.y(),
+            contact.normal.z(),
+            contact.tangent.x(),
+            contact.tangent.y(),
+            contact.tangent.z(),
+            contact.normal_impulse_sum,
+            contact.tangent_impulse_sum
         );
     }
 
@@ -88,7 +97,8 @@ private:
     RigidBodyID                                  m_next_rigid_body_id{0};
     ColliderID                                   m_next_collider_id{0};
     pbpt::math::Vec3                             m_gravity{0.0f, -9.81f, 0.0f};
-    std::uint32_t                                m_solver_iterations{8};
+    std::uint32_t                                m_velocity_iterations{8};
+    std::uint32_t                                m_position_iterations{3};
 
     bool has_dynamic_body(RigidBodyID body_id) const {
         if (body_id == kInvalidRigidBodyId) {
@@ -151,6 +161,18 @@ private:
     static pbpt::math::Float directional_effective_mass(const pbpt::math::Mat3& effective_mass,
                                                         const pbpt::math::Vec3& direction) {
         return pbpt::math::dot(direction, effective_mass * direction);
+    }
+
+    static pbpt::math::Vec3 fallback_tangent(const pbpt::math::Vec3& normal) {
+        constexpr pbpt::math::Float kEpsilon = 1e-6f;
+        const pbpt::math::Vec3 axis = std::abs(normal.x()) < 0.577f ? pbpt::math::Vec3{1.0f, 0.0f, 0.0f}
+                                                                     : pbpt::math::Vec3{0.0f, 1.0f, 0.0f};
+        auto tangent = pbpt::math::cross(normal, axis);
+        const auto tangent_length_sq = pbpt::math::dot(tangent, tangent);
+        if (tangent_length_sq <= kEpsilon * kEpsilon) {
+            tangent = pbpt::math::cross(normal, pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
+        }
+        return pbpt::math::normalize(tangent);
     }
 
     static void apply_impulse_at_contact(RigidBody& body,
@@ -274,89 +296,139 @@ private:
         return contacts;
     }
 
-    void apply_position_correction(const Contact& contact) {
+    std::vector<SolverContact> build_solver_contacts(const std::vector<Contact>& contacts) {
+        constexpr pbpt::math::Float kTangentEpsilon = 1e-6f;
+        std::vector<SolverContact> solver_contacts;
+        solver_contacts.reserve(contacts.size());
+
+        for (const auto& contact : contacts) {
+            if (!contact.is_valid()) {
+                continue;
+            }
+
+            const auto& body_a = get_rigid_body(contact.body_a);
+            const auto& body_b = get_rigid_body(contact.body_b);
+            const auto inv_mass_a = solver_inverse_mass(body_a);
+            const auto inv_mass_b = solver_inverse_mass(body_b);
+            const auto inv_mass_sum = inv_mass_a + inv_mass_b;
+            if (inv_mass_sum <= 0.0f) {
+                continue;
+            }
+
+            const auto normal = contact.result.normalized_normal();
+            const auto point = contact.result.point;
+            const auto r_a = contact_arm(body_a, point);
+            const auto r_b = contact_arm(body_b, point);
+            const auto inv_inertia_a = inverse_inertia_tensor_world(body_a);
+            const auto inv_inertia_b = inverse_inertia_tensor_world(body_b);
+            const auto effective_mass =
+                effective_mass_matrix(inv_mass_a, inv_mass_b, inv_inertia_a, inv_inertia_b, r_a, r_b);
+            const auto relative_velocity =
+                contact_point_velocity(body_b, r_b) - contact_point_velocity(body_a, r_a);
+            const auto tangent_velocity = relative_velocity - pbpt::math::dot(relative_velocity, normal) * normal;
+            const auto tangent_speed_sq = pbpt::math::dot(tangent_velocity, tangent_velocity);
+            const auto tangent = tangent_speed_sq > kTangentEpsilon * kTangentEpsilon
+                                     ? tangent_velocity / std::sqrt(tangent_speed_sq)
+                                     : fallback_tangent(normal);
+            const auto normal_velocity = pbpt::math::dot(relative_velocity, normal);
+            const auto restitution_bias =
+                normal_velocity < 0.0f ? -combined_restitution(body_a, body_b) * normal_velocity : 0.0f;
+
+            solver_contacts.push_back(SolverContact{
+                .body_a = contact.body_a,
+                .body_b = contact.body_b,
+                .collider_a = contact.collider_a,
+                .collider_b = contact.collider_b,
+                .point = point,
+                .normal = normal,
+                .tangent = tangent,
+                .penetration = contact.result.penetration,
+                .r_a = r_a,
+                .r_b = r_b,
+                .inv_mass_a = inv_mass_a,
+                .inv_mass_b = inv_mass_b,
+                .inv_inertia_a = inv_inertia_a,
+                .inv_inertia_b = inv_inertia_b,
+                .effective_mass_normal = directional_effective_mass(effective_mass, normal),
+                .effective_mass_tangent = directional_effective_mass(effective_mass, tangent),
+                .restitution_bias = restitution_bias,
+                .normal_impulse_sum = 0.0f,
+                .tangent_impulse_sum = 0.0f,
+            });
+        }
+
+        return solver_contacts;
+    }
+
+    void apply_position_correction(SolverContact& contact) {
+        constexpr pbpt::math::Float kPositionCorrectionFactor = 0.8f;
         auto& body_a = get_rigid_body(contact.body_a);
         auto& body_b = get_rigid_body(contact.body_b);
-        const auto inv_mass_a = solver_inverse_mass(body_a);
-        const auto inv_mass_b = solver_inverse_mass(body_b);
-        const auto inv_mass_sum = inv_mass_a + inv_mass_b;
+        const auto inv_mass_sum = contact.inv_mass_a + contact.inv_mass_b;
         if (inv_mass_sum <= 0.0f || !contact.is_valid()) {
             return;
         }
 
-        const auto normal = contact.result.normalized_normal();
-        const auto correction = (contact.result.penetration / inv_mass_sum) * normal;
-        body_a.state().translation.position -= inv_mass_a * correction;
-        body_b.state().translation.position += inv_mass_b * correction;
+        const auto corrected_penetration = kPositionCorrectionFactor * contact.penetration;
+        const auto correction = (corrected_penetration / inv_mass_sum) * contact.normal;
+        body_a.state().translation.position -= contact.inv_mass_a * correction;
+        body_b.state().translation.position += contact.inv_mass_b * correction;
+        contact.penetration = std::max(contact.penetration - corrected_penetration, 0.0f);
     }
 
-    void apply_velocity_impulses(const Contact& contact) {
+    void apply_velocity_impulses(SolverContact& contact) {
         auto& body_a = get_rigid_body(contact.body_a);
         auto& body_b = get_rigid_body(contact.body_b);
-        const auto inv_mass_a = solver_inverse_mass(body_a);
-        const auto inv_mass_b = solver_inverse_mass(body_b);
-        const auto inv_mass_sum = inv_mass_a + inv_mass_b;
+        const auto inv_mass_sum = contact.inv_mass_a + contact.inv_mass_b;
         if (inv_mass_sum <= 0.0f || !contact.is_valid()) {
             return;
         }
 
         constexpr pbpt::math::Float kImpulseDenominatorEpsilon = 1e-6f;
-        constexpr pbpt::math::Float kTangentEpsilon = 1e-6f;
-        const auto normal = contact.result.normalized_normal();
-        const auto contact_point  = contact.result.point;
-        const auto r_a            = contact_arm(body_a, contact_point);
-        const auto r_b            = contact_arm(body_b, contact_point);
-        const auto inv_inertia_a  = inverse_inertia_tensor_world(body_a);
-        const auto inv_inertia_b  = inverse_inertia_tensor_world(body_b);
-        const auto effective_mass = effective_mass_matrix(inv_mass_a, inv_mass_b, inv_inertia_a, inv_inertia_b, r_a, r_b);
-
         const auto relative_velocity =
-            contact_point_velocity(body_b, r_b) - contact_point_velocity(body_a, r_a);
-        const auto normal_velocity = pbpt::math::dot(relative_velocity, normal);
-        if (normal_velocity >= 0.0f) {
-            return;
-        }
+            contact_point_velocity(body_b, contact.r_b) - contact_point_velocity(body_a, contact.r_a);
 
-        const auto normal_effective_mass = directional_effective_mass(effective_mass, normal);
-        if (normal_effective_mass <= kImpulseDenominatorEpsilon) {
-            return;
-        }
+        if (contact.effective_mass_normal > kImpulseDenominatorEpsilon) {
+            const auto normal_velocity = pbpt::math::dot(relative_velocity, contact.normal);
+            const auto delta_normal_impulse =
+                -(normal_velocity - contact.restitution_bias) / contact.effective_mass_normal;
+            const auto previous_normal_impulse_sum = contact.normal_impulse_sum;
+            const auto next_normal_impulse_sum = std::max(previous_normal_impulse_sum + delta_normal_impulse, 0.0f);
+            const auto actual_delta_normal_impulse = next_normal_impulse_sum - previous_normal_impulse_sum;
+            contact.normal_impulse_sum = next_normal_impulse_sum;
 
-        const auto normal_impulse_magnitude =
-            -((1.0f + combined_restitution(body_a, body_b)) * normal_velocity) / normal_effective_mass;
-        const auto normal_impulse = normal_impulse_magnitude * normal;
-        apply_impulse_at_contact(body_a, -normal_impulse, r_a, inv_mass_a, inv_inertia_a);
-        apply_impulse_at_contact(body_b, normal_impulse, r_b, inv_mass_b, inv_inertia_b);
+            const auto normal_impulse = actual_delta_normal_impulse * contact.normal;
+            apply_impulse_at_contact(
+                body_a, -normal_impulse, contact.r_a, contact.inv_mass_a, contact.inv_inertia_a);
+            apply_impulse_at_contact(
+                body_b, normal_impulse, contact.r_b, contact.inv_mass_b, contact.inv_inertia_b);
+        }
 
         const auto relative_velocity_after_normal =
-            contact_point_velocity(body_b, r_b) - contact_point_velocity(body_a, r_a);
-        const auto tangent_velocity = relative_velocity_after_normal -
-                                      pbpt::math::dot(relative_velocity_after_normal, normal) * normal;
-        const auto tangent_speed_sq = pbpt::math::dot(tangent_velocity, tangent_velocity);
-        if (tangent_speed_sq <= kTangentEpsilon * kTangentEpsilon) {
+            contact_point_velocity(body_b, contact.r_b) - contact_point_velocity(body_a, contact.r_a);
+        if (contact.effective_mass_tangent <= kImpulseDenominatorEpsilon) {
             return;
         }
 
-        const auto tangent = tangent_velocity / std::sqrt(tangent_speed_sq);
-        const auto tangent_effective_mass = directional_effective_mass(effective_mass, tangent);
-        if (tangent_effective_mass <= kImpulseDenominatorEpsilon) {
-            return;
-        }
+        const auto delta_tangent_impulse =
+            -pbpt::math::dot(relative_velocity_after_normal, contact.tangent) / contact.effective_mass_tangent;
+        const auto previous_tangent_impulse_sum = contact.tangent_impulse_sum;
+        const auto max_friction_impulse = combined_friction(body_a, body_b) * contact.normal_impulse_sum;
+        const auto next_tangent_impulse_sum = pbpt::math::clamp(
+            previous_tangent_impulse_sum + delta_tangent_impulse, -max_friction_impulse, max_friction_impulse);
+        const auto actual_delta_tangent_impulse = next_tangent_impulse_sum - previous_tangent_impulse_sum;
+        contact.tangent_impulse_sum = next_tangent_impulse_sum;
 
-        auto tangent_impulse_magnitude =
-            -pbpt::math::dot(relative_velocity_after_normal, tangent) / tangent_effective_mass;
-        const auto max_friction_impulse =
-            combined_friction(body_a, body_b) * std::abs(normal_impulse_magnitude);
-        tangent_impulse_magnitude = pbpt::math::clamp(
-            tangent_impulse_magnitude, -max_friction_impulse, max_friction_impulse);
-
-        const auto tangent_impulse = tangent_impulse_magnitude * tangent;
-        apply_impulse_at_contact(body_a, -tangent_impulse, r_a, inv_mass_a, inv_inertia_a);
-        apply_impulse_at_contact(body_b, tangent_impulse, r_b, inv_mass_b, inv_inertia_b);
+        const auto tangent_impulse = actual_delta_tangent_impulse * contact.tangent;
+        apply_impulse_at_contact(
+            body_a, -tangent_impulse, contact.r_a, contact.inv_mass_a, contact.inv_inertia_a);
+        apply_impulse_at_contact(
+            body_b, tangent_impulse, contact.r_b, contact.inv_mass_b, contact.inv_inertia_b);
     }
 
 public:
-    static constexpr std::uint32_t kDefaultSolverIterations = 8;
+    static constexpr std::uint32_t kDefaultVelocityIterations = 8;
+    static constexpr std::uint32_t kDefaultPositionIterations = 3;
 
     RigidBodyID create_rigid_body(RigidBody rigid_body = RigidBody{}) {
         const RigidBodyID id = m_next_rigid_body_id++;
@@ -453,15 +525,25 @@ public:
         m_gravity = gravity;
         logger()->info("Gravity updated to [{:.3f}, {:.3f}, {:.3f}].", gravity.x(), gravity.y(), gravity.z());
     }
-    std::uint32_t solver_iterations() const { return m_solver_iterations; }
+    std::uint32_t velocity_iterations() const { return m_velocity_iterations; }
+    std::uint32_t position_iterations() const { return m_position_iterations; }
 
-    void set_solver_iterations(std::uint32_t iterations) {
+    void set_velocity_iterations(std::uint32_t iterations) {
         if (iterations == 0) {
-            logger()->error("set_solver_iterations failed: iterations must be greater than zero.");
-            throw std::invalid_argument("PhysicsWorld solver_iterations must be greater than zero.");
+            logger()->error("set_velocity_iterations failed: iterations must be greater than zero.");
+            throw std::invalid_argument("PhysicsWorld velocity_iterations must be greater than zero.");
         }
-        m_solver_iterations = iterations;
-        logger()->info("Solver iterations updated to {}.", m_solver_iterations);
+        m_velocity_iterations = iterations;
+        logger()->info("Velocity iterations updated to {}.", m_velocity_iterations);
+    }
+
+    void set_position_iterations(std::uint32_t iterations) {
+        if (iterations == 0) {
+            logger()->error("set_position_iterations failed: iterations must be greater than zero.");
+            throw std::invalid_argument("PhysicsWorld position_iterations must be greater than zero.");
+        }
+        m_position_iterations = iterations;
+        logger()->info("Position iterations updated to {}.", m_position_iterations);
     }
 
     void tick(float delta_seconds) {
@@ -470,26 +552,33 @@ public:
             integrate_body(rb, delta_seconds);
         }
 
-        // Recompute contacts every sweep so the solver uses current penetration, point, and normal data.
-        std::size_t last_contact_count = 0;
-        std::size_t max_contact_count = 0;
-        std::uint32_t sweeps_executed = 0;
-        pbpt::math::Float max_penetration = 0.0f;
-        for (std::uint32_t iteration = 0; iteration < m_solver_iterations; ++iteration) {
-            const auto contacts = collect_contacts();
-            if (contacts.empty()) {
-                break;
+        const auto contacts = collect_contacts();
+        auto solver_contacts = build_solver_contacts(contacts);
+        const auto contact_snapshot_count = solver_contacts.size();
+        const auto max_penetration_snapshot = std::accumulate(
+            solver_contacts.begin(),
+            solver_contacts.end(),
+            pbpt::math::Float{0.0f},
+            [](const pbpt::math::Float current_max, const SolverContact& contact) {
+                return std::max(current_max, contact.penetration);
+            });
+
+        std::uint32_t velocity_iterations_executed = 0;
+        std::uint32_t position_iterations_executed = 0;
+        if (!solver_contacts.empty()) {
+            for (std::uint32_t iteration = 0; iteration < m_velocity_iterations; ++iteration) {
+                ++velocity_iterations_executed;
+                for (auto& contact : solver_contacts) {
+                    apply_velocity_impulses(contact);
+                    log_contact_trace(log, "velocity", iteration, contact);
+                }
             }
-            last_contact_count = contacts.size();
-            max_contact_count = std::max(max_contact_count, contacts.size());
-            ++sweeps_executed;
-            for (const auto& contact : contacts) {
-                max_penetration = std::max(max_penetration, contact.result.penetration);
-                log_contact_trace(log, iteration, contact);
-                apply_position_correction(contact);
-            }
-            for (const auto& contact : contacts) {
-                apply_velocity_impulses(contact);
+
+            for (std::uint32_t iteration = 0; iteration < m_position_iterations; ++iteration) {
+                ++position_iterations_executed;
+                for (auto& contact : solver_contacts) {
+                    apply_position_correction(contact);
+                }
             }
         }
 
@@ -498,21 +587,34 @@ public:
             rb.clear_forces();
         }
 
-        if (sweeps_executed > 0 && log->should_log(spdlog::level::debug)) {
-            log->debug("Collision solve summary (delta_seconds={:.6f}, sweeps_executed={}, max_contact_count={}, "
-                       "last_contact_count={}, max_penetration={:.6f}).",
+        if (!solver_contacts.empty() && log->should_log(spdlog::level::debug)) {
+            pbpt::math::Float max_normal_impulse_sum = 0.0f;
+            pbpt::math::Float max_abs_tangent_impulse_sum = 0.0f;
+            for (const auto& contact : solver_contacts) {
+                max_normal_impulse_sum = std::max(max_normal_impulse_sum, contact.normal_impulse_sum);
+                max_abs_tangent_impulse_sum = std::max(max_abs_tangent_impulse_sum, std::abs(contact.tangent_impulse_sum));
+            }
+
+            log->debug("Collision solve summary (delta_seconds={:.6f}, contact_snapshot_count={}, "
+                       "velocity_iterations={}, position_iterations={}, "
+                       "max_penetration_snapshot={:.6f}, max_normal_impulse_sum={:.6f}, "
+                       "max_abs_tangent_impulse_sum={:.6f}).",
                        delta_seconds,
-                       sweeps_executed,
-                       max_contact_count,
-                       last_contact_count,
-                       max_penetration);
+                       contact_snapshot_count,
+                       m_velocity_iterations,
+                       m_position_iterations,
+                       max_penetration_snapshot,
+                       max_normal_impulse_sum,
+                       max_abs_tangent_impulse_sum);
         }
 
-        log->trace("Physics tick completed (delta_seconds={:.6f}, sweeps_executed={}, last_contact_count={}, "
+        log->trace("Physics tick completed (delta_seconds={:.6f}, contact_snapshot_count={}, "
+                   "velocity_iterations_executed={}, position_iterations_executed={}, "
                    "rigid_body_count={}, collider_count={}).",
                    delta_seconds,
-                   sweeps_executed,
-                   last_contact_count,
+                   contact_snapshot_count,
+                   velocity_iterations_executed,
+                   position_iterations_executed,
                    m_rigid_bodies.size(),
                    m_colliders.size());
     }

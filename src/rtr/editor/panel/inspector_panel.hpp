@@ -254,6 +254,13 @@ private:
                                 use_gravity);
             }
 
+            float mass = rigid_body->mass();
+            if (ImGui::DragFloat("Mass", &mass, 0.01f, 0.001f, 1000.0f, "%.3f")) {
+                mass = std::max(0.001f, mass);
+                rigid_body->set_mass(mass);
+                logger()->debug("RigidBody mass updated (game_object_id={}, mass={:.4f}).", game_object.id(), mass);
+            }
+
             float restitution = rigid_body->restitution();
             if (ImGui::DragFloat("Restitution", &restitution, 0.01f, 0.0f, 1.0f)) {
                 restitution = pbpt::math::clamp(restitution, 0.0f, 1.0f);

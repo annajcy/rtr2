@@ -695,7 +695,8 @@ TEST(PhysicsSceneIntegrationTest, DynamicMeshCollidesWithStaticPlaneAndGenerates
 TEST(PhysicsSceneIntegrationTest, SolverIterationsReducePenetrationAcrossStackedContacts) {
     PhysicsStepper         physics;
     framework::core::Scene scene(1);
-    physics.world().set_solver_iterations(8);
+    physics.world().set_velocity_iterations(8);
+    physics.world().set_position_iterations(3);
 
     auto& floor = scene.create_game_object("floor");
     (void)floor.add_component<framework::component::RigidBody>(
@@ -751,6 +752,38 @@ TEST(PhysicsSceneIntegrationTest, SolverIterationsReducePenetrationAcrossStacked
     EXPECT_FALSE(stacked_contact.is_valid() && stacked_contact.penetration > 0.02f);
     EXPECT_LT(std::abs(lower_body.linear_velocity().y()), 0.2f);
     EXPECT_LT(std::abs(upper_body.linear_velocity().y()), 0.2f);
+}
+
+TEST(PhysicsSceneIntegrationTest, AccumulatedFrictionDoesNotReverseTangentialVelocityAcrossVelocityIterations) {
+    PhysicsStepper         physics;
+    framework::core::Scene scene(1);
+    physics.world().set_velocity_iterations(12);
+    physics.world().set_position_iterations(3);
+
+    auto& floor = scene.create_game_object("floor");
+    floor.node().set_local_position(pbpt::math::Vec3{0.0f, -0.5f, 0.0f});
+    (void)floor.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 1.0f);
+    (void)floor.add_component<framework::component::BoxCollider>(
+        physics.world(), pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
+
+    auto& sphere = scene.create_game_object("sphere");
+    sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 0.2f, 0.0f});
+    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
+        physics.world(), 1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 1.0f);
+    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+
+    auto& physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
+    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{0.4f, -1.0f, 0.0f};
+
+    physics.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+
+    EXPECT_GE(sphere_body.linear_velocity().x(), -1e-4f);
+    EXPECT_LE(sphere_body.linear_velocity().x(), 0.4f);
+    EXPECT_NEAR(sphere_body.linear_velocity().y(), 0.0f, 1e-4f);
 }
 
 TEST(PhysicsSceneIntegrationTest, DynamicSphereCollidesWithStaticPlaneAndCorrectsNormalVelocity) {

@@ -79,6 +79,32 @@ TEST(FrameworkRigidBodyComponentTest, SetterSyncsDecayParametersToPhysicsBody) {
     EXPECT_FLOAT_EQ(physics_body.angular_decay(), 0.96f);
 }
 
+TEST(FrameworkRigidBodyComponentTest, SetterSyncsMassToPhysicsBody) {
+    system::physics::PhysicsWorld physics_world;
+    core::Scene                   scene(1);
+    auto&                         go = scene.create_game_object("body");
+
+    auto& rigid_body = go.add_component<RigidBody>(physics_world);
+    rigid_body.set_mass(2.5f);
+
+    const auto& physics_body = physics_world.get_rigid_body(rigid_body.rigid_body_id());
+    EXPECT_FLOAT_EQ(physics_body.state().mass, 2.5f);
+    EXPECT_FLOAT_EQ(rigid_body.mass(), 2.5f);
+}
+
+TEST(FrameworkRigidBodyComponentTest, InvalidMassThrows) {
+    system::physics::PhysicsWorld physics_world;
+    core::Scene                   scene(1);
+    auto&                         go = scene.create_game_object("body");
+
+    EXPECT_THROW((void)go.add_component<RigidBody>(physics_world, 0.0f), std::invalid_argument);
+
+    auto& valid_go = scene.create_game_object("valid_body");
+    auto& rigid_body = valid_go.add_component<RigidBody>(physics_world);
+    EXPECT_THROW(rigid_body.set_mass(0.0f), std::invalid_argument);
+    EXPECT_THROW(rigid_body.set_mass(std::numeric_limits<float>::infinity()), std::invalid_argument);
+}
+
 TEST(FrameworkRigidBodyComponentTest, InvalidRestitutionThrows) {
     system::physics::PhysicsWorld physics_world;
     core::Scene                   scene(1);

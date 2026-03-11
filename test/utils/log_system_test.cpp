@@ -333,7 +333,8 @@ TEST(LogSystemTest, PhysicsWorldLifecycleLogsAreWritten) {
 
     system::physics::PhysicsWorld world{};
     world.set_gravity(pbpt::math::Vec3{0.0f, -3.5f, 0.0f});
-    world.set_solver_iterations(4);
+    world.set_velocity_iterations(4);
+    world.set_position_iterations(2);
 
     system::physics::RigidBody body{};
     body.set_type(system::physics::RigidBodyType::Dynamic);
@@ -349,7 +350,8 @@ TEST(LogSystemTest, PhysicsWorldLifecycleLogsAreWritten) {
 
     EXPECT_TRUE(file_contains(log_file, "[system.physics.world]"));
     EXPECT_TRUE(file_contains(log_file, "Gravity updated"));
-    EXPECT_TRUE(file_contains(log_file, "Solver iterations updated"));
+    EXPECT_TRUE(file_contains(log_file, "Velocity iterations updated"));
+    EXPECT_TRUE(file_contains(log_file, "Position iterations updated"));
     EXPECT_TRUE(file_contains(log_file, "Rigid body created"));
     EXPECT_TRUE(file_contains(log_file, "Collider created"));
     EXPECT_TRUE(file_contains(log_file, "Physics tick completed"));
@@ -370,7 +372,8 @@ TEST(LogSystemTest, PhysicsWorldCollisionLogsAreWritten) {
     init_logging(config);
 
     system::physics::PhysicsWorld world{};
-    world.set_solver_iterations(2);
+    world.set_velocity_iterations(2);
+    world.set_position_iterations(1);
 
     system::physics::RigidBody body_a{};
     body_a.set_type(system::physics::RigidBodyType::Dynamic);
@@ -395,7 +398,12 @@ TEST(LogSystemTest, PhysicsWorldCollisionLogsAreWritten) {
     get_logger("system.physics.world")->flush();
 
     EXPECT_TRUE(file_contains(log_file, "Collision solve summary"));
-    EXPECT_TRUE(file_contains(log_file, "Contact detected"));
+    EXPECT_TRUE(file_contains(log_file, "contact_snapshot_count=1"));
+    EXPECT_TRUE(file_contains(log_file, "velocity_iterations=2"));
+    EXPECT_TRUE(file_contains(log_file, "position_iterations=1"));
+    EXPECT_TRUE(file_contains(log_file, "Solver contact state"));
+    EXPECT_TRUE(file_contains(log_file, "normal_impulse_sum="));
+    EXPECT_TRUE(file_contains(log_file, "tangent_impulse_sum="));
 
     shutdown_logging();
 }

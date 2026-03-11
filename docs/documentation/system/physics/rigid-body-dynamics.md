@@ -83,8 +83,11 @@ In the underlying `PhysicsWorld::tick`, the engine updates the overall state $s 
    return pbpt::math::normalize(...); // Renormalize to counteract accumulated floating-point errors
    ```
 
-4. **Collision Point Processing and Fine-tuning (Solve Contacts)**
-   After integration is complete, objects may interpenetrate. The system calls `solve_contacts` to calculate the impulse at each collision point, directly modifying the relative half-step velocities of the rigid bodies to bounce them apart, and applying a displacement correction (Penetration Adjustment) to mitigate sustained penetration issues.
+4. **Single Contact Snapshot Build**
+   After integration is complete, the engine runs collision detection once and converts the geometric contacts into solver contacts. Each solver contact stores the frame snapshot data needed by the projected Gauss-Seidel (PGS) solver, including contact arms, effective masses, tangent direction, and per-frame accumulated impulses.
 
-5. **Synchronization of Observable Velocities (Update Observable Velocities)**
-   Executes `update_observable_velocities`. Because the physics world's integration step is shifted by half a time step, the linear velocity $v$ and angular velocity $\omega$ are compensated back to align with the current time step so that the game logic layer can observe velocities that match the current positions.
+5. **Velocity Phase: PGS with In-Frame Accumulated Impulses**
+   The solver iterates `velocity_iterations` times over the snapshot without re-running collision detection. For each contact, the normal and tangential impulses are solved in accumulated form: each iteration computes a candidate `delta`, clamps the updated sum (`old_sum + delta`), and only applies the actual delta that survives the clamp. Friction is bounded by the accumulated normal impulse of the same frame, so the tangent solve uses `max_friction = friction * normal_impulse_sum`.
+
+6. **Position Phase: Snapshot-Based Penetration Correction**
+   The engine then runs `position_iterations` rounds of positional correction using the same frame snapshot normal and penetration depth. This stage intentionally does not re-evaluate local anchors or rebuild manifolds; it is a lightweight geometric correction, and any residual error is handled by the next frame's fresh contact snapshot.
