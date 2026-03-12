@@ -1,6 +1,6 @@
 # 刚体动力学理论与实现 (Rigid Body Dynamics)
 
-本文档将结合刚体动力学基础理论，逐步剖析其实际在代码引擎中的实现与其物理意义。
+本文档结合基础理论，说明当前代码库中的刚体模拟实现。这里描述的是现在的 `PhysicsSystem -> RigidBodyWorld -> collision pair generation` 结构，而不是旧版 `PhysicsWorld` / Leapfrog 设计。
 
 ## 一、 刚体动力学基础 (Introduction)
 
@@ -21,27 +21,21 @@
 - **隐式欧拉 (Implicit Euler)**：一阶精度，使用时间段终点 $t^{[1]}$ 的速度作为矩形高度。截断误差同样为 $O(\Delta t^2)$。
 - **中点法 (Mid-point)**：二阶精度，使用时间段中点 $t^{[0.5]}$ 的速度作为高度。其一阶导数带来的误差可以相互抵消，最终截断误差缩小至 $O(\Delta t^3)$。
 
-**蛙跳法 / 半隐式积分 (Leapfrog / Semi-implicit Integration) 代码实现：**
-为了在计算性能和稳定性之间取得平衡，物理引擎常采用这种方法（中点法的应用范例）。这体现在 `PhysicsWorld::integrate_forces_and_drift`：
+**半隐式欧拉积分 (Semi-implicit Euler) 代码实现：**
+为了在实现复杂度和稳定性之间取得平衡，当前引擎在 `RigidBodyWorld::integrate_body` 中采用半隐式欧拉更新：
 
 ```cpp
-// 1. 半步长速度的初始化与缓存（即 v^{[-0.5]} -> v^{[0.5]} 的预测）
-if (!body.linear_half_step_initialized()) {
-    body.initialize_half_step_linear_velocity(
-        state.translation.linear_velocity + acceleration * (0.5f * delta_seconds));
-}
-
-// 2. 隐式更新位置：x^{[1]} = x^{[0]} + \Delta t v^{[0.5]}
-state.translation.position += body.half_step_linear_velocity() * delta_seconds;
-
-// 3. 显式更新半步长速度：v^{[0.5]} 的累加
-body.half_step_linear_velocity() += acceleration * delta_seconds;
+const auto acc = rb.state().inverse_mass() * rb.state().forces.accumulated_force;
+rb.state().translation.linear_velocity += acc * delta_seconds;
+rb.state().translation.linear_velocity *= rb.linear_decay();
+rb.state().translation.position += rb.state().translation.linear_velocity * delta_seconds;
 ```
-*(注：这里 `half_step_linear_velocity` 实际上就是由于积分错开半个步长的中点速度估算：先显式更新速度 $v^{[1]} = v^{[0]} + \Delta t M^{-1} f^{[0]}$，然后用最新的速度来隐式更新位置 $x^{[1]} = x^{[0]} + \Delta t v^{[1]}$，这等同于 $v^{[0.5]} = v^{[-0.5]} + \Delta t M^{-1} f^{[0]}$ 以及 $x^{[1]} = x^{[0]} + \Delta t v^{[0.5]}$)*
+
+这里的顺序很关键：先更新速度，再用更新后的速度推进位置，这就是标准的 semi-implicit Euler。
 
 **常见受力计算 (Force Computation)：**
-- **重力 (Gravity Force)**：$f_{gravity}^{[0]} = M\mathbf{g}$。在代码中直接体现为：`const pbpt::math::Vec3 gravity_force = body.use_gravity() ? (m_gravity * state.mass) : pbpt::math::Vec3(0.0f);`
-- **合力与阻力 (Drag Force)**：理论公式为 $f_{drag}^{[0]} = -\sigma v^{[0]}$，在引擎中由用户自定义的阻力等合力会直接进入 `state.forces.accumulated_force`，二者共同算出加速度 `acceleration = total_force / state.mass`。（注：在实际工程中，由于阻力会降低速度，有时也会直接通过衰减系数使速度衰减：$v^{[1]} = a v^{[0]}$）
+- **重力 (Gravity Force)**：$f_{gravity} = M\mathbf{g}$。如果 `use_gravity()` 打开，系统会在积分前把重力加到力累加器中。
+- **外力累加 (Force Accumulation)**：用户代码或框架逻辑施加的外力进入 `state.forces.accumulated_force`，再通过逆质量转成线加速度。
 
 ## 三、 旋转运动与四元数 (Rotational Motion)
 
@@ -56,7 +50,7 @@ body.half_step_linear_velocity() += acceleration * delta_seconds;
 **旋转动力学的核心物理量：**
 - **力矩 (Torque, $\tau$)**：相当于平移运动中的力（Force），即代码中的 `state.forces.accumulated_torque`。计算公式为受力点的世界力臂向量和力的叉乘：$\tau_i = (Rr_i) \times f_i$。
 - **惯性张量 (Inertia, $I$)**：相当于平移运动中的质量（Mass）。由于物体在旋转，其世界坐标下的惯性张量需要根据当前的旋转矩阵 $R$ 实时更新：$I^{-1} = R I_{ref}^{-1} R^T$。代码里刚体存储的是自身的局部逆惯性张量 (`m_inverse_inertia_tensor_ref`)。
-  在系统中封装在 `PhysicsWorld::inverse_inertia_tensor_world`：
+  在系统中封装在 `RigidBodyWorld::inverse_inertia_tensor_world`：
   ```cpp
   const auto rotation_matrix = body.state().rotation.orientation.to_mat3();
   return rotation_matrix * body.inverse_inertia_tensor_ref() * pbpt::math::transpose(rotation_matrix);
@@ -64,30 +58,69 @@ body.half_step_linear_velocity() += acceleration * delta_seconds;
 
 ## 四、 完整的刚体更新循环 (Simulation Implementation)
 
-在物理引擎底层的 `PhysicsWorld::tick` 中，每一帧通过给定的时间步长 $\Delta t$，按照如下顺序对状态集合 $s = \{v, x, \omega, q\}$ 进行了完整更新：
+在 `RigidBodyWorld::step` 中，每一帧通过给定时间步长 $\Delta t$，按如下顺序更新状态集合 $s = \{v, x, \omega, q\}$：
 
-1. **预处理与力、力矩累加 (Force Integration & Drift)**
-   将四元数 $q^{[0]}$ 转换为旋转矩阵 $R^{[0]}$。根据局部惯性张量 $I_{ref}$ 计算当前的世界惯性张量（即前文的 $I^{[0]} \leftarrow R^{[0]}I_{ref}(R^{[0]})^T$ 操作）。收集所有外力 $f_i^{[0]}$ 并累加合力 $f^{[0]}$，转换为平移加速度。计算偏心受力产生的力矩并累加总力矩 $\tau^{[0]} \leftarrow \sum (R^{[0]}r_i) \times f_i^{[0]}$ 计算角加速度。
+1. **积分 Dynamic 刚体**
+   对每个 awake 的 Dynamic 刚体，系统会：
+   - 在需要时加入重力，
+   - 根据累计外力积分线速度，
+   - 施加线速度衰减，
+   - 用更新后的线速度推进位置，
+   - 计算世界空间逆惯性张量，
+   - 根据累计力矩积分角速度，
+   - 施加角速度衰减，
+   - 推进四元数朝向并重新归一化。
    
-2. **平移状态更新半隐式更新 (Translational Update)**
-   根据前述的蛙跳法，推进 `half_step_linear_velocity` 并用于隐式更新下一帧的位置 `position`。
+2. **构建 Contact Snapshot**
+   系统遍历 collider 对，跳过同 body 和 static-static 组合，将 collider 转成 `WorldCollider`，并调用 `collision/` 中对应的 `ContactPairTrait<...>::generate(...)`。
 
-3. **旋转状态半隐式更新 (Rotational Update)**
-   类似平移状态，代码同样采用半步长角速度来积分更新旋转朝向四元数：
-   ```cpp
-   // 更新朝向四元数（四元数增量导数乘法积分）
-   state.rotation.orientation = integrate_orientation(state.rotation.orientation, body.half_step_angular_velocity(), delta_seconds);
-   // 更新半步长角加速度
-   body.half_step_angular_velocity() += angular_acceleration * delta_seconds;
-   ```
-   其中 `integrate_orientation` 严格实现了公式 $q^{[1]} \leftarrow q^{[0]} + \left[0 \quad \frac{\Delta t}{2}\omega^{[1]}\right] \times q^{[0]}$（使用四元数乘法）：
-   ```cpp
-   const pbpt::math::Quat delta = (omega_quat * orientation) * (0.5f * delta_seconds);
-   return pbpt::math::normalize(...); // 为了抵消浮点误差累加进行重归一化
-   ```
+3. **把几何接触提升为求解接触**
+   有效的 `ContactResult` 会先转成 rigid-body 模块内部的 `Contact`，再转成 `SolverContact`。这一阶段会计算：
+   - body id 和 collider id，
+   - 接触力臂 `r_a`、`r_b`，
+   - 世界空间逆惯性张量，
+   - 法线与切线方向，
+   - 法向/切向 effective mass，
+   - restitution bias，
+   - 当前帧内初始化为 0 的累计冲量。
 
-4. **碰撞点处理与微调 (Solve Contacts)**
-   积分完成后，可能引起物体相互嵌入。此时调用 `solve_contacts` 计算各碰撞点的冲量(Impulse)，直接用于修改刚体的相对半步长速度进行物理弹开，并通过位移校正减缓持续穿透的问题（Penetration Adjustment）。
+4. **速度阶段：Projected Gauss-Seidel**
+   系统对同一帧 snapshot 迭代 `velocity_iterations` 次。对每个 contact：
+   - 求法向冲量，
+   - 以累计形式更新并 clamp 到非负，
+   - 将实际增量冲量施加到两个刚体，
+   - 再求切向冲量，
+   - 将摩擦冲量幅值限制在 `mu * normal_impulse_sum` 内。
 
-5. **速度的复苏化同步 (Update Observable Velocities)**
-   执行 `update_observable_velocities`。由于物理世界的积分推演错开了半个时间步长，为了让游戏逻辑层观测到的线性速度与角速度能够匹配目前的位置，$v$ 与 $\omega$ 会被再次补偿回落到整点节拍上。
+5. **位置阶段：穿透修正**
+   系统再执行 `position_iterations` 轮位置修正，使用 snapshot 中保存的法线和穿透深度来缓解 interpenetration。这个阶段不会在同一帧内重建接触几何。
+
+6. **清空外力**
+   求解结束后，每个 rigid body 都会清空力和力矩累加器，为下一帧的外部驱动做准备。
+
+## 五、 旋转更新细节
+
+当前朝向更新使用标准的四元数导数形式：
+
+```cpp
+const auto angular_velocity_quat = pbpt::math::Quat(
+    0.0f,
+    rb.state().rotation.angular_velocity.x(),
+    rb.state().rotation.angular_velocity.y(),
+    rb.state().rotation.angular_velocity.z());
+rb.state().rotation.orientation +=
+    0.5f * delta_seconds * angular_velocity_quat * rb.state().rotation.orientation;
+rb.state().rotation.orientation = pbpt::math::normalize(rb.state().rotation.orientation);
+```
+
+这不是当前代码中的“半步长角速度”积分，而是直接的 semi-implicit 更新，并通过归一化抑制数值误差。
+
+## 六、 `collision` 与求解器的边界
+
+当前刚体求解器有意持有耦合侧类型：
+
+- `rigid_body/collider.hpp` 定义带 `RigidBodyID` 的 body-attached collider。
+- `rigid_body/contact.hpp` 定义 `Contact` 和 `SolverContact`。
+- `collision/contact.hpp` 只保留 `ContactResult` 和 `ContactPairTrait`。
+
+这样做可以让碰撞检测保持可复用，同时保证 solver-facing state 保留在 rigid-body 模块内部。

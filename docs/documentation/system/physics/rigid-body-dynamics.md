@@ -1,6 +1,6 @@
 # Rigid Body Dynamics Theory and Implementation
 
-This document provides a detailed breakdown of the rigid body dynamics theory and its corresponding implementation in the `rtr::system::physics` engine.
+This document explains the rigid-body simulation implemented in the current `rtr::system::physics` runtime. The implementation described here corresponds to `PhysicsSystem -> RigidBodyWorld -> collision pair generation`, not to the older `PhysicsWorld` / leapfrog-based design.
 
 ## 1. Introduction
 
@@ -21,27 +21,21 @@ Updating position and velocity is essentially calculating the area under the vel
 - **Implicit Euler**: First-order accuracy, uses the velocity at the end of the time interval. Truncation error is also $O(\Delta t^2)$.
 - **Mid-point**: Second-order accuracy, uses the velocity at the midpoint of the time interval. The errors introduced by the first derivative can cancel each other out, reducing the final truncation error to $O(\Delta t^3)$.
 
-**Leapfrog / Semi-implicit Integration Implementation:**
-To achieve a balance between computational performance and stability, the physical engine practically uses the Leapfrog method (an application paradigm of the mid-point method). This is reflected in `PhysicsWorld::integrate_forces_and_drift`:
+**Semi-implicit Euler Integration Implementation:**
+To balance simplicity and stability, the engine currently uses a semi-implicit Euler update inside `RigidBodyWorld::integrate_body`:
 
 ```cpp
-// 1. Initialization and caching of half-step velocity (predicting v^{[-0.5]} -> v^{[0.5]})
-if (!body.linear_half_step_initialized()) {
-    body.initialize_half_step_linear_velocity(
-        state.translation.linear_velocity + acceleration * (0.5f * delta_seconds));
-}
-
-// 2. Implicitly update position: x^{[1]} = x^{[0]} + \Delta t v^{[0.5]}
-state.translation.position += body.half_step_linear_velocity() * delta_seconds;
-
-// 3. Explicitly update half-step velocity: Accumulating v^{[0.5]}
-body.half_step_linear_velocity() += acceleration * delta_seconds;
+const auto acc = rb.state().inverse_mass() * rb.state().forces.accumulated_force;
+rb.state().translation.linear_velocity += acc * delta_seconds;
+rb.state().translation.linear_velocity *= rb.linear_decay();
+rb.state().translation.position += rb.state().translation.linear_velocity * delta_seconds;
 ```
-*(Note: Here, `half_step_linear_velocity` is effectively the midpoint velocity estimate achieved by shifting the integration by half a time step.)*
+
+The order matters: velocity is updated first, and the new velocity is then used to advance position. This is the standard semi-implicit Euler pattern.
 
 **Common Force Computation:**
-- **Gravity**: $f_{gravity}^{[0]} = M\mathbf{g}$. In code, this is directly implemented as: `const pbpt::math::Vec3 gravity_force = body.use_gravity() ? (m_gravity * state.mass) : pbpt::math::Vec3(0.0f);`
-- **Force Accumulation**: Custom forces (like drag) added by the user flow directly into `state.forces.accumulated_force`. Together, they compute the acceleration: `acceleration = total_force / state.mass`.
+- **Gravity**: $f_{gravity} = M\mathbf{g}$. If `use_gravity()` is enabled, gravity is added to the force accumulator before integration.
+- **Force Accumulation**: Custom forces added by gameplay or framework code flow into `state.forces.accumulated_force`, which is converted into linear acceleration through inverse mass.
 
 ## 3. Rotational Motion and Quaternions
 
@@ -53,7 +47,7 @@ Compared to Euler angles (which can cause gimbal lock and are difficult to diffe
 **Core Physical Quantities of Rotational Dynamics:**
 - **Torque ($\tau$)**: Equivalent to Force in translational motion. In the code, this is `state.forces.accumulated_torque`. The formula is the cross product of the world moment arm vector and the force at the application point: $\tau_i = (Rr_i) \times f_i$.
 - **Inertia Tensor ($I$)**: Equivalent to Mass. Since the object is rotating, its world-coordinate inertia tensor must be updated in real-time based on the current rotation matrix $R$: $I^{-1} = R I_{ref}^{-1} R^T$. The rigid body stores its local inverse inertia tensor (`m_inverse_inertia_tensor_ref`).
-  In the system, this is encapsulated in `PhysicsWorld::inverse_inertia_tensor_world`:
+  In the system, this is encapsulated in `RigidBodyWorld::inverse_inertia_tensor_world`:
   ```cpp
   const auto rotation_matrix = body.state().rotation.orientation.to_mat3();
   return rotation_matrix * body.inverse_inertia_tensor_ref() * pbpt::math::transpose(rotation_matrix);
@@ -61,33 +55,69 @@ Compared to Euler angles (which can cause gimbal lock and are difficult to diffe
 
 ## 4. Complete Rigid Body Update Loop (Simulation Implementation)
 
-In the underlying `PhysicsWorld::tick`, the engine updates the overall state $s = \{v, x, \omega, q\}$ in the following order:
+In `RigidBodyWorld::step`, the engine updates the overall state $s = \{v, x, \omega, q\}$ in the following order:
 
-1. **Preprocessing and Force/Torque Accumulation (Force Integration & Drift)**
-   Accumulates external forces to convert to translational acceleration, and calculates angular acceleration by converting torque via the local pseudo-inertia tensor (i.e., the $I^{[0]} \leftarrow R^{[0]}I_{ref}(R^{[0]})^T$ operation mentioned above).
+1. **Integrate Dynamic Bodies**
+   For every awake dynamic rigid body, the world:
+   - adds gravity when enabled,
+   - integrates linear velocity from accumulated force,
+   - applies linear decay,
+   - advances position with the updated velocity,
+   - computes world-space inverse inertia,
+   - integrates angular velocity from accumulated torque,
+   - applies angular decay,
+   - advances orientation and renormalizes the quaternion.
    
-2. **Semi-implicit Update of Translational State (Translational Update)**
-   Following the leapfrog method described earlier, advances `half_step_linear_velocity` and uses it to update the position `position` for the next frame.
+2. **Build Contact Snapshot**
+   The world enumerates collider pairs, skips self-pairs and static-static pairs, converts colliders into `WorldCollider` instances, and calls the corresponding `ContactPairTrait<...>::generate(...)` routines from `collision/`.
 
-3. **Semi-implicit Update of Rotational State (Rotational Update)**
-   Similar to the translational state, the code also uses a half-step angular velocity to integrate and update the rotation orientation quaternion:
-   ```cpp
-   // Update orientation quaternion (quaternion incremental derivative multiplication integration)
-   state.rotation.orientation = integrate_orientation(state.rotation.orientation, body.half_step_angular_velocity(), delta_seconds);
-   // Update half-step angular acceleration
-   body.half_step_angular_velocity() += angular_acceleration * delta_seconds;
-   ```
-   Where `integrate_orientation` strictly implements the formula $q^{[1]} \leftarrow q^{[0]} + \left[0 \quad \frac{\Delta t}{2}\omega^{[1]}\right] \times q^{[0]}$:
-   ```cpp
-   const pbpt::math::Quat delta = (omega_quat * orientation) * (0.5f * delta_seconds);
-   return pbpt::math::normalize(...); // Renormalize to counteract accumulated floating-point errors
-   ```
+3. **Lift Geometric Contacts into Solver Contacts**
+   A valid `ContactResult` is converted into rigid-body-specific `Contact` and then `SolverContact` records. This stage computes:
+   - body ids and collider ids,
+   - contact arms `r_a`, `r_b`,
+   - world-space inverse inertia tensors,
+   - contact normal and tangent,
+   - effective mass along normal and tangent directions,
+   - restitution bias,
+   - frame-local accumulated impulses initialized to zero.
 
-4. **Single Contact Snapshot Build**
-   After integration is complete, the engine runs collision detection once and converts the geometric contacts into solver contacts. Each solver contact stores the frame snapshot data needed by the projected Gauss-Seidel (PGS) solver, including contact arms, effective masses, tangent direction, and per-frame accumulated impulses.
+4. **Velocity Phase: Projected Gauss-Seidel**
+   The solver iterates `velocity_iterations` times over the frame snapshot. For each contact:
+   - solve the normal impulse,
+   - accumulate and clamp it to stay non-negative,
+   - apply the actual delta impulse to both bodies,
+   - solve the tangential impulse,
+   - clamp friction magnitude against `mu * normal_impulse_sum`.
 
-5. **Velocity Phase: PGS with In-Frame Accumulated Impulses**
-   The solver iterates `velocity_iterations` times over the snapshot without re-running collision detection. For each contact, the normal and tangential impulses are solved in accumulated form: each iteration computes a candidate `delta`, clamps the updated sum (`old_sum + delta`), and only applies the actual delta that survives the clamp. Friction is bounded by the accumulated normal impulse of the same frame, so the tangent solve uses `max_friction = friction * normal_impulse_sum`.
+5. **Position Phase: Penetration Correction**
+   The solver then runs `position_iterations` rounds of positional correction using the contact normal and penetration depth stored in the snapshot. This does not rebuild contact geometry within the same frame.
 
-6. **Position Phase: Snapshot-Based Penetration Correction**
-   The engine then runs `position_iterations` rounds of positional correction using the same frame snapshot normal and penetration depth. This stage intentionally does not re-evaluate local anchors or rebuild manifolds; it is a lightweight geometric correction, and any residual error is handled by the next frame's fresh contact snapshot.
+6. **Clear External Forces**
+   After solving, every rigid body clears its force and torque accumulators so the next frame starts from a clean externally-driven state.
+
+## 5. Rotational Update Details
+
+Orientation is advanced with the standard quaternion derivative form:
+
+```cpp
+const auto angular_velocity_quat = pbpt::math::Quat(
+    0.0f,
+    rb.state().rotation.angular_velocity.x(),
+    rb.state().rotation.angular_velocity.y(),
+    rb.state().rotation.angular_velocity.z());
+rb.state().rotation.orientation +=
+    0.5f * delta_seconds * angular_velocity_quat * rb.state().rotation.orientation;
+rb.state().rotation.orientation = pbpt::math::normalize(rb.state().rotation.orientation);
+```
+
+This is not a half-step angular-velocity integrator in the current codebase; it is a direct semi-implicit update with normalization for numerical stability.
+
+## 6. Collision / Solver Boundary
+
+The rigid-body solver intentionally owns the coupling-side types:
+
+- `rigid_body/collider.hpp` defines body-attached colliders with `RigidBodyID`.
+- `rigid_body/contact.hpp` defines `Contact` and `SolverContact`.
+- `collision/contact.hpp` only defines `ContactResult` and `ContactPairTrait`.
+
+This keeps collision detection reusable while ensuring solver-facing state remains local to the rigid-body module.

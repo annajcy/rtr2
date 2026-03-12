@@ -1,17 +1,73 @@
 # 物理系统总览 (Overview)
 
-本文档是对 `rtr2` 中自定义物理引擎 (`rtr::system::physics`) 的架构总览解析。物理引擎主要基于半隐式欧拉（蛙跳法）进行刚体动力学模拟。对于具体的理论实现细节，可以参考刚体动力学文档。
+本文档描述 `rtr2` 当前的 `rtr::system::physics` 架构。现阶段这套物理系统是一个“仅刚体”的运行时：`PhysicsSystem` 负责总调度，`RigidBodyWorld` 负责实际模拟，`collision` 模块负责共享的几何接触检测。
 
 ## 架构总览
 
-整个物理模块的架构分为以下几个主要层次和组件：
+当前物理模块可以分为以下几个层次：
 
-1. **`scene_physics_sync.hpp`（场景到物理的适配层）**
-   - **职责**：负责将底层独立物理世界与上层框架组件（ECS 结构的 `GameObject`，主要是 `RigidBody` 和 `Collider` 组件）连接起来。
-   - **交互流程**：运行时先调用 `sync_scene_to_physics()`（将场景节点位姿同步给碰撞体和非 Dynamic 刚体），再执行 `PhysicsWorld::tick()`，最后调用 `sync_physics_to_scene()` 将受物理驱动的动态刚体位姿同步回场景节点。
-2. **`PhysicsWorld` (核心物理沙盒)**
-   - **指责**：负责维护所有的刚体结构 (`RigidBody`) 和碰撞体结构 (`Collider`)，是发生物理模拟本身的核心对象。
-   - **核心管线 (`tick`)**：每一帧的时间更新中，顺序执行力与位移积分 (`integrate_forces_and_drift`)、碰撞检测 (`generate_contacts`)、碰撞点求解约束 (`solve_contacts`)，及最终外部可观测速度的更新 (`update_observable_velocities`)。
-3. **`RigidBody` (刚体数据容器)**
-   - **指责**：纯数据对象，内部包含了刚体的运动状态（`RigidBodyState`），分为平移状态 (`TranslationState`：位置和速度) 和旋转状态 (`RotationalState`：四元数朝向和角速度)，以及力量累加器 (`ForceAccumulator`)。
-   - **特殊字段**：为了兼容蛙跳法半隐式积分，该类还维护了半步长速度 (`m_half_step_linear_velocity` 和 `m_half_step_angular_velocity`)。
+1. **`PhysicsSystem`（运行时总调度器）**
+   - **职责**：作为 `AppRuntime` 当前持有的物理运行时入口。
+   - **交互流程**：`PhysicsSystem::step(scene, dt)` 会先把框架层的位姿和碰撞体状态同步进刚体世界，再调用 `RigidBodyWorld::step(dt)`，最后把动态刚体的结果回写到 scene graph。
+2. **`rigid_body_scene_sync.hpp`（场景到刚体系统的适配层）**
+   - **职责**：连接 `GameObject` 组件与刚体模拟状态。
+   - **输入同步**：把 scene graph 中的 world transform、scale、collider 参数同步到 `RigidBodyWorld`。
+   - **输出同步**：在 fixed tick 结束后，把 `RigidBodyWorld` 中 Dynamic 刚体的位姿写回 scene graph。
+3. **`RigidBodyWorld`（核心模拟世界）**
+   - **职责**：维护全部刚体和附着在刚体上的碰撞体，负责运动积分、接触收集与碰撞响应求解。
+   - **核心管线 (`step`)**：每次 fixed step 中，先积分 Dynamic 刚体，再构建一份仅在当前帧有效的 contact snapshot，随后执行速度阶段的 PGS 迭代和位置阶段的穿透修正，最后清空外力累加器。
+   - **范围边界**：当前这个 world 只管理 rigid body，不包含 cloth / FEM / water 的运行时。
+4. **`RigidBody` (刚体数据容器)**
+   - **职责**：保存刚体的运动状态（`RigidBodyState`）、摩擦和恢复系数、sleep/awake 状态、质量属性，以及力/力矩累加器。
+4. **`collision/`（几何接触层）**
+   - **职责**：提供纯碰撞检测相关的数据结构和两两碰撞接触生成逻辑。
+   - **包含内容**：`ColliderShape`、`WorldCollider`、`ContactResult`、`ContactPairTrait<...>::generate(...)`。
+   - **边界定义**：这一层不持有刚体 id，也不持有求解阶段的 contact cache；这些耦合类型放在 `rigid_body/` 内。
+
+## 当前目录结构
+
+```text
+src/rtr/system/physics/
+  physics_system.hpp
+  common/
+    physics_ids.hpp
+    physics_material.hpp
+    physics_step_context.hpp
+  collision/
+    collider_shape.hpp
+    contact.hpp
+    sphere_sphere.hpp
+    sphere_box.hpp
+    sphere_plane.hpp
+    box_box.hpp
+    box_plane.hpp
+    mesh_plane.hpp
+    plane_common.hpp
+  rigid_body/
+    rigid_body.hpp
+    rigid_body_type.hpp
+    collider.hpp
+    contact.hpp
+    rigid_body_world.hpp
+```
+
+## Fixed Tick 运行契约
+
+当前运行时的 fixed-step 路径是：
+
+1. `AppRuntime` 累积时间并执行 fixed updates。
+2. 每个 fixed tick 调用 `PhysicsSystem::step(scene, fixed_dt)`。
+3. `sync_scene_to_rigid_body(scene, rigid_body_world)` 同步输入。
+4. `RigidBodyWorld::step(fixed_dt)` 执行积分和碰撞响应。
+5. `sync_rigid_body_to_scene(scene, rigid_body_world)` 将 Dynamic 刚体结果写回 scene。
+
+因此，Dynamic 刚体的权威模拟状态保存在 `RigidBodyWorld` 中，而 scene graph 仍然是渲染和编辑器侧可见的表示。
+
+## `collision` 与 `rigid_body` 的职责边界
+
+当前边界是有意这样划分的：
+
+- `collision/` 只负责纯几何和接触生成。
+- `rigid_body/` 负责 `Collider`、`Contact`、`SolverContact` 以及冲量求解。
+
+这样做的目的，是让碰撞对检测逻辑保持可复用，同时把刚体 id、累计冲量和求解阶段的状态留在真正使用它们的 rigid-body 模块内部。
