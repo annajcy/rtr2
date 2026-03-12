@@ -5,8 +5,8 @@
 
 #include <pbpt/math/math.h>
 
-#include "rtr/framework/component/physics/collider.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 
 namespace rtr::framework::component {
 
@@ -40,7 +40,7 @@ private:
     }
 
 public:
-    explicit PlaneCollider(core::GameObject& owner, system::physics::PhysicsWorld& world,
+    explicit PlaneCollider(core::GameObject& owner, system::physics::RigidBodyWorld& world,
                            const pbpt::math::Vec3& normal_local = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
                            const pbpt::math::Vec3& local_position = pbpt::math::Vec3{0.0f},
                            const pbpt::math::Quat& local_rotation = pbpt::math::Quat::identity())

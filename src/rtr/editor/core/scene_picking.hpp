@@ -14,8 +14,8 @@
 
 #include "rtr/editor/core/editor_types.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/physics/box_collider.hpp"
-#include "rtr/framework/component/physics/sphere_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_kinds.hpp"
 #include "rtr/resource/resource_manager.hpp"

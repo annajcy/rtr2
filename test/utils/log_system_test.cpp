@@ -22,7 +22,7 @@
 #include "rtr/rhi/window.hpp"
 #include "rtr/system/input/input_state.hpp"
 #include "rtr/system/input/input_types.hpp"
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::utils::test {
@@ -319,7 +319,7 @@ TEST(LogSystemTest, FrameworkCoreLifecycleLogsAreWritten) {
     shutdown_logging();
 }
 
-TEST(LogSystemTest, PhysicsWorldLifecycleLogsAreWritten) {
+TEST(LogSystemTest, RigidBodyWorldLifecycleLogsAreWritten) {
     shutdown_logging();
     TempDir temp_dir{};
     const auto log_file = temp_dir.path / "rtr.log";
@@ -331,7 +331,7 @@ TEST(LogSystemTest, PhysicsWorldLifecycleLogsAreWritten) {
     config.level = LogLevel::trace;
     init_logging(config);
 
-    system::physics::PhysicsWorld world{};
+    system::physics::RigidBodyWorld world{};
     world.set_gravity(pbpt::math::Vec3{0.0f, -3.5f, 0.0f});
     world.set_velocity_iterations(4);
     world.set_position_iterations(2);
@@ -342,13 +342,13 @@ TEST(LogSystemTest, PhysicsWorldLifecycleLogsAreWritten) {
     body.state().mass = 2.0f;
     const auto body_id = world.create_rigid_body(body);
     const auto collider_id = world.create_collider(body_id, system::physics::Collider{});
-    world.tick(1.0f / 60.0f);
+    world.step(1.0f / 60.0f);
     EXPECT_TRUE(world.remove_collider(collider_id));
     EXPECT_TRUE(world.remove_rigid_body(body_id));
 
-    get_logger("system.physics.world")->flush();
+    get_logger("system.physics.rigid_body.world")->flush();
 
-    EXPECT_TRUE(file_contains(log_file, "[system.physics.world]"));
+    EXPECT_TRUE(file_contains(log_file, "[system.physics.rigid_body.world]"));
     EXPECT_TRUE(file_contains(log_file, "Gravity updated"));
     EXPECT_TRUE(file_contains(log_file, "Velocity iterations updated"));
     EXPECT_TRUE(file_contains(log_file, "Position iterations updated"));
@@ -359,7 +359,7 @@ TEST(LogSystemTest, PhysicsWorldLifecycleLogsAreWritten) {
     shutdown_logging();
 }
 
-TEST(LogSystemTest, PhysicsWorldCollisionLogsAreWritten) {
+TEST(LogSystemTest, RigidBodyWorldCollisionLogsAreWritten) {
     shutdown_logging();
     TempDir temp_dir{};
     const auto log_file = temp_dir.path / "rtr.log";
@@ -371,7 +371,7 @@ TEST(LogSystemTest, PhysicsWorldCollisionLogsAreWritten) {
     config.level = LogLevel::trace;
     init_logging(config);
 
-    system::physics::PhysicsWorld world{};
+    system::physics::RigidBodyWorld world{};
     world.set_velocity_iterations(2);
     world.set_position_iterations(1);
 
@@ -393,9 +393,9 @@ TEST(LogSystemTest, PhysicsWorldCollisionLogsAreWritten) {
     const auto body_b_id = world.create_rigid_body(body_b);
     (void)world.create_collider(body_a_id, system::physics::Collider{});
     (void)world.create_collider(body_b_id, system::physics::Collider{});
-    world.tick(1.0f / 60.0f);
+    world.step(1.0f / 60.0f);
 
-    get_logger("system.physics.world")->flush();
+    get_logger("system.physics.rigid_body.world")->flush();
 
     EXPECT_TRUE(file_contains(log_file, "Collision solve summary"));
     EXPECT_TRUE(file_contains(log_file, "contact_snapshot_count=1"));

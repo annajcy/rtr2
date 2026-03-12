@@ -3,7 +3,7 @@
 #include <pbpt/math/math.h>
 
 #include "rtr/framework/component/component.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/core/game_object.hpp"
 #include "rtr/system/input/input_state.hpp"
 #include "rtr/system/input/input_types.hpp"

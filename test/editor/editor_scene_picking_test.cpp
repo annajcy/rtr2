@@ -1,18 +1,18 @@
 #include "gtest/gtest.h"
 
 #include "rtr/editor/core/scene_picking.hpp"
-#include "rtr/framework/component/physics/box_collider.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
-#include "rtr/framework/component/physics/sphere_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
 namespace rtr::editor::test {
 
 TEST(EditorScenePickingTest, SpherePickUsesColliderLocalScale) {
     resource::ResourceManager      resources;
-    system::physics::PhysicsWorld  physics_world;
+    system::physics::RigidBodyWorld  physics_world;
     framework::core::Scene         scene(1);
 
     auto& go = scene.create_game_object("sphere");
@@ -38,7 +38,7 @@ TEST(EditorScenePickingTest, SpherePickUsesColliderLocalScale) {
 
 TEST(EditorScenePickingTest, BoxPickUsesColliderLocalScale) {
     resource::ResourceManager      resources;
-    system::physics::PhysicsWorld  physics_world;
+    system::physics::RigidBodyWorld  physics_world;
     framework::core::Scene         scene(1);
 
     auto& go = scene.create_game_object("box");

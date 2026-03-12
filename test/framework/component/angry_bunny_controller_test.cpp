@@ -3,16 +3,16 @@
 #include "gtest/gtest.h"
 
 #include "../../../examples/games103_lab/lab1_angry_bunny/angry_bunny_controller.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/system/input/input_state.hpp"
 #include "rtr/system/input/input_types.hpp"
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
 namespace rtr::examples::games103_lab::lab1_angry_bunny::test {
 
 TEST(AngryBunnyControllerTest, WaitingStateKeepsBunnySpinningWithoutGravity) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     framework::core::Scene        scene(1);
     system::input::InputState     input_state;
 
@@ -30,7 +30,7 @@ TEST(AngryBunnyControllerTest, WaitingStateKeepsBunnySpinningWithoutGravity) {
 }
 
 TEST(AngryBunnyControllerTest, LaunchAndResetEdgesUpdateStateOnce) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     framework::core::Scene        scene(1);
     system::input::InputState     input_state;
 

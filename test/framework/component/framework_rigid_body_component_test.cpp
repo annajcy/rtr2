@@ -5,14 +5,14 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/core/scene.hpp"
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
 namespace rtr::framework::component::test {
 
 TEST(FrameworkRigidBodyComponentTest, ConstructorWritesMaterialParametersToPhysicsBody) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("body");
 
@@ -32,7 +32,7 @@ TEST(FrameworkRigidBodyComponentTest, ConstructorWritesMaterialParametersToPhysi
 }
 
 TEST(FrameworkRigidBodyComponentTest, SetterSyncsMaterialParametersToPhysicsBody) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("body");
 
@@ -46,7 +46,7 @@ TEST(FrameworkRigidBodyComponentTest, SetterSyncsMaterialParametersToPhysicsBody
 }
 
 TEST(FrameworkRigidBodyComponentTest, ConstructorWritesDecayParametersToPhysicsBody) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("body");
 
@@ -66,7 +66,7 @@ TEST(FrameworkRigidBodyComponentTest, ConstructorWritesDecayParametersToPhysicsB
 }
 
 TEST(FrameworkRigidBodyComponentTest, SetterSyncsDecayParametersToPhysicsBody) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("body");
 
@@ -80,7 +80,7 @@ TEST(FrameworkRigidBodyComponentTest, SetterSyncsDecayParametersToPhysicsBody) {
 }
 
 TEST(FrameworkRigidBodyComponentTest, SetterSyncsMassToPhysicsBody) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("body");
 
@@ -93,7 +93,7 @@ TEST(FrameworkRigidBodyComponentTest, SetterSyncsMassToPhysicsBody) {
 }
 
 TEST(FrameworkRigidBodyComponentTest, InvalidMassThrows) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("body");
 
@@ -106,7 +106,7 @@ TEST(FrameworkRigidBodyComponentTest, InvalidMassThrows) {
 }
 
 TEST(FrameworkRigidBodyComponentTest, InvalidRestitutionThrows) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("body");
 
@@ -134,7 +134,7 @@ TEST(FrameworkRigidBodyComponentTest, InvalidRestitutionThrows) {
 }
 
 TEST(FrameworkRigidBodyComponentTest, InvalidFrictionThrows) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("body");
 
@@ -154,7 +154,7 @@ TEST(FrameworkRigidBodyComponentTest, InvalidFrictionThrows) {
 }
 
 TEST(FrameworkRigidBodyComponentTest, InvalidDecayThrows) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("body");
 

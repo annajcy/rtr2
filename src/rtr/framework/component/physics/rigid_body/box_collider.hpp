@@ -5,8 +5,8 @@
 
 #include <pbpt/math/math.h>
 
-#include "rtr/framework/component/physics/collider.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 
 namespace rtr::framework::component {
 
@@ -49,7 +49,7 @@ private:
     }
 
 public:
-    explicit BoxCollider(core::GameObject& owner, system::physics::PhysicsWorld& world,
+    explicit BoxCollider(core::GameObject& owner, system::physics::RigidBodyWorld& world,
                          const pbpt::math::Vec3& half_extents = pbpt::math::Vec3{0.5f, 0.5f, 0.5f},
                          const pbpt::math::Vec3& local_position = pbpt::math::Vec3{0.0f},
                          const pbpt::math::Quat& local_rotation = pbpt::math::Quat::identity(),

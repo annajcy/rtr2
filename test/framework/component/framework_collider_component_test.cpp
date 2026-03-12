@@ -3,14 +3,14 @@
 #include "gtest/gtest.h"
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/physics/box_collider.hpp"
-#include "rtr/framework/component/physics/mesh_collider.hpp"
-#include "rtr/framework/component/physics/plane_collider.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
-#include "rtr/framework/component/physics/sphere_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/mesh_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
 namespace rtr::framework::component::test {
 
@@ -30,7 +30,7 @@ utils::ObjMeshData make_triangle_mesh() {
 }  // namespace
 
 TEST(FrameworkColliderComponentTest, SphereColliderThrowsWhenRigidBodyIsMissing) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("sphere");
@@ -38,7 +38,7 @@ TEST(FrameworkColliderComponentTest, SphereColliderThrowsWhenRigidBodyIsMissing)
 }
 
 TEST(FrameworkColliderComponentTest, BoxColliderThrowsWhenRigidBodyIsMissing) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("box");
@@ -47,7 +47,7 @@ TEST(FrameworkColliderComponentTest, BoxColliderThrowsWhenRigidBodyIsMissing) {
 }
 
 TEST(FrameworkColliderComponentTest, PlaneColliderThrowsWhenRigidBodyIsMissing) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("plane");
@@ -55,7 +55,7 @@ TEST(FrameworkColliderComponentTest, PlaneColliderThrowsWhenRigidBodyIsMissing) 
 }
 
 TEST(FrameworkColliderComponentTest, MeshColliderThrowsWhenMeshRendererIsMissing) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     resource::ResourceManager     resources;
     core::Scene                   scene(1);
 
@@ -65,7 +65,7 @@ TEST(FrameworkColliderComponentTest, MeshColliderThrowsWhenMeshRendererIsMissing
 }
 
 TEST(FrameworkColliderComponentTest, StaticRigidBodyCanOwnBoxColliderAndDestroyRemovesCollider) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("wall");
@@ -83,7 +83,7 @@ TEST(FrameworkColliderComponentTest, StaticRigidBodyCanOwnBoxColliderAndDestroyR
 }
 
 TEST(FrameworkColliderComponentTest, SphereColliderSyncsFullLocalTransformToPhysicsCollider) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("sphere");
@@ -112,7 +112,7 @@ TEST(FrameworkColliderComponentTest, SphereColliderSyncsFullLocalTransformToPhys
 }
 
 TEST(FrameworkColliderComponentTest, BoxColliderSyncsFullLocalTransformToPhysicsCollider) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("box");
@@ -141,7 +141,7 @@ TEST(FrameworkColliderComponentTest, BoxColliderSyncsFullLocalTransformToPhysics
 }
 
 TEST(FrameworkColliderComponentTest, PlaneColliderSyncsWorldNormalWithNodeRotation) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("plane");
@@ -162,7 +162,7 @@ TEST(FrameworkColliderComponentTest, PlaneColliderSyncsWorldNormalWithNodeRotati
 }
 
 TEST(FrameworkColliderComponentTest, MeshColliderReadsLocalVerticesFromMeshRenderer) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     resource::ResourceManager     resources;
     core::Scene                   scene(1);
     const auto mesh_handle = resources.create<resource::MeshResourceKind>(make_triangle_mesh());

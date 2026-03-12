@@ -4,11 +4,11 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/physics/reset_position.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/reset_position.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
 namespace rtr::framework::component::test {
 
@@ -19,7 +19,7 @@ TEST(FrameworkResetPositionComponentTest, ThrowsWhenRigidBodyIsMissing) {
 }
 
 TEST(FrameworkResetPositionComponentTest, ResetsPositionWhenThresholdIsReached) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("falling");
     go.node().set_local_position({0.0f, 2.0f, 0.0f});
@@ -39,7 +39,7 @@ TEST(FrameworkResetPositionComponentTest, ResetsPositionWhenThresholdIsReached) 
 }
 
 TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPreservesSpin) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("falling");
     go.node().set_local_position({0.0f, 2.0f, 0.0f});
@@ -78,7 +78,7 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPrese
 }
 
 TEST(FrameworkResetPositionComponentTest, UpdatedParametersAffectNextFixedTick) {
-    system::physics::PhysicsWorld physics_world;
+    system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
     auto&                         go = scene.create_game_object("falling");
     go.node().set_local_position({0.0f, 2.0f, 0.0f});

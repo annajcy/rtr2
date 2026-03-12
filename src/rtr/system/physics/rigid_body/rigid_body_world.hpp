@@ -14,17 +14,24 @@
 
 #include <pbpt/math/math.h>
 
-#include "rtr/system/physics/collider.hpp"
-#include "rtr/system/physics/collision.hpp"
-#include "rtr/system/physics/rigid_body.hpp"
+#include "rtr/system/physics/collision/box_box.hpp"
+#include "rtr/system/physics/collision/box_plane.hpp"
+#include "rtr/system/physics/collision/contact.hpp"
+#include "rtr/system/physics/rigid_body/collider.hpp"
+#include "rtr/system/physics/rigid_body/contact.hpp"
+#include "rtr/system/physics/collision/mesh_plane.hpp"
+#include "rtr/system/physics/collision/sphere_box.hpp"
+#include "rtr/system/physics/collision/sphere_plane.hpp"
+#include "rtr/system/physics/collision/sphere_sphere.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::system::physics {
 
-class PhysicsWorld {
+class RigidBodyWorld {
 private:
     static std::shared_ptr<spdlog::logger> logger() {
-        return utils::get_logger("system.physics.world");
+        return utils::get_logger("system.physics.rigid_body.world");
     }
 
     static const char* rigid_body_type_name(RigidBodyType type) {
@@ -531,7 +538,7 @@ public:
     void set_velocity_iterations(std::uint32_t iterations) {
         if (iterations == 0) {
             logger()->error("set_velocity_iterations failed: iterations must be greater than zero.");
-            throw std::invalid_argument("PhysicsWorld velocity_iterations must be greater than zero.");
+            throw std::invalid_argument("RigidBodyWorld velocity_iterations must be greater than zero.");
         }
         m_velocity_iterations = iterations;
         logger()->info("Velocity iterations updated to {}.", m_velocity_iterations);
@@ -540,13 +547,13 @@ public:
     void set_position_iterations(std::uint32_t iterations) {
         if (iterations == 0) {
             logger()->error("set_position_iterations failed: iterations must be greater than zero.");
-            throw std::invalid_argument("PhysicsWorld position_iterations must be greater than zero.");
+            throw std::invalid_argument("RigidBodyWorld position_iterations must be greater than zero.");
         }
         m_position_iterations = iterations;
         logger()->info("Position iterations updated to {}.", m_position_iterations);
     }
 
-    void tick(float delta_seconds) {
+    void step(float delta_seconds) {
         auto log = logger();
         for (auto& [id, rb] : m_rigid_bodies) {
             integrate_body(rb, delta_seconds);

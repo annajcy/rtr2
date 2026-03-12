@@ -6,8 +6,8 @@
 #include <pbpt/math/math.h>
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/physics/collider.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/resource/resource_manager.hpp"
 
 namespace rtr::framework::component {
@@ -78,7 +78,7 @@ private:
     }
 
 public:
-    explicit MeshCollider(core::GameObject& owner, system::physics::PhysicsWorld& world,
+    explicit MeshCollider(core::GameObject& owner, system::physics::RigidBodyWorld& world,
                           const pbpt::math::Vec3& local_position = pbpt::math::Vec3{0.0f},
                           const pbpt::math::Quat& local_rotation = pbpt::math::Quat::identity(),
                           const pbpt::math::Vec3& local_scale = pbpt::math::Vec3{1.0f})

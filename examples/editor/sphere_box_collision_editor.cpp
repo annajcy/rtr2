@@ -18,10 +18,10 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/physics/box_collider.hpp"
-#include "rtr/framework/component/physics/reset_position.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
-#include "rtr/framework/component/physics/sphere_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/reset_position.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/system/input/input_types.hpp"
 
 int main() {
@@ -69,9 +69,9 @@ int main() {
         sphere_go.node().set_local_position({0.0f, 1.5f, 0.0f});
         sphere_go.node().set_local_scale({8.0f, 8.0f, 8.0f});
 
-        auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_world());
+        auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         (void)sphere_body;
-        (void)sphere_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_world(), 0.1f);
+        (void)sphere_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_world(), 0.1f);
         auto& reset = sphere_go.add_component<rtr::framework::component::ResetPosition>();
         reset.set_threshold_y(-2.0f);
         reset.set_reset_position(pbpt::math::Vec3{0.0f, 1.5f, 0.0f});
@@ -86,10 +86,10 @@ int main() {
             pbpt::math::angle_axis(pbpt::math::radians(-90.0f), pbpt::math::Vec3{1.0f, 0.0f, 0.0f}) *
             pbpt::math::angle_axis(pbpt::math::radians(15.0f), pbpt::math::Vec3{0.0f, 0.0f, 1.0f}));
         floor_go.node().set_local_scale({10.0f, 10.0f, 1.0f});
-        auto& floor_body = floor_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_world());
+        auto& floor_body = floor_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         floor_body.set_type(rtr::system::physics::RigidBodyType::Static);
         (void)floor_go.add_component<rtr::framework::component::BoxCollider>(
-            runtime.physics_world(), pbpt::math::Vec3{0.5f, 0.5f, 0.05f});
+            runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{0.5f, 0.5f, 0.05f});
 
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{
             .on_post_update =

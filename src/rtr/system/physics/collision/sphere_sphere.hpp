@@ -2,8 +2,8 @@
 
 #include <cmath>
 
-#include "rtr/system/physics/collider.hpp"
-#include "rtr/system/physics/collision/base.hpp"
+#include "rtr/system/physics/collision/collider_shape.hpp"
+#include "rtr/system/physics/collision/contact.hpp"
 
 namespace rtr::system::physics {
 

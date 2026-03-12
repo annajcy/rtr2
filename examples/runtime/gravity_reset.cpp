@@ -5,16 +5,16 @@
 
 #include <pbpt/math/math.h>
 
-#include "rtr/framework/component/physics/reset_position.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/reset_position.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
-#include "rtr/framework/integration/physics/scene_physics_sync.hpp"
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/framework/integration/physics/rigid_body_scene_sync.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
 int main() {
     try {
-        rtr::system::physics::PhysicsWorld physics_world;
+        rtr::system::physics::RigidBodyWorld physics_world;
         rtr::framework::core::Scene        scene(1);
 
         auto& mover = scene.create_game_object("gravity_reset_mover");
@@ -37,9 +37,9 @@ int main() {
                 .fixed_tick_index    = static_cast<std::uint64_t>(tick),
             };
             scene.fixed_tick(fixed_ctx);
-            rtr::framework::integration::physics::sync_scene_to_physics(scene, physics_world);
-            physics_world.tick(static_cast<float>(fixed_ctx.fixed_delta_seconds));
-            rtr::framework::integration::physics::sync_physics_to_scene(scene, physics_world);
+            rtr::framework::integration::physics::sync_scene_to_rigid_body(scene, physics_world);
+            physics_world.step(static_cast<float>(fixed_ctx.fixed_delta_seconds));
+            rtr::framework::integration::physics::sync_rigid_body_to_scene(scene, physics_world);
 
             const auto& state = physics_world.get_rigid_body(rigid_body.rigid_body_id()).state();
             std::cout << tick << ',' << std::fixed << std::setprecision(4) << state.translation.position.y() << ','

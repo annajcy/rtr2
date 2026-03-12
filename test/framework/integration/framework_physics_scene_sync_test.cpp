@@ -5,17 +5,23 @@
 #include "gtest/gtest.h"
 
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/physics/box_collider.hpp"
-#include "rtr/framework/component/physics/mesh_collider.hpp"
-#include "rtr/framework/component/physics/plane_collider.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
-#include "rtr/framework/component/physics/sphere_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/mesh_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
-#include "rtr/framework/integration/physics/scene_physics_sync.hpp"
+#include "rtr/framework/integration/physics/rigid_body_scene_sync.hpp"
 #include "rtr/resource/resource_manager.hpp"
-#include "rtr/system/physics/collision.hpp"
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/system/physics/collision/box_box.hpp"
+#include "rtr/system/physics/collision/box_plane.hpp"
+#include "rtr/system/physics/collision/contact.hpp"
+#include "rtr/system/physics/collision/mesh_plane.hpp"
+#include "rtr/system/physics/collision/sphere_box.hpp"
+#include "rtr/system/physics/collision/sphere_plane.hpp"
+#include "rtr/system/physics/collision/sphere_sphere.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
 namespace rtr::framework::integration::physics::test {
 
@@ -28,17 +34,17 @@ namespace {
 
 class PhysicsStepper {
 public:
-    system::physics::PhysicsWorld& world() { return m_world; }
-    const system::physics::PhysicsWorld& world() const { return m_world; }
+    system::physics::RigidBodyWorld& world() { return m_world; }
+    const system::physics::RigidBodyWorld& world() const { return m_world; }
 
     void fixed_tick(framework::core::Scene& scene, const framework::core::FixedTickContext& ctx) {
-        sync_scene_to_physics(scene, m_world);
-        m_world.tick(static_cast<float>(ctx.fixed_delta_seconds));
-        sync_physics_to_scene(scene, m_world);
+        sync_scene_to_rigid_body(scene, m_world);
+        m_world.step(static_cast<float>(ctx.fixed_delta_seconds));
+        sync_rigid_body_to_scene(scene, m_world);
     }
 
 private:
-    system::physics::PhysicsWorld m_world{};
+    system::physics::RigidBodyWorld m_world{};
 };
 
 pbpt::math::Mat3 diagonal_inverse_inertia(const pbpt::math::Float x,

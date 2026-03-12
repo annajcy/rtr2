@@ -5,8 +5,8 @@
 
 #include <pbpt/math/math.h>
 
-#include "rtr/framework/component/physics/collider.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 
 namespace rtr::framework::component {
 
@@ -48,7 +48,7 @@ private:
     }
 
 public:
-    explicit SphereCollider(core::GameObject& owner, system::physics::PhysicsWorld& world,
+    explicit SphereCollider(core::GameObject& owner, system::physics::RigidBodyWorld& world,
                             pbpt::math::Float radius = 0.5f,
                             const pbpt::math::Vec3& local_position = pbpt::math::Vec3{0.0f},
                             const pbpt::math::Quat& local_rotation = pbpt::math::Quat::identity(),

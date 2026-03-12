@@ -19,9 +19,9 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/physics/box_collider.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
-#include "rtr/framework/component/physics/sphere_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/system/input/input_types.hpp"
 
 namespace {
@@ -59,7 +59,7 @@ void sync_camera_aspect(rtr::app::RuntimeContext& ctx) {
 
 void reset_dynamic_body(rtr::framework::core::GameObject& game_object,
                         rtr::framework::component::RigidBody& rigid_body,
-                        rtr::system::physics::PhysicsWorld& physics_world,
+                        rtr::system::physics::RigidBodyWorld& physics_world,
                         const pbpt::math::Vec3& position,
                         const pbpt::math::Quat& orientation,
                         const pbpt::math::Vec3& linear_velocity,
@@ -145,11 +145,11 @@ int main() {
             go.node().set_local_rotation(rotation);
             go.node().set_local_scale(scale);
             (void)go.add_component<rtr::framework::component::MeshRenderer>(runtime.resource_manager(), quad_mesh, color);
-            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_world());
+            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
             rigid_body.set_type(body_type);
             rigid_body.set_restitution(restitution);
             rigid_body.set_friction(friction);
-            (void)go.add_component<rtr::framework::component::BoxCollider>(runtime.physics_world(), half_extents);
+            (void)go.add_component<rtr::framework::component::BoxCollider>(runtime.physics_system().rigid_body_world(), half_extents);
             return rigid_body;
         };
 
@@ -195,70 +195,70 @@ int main() {
         ramp_ball_go.node().set_local_scale({0.35f, 0.35f, 0.35f});
         (void)ramp_ball_go.add_component<rtr::framework::component::MeshRenderer>(
             runtime.resource_manager(), sphere_mesh, pbpt::math::Vec4{0.95f, 0.66f, 0.26f, 1.0f});
-        auto& ramp_ball = ramp_ball_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_world());
+        auto& ramp_ball = ramp_ball_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         ramp_ball.set_friction(0.85f);
         ramp_ball.set_restitution(0.05f);
         ramp_ball.set_inverse_inertia_tensor_ref(diagonal_inverse_inertia(1.0f, 1.0f, 1.0f));
-        (void)ramp_ball_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_world(), 1.0f);
+        (void)ramp_ball_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_world(), 1.0f);
 
         auto& bounce_ball_go = scene.create_game_object("bounce_ball");
         bounce_ball_go.node().set_local_scale({0.42f, 0.42f, 0.42f});
         (void)bounce_ball_go.add_component<rtr::framework::component::MeshRenderer>(
             runtime.resource_manager(), sphere_mesh, pbpt::math::Vec4{0.33f, 0.80f, 0.93f, 1.0f});
-        auto& bounce_ball = bounce_ball_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_world());
+        auto& bounce_ball = bounce_ball_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         bounce_ball.set_restitution(0.88f);
         bounce_ball.set_friction(0.02f);
         bounce_ball.set_inverse_inertia_tensor_ref(diagonal_inverse_inertia(1.0f, 1.0f, 1.0f));
-        (void)bounce_ball_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_world(), 1.0f);
+        (void)bounce_ball_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_world(), 1.0f);
 
         auto& target_ball_go = scene.create_game_object("impact_target_ball");
         target_ball_go.node().set_local_scale({0.44f, 0.44f, 0.44f});
         (void)target_ball_go.add_component<rtr::framework::component::MeshRenderer>(
             runtime.resource_manager(), sphere_mesh, pbpt::math::Vec4{0.43f, 0.92f, 0.57f, 1.0f});
-        auto& target_ball = target_ball_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_world());
+        auto& target_ball = target_ball_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         target_ball.set_use_gravity(false);
         target_ball.set_restitution(0.35f);
         target_ball.set_friction(0.08f);
         target_ball.set_inverse_inertia_tensor_ref(diagonal_inverse_inertia(1.0f, 1.0f, 1.0f));
-        (void)target_ball_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_world(), 1.0f);
+        (void)target_ball_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_world(), 1.0f);
 
         auto& striker_go = scene.create_game_object("impact_striker");
         striker_go.node().set_local_scale({0.5f, 1.4f, 1.0f});
         (void)striker_go.add_component<rtr::framework::component::MeshRenderer>(
             runtime.resource_manager(), quad_mesh, pbpt::math::Vec4{0.93f, 0.37f, 0.48f, 1.0f});
-        auto& striker = striker_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_world());
+        auto& striker = striker_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         striker.set_use_gravity(false);
         striker.set_restitution(0.70f);
         striker.set_friction(0.10f);
         striker.set_inverse_inertia_tensor_ref(diagonal_inverse_inertia(0.0f, 0.0f, 1.8f));
         (void)striker_go.add_component<rtr::framework::component::BoxCollider>(
-            runtime.physics_world(), pbpt::math::Vec3{0.5f, 0.5f, 0.10f});
+            runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{0.5f, 0.5f, 0.10f});
 
         auto& spinner_go = scene.create_game_object("torque_spinner");
         spinner_go.node().set_local_scale({0.55f, 2.2f, 1.0f});
         (void)spinner_go.add_component<rtr::framework::component::MeshRenderer>(
             runtime.resource_manager(), quad_mesh, pbpt::math::Vec4{0.76f, 0.56f, 0.95f, 1.0f});
-        auto& spinner = spinner_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_world());
+        auto& spinner = spinner_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         spinner.set_use_gravity(false);
         spinner.set_friction(0.0f);
         spinner.set_inverse_inertia_tensor_ref(diagonal_inverse_inertia(0.2f, 1.5f, 0.2f));
         (void)spinner_go.add_component<rtr::framework::component::BoxCollider>(
-            runtime.physics_world(), pbpt::math::Vec3{0.5f, 0.5f, 0.08f});
+            runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{0.5f, 0.5f, 0.08f});
 
         auto reset_showcase = [&]() {
-            reset_dynamic_body(ramp_ball_go, ramp_ball, runtime.physics_world(), pbpt::math::Vec3{-5.2f, 1.7f, 0.0f},
+            reset_dynamic_body(ramp_ball_go, ramp_ball, runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{-5.2f, 1.7f, 0.0f},
                                pbpt::math::Quat::identity(), pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
 
-            reset_dynamic_body(bounce_ball_go, bounce_ball, runtime.physics_world(), pbpt::math::Vec3{-0.4f, 2.3f, 0.0f},
+            reset_dynamic_body(bounce_ball_go, bounce_ball, runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{-0.4f, 2.3f, 0.0f},
                                pbpt::math::Quat::identity(), pbpt::math::Vec3{0.25f, 0.0f, 0.0f});
 
-            reset_dynamic_body(target_ball_go, target_ball, runtime.physics_world(), pbpt::math::Vec3{2.4f, 0.9f, 0.0f},
+            reset_dynamic_body(target_ball_go, target_ball, runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{2.4f, 0.9f, 0.0f},
                                pbpt::math::Quat::identity(), pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
 
-            reset_dynamic_body(striker_go, striker, runtime.physics_world(), pbpt::math::Vec3{0.5f, 1.45f, 0.0f},
+            reset_dynamic_body(striker_go, striker, runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{0.5f, 1.45f, 0.0f},
                                pbpt::math::Quat::identity(), pbpt::math::Vec3{4.8f, -0.15f, 0.0f});
 
-            reset_dynamic_body(spinner_go, spinner, runtime.physics_world(), pbpt::math::Vec3{5.0f, 1.2f, 0.0f},
+            reset_dynamic_body(spinner_go, spinner, runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{5.0f, 1.2f, 0.0f},
                                pbpt::math::Quat::identity(), pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
                                pbpt::math::Vec3{0.0f, 0.6f, 0.0f});
         };

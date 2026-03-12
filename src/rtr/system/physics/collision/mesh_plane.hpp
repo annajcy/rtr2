@@ -1,7 +1,7 @@
 #pragma once
 
-#include "rtr/system/physics/collider.hpp"
-#include "rtr/system/physics/collision/base.hpp"
+#include "rtr/system/physics/collision/collider_shape.hpp"
+#include "rtr/system/physics/collision/contact.hpp"
 #include "rtr/system/physics/collision/plane_common.hpp"
 
 namespace rtr::system::physics {

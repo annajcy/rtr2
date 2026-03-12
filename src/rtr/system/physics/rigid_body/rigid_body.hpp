@@ -8,11 +8,10 @@
 #include "pbpt/math/complex/quaternion.hpp"
 #include "pbpt/math/matrix/matrix.hpp"
 #include "pbpt/math/spatial/vector.hpp"
-#include "rtr/system/physics/type.hpp"
+#include "rtr/system/physics/common/physics_ids.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_type.hpp"
 
 namespace rtr::system::physics {
-
-enum class RigidBodyType { Static, Dynamic, Kinematic };
 
 struct TranslationState {
     pbpt::math::Vec3 position{0.0f};
@@ -31,7 +30,7 @@ struct ForceAccumulator {
 
 struct RigidBodyState {
     TranslationState  translation{};
-    RotationState   rotation{};
+    RotationState     rotation{};
     ForceAccumulator  forces{};
     pbpt::math::Vec3 scale{1.0f};
     pbpt::math::Float mass{1.0f};

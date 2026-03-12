@@ -14,20 +14,20 @@
 #include "gtest/gtest.h"
 
 #define private public
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 #undef private
 
 namespace rtr::system::physics::test {
 
-TEST(PhysicsWorldTest, DefaultsIterationsToVelocityEightAndPositionThree) {
-    PhysicsWorld world;
+TEST(RigidBodyWorldTest, DefaultsIterationsToVelocityEightAndPositionThree) {
+    RigidBodyWorld world;
 
-    EXPECT_EQ(world.velocity_iterations(), PhysicsWorld::kDefaultVelocityIterations);
-    EXPECT_EQ(world.position_iterations(), PhysicsWorld::kDefaultPositionIterations);
+    EXPECT_EQ(world.velocity_iterations(), RigidBodyWorld::kDefaultVelocityIterations);
+    EXPECT_EQ(world.position_iterations(), RigidBodyWorld::kDefaultPositionIterations);
 }
 
-TEST(PhysicsWorldTest, SettersUpdateIterations) {
-    PhysicsWorld world;
+TEST(RigidBodyWorldTest, SettersUpdateIterations) {
+    RigidBodyWorld world;
 
     world.set_velocity_iterations(4);
     world.set_position_iterations(2);
@@ -36,20 +36,20 @@ TEST(PhysicsWorldTest, SettersUpdateIterations) {
     EXPECT_EQ(world.position_iterations(), 2u);
 }
 
-TEST(PhysicsWorldTest, RejectsZeroVelocityIterations) {
-    PhysicsWorld world;
+TEST(RigidBodyWorldTest, RejectsZeroVelocityIterations) {
+    RigidBodyWorld world;
 
     EXPECT_THROW(world.set_velocity_iterations(0), std::invalid_argument);
 }
 
-TEST(PhysicsWorldTest, RejectsZeroPositionIterations) {
-    PhysicsWorld world;
+TEST(RigidBodyWorldTest, RejectsZeroPositionIterations) {
+    RigidBodyWorld world;
 
     EXPECT_THROW(world.set_position_iterations(0), std::invalid_argument);
 }
 
-TEST(PhysicsWorldTest, NormalAccumulatedImpulseCanRollbackWithoutGoingNegative) {
-    PhysicsWorld world;
+TEST(RigidBodyWorldTest, NormalAccumulatedImpulseCanRollbackWithoutGoingNegative) {
+    RigidBodyWorld world;
 
     RigidBody body_a{};
     body_a.set_type(RigidBodyType::Dynamic);

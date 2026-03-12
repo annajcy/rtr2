@@ -9,13 +9,13 @@
 
 #include "rtr/framework/component/component.hpp"
 #include "rtr/framework/core/game_object.hpp"
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
 namespace rtr::framework::component {
 
 class RigidBody final : public Component {
 private:
-    system::physics::PhysicsWorld& m_physics_world;
+    system::physics::RigidBodyWorld& m_physics_world;
     system::physics::RigidBodyID   m_rigid_body_id{};
     system::physics::RigidBodyType m_type{system::physics::RigidBodyType::Dynamic};
     pbpt::math::Float              m_mass{1.0f};
@@ -83,7 +83,7 @@ private:
     }
 
 public:
-    explicit RigidBody(core::GameObject& owner, system::physics::PhysicsWorld& world, pbpt::math::Float mass = 1.0f,
+    explicit RigidBody(core::GameObject& owner, system::physics::RigidBodyWorld& world, pbpt::math::Float mass = 1.0f,
                        system::physics::RigidBodyType type = system::physics::RigidBodyType::Dynamic,
                        bool use_gravity = true,
                        const pbpt::math::Mat3& inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros(),

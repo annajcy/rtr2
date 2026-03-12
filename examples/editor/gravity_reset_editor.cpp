@@ -18,8 +18,8 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/physics/reset_position.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/reset_position.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/system/input/input_types.hpp"
 
 int main() {
@@ -67,7 +67,7 @@ int main() {
         bunny_go.node().set_local_position({0.0f, 2.0f, 0.0f});
         bunny_go.node().set_local_scale({10.0f, 10.0f, 10.0f});
 
-        (void)bunny_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_world());
+        (void)bunny_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         auto& reset_position = bunny_go.add_component<rtr::framework::component::ResetPosition>();
         reset_position.set_threshold_y(-1.0f);
         reset_position.set_reset_position(pbpt::math::Vec3{0.0f, 2.0f, 0.0f});

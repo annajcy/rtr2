@@ -1,15 +1,15 @@
 #pragma once
 
-#include "rtr/framework/component/physics/box_collider.hpp"
-#include "rtr/framework/component/physics/collider.hpp"
-#include "rtr/framework/component/physics/rigid_body.hpp"
-#include "rtr/framework/component/physics/sphere_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
+#include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
-#include "rtr/system/physics/physics_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
 namespace rtr::framework::integration::physics {
 
-inline void sync_scene_to_physics(core::Scene& scene, system::physics::PhysicsWorld& physics_world) {
+inline void sync_scene_to_rigid_body(core::Scene& scene, system::physics::RigidBodyWorld& rigid_body_world) {
     scene.scene_graph().update_world_transforms();
 
     const auto active_nodes = scene.scene_graph().active_nodes();
@@ -21,8 +21,8 @@ inline void sync_scene_to_physics(core::Scene& scene, system::physics::PhysicsWo
 
         auto* rigid_body_component = game_object->get_component<component::RigidBody>();
         if (rigid_body_component != nullptr && rigid_body_component->enabled() &&
-            physics_world.has_rigid_body(rigid_body_component->rigid_body_id())) {
-            auto& body = physics_world.get_rigid_body(rigid_body_component->rigid_body_id());
+            rigid_body_world.has_rigid_body(rigid_body_component->rigid_body_id())) {
+            auto& body = rigid_body_world.get_rigid_body(rigid_body_component->rigid_body_id());
             body.state().scale = game_object->node().world_scale();
             if (body.type() != system::physics::RigidBodyType::Dynamic) {
                 body.state().translation.position = game_object->node().world_position();
@@ -37,7 +37,7 @@ inline void sync_scene_to_physics(core::Scene& scene, system::physics::PhysicsWo
     }
 }
 
-inline void sync_physics_to_scene(core::Scene& scene, system::physics::PhysicsWorld& physics_world) {
+inline void sync_rigid_body_to_scene(core::Scene& scene, system::physics::RigidBodyWorld& rigid_body_world) {
     const auto active_nodes = scene.scene_graph().active_nodes();
     for (const auto id : active_nodes) {
         auto* game_object = scene.find_game_object(id);
@@ -49,11 +49,11 @@ inline void sync_physics_to_scene(core::Scene& scene, system::physics::PhysicsWo
         if (rigid_body_component == nullptr || !rigid_body_component->enabled()) {
             continue;
         }
-        if (!physics_world.has_rigid_body(rigid_body_component->rigid_body_id())) {
+        if (!rigid_body_world.has_rigid_body(rigid_body_component->rigid_body_id())) {
             continue;
         }
 
-        const auto& body = physics_world.get_rigid_body(rigid_body_component->rigid_body_id());
+        const auto& body = rigid_body_world.get_rigid_body(rigid_body_component->rigid_body_id());
         if (body.type() != system::physics::RigidBodyType::Dynamic) {
             continue;
         }
