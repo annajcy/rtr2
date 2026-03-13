@@ -7,6 +7,7 @@
 #include "rtr/framework/component/component.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/resource/resource_types.hpp"
+#include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::framework::component {
@@ -53,6 +54,15 @@ public:
             local_vertices.push_back(vertex.position);
         }
         return local_vertices;
+    }
+
+    system::render::MeshView mesh_view(rhi::Device& device) {
+        auto& mesh = m_resources.require_gpu<resource::MeshResourceKind>(m_mesh, device);
+        return system::render::MeshView{
+            .vertex_buffer = mesh.vertex_buffer(),
+            .index_buffer  = mesh.index_buffer(),
+            .index_count   = mesh.index_count()
+        };
     }
 
     void set_mesh_handle(resource::MeshHandle mesh) {

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build the follow-up GAMES103 labs on top of the current RTR2 framework by extending the existing rigid-body pipeline into a layered physics system:
+Build the follow-up GAMES103 labs on top of the current RTR2 framework by extending the existing rigid-body pipeline into a physics system with explicit world ownership:
 
 - Lab 2: cloth simulation
 - Lab 3: tetrahedral FEM soft body
@@ -15,7 +15,7 @@ The right strategy is not to rewrite the current rigid-body system. RTR2 already
 - `Component::on_fixed_update()` for custom simulation updates
 - scene-to-physics and physics-to-scene sync
 
-So the roadmap should treat cloth, FEM, and water as new simulation modules that run alongside the current rigid-body world.
+So the roadmap should evolve `PhysicsSystem` into a coordinator that explicitly owns concrete worlds such as `RigidBodyWorld`, `ClothWorld`, `FemWorld`, and `WaterWorld`, instead of introducing a fake generic solver layer.
 
 ## Existing Integration Points
 
@@ -30,19 +30,20 @@ Useful framework anchors:
 Design implication:
 
 - keep `PhysicsWorld` focused on rigid-body dynamics and collision
-- add new simulation systems for deformables and fluids
-- update these systems in fixed tick
-- write results back to scene transforms or dynamic mesh vertices
+- let `PhysicsSystem` coordinate multiple concrete simulation worlds in fixed tick
+- add cloth, FEM, and water incrementally as separate world implementations
+- write results back to scene transforms or dynamic mesh vertices as needed
 
 ## Architecture Direction
 
 Recommended code layout:
 
-- `src/rtr/system/simulation/common/`
-- `src/rtr/system/simulation/cloth/`
-- `src/rtr/system/simulation/fem/`
-- `src/rtr/system/simulation/water/`
-- `src/rtr/framework/component/simulation/`
+- `src/rtr/system/physics/cloth/`
+- `src/rtr/system/physics/fem/`
+- `src/rtr/system/physics/water/`
+- `src/rtr/framework/component/physics/cloth/`
+- `src/rtr/framework/component/physics/fem/`
+- `src/rtr/framework/component/physics/water/`
 - `examples/games103_lab/lab2_cloth/`
 - `examples/games103_lab/lab3_bouncy_house/`
 - `examples/games103_lab/lab4_pool_ripples/`
@@ -50,59 +51,43 @@ Recommended code layout:
 Recommended ownership split:
 
 - rigid bodies, colliders, impulses: existing `PhysicsWorld`
-- particle/constraint states: cloth module
-- tetrahedral mesh and elastic force states: FEM module
-- 2D height field and coupling masks: water module
-- render-facing mesh sync: common simulation utilities
+- cloth particles, constraints, and solver state: `ClothWorld`
+- tetrahedral mesh and elastic force state: `FemWorld`
+- 2D height field and coupling masks: `WaterWorld`
+- `PhysicsSystem`: fixed-step coordinator for all worlds
+- `framework/component/physics/*`: optional scene-facing helpers added only when integration becomes necessary
 
-## Phase 0: Foundation
+Important design rule:
 
-Objective:
-
-Create a reusable simulation scaffold before implementing individual labs.
-
-Tasks:
-
-- define a common fixed-step simulation update pattern
-- add dynamic mesh update utilities for deforming surfaces/volumes
-- add lightweight debug visualization for particles, edges, tetrahedra, and grids
-- separate simulation data from render mesh data
-- decide how each simulation component stores topology and state
-
-Deliverables:
-
-- reusable simulation base utilities
-- one minimal deformable-mesh example that updates vertices every fixed tick
-
-Why this matters:
-
-Lab 2, 3, and 4 all need stable fixed-step updates and mesh write-back. If this is hacked per lab, later coupling work will become messy.
+`PhysicsSystem` owns separate worlds for rigid bodies, cloth, FEM, and water. They are coordinated in the fixed-step loop, but they should not be forced behind a generic simulation abstraction unless concrete duplication later justifies shared utilities.
 
 ## Phase 1: Lab 2 Cloth
 
 Objective:
 
-Implement cloth first, starting with PBD, then optionally adding the implicit solver backend.
+Implement cloth first. Start by establishing a cloth-specific deformable-mesh path, then build the actual cloth solver on top of it. Begin with PBD, and optionally add the implicit solver backend later.
 
 Recommended order:
 
-1. particle and edge topology
-2. pinned vertices
-3. gravity and damping
-4. PBD strain limiting
-5. sphere collision
-6. implicit cloth solver
-7. Chebyshev acceleration
+1. cloth mesh resource and deformable vertex write-back path
+2. particle and edge topology
+3. pinned vertices
+4. gravity and damping
+5. PBD strain limiting
+6. sphere collision
+7. implicit cloth solver
+8. Chebyshev acceleration
 
-Why start with PBD:
+Why start with cloth:
 
-- faster to get running
-- builds reusable particle-system infrastructure
-- good for validating fixed points, constraints, and collision projection
+- it is the first target lab
+- it validates deformable mesh write-back in the smallest useful context
+- PBD is faster to get running and is good for validating fixed points, constraints, and collision projection
 
 Core features:
 
 - cloth mesh topology generation
+- cloth-to-render mesh write-back each fixed tick
 - per-vertex position and velocity
 - edge rest lengths
 - pinned constraints
@@ -111,6 +96,7 @@ Core features:
 
 Suggested modules:
 
+- `cloth_world`
 - `cloth_state`
 - `cloth_topology`
 - `cloth_pbd_solver`
@@ -119,6 +105,7 @@ Suggested modules:
 
 Exit criteria:
 
+- a minimal cloth-owned deformable mesh updates vertices every fixed tick
 - fixed points remain stable
 - cloth does not stretch excessively
 - sphere collision is robust
@@ -128,7 +115,7 @@ Exit criteria:
 
 Objective:
 
-Extend the system from surface particles to tetrahedral elastic bodies.
+Extend the system from cloth surface particles to tetrahedral elastic bodies.
 
 Core features:
 
@@ -156,6 +143,7 @@ Implementation order:
 
 Suggested modules:
 
+- `fem_world`
 - `tet_mesh`
 - `fem_state`
 - `stvk_material`
@@ -178,7 +166,7 @@ Add a grid-based surface solver instead of a particle or tetrahedral solver.
 
 Important design note:
 
-Do not try to force water into the same data model as cloth or FEM. Water here is a height-field simulation and should stay separate.
+Do not try to force water into the same data model as cloth or FEM. Water here is a height-field simulation and should stay separate as its own world implementation.
 
 Core features:
 
@@ -190,6 +178,7 @@ Core features:
 
 Suggested modules:
 
+- `water_world`
 - `height_field_2d`
 - `shallow_wave_solver`
 - `water_disturbance`
@@ -258,25 +247,25 @@ Exit criteria:
 
 ## Cross-Cutting Engineering Priorities
 
-These should be done early and reused everywhere:
+These should be done early and reused where they are clearly needed:
 
 - fixed-step determinism where practical
 - simulation reset support
 - stable parameter exposure for damping, stiffness, solver iterations, and substeps
-- mesh-state visualization for debugging
 - small deterministic examples before full scenes
+- add mesh/debug visualization only when diagnosis becomes necessary
 
-Recommended debug assets:
+Recommended debug progression:
 
-- particle/edge overlay for cloth
-- tetra wireframe or tet inspector for FEM
-- grid occupancy and mask debug view for water coupling
+- cloth particle or edge overlay first if cloth debugging needs it
+- tetra wireframe or tet inspector later when FEM work starts
+- grid occupancy and mask views later when water coupling work starts
 
 ## Milestone Plan
 
 ### Milestone A
 
-Simulation scaffold plus one deformable mesh update path.
+Cloth deformable mesh path updates vertices every fixed tick.
 
 ### Milestone B
 
@@ -306,34 +295,33 @@ Optional two-way coupling from water back to rigid bodies.
 
 If the goal is to finish the labs efficiently:
 
-1. PBD cloth
+1. cloth deformable mesh path + PBD cloth
 2. FEM soft body
 3. shallow-wave water
 4. one-way coupling
 5. implicit cloth
 6. two-way coupling
 
-If the goal is to build a stronger reusable physics system:
+If the goal is to build a stronger physics system without over-generalizing:
 
-1. foundation scaffold
-2. PBD cloth
-3. FEM soft body
-4. water solver
-5. coupling
-6. optional advanced solvers and accelerations
+1. cloth deformable mesh path + PBD cloth
+2. FEM soft body
+3. water solver
+4. coupling
+5. optional advanced solvers and accelerations
 
 ## Final Guidance
 
 The main technical principle for this roadmap is:
 
 - do not over-unify the math
-- do unify the runtime scaffolding
+- do not over-generalize the architecture too early
 
-Cloth, FEM, and shallow-wave water are different numerical models. They should share:
+Cloth, FEM, and shallow-wave water are different numerical models. They may selectively share:
 
 - fixed-step scheduling
-- component integration style
-- mesh synchronization
-- debugging and parameter plumbing
+- scene integration style
+- mesh synchronization helpers
+- debugging and parameter plumbing when the duplication is real
 
-But they should not be forced into one fake generic solver abstraction too early.
+But the default design should prefer explicit world ownership, with shared utilities added only after concrete duplication appears.

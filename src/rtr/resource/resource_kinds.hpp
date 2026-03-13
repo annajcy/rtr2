@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "rtr/rhi/device.hpp"
+#include "rtr/rhi/dynamic_mesh.hpp"
 #include "rtr/rhi/mesh.hpp"
 #include "rtr/rhi/texture.hpp"
 #include "rtr/utils/image_io.hpp"
@@ -42,6 +43,32 @@ struct MeshResourceKind {
 
     static gpu_type upload_to_gpu(rhi::Device& device, const cpu_type& mesh, const options_type&) {
         return rhi::Mesh::from_cpu_data(device, mesh);
+    }
+};
+
+struct DeformableMeshResourceKind {
+    using cpu_type     = utils::ObjMeshData;
+    using gpu_type     = rhi::DynamicMesh;
+    using options_type = std::monostate;
+
+    static void validate_cpu(const cpu_type& mesh) {
+        MeshResourceKind::validate_cpu(mesh);
+    }
+
+    static cpu_type normalize_cpu(cpu_type mesh, const options_type&) {
+        return mesh;
+    }
+
+    static cpu_type load_from_path(const std::filesystem::path& abs_path, const options_type&) {
+        return MeshResourceKind::load_from_path(abs_path, {});
+    }
+
+    static void save_to_path(const cpu_type& mesh, const std::filesystem::path& abs_path) {
+        MeshResourceKind::save_to_path(mesh, abs_path);
+    }
+
+    static gpu_type upload_to_gpu(rhi::Device& device, const cpu_type& mesh, const options_type&) {
+        return rhi::DynamicMesh(device, mesh);
     }
 };
 

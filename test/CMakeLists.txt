@@ -79,6 +79,18 @@ rtr_add_test(
     system/physics/physics_system/physics_system_test.cpp
 )
 rtr_add_test(
+    test_tet_surface_extract
+    system/physics/fem/tet_surface_extract_test.cpp
+)
+rtr_add_test(
+    test_normal_recompute
+    system/physics/common/normal_recompute_test.cpp
+)
+rtr_add_test(
+    test_deformable_mesh_state
+    system/physics/common/deformable_mesh_state_test.cpp
+)
+rtr_add_test(
     test_framework_forward_scene_view_builder
     framework/integration/framework_forward_scene_view_builder_test.cpp
     rtr::runtime
@@ -147,6 +159,11 @@ rtr_add_test(
 rtr_add_test(
     test_framework_mesh_renderer
     framework/component/framework_mesh_renderer_test.cpp
+    rtr::runtime
+)
+rtr_add_integration_test(
+    test_framework_deformable_mesh_renderer
+    framework/component/framework_deformable_mesh_renderer_test.cpp
     rtr::runtime
 )
 rtr_add_test(
@@ -257,6 +274,11 @@ rtr_add_test(
 rtr_add_test(
     test_image_transition
     rhi/image_transition_test.cpp
+    rtr::runtime
+)
+rtr_add_integration_test(
+    test_dynamic_mesh
+    rhi/dynamic_mesh_test.cpp
     rtr::runtime
 )
 

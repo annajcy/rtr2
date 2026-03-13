@@ -289,7 +289,7 @@ private:
 
             std::memcpy(frame_ubos[i].mapped_data(), &ubo, sizeof(ubo));
 
-            items.push_back({.mesh = r.mesh, .per_object_set = frame_sets[i]});
+            items.push_back({.mesh_view = r.mesh_view, .per_object_set = frame_sets[i]});
         }
         return items;
     }

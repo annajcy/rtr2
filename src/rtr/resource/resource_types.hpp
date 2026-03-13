@@ -8,6 +8,7 @@ namespace rtr::resource {
 
 struct MeshResourceKind;
 struct TextureResourceKind;
+struct DeformableMeshResourceKind;
 
 template <class KindTag>
 struct ResourceHandle {
@@ -24,6 +25,7 @@ struct ResourceHandle {
 
 using MeshHandle = ResourceHandle<MeshResourceKind>;
 using TextureHandle = ResourceHandle<TextureResourceKind>;
+using DeformableMeshHandle = ResourceHandle<DeformableMeshResourceKind>;
 
 } // namespace rtr::resource
 

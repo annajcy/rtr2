@@ -6,10 +6,17 @@
 #include <vector>
 
 #include "rtr/rhi/mesh.hpp"
+#include "vulkan/vulkan.hpp"
 
 namespace rtr::system::render {
 
 constexpr uint32_t kMaxPointLights = 4;
+
+struct MeshView {
+    vk::Buffer vertex_buffer;
+    vk::Buffer index_buffer;
+    uint32_t   index_count;
+};
 
 struct ForwardSceneCameraData {
     pbpt::math::Mat4 view{1.0f};
@@ -28,7 +35,7 @@ struct ForwardScenePointLight {
 
 struct ForwardSceneRenderable {
     std::uint64_t    instance_id{0};
-    rhi::Mesh&       mesh;
+    MeshView         mesh_view;
     pbpt::math::Vec4 base_color{1.0f, 1.0f, 1.0f, 1.0f};
     pbpt::math::Mat4 model{1.0f};
     pbpt::math::Mat4 normal{1.0f};

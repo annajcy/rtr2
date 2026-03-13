@@ -6,6 +6,7 @@
 #include "rtr/rhi/mesh.hpp"
 #include "rtr/rhi/texture.hpp"
 #include "rtr/system/render/frame_context.hpp"
+#include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 #include "rtr/system/render/render_pass.hpp"
 #include "rtr/system/render/render_resource_state.hpp"
 #include "vulkan/vulkan.hpp"
@@ -13,7 +14,7 @@
 namespace rtr::system::render {
 
 struct ForwardPassDrawItem {
-    rhi::Mesh& mesh;
+    MeshView mesh_view;
     vk::raii::DescriptorSet& per_object_set;
 };
 
@@ -129,14 +130,14 @@ protected:
         cmd.setScissor(0, scissor);
 
         for (const auto& item : resources.draw_items) {
-            std::vector<vk::Buffer>     vertex_buffers = {item.mesh.vertex_buffer()};
+            std::vector<vk::Buffer>     vertex_buffers = {item.mesh_view.vertex_buffer};
             std::vector<vk::DeviceSize> offsets        = {0};
             cmd.bindVertexBuffers(0, vertex_buffers, offsets);
-            cmd.bindIndexBuffer(item.mesh.index_buffer(), 0, vk::IndexType::eUint32);
+            cmd.bindIndexBuffer(item.mesh_view.index_buffer, 0, vk::IndexType::eUint32);
 
             cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_pipeline_layout, 0, *item.per_object_set, {});
 
-            cmd.drawIndexed(item.mesh.index_count(), 1, 0, 0, 0);
+            cmd.drawIndexed(item.mesh_view.index_count, 1, 0, 0, 0);
         }
 
         cmd.endRendering();

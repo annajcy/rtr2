@@ -6,6 +6,7 @@
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/deformable_mesh_renderer.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/device.hpp"
@@ -32,6 +33,7 @@ inline system::render::ForwardSceneView build_forward_scene_view(const core::Sce
         }
         const auto* camera        = go->get_component<component::Camera>();
         const auto* mesh_renderer = go->get_component<component::MeshRenderer>();
+        const auto* def_mesh_renderer = go->get_component<component::DeformableMeshRenderer>();
         const auto* point_light   = go->get_component<component::light::PointLight>();
 
         const auto             node  = scene.scene_graph().node(id);
@@ -60,21 +62,30 @@ inline system::render::ForwardSceneView build_forward_scene_view(const core::Sce
             view.point_lights.emplace_back(pl);
         }
 
-        if (mesh_renderer == nullptr || !mesh_renderer->enabled()) {
+        bool has_mesh_renderer = (mesh_renderer != nullptr && mesh_renderer->enabled());
+        bool has_def_mesh_renderer = (def_mesh_renderer != nullptr && def_mesh_renderer->enabled());
+
+        if (!has_mesh_renderer && !has_def_mesh_renderer) {
             continue;
         }
 
         const pbpt::math::Mat4 normal = pbpt::math::transpose(pbpt::math::inverse(model));
-        const resource::MeshHandle mesh_handle = mesh_renderer->mesh_handle();
-        if (!mesh_handle.is_valid()) {
-            throw std::runtime_error("MeshRenderer mesh handle is invalid.");
+        
+        system::render::MeshView mesh_view;
+        pbpt::math::Vec4 base_color{1.0f};
+
+        if (has_mesh_renderer) {
+            mesh_view = const_cast<component::MeshRenderer*>(mesh_renderer)->mesh_view(device);
+            base_color = mesh_renderer->base_color();
+        } else {
+            mesh_view = const_cast<component::DeformableMeshRenderer*>(def_mesh_renderer)->mesh_view(device);
+            base_color = def_mesh_renderer->base_color();
         }
-        auto& mesh = resources.require_gpu<rtr::resource::MeshResourceKind>(mesh_handle, device);
 
         view.renderables.emplace_back(system::render::ForwardSceneRenderable{
             .instance_id = static_cast<std::uint64_t>(id),
-            .mesh        = mesh,
-            .base_color  = mesh_renderer->base_color(),
+            .mesh_view   = mesh_view,
+            .base_color  = base_color,
             .model       = model,
             .normal      = normal,
         });
