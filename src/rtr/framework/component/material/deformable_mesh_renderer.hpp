@@ -22,6 +22,12 @@ private:
     resource::DeformableMeshHandle m_mesh{};
     pbpt::math::Vec4 m_base_color{1.0f, 1.0f, 1.0f, 1.0f};
 
+    std::vector<rhi::DynamicMesh::Vertex> m_pending_vertices;
+    bool m_vertices_dirty{false};
+
+    std::vector<pbpt::math::Vec3> m_pending_normals;
+    bool m_normals_dirty{false};
+
 public:
     explicit DeformableMeshRenderer(
         core::GameObject& owner,
@@ -43,12 +49,39 @@ public:
         return m_mesh;
     }
 
-    rhi::DynamicMesh& require_dynamic_mesh(rhi::Device& device) {
-        return m_resources.require_gpu<resource::DeformableMeshResourceKind>(m_mesh, device);
+    std::vector<pbpt::math::Vec3> local_vertices() const {
+        if (!m_resources.alive<resource::DeformableMeshResourceKind>(m_mesh)) {
+            throw std::runtime_error("DeformableMeshRenderer mesh handle is not alive.");
+        }
+        const auto& mesh = m_resources.cpu<resource::DeformableMeshResourceKind>(m_mesh);
+        std::vector<pbpt::math::Vec3> local_vertices;
+        local_vertices.reserve(mesh.vertices.size());
+        for (const auto& vertex : mesh.vertices) {
+            local_vertices.push_back(vertex.position);
+        }
+        return local_vertices;
+    }
+
+    std::vector<uint32_t> indices() const {
+        if (!m_resources.alive<resource::DeformableMeshResourceKind>(m_mesh)) {
+            throw std::runtime_error("DeformableMeshRenderer mesh handle is not alive.");
+        }
+        const auto& mesh = m_resources.cpu<resource::DeformableMeshResourceKind>(m_mesh);
+        return mesh.indices;
     }
 
     system::render::MeshView mesh_view(rhi::Device& device) {
-        auto& dm = require_dynamic_mesh(device);
+        auto& dm = m_resources.require_gpu<resource::DeformableMeshResourceKind>(m_mesh, device);
+        
+        if (m_vertices_dirty) {
+            dm.update_vertices(m_pending_vertices);
+            m_vertices_dirty = false;
+        }
+        if (m_normals_dirty) {
+            dm.update_normals(m_pending_normals);
+            m_normals_dirty = false;
+        }
+
         return system::render::MeshView{
             .vertex_buffer = dm.vertex_buffer(),
             .index_buffer  = dm.index_buffer(),
@@ -56,12 +89,14 @@ public:
         };
     }
 
-    void update_positions(rhi::Device& device, std::span<const rhi::DynamicMesh::Vertex> vertices) {
-        require_dynamic_mesh(device).update_vertices(vertices);
+    void update_positions(std::span<const rhi::DynamicMesh::Vertex> vertices) {
+        m_pending_vertices.assign(vertices.begin(), vertices.end());
+        m_vertices_dirty = true;
     }
 
-    void update_normals(rhi::Device& device, std::span<const pbpt::math::Vec3> normals) {
-        require_dynamic_mesh(device).update_normals(normals);
+    void update_normals(std::span<const pbpt::math::Vec3> normals) {
+        m_pending_normals.assign(normals.begin(), normals.end());
+        m_normals_dirty = true;
     }
 
     const pbpt::math::Vec4& base_color() const {

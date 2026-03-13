@@ -20,6 +20,7 @@
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/deformable_mesh_renderer.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/core/game_object.hpp"
 #include "rtr/framework/core/scene.hpp"
@@ -168,7 +169,7 @@ private:
             }
 
             pbpt::math::Vec4 base_color = mesh_renderer->base_color();
-            if (ImGui::ColorEdit4("Base Color", &base_color.x())) {
+            if (ImGui::ColorEdit4("Base Color##mesh_renderer", &base_color.x())) {
                 mesh_renderer->set_base_color(base_color);
                 logger()->debug(
                     "MeshRenderer base_color updated (game_object_id={}, rgba=[{:.3f}, {:.3f}, {:.3f}, {:.3f}]).",
@@ -176,6 +177,32 @@ private:
             }
 
             ImGui::Text("Mesh Handle: %llu", static_cast<unsigned long long>(mesh_renderer->mesh_handle().value));
+        }
+    }
+
+    static void draw_deformable_mesh_renderer_editor(framework::core::GameObject& game_object) {
+        auto* def_mesh_renderer = game_object.get_component<framework::component::DeformableMeshRenderer>();
+        if (def_mesh_renderer == nullptr) {
+            return;
+        }
+
+        if (ImGui::CollapsingHeader("DeformableMeshRenderer", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = def_mesh_renderer->enabled();
+            if (ImGui::Checkbox("Enabled##def_mesh_renderer", &enabled)) {
+                game_object.set_component_enabled<framework::component::DeformableMeshRenderer>(enabled);
+                logger()->debug("DeformableMeshRenderer enabled updated (game_object_id={}, enabled={}).", game_object.id(),
+                                enabled);
+            }
+
+            pbpt::math::Vec4 base_color = def_mesh_renderer->base_color();
+            if (ImGui::ColorEdit4("Base Color##def_mesh_renderer", &base_color.x())) {
+                def_mesh_renderer->set_base_color(base_color);
+                logger()->debug(
+                    "DeformableMeshRenderer base_color updated (game_object_id={}, rgba=[{:.3f}, {:.3f}, {:.3f}, {:.3f}]).",
+                    game_object.id(), base_color.x(), base_color.y(), base_color.z(), base_color.w());
+            }
+
+            ImGui::Text("Mesh Handle: %llu", static_cast<unsigned long long>(def_mesh_renderer->mesh_handle().value));
         }
     }
 
@@ -762,6 +789,7 @@ public:
 
         draw_camera_editor(*scene, *game_object);
         draw_mesh_renderer_editor(*game_object);
+        draw_deformable_mesh_renderer_editor(*game_object);
         draw_point_light_editor(*game_object);
         draw_rigid_body_editor(*game_object);
         draw_sphere_collider_editor(ctx, *game_object);

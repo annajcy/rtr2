@@ -13,6 +13,7 @@
 #include "imgui.h"
 
 #include "rtr/editor/core/editor_types.hpp"
+#include "rtr/framework/component/material/deformable_mesh_renderer.hpp"
 #include "rtr/framework/component/material/mesh_renderer.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
@@ -124,6 +125,43 @@ inline LocalMeshBounds compute_local_mesh_bounds(
     }
 
     const auto& mesh = resources.cpu<resource::MeshResourceKind>(mesh_handle);
+    if (mesh.vertices.empty()) {
+        return {};
+    }
+
+    LocalMeshBounds bounds{};
+    bounds.min = mesh.vertices.front().position;
+    bounds.max = mesh.vertices.front().position;
+    for (const auto& vertex : mesh.vertices) {
+        bounds.min.x() = std::min(bounds.min.x(), vertex.position.x());
+        bounds.min.y() = std::min(bounds.min.y(), vertex.position.y());
+        bounds.min.z() = std::min(bounds.min.z(), vertex.position.z());
+        bounds.max.x() = std::max(bounds.max.x(), vertex.position.x());
+        bounds.max.y() = std::max(bounds.max.y(), vertex.position.y());
+        bounds.max.z() = std::max(bounds.max.z(), vertex.position.z());
+    }
+    bounds.valid = true;
+    cache.emplace(mesh_handle.value, bounds);
+    return bounds;
+}
+
+inline LocalMeshBounds compute_local_deformable_mesh_bounds(
+    resource::ResourceManager& resources,
+    resource::DeformableMeshHandle mesh_handle
+) {
+    static std::unordered_map<std::uint64_t, LocalMeshBounds> cache{};
+
+    if (!mesh_handle.is_valid()) {
+        return {};
+    }
+
+    // Notice we cache the original bounds. If accurate deformed picking is needed,
+    // this could be updated dynamically. For editor selection, original bounds is usually sufficient.
+    if (const auto it = cache.find(mesh_handle.value); it != cache.end()) {
+        return it->second;
+    }
+
+    const auto& mesh = resources.cpu<resource::DeformableMeshResourceKind>(mesh_handle);
     if (mesh.vertices.empty()) {
         return {};
     }
@@ -291,6 +329,11 @@ inline std::optional<ScenePickResult> pick_scene_game_object(
         } else if (const auto* mesh_renderer = game_object->get_component<framework::component::MeshRenderer>();
                    mesh_renderer != nullptr && mesh_renderer->enabled() && mesh_renderer->mesh_handle().is_valid()) {
             const LocalMeshBounds bounds = detail::compute_local_mesh_bounds(resources, mesh_renderer->mesh_handle());
+            hit_distance = detail::intersect_mesh_bounds(ray, game_object->node().world_matrix(), bounds);
+            hit_source = ScenePickHitSource::MeshBounds;
+        } else if (const auto* deformable_renderer = game_object->get_component<framework::component::DeformableMeshRenderer>();
+                   deformable_renderer != nullptr && deformable_renderer->enabled() && deformable_renderer->mesh_handle().is_valid()) {
+            const LocalMeshBounds bounds = detail::compute_local_deformable_mesh_bounds(resources, deformable_renderer->mesh_handle());
             hit_distance = detail::intersect_mesh_bounds(ray, game_object->node().world_matrix(), bounds);
             hit_source = ScenePickHitSource::MeshBounds;
         }

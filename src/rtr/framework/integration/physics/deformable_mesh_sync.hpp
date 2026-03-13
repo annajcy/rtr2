@@ -9,8 +9,7 @@ namespace rtr::framework::integration::physics {
 
 inline void sync_deformable_mesh_to_renderer(
     const system::physics::DeformableMeshState& state,
-    component::DeformableMeshRenderer& renderer,
-    rhi::Device& device
+    component::DeformableMeshRenderer& renderer
 ) {
     if (state.positions.empty()) {
         return;
@@ -26,7 +25,7 @@ inline void sync_deformable_mesh_to_renderer(
         update_vertices[i].uv       = pbpt::math::Vec2{0.0f};
     }
 
-    renderer.update_positions(device, update_vertices);
+    renderer.update_positions(update_vertices);
 }
 
 } // namespace rtr::framework::integration::physics
