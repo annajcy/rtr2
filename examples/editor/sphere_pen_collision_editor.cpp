@@ -19,7 +19,7 @@
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
@@ -83,7 +83,7 @@ int main() {
             go.node().set_local_position(position);
             go.node().set_local_rotation(rotation);
             go.node().set_local_scale(scale);
-            (void)go.add_component<rtr::framework::component::MeshRenderer>(runtime.resource_manager(), quad_mesh, color);
+            (void)go.add_component<rtr::framework::component::StaticMeshComponent>(runtime.resource_manager(), quad_mesh, color);
             auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
             rigid_body.set_type(rtr::system::physics::RigidBodyType::Static);
             (void)go.add_component<rtr::framework::component::BoxCollider>(
@@ -118,7 +118,7 @@ int main() {
             auto&       go    = scene.create_game_object("sphere_" + std::to_string(i));
             go.node().set_local_position(spawn.position);
             go.node().set_local_scale({0.2f, 0.2f, 0.2f});
-            (void)go.add_component<rtr::framework::component::MeshRenderer>(runtime.resource_manager(), sphere_mesh, spawn.color);
+            (void)go.add_component<rtr::framework::component::StaticMeshComponent>(runtime.resource_manager(), sphere_mesh, spawn.color);
 
             auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
             (void)go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_world(), 1.0f);

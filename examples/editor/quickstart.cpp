@@ -16,7 +16,7 @@
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/editor/render/forward_editor_pipeline.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/system/input/input_types.hpp"
 
@@ -62,7 +62,7 @@ int main() {
                                      const pbpt::math::Vec4& base_color) {
             const auto mesh_handle =
                 runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(mesh_path);
-            (void)go.add_component<rtr::framework::component::MeshRenderer>(
+            (void)go.add_component<rtr::framework::component::StaticMeshComponent>(
                 runtime.resource_manager(), mesh_handle, base_color);
         };
 

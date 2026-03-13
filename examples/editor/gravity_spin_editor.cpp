@@ -17,7 +17,7 @@
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/reset_position.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/system/input/input_types.hpp"
@@ -65,7 +65,7 @@ int main() {
         auto&      bunny_go   = scene.create_game_object("bunny_spin");
         const auto bunny_mesh = runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(
             "models/stanford_bunny.obj");
-        (void)bunny_go.add_component<rtr::framework::component::MeshRenderer>(
+        (void)bunny_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), bunny_mesh, pbpt::math::Vec4{0.90f, 0.85f, 0.78f, 1.0f});
         bunny_go.node().set_local_position(kResetPosition);
         bunny_go.node().set_local_scale({10.0f, 10.0f, 10.0f});
@@ -87,7 +87,7 @@ int main() {
         auto&      ground_go   = scene.create_game_object("ground");
         const auto ground_mesh = runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(
             "models/colored_quad.obj");
-        (void)ground_go.add_component<rtr::framework::component::MeshRenderer>(
+        (void)ground_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), ground_mesh, pbpt::math::Vec4{0.25f, 0.25f, 0.28f, 1.0f});
         ground_go.node().set_local_position({0.0f, -1.0f, 0.0f});
         ground_go.node().set_local_rotation(

@@ -18,7 +18,7 @@
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
@@ -144,7 +144,7 @@ int main() {
             go.node().set_local_position(position);
             go.node().set_local_rotation(rotation);
             go.node().set_local_scale(scale);
-            (void)go.add_component<rtr::framework::component::MeshRenderer>(runtime.resource_manager(), quad_mesh, color);
+            (void)go.add_component<rtr::framework::component::StaticMeshComponent>(runtime.resource_manager(), quad_mesh, color);
             auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
             rigid_body.set_type(body_type);
             rigid_body.set_restitution(restitution);
@@ -193,7 +193,7 @@ int main() {
 
         auto& ramp_ball_go = scene.create_game_object("ramp_ball");
         ramp_ball_go.node().set_local_scale({0.35f, 0.35f, 0.35f});
-        (void)ramp_ball_go.add_component<rtr::framework::component::MeshRenderer>(
+        (void)ramp_ball_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), sphere_mesh, pbpt::math::Vec4{0.95f, 0.66f, 0.26f, 1.0f});
         auto& ramp_ball = ramp_ball_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         ramp_ball.set_friction(0.85f);
@@ -203,7 +203,7 @@ int main() {
 
         auto& bounce_ball_go = scene.create_game_object("bounce_ball");
         bounce_ball_go.node().set_local_scale({0.42f, 0.42f, 0.42f});
-        (void)bounce_ball_go.add_component<rtr::framework::component::MeshRenderer>(
+        (void)bounce_ball_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), sphere_mesh, pbpt::math::Vec4{0.33f, 0.80f, 0.93f, 1.0f});
         auto& bounce_ball = bounce_ball_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         bounce_ball.set_restitution(0.88f);
@@ -213,7 +213,7 @@ int main() {
 
         auto& target_ball_go = scene.create_game_object("impact_target_ball");
         target_ball_go.node().set_local_scale({0.44f, 0.44f, 0.44f});
-        (void)target_ball_go.add_component<rtr::framework::component::MeshRenderer>(
+        (void)target_ball_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), sphere_mesh, pbpt::math::Vec4{0.43f, 0.92f, 0.57f, 1.0f});
         auto& target_ball = target_ball_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         target_ball.set_use_gravity(false);
@@ -224,7 +224,7 @@ int main() {
 
         auto& striker_go = scene.create_game_object("impact_striker");
         striker_go.node().set_local_scale({0.5f, 1.4f, 1.0f});
-        (void)striker_go.add_component<rtr::framework::component::MeshRenderer>(
+        (void)striker_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), quad_mesh, pbpt::math::Vec4{0.93f, 0.37f, 0.48f, 1.0f});
         auto& striker = striker_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         striker.set_use_gravity(false);
@@ -236,7 +236,7 @@ int main() {
 
         auto& spinner_go = scene.create_game_object("torque_spinner");
         spinner_go.node().set_local_scale({0.55f, 2.2f, 1.0f});
-        (void)spinner_go.add_component<rtr::framework::component::MeshRenderer>(
+        (void)spinner_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), quad_mesh, pbpt::math::Vec4{0.76f, 0.56f, 0.95f, 1.0f});
         auto& spinner = spinner_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         spinner.set_use_gravity(false);

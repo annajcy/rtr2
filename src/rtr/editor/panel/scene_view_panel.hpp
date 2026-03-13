@@ -17,7 +17,8 @@
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera/orthographic_camera.hpp"
 #include "rtr/framework/component/camera/perspective_camera.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
+#include "rtr/framework/component/material/deformable_mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
@@ -82,6 +83,19 @@ inline const std::vector<MeshEdge>& cached_mesh_edges(resource::ResourceManager&
     }
 
     const auto& mesh = resources.cpu<resource::MeshResourceKind>(mesh_handle);
+    const auto [inserted_it, _] = cache.emplace(mesh_handle.value, build_unique_mesh_edges(mesh));
+    return inserted_it->second;
+}
+
+inline const std::vector<MeshEdge>& cached_deformable_mesh_edges(resource::ResourceManager& resources, resource::DeformableMeshHandle mesh_handle) {
+    static std::unordered_map<std::uint64_t, std::vector<MeshEdge>> cache{};
+
+    const auto it = cache.find(mesh_handle.value);
+    if (it != cache.end()) {
+        return it->second;
+    }
+
+    const auto& mesh = resources.cpu<resource::DeformableMeshResourceKind>(mesh_handle);
     const auto [inserted_it, _] = cache.emplace(mesh_handle.value, build_unique_mesh_edges(mesh));
     return inserted_it->second;
 }
@@ -392,29 +406,23 @@ private:
         ImDrawList* draw_list,
         EditorContext& ctx,
         const auto& node,
-        const framework::component::MeshRenderer& mesh_renderer,
+        const std::vector<pbpt::math::Vec3>& vertices,
+        const std::vector<scene_view_detail::MeshEdge>& edges,
         const ActiveCameraInfo& active_camera,
         const EditorViewportRect& viewport_rect
     ) {
         constexpr ImU32 kMeshOutlineColor = IM_COL32(64, 220, 255, 255);
         constexpr float kMeshOutlineThickness = 1.5f;
 
-        const auto mesh_handle = mesh_renderer.mesh_handle();
-        if (!mesh_handle.is_valid() || !ctx.resources().alive<resource::MeshResourceKind>(mesh_handle)) {
-            return;
-        }
-
-        const auto& cpu_mesh = ctx.resources().cpu<resource::MeshResourceKind>(mesh_handle);
-        const auto& edges = scene_view_detail::cached_mesh_edges(ctx.resources(), mesh_handle);
         const auto& world_matrix = node.world_matrix();
 
         for (const auto& edge : edges) {
-            if (edge.a >= cpu_mesh.vertices.size() || edge.b >= cpu_mesh.vertices.size()) {
+            if (edge.a >= vertices.size() || edge.b >= vertices.size()) {
                 continue;
             }
 
-            const pbpt::math::Vec4 clip_a = world_matrix * pbpt::math::Vec4(cpu_mesh.vertices[edge.a].position, 1.0f);
-            const pbpt::math::Vec4 clip_b = world_matrix * pbpt::math::Vec4(cpu_mesh.vertices[edge.b].position, 1.0f);
+            const pbpt::math::Vec4 clip_a = world_matrix * pbpt::math::Vec4(vertices[edge.a], 1.0f);
+            const pbpt::math::Vec4 clip_b = world_matrix * pbpt::math::Vec4(vertices[edge.b], 1.0f);
             const pbpt::math::Vec3 world_a{clip_a.x(), clip_a.y(), clip_a.z()};
             const pbpt::math::Vec3 world_b{clip_b.x(), clip_b.y(), clip_b.z()};
             draw_projected_segment(
@@ -552,9 +560,14 @@ private:
 
         switch (ctx.gizmo_state().target) {
             case EditorGizmoTarget::GameObjectTransform:
-                if (const auto* mesh_renderer = game_object->get_component<framework::component::MeshRenderer>();
-                    mesh_renderer != nullptr && mesh_renderer->enabled()) {
-                    draw_mesh_outline(draw_list, ctx, node, *mesh_renderer, active_camera, viewport_rect);
+                if (const auto* static_mesh = game_object->get_component<framework::component::StaticMeshComponent>();
+                    static_mesh != nullptr && static_mesh->enabled() && static_mesh->has_valid_mesh()) {
+                    const auto& edges = scene_view_detail::cached_mesh_edges(ctx.resources(), static_mesh->mesh_handle());
+                    draw_mesh_outline(draw_list, ctx, node, static_mesh->local_vertices(), edges, active_camera, viewport_rect);
+                } else if (const auto* def_mesh = game_object->get_component<framework::component::DeformableMeshComponent>();
+                           def_mesh != nullptr && def_mesh->enabled() && def_mesh->has_valid_mesh()) {
+                    const auto& edges = scene_view_detail::cached_deformable_mesh_edges(ctx.resources(), def_mesh->mesh_handle());
+                    draw_mesh_outline(draw_list, ctx, node, def_mesh->local_vertices(), edges, active_camera, viewport_rect);
                 }
                 break;
             case EditorGizmoTarget::SphereColliderLocal:

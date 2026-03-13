@@ -10,7 +10,7 @@
 
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/core/scene.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
@@ -69,7 +69,7 @@ void setup_scene_with_camera(core::Scene& scene) {
 
 void add_minimal_pbpt_emitter_shape(core::Scene& scene, resource::ResourceManager& resources) {
     auto& go = scene.create_game_object("pbpt_test_shape");
-    (void)go.add_component<component::MeshRenderer>(
+    (void)go.add_component<component::StaticMeshComponent>(
         resources, create_test_mesh(resources)
     );
     (void)go.add_component<component::PbptMesh>();

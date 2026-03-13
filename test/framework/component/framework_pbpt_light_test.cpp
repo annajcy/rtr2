@@ -3,14 +3,14 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
 
 namespace rtr::framework::component::test {
 
-TEST(FrameworkPbptLightTest, ThrowsWhenMeshRendererIsMissing) {
+TEST(FrameworkPbptLightTest, ThrowsWhenStaticMeshComponentIsMissing) {
     core::Scene scene(1);
     auto& go = scene.create_game_object("light");
 
@@ -20,11 +20,11 @@ TEST(FrameworkPbptLightTest, ThrowsWhenMeshRendererIsMissing) {
     );
 }
 
-TEST(FrameworkPbptLightTest, CanAttachWhenMeshRendererExists) {
+TEST(FrameworkPbptLightTest, CanAttachWhenStaticMeshComponentExists) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("light");
-    auto& renderer = go.add_component<MeshRenderer>(resources, resource::MeshHandle{10});
+    auto& renderer = go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{10});
     auto& pbpt_light = go.add_component<PbptLight>();
 
     EXPECT_EQ(&pbpt_light.mesh_renderer(), &renderer);
@@ -35,7 +35,7 @@ TEST(FrameworkPbptLightTest, RadianceSpectrumValidationThrowsForInvalidData) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("light");
-    (void)go.add_component<MeshRenderer>(resources, resource::MeshHandle{10});
+    (void)go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{10});
     auto& pbpt_light = go.add_component<PbptLight>();
 
     EXPECT_THROW(
@@ -62,7 +62,7 @@ TEST(FrameworkPbptLightTest, RadianceSpectrumSetAndReadBack) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("light");
-    (void)go.add_component<MeshRenderer>(resources, resource::MeshHandle{10});
+    (void)go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{10});
     auto& pbpt_light = go.add_component<PbptLight>();
 
     const PbptSpectrum spectrum{

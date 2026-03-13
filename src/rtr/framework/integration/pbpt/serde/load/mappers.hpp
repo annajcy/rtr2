@@ -15,7 +15,7 @@
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/resource/resource_manager.hpp"
@@ -79,7 +79,7 @@ struct ObjLambertianShapeImportMapper {
         object_name = compat_import_detail::make_unique_name(object_name, pkg.result.imported_game_object_id_by_name);
 
         auto& go = ctx.scene.create_game_object(object_name);
-        (void)go.add_component<component::MeshRenderer>(
+        (void)go.add_component<component::StaticMeshComponent>(
             ctx.resources, mesh_handle, ::pbpt::math::Vec4{reflectance.r, reflectance.g, reflectance.b, 1.0f});
         (void)go.add_component<component::PbptMesh>();
         go.node().set_local_model_matrix(compat_import_detail::to_mat4(record.object_to_world));

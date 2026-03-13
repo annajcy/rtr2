@@ -5,7 +5,7 @@
 
 #include <pbpt/math/math.h>
 
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/resource/resource_manager.hpp"
@@ -24,20 +24,20 @@ private:
         }
     }
 
-    MeshRenderer& owner_mesh_renderer_or_throw() {
-        auto* mesh_renderer = owner().get_component<MeshRenderer>();
-        if (mesh_renderer == nullptr) {
-            throw std::runtime_error("MeshCollider requires a MeshRenderer on the same GameObject.");
+    MeshComponent& owner_mesh_component_or_throw() {
+        auto* mesh_component = owner().get_component<MeshComponent>();
+        if (mesh_component == nullptr) {
+            throw std::runtime_error("MeshCollider requires a MeshComponent on the same GameObject.");
         }
-        return *mesh_renderer;
+        return *mesh_component;
     }
 
-    const MeshRenderer& owner_mesh_renderer_or_throw() const {
-        const auto* mesh_renderer = owner().get_component<MeshRenderer>();
-        if (mesh_renderer == nullptr) {
-            throw std::runtime_error("MeshCollider requires a MeshRenderer on the same GameObject.");
+    const MeshComponent& owner_mesh_component_or_throw() const {
+        const auto* mesh_component = owner().get_component<MeshComponent>();
+        if (mesh_component == nullptr) {
+            throw std::runtime_error("MeshCollider requires a MeshComponent on the same GameObject.");
         }
-        return *mesh_renderer;
+        return *mesh_component;
     }
 
     static pbpt::math::Vec3 sanitize_position(const pbpt::math::Vec3& local_position) {
@@ -63,14 +63,8 @@ private:
         return local_scale;
     }
 
-    resource::MeshHandle mesh_handle_from_renderer() const {
-        const auto mesh_handle = owner_mesh_renderer_or_throw().mesh_handle();
-        validate_mesh_handle(mesh_handle);
-        return mesh_handle;
-    }
-
     std::vector<pbpt::math::Vec3> local_vertices_from_renderer() const {
-        auto local_vertices = owner_mesh_renderer_or_throw().local_vertices();
+        auto local_vertices = owner_mesh_component_or_throw().local_vertices();
         if (local_vertices.empty()) {
             throw std::runtime_error("MeshCollider requires a mesh with at least one vertex.");
         }

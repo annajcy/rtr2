@@ -17,7 +17,7 @@
 #include "pbpt/radiometry/constant/illuminant_spectrum.hpp"
 #include "pbpt/shape/plugin/shape/triangle.hpp"
 
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/scene.hpp"
@@ -25,11 +25,11 @@
 
 namespace rtr::framework::integration {
 
-struct MeshRendererPbptMeshExportMapper {
-    static constexpr std::string_view kName = "MeshRendererPbptMeshExportMapper";
+struct StaticMeshComponentPbptMeshExportMapper {
+    static constexpr std::string_view kName = "StaticMeshComponentPbptMeshExportMapper";
 
     static bool matches(const core::GameObject& go, const ExportGlobalContext&, ::pbpt::serde::PbptXmlResult<float>&) {
-        const auto* mesh_renderer = go.get_component<component::MeshRenderer>();
+        const auto* mesh_renderer = go.get_component<component::StaticMeshComponent>();
         const auto* pbpt_mesh     = go.get_component<component::PbptMesh>();
         if (mesh_renderer == nullptr || pbpt_mesh == nullptr)
             return false;
@@ -40,7 +40,7 @@ struct MeshRendererPbptMeshExportMapper {
 
     static void map(const core::GameObject& go, const ExportGlobalContext& ctx,
                     ::pbpt::serde::PbptXmlResult<float>& result) {
-        const auto* mesh_renderer = go.get_component<component::MeshRenderer>();
+        const auto* mesh_renderer = go.get_component<component::StaticMeshComponent>();
         const auto* pbpt_mesh     = go.get_component<component::PbptMesh>();
         const auto* pbpt_light    = go.get_component<component::PbptLight>();
 
@@ -64,7 +64,7 @@ struct MeshRendererPbptMeshExportMapper {
 
         const ::pbpt::math::Vec4 base_color = mesh_renderer->base_color();
         const component::PbptRgb reflectance{.r = base_color.x(), .g = base_color.y(), .b = base_color.z()};
-        component::validate_pbpt_rgb(reflectance, "MeshRenderer.base_color");
+        component::validate_pbpt_rgb(reflectance, "StaticMeshComponent.base_color");
 
         const std::string material_key = compat_export_detail::reflectance_key(reflectance);
         std::string       material_name;

@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "rtr/framework/component/component.hpp"
-#include "rtr/framework/component/material/deformable_mesh_renderer.hpp"
+#include "rtr/framework/component/material/deformable_mesh_component.hpp"
 #include "rtr/framework/core/game_object.hpp"
 #include "rtr/rhi/device.hpp"
 #include "rtr/system/physics/common/normal_recompute.hpp"
@@ -29,7 +29,7 @@ public:
             return;
         }
 
-        auto* renderer = owner().get_component<framework::component::DeformableMeshRenderer>();
+        auto* renderer = owner().get_component<framework::component::DeformableMeshComponent>();
         if (renderer == nullptr) {
             return;
         }

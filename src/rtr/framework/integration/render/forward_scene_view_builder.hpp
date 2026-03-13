@@ -5,8 +5,8 @@
 
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/material/deformable_mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
+#include "rtr/framework/component/material/deformable_mesh_component.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/device.hpp"
@@ -32,8 +32,7 @@ inline system::render::ForwardSceneView build_forward_scene_view(const core::Sce
             continue;
         }
         const auto* camera        = go->get_component<component::Camera>();
-        const auto* mesh_renderer = go->get_component<component::MeshRenderer>();
-        const auto* def_mesh_renderer = go->get_component<component::DeformableMeshRenderer>();
+        const auto* mesh_component = go->get_component<component::MeshComponent>();
         const auto* point_light   = go->get_component<component::light::PointLight>();
 
         const auto             node  = scene.scene_graph().node(id);
@@ -62,25 +61,14 @@ inline system::render::ForwardSceneView build_forward_scene_view(const core::Sce
             view.point_lights.emplace_back(pl);
         }
 
-        bool has_mesh_renderer = (mesh_renderer != nullptr && mesh_renderer->enabled());
-        bool has_def_mesh_renderer = (def_mesh_renderer != nullptr && def_mesh_renderer->enabled());
-
-        if (!has_mesh_renderer && !has_def_mesh_renderer) {
+        if (mesh_component == nullptr || !mesh_component->enabled() || !mesh_component->has_valid_mesh()) {
             continue;
         }
 
         const pbpt::math::Mat4 normal = pbpt::math::transpose(pbpt::math::inverse(model));
         
-        system::render::MeshView mesh_view;
-        pbpt::math::Vec4 base_color{1.0f};
-
-        if (has_mesh_renderer) {
-            mesh_view = const_cast<component::MeshRenderer*>(mesh_renderer)->mesh_view(device);
-            base_color = mesh_renderer->base_color();
-        } else {
-            mesh_view = const_cast<component::DeformableMeshRenderer*>(def_mesh_renderer)->mesh_view(device);
-            base_color = def_mesh_renderer->base_color();
-        }
+        system::render::MeshView mesh_view = const_cast<component::MeshComponent*>(mesh_component)->mesh_view(device);
+        pbpt::math::Vec4 base_color = mesh_component->base_color();
 
         view.renderables.emplace_back(system::render::ForwardSceneRenderable{
             .instance_id = static_cast<std::uint64_t>(id),

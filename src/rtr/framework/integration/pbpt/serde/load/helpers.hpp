@@ -78,7 +78,7 @@ inline component::PbptRgb lambertian_to_rgb(const ::pbpt::material::LambertianMa
             if constexpr (std::is_same_v<ValueT, ::pbpt::radiometry::PiecewiseLinearSpectrumDistribution<float>>) {
                 return ::rtr::framework::integration::pbpt_spectrum_to_rgb(to_component_spectrum(value));
             } else {
-                throw std::runtime_error("Lambertian texture reflectance is not expressible by RTR MeshRenderer.");
+                throw std::runtime_error("Lambertian texture reflectance is not expressible by RTR StaticMeshComponent.");
             }
         },
         source);

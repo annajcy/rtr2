@@ -4,7 +4,7 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/mesh_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
@@ -685,7 +685,7 @@ TEST(PhysicsSceneIntegrationTest, DynamicMeshCollidesWithStaticPlaneAndGenerates
     mesh_go.node().set_local_position(pbpt::math::Vec3{0.0f, 0.1f, 0.0f});
     auto& mesh_body = mesh_go.add_component<framework::component::RigidBody>(
         physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.25f);
-    (void)mesh_go.add_component<framework::component::MeshRenderer>(resources, mesh_handle);
+    (void)mesh_go.add_component<framework::component::StaticMeshComponent>(resources, mesh_handle);
     (void)mesh_go.add_component<framework::component::MeshCollider>(physics.world());
     mesh_body.set_linear_velocity(pbpt::math::Vec3{0.0f, -1.0f, 0.0f});
 

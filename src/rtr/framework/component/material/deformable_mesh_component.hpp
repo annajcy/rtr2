@@ -4,7 +4,7 @@
 #include <span>
 #include <stdexcept>
 
-#include "rtr/framework/component/component.hpp"
+#include "rtr/framework/component/material/mesh_component.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/resource/resource_types.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
@@ -12,15 +12,14 @@
 
 namespace rtr::framework::component {
 
-class DeformableMeshRenderer final : public Component {
+class DeformableMeshComponent final : public MeshComponent {
 private:
     static std::shared_ptr<spdlog::logger> logger() {
-        return utils::get_logger("framework.component.deformable_mesh_renderer");
+        return utils::get_logger("framework.component.deformable_mesh_component");
     }
 
     resource::ResourceManager& m_resources;
     resource::DeformableMeshHandle m_mesh{};
-    pbpt::math::Vec4 m_base_color{1.0f, 1.0f, 1.0f, 1.0f};
 
     std::vector<rhi::DynamicMesh::Vertex> m_pending_vertices;
     bool m_vertices_dirty{false};
@@ -29,19 +28,18 @@ private:
     bool m_normals_dirty{false};
 
 public:
-    explicit DeformableMeshRenderer(
+    explicit DeformableMeshComponent(
         core::GameObject& owner,
         resource::ResourceManager& resources,
         resource::DeformableMeshHandle mesh,
         pbpt::math::Vec4 base_color = pbpt::math::Vec4{1.0f, 1.0f, 1.0f, 1.0f}
     )
-        : Component(owner),
+        : MeshComponent(owner, base_color),
           m_resources(resources),
-          m_mesh(mesh),
-          m_base_color(base_color) {
+          m_mesh(mesh) {
         if (!m_mesh.is_valid()) {
-            logger()->error("DeformableMeshRenderer ctor failed: mesh handle is invalid.");
-            throw std::invalid_argument("DeformableMeshRenderer mesh handle must be valid.");
+            logger()->error("DeformableMeshComponent ctor failed: mesh handle is invalid.");
+            throw std::invalid_argument("DeformableMeshComponent mesh handle must be valid.");
         }
     }
 
@@ -49,9 +47,9 @@ public:
         return m_mesh;
     }
 
-    std::vector<pbpt::math::Vec3> local_vertices() const {
+    std::vector<pbpt::math::Vec3> local_vertices() const override {
         if (!m_resources.alive<resource::DeformableMeshResourceKind>(m_mesh)) {
-            throw std::runtime_error("DeformableMeshRenderer mesh handle is not alive.");
+            throw std::runtime_error("DeformableMeshComponent mesh handle is not alive.");
         }
         const auto& mesh = m_resources.cpu<resource::DeformableMeshResourceKind>(m_mesh);
         std::vector<pbpt::math::Vec3> local_vertices;
@@ -64,13 +62,17 @@ public:
 
     std::vector<uint32_t> indices() const {
         if (!m_resources.alive<resource::DeformableMeshResourceKind>(m_mesh)) {
-            throw std::runtime_error("DeformableMeshRenderer mesh handle is not alive.");
+            throw std::runtime_error("DeformableMeshComponent mesh handle is not alive.");
         }
         const auto& mesh = m_resources.cpu<resource::DeformableMeshResourceKind>(m_mesh);
         return mesh.indices;
     }
 
-    system::render::MeshView mesh_view(rhi::Device& device) {
+    bool has_valid_mesh() const override {
+        return m_mesh.is_valid() && m_resources.alive<resource::DeformableMeshResourceKind>(m_mesh);
+    }
+
+    system::render::MeshView mesh_view(rhi::Device& device) override {
         auto& dm = m_resources.require_gpu<resource::DeformableMeshResourceKind>(m_mesh, device);
         
         if (m_vertices_dirty) {
@@ -97,14 +99,6 @@ public:
     void update_normals(std::span<const pbpt::math::Vec3> normals) {
         m_pending_normals.assign(normals.begin(), normals.end());
         m_normals_dirty = true;
-    }
-
-    const pbpt::math::Vec4& base_color() const {
-        return m_base_color;
-    }
-
-    void set_base_color(const pbpt::math::Vec4& base_color) {
-        m_base_color = base_color;
     }
 };
 

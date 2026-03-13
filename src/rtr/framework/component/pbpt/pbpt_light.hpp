@@ -5,7 +5,7 @@
 #include <utility>
 
 #include "rtr/framework/component/component.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/pbpt/pbpt_spectrum.hpp"
 #include "rtr/framework/core/game_object.hpp"
 #include "rtr/utils/log.hpp"
@@ -24,7 +24,7 @@ private:
 
     PbptAreaEmitter m_area_emitter{};
 
-    const MeshRenderer& require_mesh_renderer() const { return owner().component_or_throw<MeshRenderer>(); }
+    const StaticMeshComponent& require_mesh_renderer() const { return owner().component_or_throw<StaticMeshComponent>(); }
 
 public:
     explicit PbptLight(core::GameObject& owner)
@@ -34,7 +34,7 @@ public:
         (void)require_mesh_renderer();
     }
 
-    const MeshRenderer& mesh_renderer() const {
+    const StaticMeshComponent& mesh_renderer() const {
         return require_mesh_renderer();
     }
 

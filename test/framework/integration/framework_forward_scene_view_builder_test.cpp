@@ -10,7 +10,7 @@
 
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/render/forward_scene_view_builder.hpp"
 #include "rtr/resource/resource_manager.hpp"
@@ -67,11 +67,11 @@ resource::MeshHandle create_test_mesh(resource::ResourceManager& resources) {
 }
 
 void add_renderer(framework::core::GameObject& go, resource::ResourceManager& resources) {
-    (void)go.add_component<component::MeshRenderer>(resources, create_test_mesh(resources));
+    (void)go.add_component<component::StaticMeshComponent>(resources, create_test_mesh(resources));
 }
 
 void add_renderer_with_color(framework::core::GameObject& go, resource::ResourceManager& resources) {
-    (void)go.add_component<component::MeshRenderer>(resources, create_test_mesh(resources),
+    (void)go.add_component<component::StaticMeshComponent>(resources, create_test_mesh(resources),
                                                     pbpt::math::Vec4{0.3f, 0.4f, 0.5f, 1.0f});
 }
 
@@ -182,7 +182,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ReturnsBlackFrameWhenMultipleActiveCa
     EXPECT_TRUE(view.point_lights.empty());
 }
 
-TEST(FrameworkForwardSceneViewBuilderTest, ExtractsOnlyActiveNodesWithMeshRenderer) {
+TEST(FrameworkForwardSceneViewBuilderTest, ExtractsOnlyActiveNodesWithStaticMeshComponent) {
     if (!gpu_tests_enabled()) {
         GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
     }
@@ -217,7 +217,7 @@ TEST(FrameworkForwardSceneViewBuilderTest, ExtractsOnlyActiveNodesWithMeshRender
     EXPECT_FALSE(std::find(ids.begin(), ids.end(), static_cast<std::uint64_t>(child.id())) != ids.end());
 }
 
-TEST(FrameworkForwardSceneViewBuilderTest, DisabledMeshRendererIsExcludedFromRenderables) {
+TEST(FrameworkForwardSceneViewBuilderTest, DisabledStaticMeshComponentIsExcludedFromRenderables) {
     if (!gpu_tests_enabled()) {
         GTEST_SKIP() << "Set RTR_RUN_GPU_TESTS=1 to run integration GPU tests.";
     }
@@ -231,9 +231,9 @@ TEST(FrameworkForwardSceneViewBuilderTest, DisabledMeshRendererIsExcludedFromRen
     auto& obj2 = scene.create_game_object("obj2");
     add_renderer(obj2, resources);
 
-    auto* renderer2 = obj2.get_component<component::MeshRenderer>();
+    auto* renderer2 = obj2.get_component<component::StaticMeshComponent>();
     ASSERT_NE(renderer2, nullptr);
-    obj2.set_component_enabled<component::MeshRenderer>(false);
+    obj2.set_component_enabled<component::StaticMeshComponent>(false);
 
     const auto view = render::build_forward_scene_view(scene, resources, harness.device);
     ASSERT_EQ(view.renderables.size(), 1u);

@@ -19,8 +19,9 @@
 #include "rtr/framework/component/physics/rigid_body/reset_position.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
-#include "rtr/framework/component/material/deformable_mesh_renderer.hpp"
+#include "rtr/framework/component/material/mesh_component.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
+#include "rtr/framework/component/material/deformable_mesh_component.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/core/game_object.hpp"
 #include "rtr/framework/core/scene.hpp"
@@ -154,55 +155,55 @@ private:
         }
     }
 
-    static void draw_mesh_renderer_editor(framework::core::GameObject& game_object) {
-        auto* mesh_renderer = game_object.get_component<framework::component::MeshRenderer>();
-        if (mesh_renderer == nullptr) {
+    static void draw_static_mesh_component_editor(framework::core::GameObject& game_object) {
+        auto* mesh_component = game_object.get_component<framework::component::StaticMeshComponent>();
+        if (mesh_component == nullptr) {
             return;
         }
 
-        if (ImGui::CollapsingHeader("MeshRenderer", ImGuiTreeNodeFlags_DefaultOpen)) {
-            bool enabled = mesh_renderer->enabled();
-            if (ImGui::Checkbox("Enabled##mesh_renderer", &enabled)) {
-                game_object.set_component_enabled<framework::component::MeshRenderer>(enabled);
-                logger()->debug("MeshRenderer enabled updated (game_object_id={}, enabled={}).", game_object.id(),
+        if (ImGui::CollapsingHeader("StaticMeshComponent", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = mesh_component->enabled();
+            if (ImGui::Checkbox("Enabled##static_mesh_component", &enabled)) {
+                game_object.set_component_enabled<framework::component::StaticMeshComponent>(enabled);
+                logger()->debug("StaticMeshComponent enabled updated (game_object_id={}, enabled={}).", game_object.id(),
                                 enabled);
             }
 
-            pbpt::math::Vec4 base_color = mesh_renderer->base_color();
-            if (ImGui::ColorEdit4("Base Color##mesh_renderer", &base_color.x())) {
-                mesh_renderer->set_base_color(base_color);
+            pbpt::math::Vec4 base_color = mesh_component->base_color();
+            if (ImGui::ColorEdit4("Base Color##static_mesh_component", &base_color.x())) {
+                mesh_component->set_base_color(base_color);
                 logger()->debug(
-                    "MeshRenderer base_color updated (game_object_id={}, rgba=[{:.3f}, {:.3f}, {:.3f}, {:.3f}]).",
+                    "StaticMeshComponent base_color updated (game_object_id={}, rgba=[{:.3f}, {:.3f}, {:.3f}, {:.3f}]).",
                     game_object.id(), base_color.x(), base_color.y(), base_color.z(), base_color.w());
             }
 
-            ImGui::Text("Mesh Handle: %llu", static_cast<unsigned long long>(mesh_renderer->mesh_handle().value));
+            ImGui::Text("Mesh Handle: %llu", static_cast<unsigned long long>(mesh_component->mesh_handle().value));
         }
     }
 
-    static void draw_deformable_mesh_renderer_editor(framework::core::GameObject& game_object) {
-        auto* def_mesh_renderer = game_object.get_component<framework::component::DeformableMeshRenderer>();
-        if (def_mesh_renderer == nullptr) {
+    static void draw_deformable_mesh_component_editor(framework::core::GameObject& game_object) {
+        auto* def_mesh_comp = game_object.get_component<framework::component::DeformableMeshComponent>();
+        if (def_mesh_comp == nullptr) {
             return;
         }
 
-        if (ImGui::CollapsingHeader("DeformableMeshRenderer", ImGuiTreeNodeFlags_DefaultOpen)) {
-            bool enabled = def_mesh_renderer->enabled();
-            if (ImGui::Checkbox("Enabled##def_mesh_renderer", &enabled)) {
-                game_object.set_component_enabled<framework::component::DeformableMeshRenderer>(enabled);
-                logger()->debug("DeformableMeshRenderer enabled updated (game_object_id={}, enabled={}).", game_object.id(),
+        if (ImGui::CollapsingHeader("DeformableMeshComponent", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = def_mesh_comp->enabled();
+            if (ImGui::Checkbox("Enabled##def_mesh_comp", &enabled)) {
+                game_object.set_component_enabled<framework::component::DeformableMeshComponent>(enabled);
+                logger()->debug("DeformableMeshComponent enabled updated (game_object_id={}, enabled={}).", game_object.id(),
                                 enabled);
             }
 
-            pbpt::math::Vec4 base_color = def_mesh_renderer->base_color();
-            if (ImGui::ColorEdit4("Base Color##def_mesh_renderer", &base_color.x())) {
-                def_mesh_renderer->set_base_color(base_color);
+            pbpt::math::Vec4 base_color = def_mesh_comp->base_color();
+            if (ImGui::ColorEdit4("Base Color##def_mesh_comp", &base_color.x())) {
+                def_mesh_comp->set_base_color(base_color);
                 logger()->debug(
-                    "DeformableMeshRenderer base_color updated (game_object_id={}, rgba=[{:.3f}, {:.3f}, {:.3f}, {:.3f}]).",
+                    "DeformableMeshComponent base_color updated (game_object_id={}, rgba=[{:.3f}, {:.3f}, {:.3f}, {:.3f}]).",
                     game_object.id(), base_color.x(), base_color.y(), base_color.z(), base_color.w());
             }
 
-            ImGui::Text("Mesh Handle: %llu", static_cast<unsigned long long>(def_mesh_renderer->mesh_handle().value));
+            ImGui::Text("Mesh Handle: %llu", static_cast<unsigned long long>(def_mesh_comp->mesh_handle().value));
         }
     }
 
@@ -548,12 +549,11 @@ private:
                                 enabled);
             }
 
-            if (const auto* mesh_renderer = game_object.get_component<framework::component::MeshRenderer>();
-                mesh_renderer != nullptr) {
-                ImGui::Text("Mesh Handle: %llu",
-                            static_cast<unsigned long long>(mesh_renderer->mesh_handle().value));
+            if (const auto* mesh_comp = game_object.get_component<framework::component::MeshComponent>();
+                mesh_comp != nullptr) {
+                ImGui::Text("Has Valid Mesh: %s", mesh_comp->has_valid_mesh() ? "Yes" : "No");
             } else {
-                ImGui::TextDisabled("MeshRenderer is required on the same GameObject.");
+                ImGui::TextDisabled("MeshComponent is required on the same GameObject.");
             }
 
             pbpt::math::Vec3 local_position = mesh->local_position();
@@ -788,8 +788,8 @@ public:
         }
 
         draw_camera_editor(*scene, *game_object);
-        draw_mesh_renderer_editor(*game_object);
-        draw_deformable_mesh_renderer_editor(*game_object);
+        draw_static_mesh_component_editor(*game_object);
+        draw_deformable_mesh_component_editor(*game_object);
         draw_point_light_editor(*game_object);
         draw_rigid_body_editor(*game_object);
         draw_sphere_collider_editor(ctx, *game_object);

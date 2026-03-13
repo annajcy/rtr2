@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include "rtr/framework/component/component.hpp"
+#include "rtr/framework/component/material/mesh_component.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/resource/resource_types.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
@@ -12,30 +12,28 @@
 
 namespace rtr::framework::component {
 
-class MeshRenderer final : public Component {
+class StaticMeshComponent final : public MeshComponent {
 private:
     static std::shared_ptr<spdlog::logger> logger() {
-        return utils::get_logger("framework.component.mesh_renderer");
+        return utils::get_logger("framework.component.static_mesh_component");
     }
 
     resource::ResourceManager& m_resources;
     resource::MeshHandle       m_mesh{};
-    pbpt::math::Vec4           m_base_color{1.0f, 1.0f, 1.0f, 1.0f};
 
 public:
-    explicit MeshRenderer(
+    explicit StaticMeshComponent(
         core::GameObject& owner,
         resource::ResourceManager& resources,
         resource::MeshHandle mesh,
         pbpt::math::Vec4 base_color = pbpt::math::Vec4{1.0f, 1.0f, 1.0f, 1.0f}
     )
-        : Component(owner),
+        : MeshComponent(owner, base_color),
           m_resources(resources),
-          m_mesh(mesh),
-          m_base_color(base_color) {
+          m_mesh(mesh) {
         if (!m_mesh.is_valid()) {
-            logger()->error("MeshRenderer ctor failed: mesh handle is invalid.");
-            throw std::invalid_argument("MeshRenderer mesh handle must be valid.");
+            logger()->error("StaticMeshComponent ctor failed: mesh handle is invalid.");
+            throw std::invalid_argument("StaticMeshComponent mesh handle must be valid.");
         }
     }
 
@@ -43,9 +41,9 @@ public:
         return m_mesh;
     }
 
-    std::vector<pbpt::math::Vec3> local_vertices() const {
+    std::vector<pbpt::math::Vec3> local_vertices() const override {
         if (!m_resources.alive<resource::MeshResourceKind>(m_mesh)) {
-            throw std::runtime_error("MeshRenderer mesh handle is not alive in ResourceManager.");
+            throw std::runtime_error("StaticMeshComponent mesh handle is not alive in ResourceManager.");
         }
         const auto& mesh = m_resources.cpu<resource::MeshResourceKind>(m_mesh);
         std::vector<pbpt::math::Vec3> local_vertices;
@@ -56,7 +54,11 @@ public:
         return local_vertices;
     }
 
-    system::render::MeshView mesh_view(rhi::Device& device) {
+    bool has_valid_mesh() const override {
+        return m_mesh.is_valid() && m_resources.alive<resource::MeshResourceKind>(m_mesh);
+    }
+
+    system::render::MeshView mesh_view(rhi::Device& device) override {
         auto& mesh = m_resources.require_gpu<resource::MeshResourceKind>(m_mesh, device);
         return system::render::MeshView{
             .vertex_buffer = mesh.vertex_buffer(),
@@ -68,20 +70,12 @@ public:
     void set_mesh_handle(resource::MeshHandle mesh) {
         if (!mesh.is_valid()) {
             logger()->error("set_mesh_handle failed: mesh handle is invalid.");
-            throw std::invalid_argument("MeshRenderer mesh handle must be valid.");
+            throw std::invalid_argument("StaticMeshComponent mesh handle must be valid.");
         }
         if (m_mesh.value != mesh.value) {
-            logger()->debug("MeshRenderer mesh handle updated (old={}, new={}).", m_mesh.value, mesh.value);
+            logger()->debug("StaticMeshComponent mesh handle updated (old={}, new={}).", m_mesh.value, mesh.value);
         }
         m_mesh = mesh;
-    }
-
-    const pbpt::math::Vec4& base_color() const {
-        return m_base_color;
-    }
-
-    void set_base_color(const pbpt::math::Vec4& base_color) {
-        m_base_color = base_color;
     }
 };
 

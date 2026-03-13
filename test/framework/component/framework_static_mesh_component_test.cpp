@@ -4,48 +4,48 @@
 #include "gtest/gtest.h"
 
 
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
 
 namespace rtr::framework::component::test {
 
-TEST(FrameworkMeshRendererTest, ConstructWithValidHandles) {
+TEST(FrameworkStaticMeshComponentTest, ConstructWithValidHandles) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>(resources, resource::MeshHandle{1});
+    auto& renderer = go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{1});
     EXPECT_EQ(renderer.mesh_handle(), resource::MeshHandle{1});
     EXPECT_EQ(renderer.base_color(), pbpt::math::Vec4(1.0f));
 }
 
-TEST(FrameworkMeshRendererTest, InvalidMeshHandleThrows) {
+TEST(FrameworkStaticMeshComponentTest, InvalidMeshHandleThrows) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("mesh");
     EXPECT_THROW(
-        (void)go.add_component<MeshRenderer>(resources, resource::MeshHandle{}),
+        (void)go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{}),
         std::invalid_argument
     );
 
-    auto& renderer = go.add_component<MeshRenderer>(resources, resource::MeshHandle{1});
+    auto& renderer = go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{1});
     EXPECT_THROW((void)renderer.set_mesh_handle(resource::MeshHandle{}), std::invalid_argument);
 }
 
-TEST(FrameworkMeshRendererTest, AllowsCustomBaseColor) {
+TEST(FrameworkStaticMeshComponentTest, AllowsCustomBaseColor) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>(
+    auto& renderer = go.add_component<StaticMeshComponent>(
         resources, resource::MeshHandle{1}, pbpt::math::Vec4{0.2f, 0.3f, 0.4f, 1.0f});
     EXPECT_EQ(renderer.base_color(), pbpt::math::Vec4(0.2f, 0.3f, 0.4f, 1.0f));
 }
 
-TEST(FrameworkMeshRendererTest, SettersUpdateState) {
+TEST(FrameworkStaticMeshComponentTest, SettersUpdateState) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>(resources, resource::MeshHandle{1});
+    auto& renderer = go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{1});
 
     renderer.set_mesh_handle(resource::MeshHandle{3});
     renderer.set_base_color(pbpt::math::Vec4{0.1f, 0.2f, 0.3f, 1.0f});
@@ -54,25 +54,25 @@ TEST(FrameworkMeshRendererTest, SettersUpdateState) {
     EXPECT_EQ(renderer.base_color(), pbpt::math::Vec4(0.1f, 0.2f, 0.3f, 1.0f));
 }
 
-TEST(FrameworkMeshRendererTest, GameObjectCanAddAndQueryMeshRenderer) {
+TEST(FrameworkStaticMeshComponentTest, GameObjectCanAddAndQueryStaticMeshComponent) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>(resources, resource::MeshHandle{11});
+    auto& renderer = go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{11});
 
-    EXPECT_TRUE(go.has_component<MeshRenderer>());
-    EXPECT_EQ(go.get_component<MeshRenderer>(), &renderer);
+    EXPECT_TRUE(go.has_component<StaticMeshComponent>());
+    EXPECT_EQ(go.get_component<StaticMeshComponent>(), &renderer);
     EXPECT_EQ(renderer.mesh_handle(), resource::MeshHandle{11});
 }
 
-TEST(FrameworkMeshRendererTest, GameObjectEnforcesUniqueMeshRendererType) {
+TEST(FrameworkStaticMeshComponentTest, GameObjectEnforcesUniqueStaticMeshComponentType) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("mesh");
-    (void)go.add_component<MeshRenderer>(resources, resource::MeshHandle{1});
+    (void)go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{1});
 
     EXPECT_THROW(
-        (void)go.add_component<MeshRenderer>(resources, resource::MeshHandle{3}),
+        (void)go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{3}),
         std::runtime_error
     );
 }

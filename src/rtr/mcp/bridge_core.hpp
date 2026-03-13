@@ -16,7 +16,7 @@
 #include <nlohmann/json.hpp>
 
 #include "rtr/framework/component/camera/perspective_camera.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/pbpt/pbpt_light.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/world.hpp"
@@ -534,7 +534,7 @@ private:
                                                pbpt::math::Vec4{1.0f, 1.0f, 1.0f, 1.0f});
             const auto mesh_handle =
                 session.resources->create_from_relative_path<resource::MeshResourceKind>(mesh_path);
-            (void)game_object.add_component<framework::component::MeshRenderer>(*session.resources, mesh_handle, base_color);
+            (void)game_object.add_component<framework::component::StaticMeshComponent>(*session.resources, mesh_handle, base_color);
 
             const bool want_pbpt_mesh = (type == "emissive_mesh_object")
                                             ? true
@@ -622,8 +622,8 @@ private:
                 }
             }
 
-            if (const auto* mesh_renderer = go.get_component<framework::component::MeshRenderer>(); mesh_renderer != nullptr) {
-                components.push_back("MeshRenderer");
+            if (const auto* mesh_renderer = go.get_component<framework::component::StaticMeshComponent>(); mesh_renderer != nullptr) {
+                components.push_back("StaticMeshComponent");
                 if (!session.resources->alive<resource::MeshResourceKind>(mesh_renderer->mesh_handle())) {
                     issues.push_back("Mesh handle is not alive for '" + object_name + "'.");
                 }

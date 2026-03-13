@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "rtr/framework/component/material/deformable_mesh_renderer.hpp"
+#include "rtr/framework/component/material/deformable_mesh_component.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/render/renderer.hpp"
@@ -7,7 +7,7 @@
 using namespace rtr::framework::component;
 using namespace rtr::rhi;
 
-TEST(DeformableMeshRendererTest, BasicUsage) {
+TEST(DeformableMeshComponentTest, BasicUsage) {
     const char* env_str = std::getenv("RTR_RUN_GPU_TESTS");
     if (env_str == nullptr || std::string(env_str) != "1") {
         GTEST_SKIP() << "Skipping GPU test. Set RTR_RUN_GPU_TESTS=1 to run.";
@@ -31,7 +31,7 @@ TEST(DeformableMeshRendererTest, BasicUsage) {
     rtr::framework::core::Scene scene(1);
     auto& go = scene.create_game_object("test");
 
-    DeformableMeshRenderer renderer(go, resources, handle);
+    DeformableMeshComponent renderer(go, resources, handle);
     EXPECT_EQ(renderer.mesh_handle(), handle);
 
     auto mv = renderer.mesh_view(device);

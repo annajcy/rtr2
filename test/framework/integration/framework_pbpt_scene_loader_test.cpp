@@ -7,7 +7,7 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
@@ -163,7 +163,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsCboxSubsetAndAttachesComponents) {
     EXPECT_NEAR(imported_camera->near_bound(), 0.1f, 1e-5f);
     EXPECT_NEAR(imported_camera->far_bound(), 1000.0f, 1e-5f);
 
-    const auto* renderer    = mesh_go->get_component<component::MeshRenderer>();
+    const auto* renderer    = mesh_go->get_component<component::StaticMeshComponent>();
     const auto* pbpt_mesh   = mesh_go->get_component<component::PbptMesh>();
     const auto* pbpt_light  = mesh_go->get_component<component::PbptLight>();
     const auto* point_light = mesh_go->get_component<component::light::PointLight>();
@@ -240,7 +240,7 @@ TEST(FrameworkPbptSceneLoaderTest, ImportsRgbReflectanceAndMapsToBaseColor) {
 
     const auto* mesh_go = find_mesh_object(scene);
     ASSERT_NE(mesh_go, nullptr);
-    const auto* renderer  = mesh_go->get_component<component::MeshRenderer>();
+    const auto* renderer  = mesh_go->get_component<component::StaticMeshComponent>();
     const auto* pbpt_mesh = mesh_go->get_component<component::PbptMesh>();
     ASSERT_NE(renderer, nullptr);
     ASSERT_NE(pbpt_mesh, nullptr);

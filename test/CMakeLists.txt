@@ -157,13 +157,13 @@ rtr_add_test(
     framework/component/framework_point_light_test.cpp
 )
 rtr_add_test(
-    test_framework_mesh_renderer
-    framework/component/framework_mesh_renderer_test.cpp
+    test_framework_static_mesh_component
+    framework/component/framework_static_mesh_component_test.cpp
     rtr::runtime
 )
 rtr_add_integration_test(
-    test_framework_deformable_mesh_renderer
-    framework/component/framework_deformable_mesh_renderer_test.cpp
+    test_framework_deformable_mesh_component
+    framework/component/framework_deformable_mesh_component_test.cpp
     rtr::runtime
 )
 rtr_add_test(

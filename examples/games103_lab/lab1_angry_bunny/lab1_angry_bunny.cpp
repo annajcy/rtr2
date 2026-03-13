@@ -17,7 +17,7 @@
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/mesh_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
@@ -74,7 +74,7 @@ int main() {
         auto& bunny_go = scene.create_game_object("angry_bunny");
         bunny_go.node().set_local_position(kResetPosition);
         bunny_go.node().set_local_scale({10.0f, 10.0f, 10.0f});
-        (void)bunny_go.add_component<rtr::framework::component::MeshRenderer>(
+        (void)bunny_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), bunny_mesh, pbpt::math::Vec4{0.90f, 0.85f, 0.78f, 1.0f});
         auto& bunny_body = bunny_go.add_component<rtr::framework::component::RigidBody>(
             runtime.physics_system().rigid_body_world(), 1.0f, rtr::system::physics::RigidBodyType::Dynamic, false,
@@ -98,7 +98,7 @@ int main() {
             go.node().set_local_position(position);
             go.node().set_local_rotation(rotation);
             go.node().set_local_scale(scale);
-            (void)go.add_component<rtr::framework::component::MeshRenderer>(runtime.resource_manager(), quad_mesh, color);
+            (void)go.add_component<rtr::framework::component::StaticMeshComponent>(runtime.resource_manager(), quad_mesh, color);
             auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
             rigid_body.set_type(rtr::system::physics::RigidBodyType::Static);
             (void)go.add_component<rtr::framework::component::PlaneCollider>(runtime.physics_system().rigid_body_world(), normal_local);

@@ -4,14 +4,14 @@
 #include "gtest/gtest.h"
 
 
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/pbpt/pbpt_mesh.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
 
 namespace rtr::framework::component::test {
 
-TEST(FrameworkPbptMeshTest, ThrowsWhenMeshRendererIsMissing) {
+TEST(FrameworkPbptMeshTest, ThrowsWhenStaticMeshComponentIsMissing) {
     core::Scene scene(1);
     auto& go = scene.create_game_object("mesh");
 
@@ -21,11 +21,11 @@ TEST(FrameworkPbptMeshTest, ThrowsWhenMeshRendererIsMissing) {
     );
 }
 
-TEST(FrameworkPbptMeshTest, CanAttachWhenMeshRendererExists) {
+TEST(FrameworkPbptMeshTest, CanAttachWhenStaticMeshComponentExists) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>(resources, resource::MeshHandle{10});
+    auto& renderer = go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
     EXPECT_EQ(&pbpt_mesh.mesh_renderer(), &renderer);
@@ -33,11 +33,11 @@ TEST(FrameworkPbptMeshTest, CanAttachWhenMeshRendererExists) {
     EXPECT_EQ(renderer.base_color(), pbpt::math::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
 }
 
-TEST(FrameworkPbptMeshTest, MeshHandleTracksMeshRendererUpdates) {
+TEST(FrameworkPbptMeshTest, MeshHandleTracksStaticMeshComponentUpdates) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>(resources, resource::MeshHandle{10});
+    auto& renderer = go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
     EXPECT_EQ(pbpt_mesh.mesh_handle(), resource::MeshHandle{10});
@@ -45,11 +45,11 @@ TEST(FrameworkPbptMeshTest, MeshHandleTracksMeshRendererUpdates) {
     EXPECT_EQ(pbpt_mesh.mesh_handle(), resource::MeshHandle{30});
 }
 
-TEST(FrameworkPbptMeshTest, MeshRendererAccessorTracksBaseColorUpdates) {
+TEST(FrameworkPbptMeshTest, StaticMeshComponentAccessorTracksBaseColorUpdates) {
     core::Scene scene(1);
     resource::ResourceManager resources{};
     auto& go = scene.create_game_object("mesh");
-    auto& renderer = go.add_component<MeshRenderer>(resources, resource::MeshHandle{10});
+    auto& renderer = go.add_component<StaticMeshComponent>(resources, resource::MeshHandle{10});
     auto& pbpt_mesh = go.add_component<PbptMesh>();
 
     renderer.set_base_color(pbpt::math::Vec4(0.2f, 0.4f, 0.6f, 1.0f));

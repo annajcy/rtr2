@@ -2,7 +2,7 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/mesh_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
@@ -54,7 +54,7 @@ TEST(FrameworkColliderComponentTest, PlaneColliderThrowsWhenRigidBodyIsMissing) 
     EXPECT_THROW((void)go.add_component<PlaneCollider>(physics_world), std::runtime_error);
 }
 
-TEST(FrameworkColliderComponentTest, MeshColliderThrowsWhenMeshRendererIsMissing) {
+TEST(FrameworkColliderComponentTest, MeshColliderThrowsWhenStaticMeshComponentIsMissing) {
     system::physics::RigidBodyWorld physics_world;
     resource::ResourceManager     resources;
     core::Scene                   scene(1);
@@ -161,7 +161,7 @@ TEST(FrameworkColliderComponentTest, PlaneColliderSyncsWorldNormalWithNodeRotati
     EXPECT_NEAR(world_plane->normal.z(), 0.0f, 1e-5f);
 }
 
-TEST(FrameworkColliderComponentTest, MeshColliderReadsLocalVerticesFromMeshRenderer) {
+TEST(FrameworkColliderComponentTest, MeshColliderReadsLocalVerticesFromStaticMeshComponent) {
     system::physics::RigidBodyWorld physics_world;
     resource::ResourceManager     resources;
     core::Scene                   scene(1);
@@ -169,7 +169,7 @@ TEST(FrameworkColliderComponentTest, MeshColliderReadsLocalVerticesFromMeshRende
 
     auto& go = scene.create_game_object("mesh");
     auto& rigid_body = go.add_component<RigidBody>(physics_world);
-    auto& mesh_renderer = go.add_component<MeshRenderer>(resources, mesh_handle);
+    auto& mesh_renderer = go.add_component<StaticMeshComponent>(resources, mesh_handle);
     auto& mesh = go.add_component<MeshCollider>(physics_world);
 
     const auto local_vertices = mesh_renderer.local_vertices();

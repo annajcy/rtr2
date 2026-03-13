@@ -20,7 +20,7 @@
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
-#include "rtr/framework/component/material/mesh_renderer.hpp"
+#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
@@ -149,7 +149,7 @@ int main() {
             go.node().set_local_position(position);
             go.node().set_local_rotation(rotation);
             go.node().set_local_scale(scale);
-            (void)go.add_component<rtr::framework::component::MeshRenderer>(runtime.resource_manager(), quad_mesh, color);
+            (void)go.add_component<rtr::framework::component::StaticMeshComponent>(runtime.resource_manager(), quad_mesh, color);
             auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
             rigid_body.set_type(rtr::system::physics::RigidBodyType::Static);
             rigid_body.set_restitution(restitution);
@@ -176,7 +176,7 @@ int main() {
 
         auto& sphere_go = scene.create_game_object("rolling_sphere");
         sphere_go.node().set_local_scale({0.48f, 0.48f, 0.48f});
-        (void)sphere_go.add_component<rtr::framework::component::MeshRenderer>(
+        (void)sphere_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), sphere_mesh, pbpt::math::Vec4{0.95f, 0.66f, 0.26f, 1.0f});
         auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
         sphere_body.set_restitution(0.8f);
@@ -202,7 +202,7 @@ int main() {
         for (std::size_t index = 0; index < kStackBoxCount; ++index) {
             auto& box_go = scene.create_game_object("stack_box_" + std::to_string(index));
             box_go.node().set_local_scale({0.9f, 0.9f, 0.9f});
-            (void)box_go.add_component<rtr::framework::component::MeshRenderer>(
+            (void)box_go.add_component<rtr::framework::component::StaticMeshComponent>(
                 runtime.resource_manager(), cube_mesh, stack_colors[index]);
 
             auto& box_body =
