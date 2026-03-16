@@ -66,6 +66,82 @@ struct DummyKind {
     }
 };
 
+struct DummySyncKind {
+    using cpu_type = DummyCpu;
+    using gpu_type = DummyGpu;
+    using options_type = std::monostate;
+
+    static inline int upload_count = 0;
+    static inline int sync_count = 0;
+
+    static void reset_counters() {
+        upload_count = 0;
+        sync_count = 0;
+    }
+
+    static void validate_cpu(const cpu_type& cpu) {
+        if (cpu.value <= 0) {
+            throw std::invalid_argument("DummyCpu value must be positive.");
+        }
+    }
+
+    static cpu_type normalize_cpu(cpu_type cpu, const options_type&) {
+        return cpu;
+    }
+
+    static cpu_type load_from_path(const std::filesystem::path&, const options_type&) {
+        throw std::runtime_error("Not used in test.");
+    }
+
+    static void save_to_path(const cpu_type&, const std::filesystem::path&) {
+        throw std::runtime_error("Not used in test.");
+    }
+
+    static gpu_type upload_to_gpu(rhi::Device&, const cpu_type& cpu, const options_type&) {
+        ++upload_count;
+        return gpu_type{.value = cpu.value};
+    }
+
+    static void sync_gpu(rhi::Device&, const cpu_type& cpu, gpu_type& gpu, const options_type&) {
+        ++sync_count;
+        gpu.value = cpu.value;
+    }
+};
+
+struct DummyNoSyncKind {
+    using cpu_type = DummyCpu;
+    using gpu_type = DummyGpu;
+    using options_type = std::monostate;
+
+    static void validate_cpu(const cpu_type& cpu) {
+        if (cpu.value <= 0) {
+            throw std::invalid_argument("DummyCpu value must be positive.");
+        }
+    }
+
+    static cpu_type normalize_cpu(cpu_type cpu, const options_type&) {
+        return cpu;
+    }
+
+    static cpu_type load_from_path(const std::filesystem::path&, const options_type&) {
+        throw std::runtime_error("Not used in test.");
+    }
+
+    static void save_to_path(const cpu_type&, const std::filesystem::path&) {
+        throw std::runtime_error("Not used in test.");
+    }
+
+    static gpu_type upload_to_gpu(rhi::Device&, const cpu_type& cpu, const options_type&) {
+        return gpu_type{.value = cpu.value};
+    }
+};
+
+static_assert(rtr::resource::ImmutableResourceKind<DummyKind>);
+static_assert(!rtr::resource::MutableResourceKind<DummyKind>);
+static_assert(rtr::resource::MutableResourceKind<DummySyncKind>);
+static_assert(rtr::resource::ImmutableResourceKind<DummyNoSyncKind>);
+static_assert(!rtr::resource::MutableResourceKind<DummyNoSyncKind>);
+
 struct TempDir {
     std::filesystem::path path{};
 
@@ -124,6 +200,26 @@ TEST(ResourceManagerGenericKindsTest, RelativePathLoadAndSaveUseKindHooks) {
     int saved = 0;
     in >> saved;
     EXPECT_EQ(saved, 14);
+}
+
+TEST(ResourceManagerGenericKindsTest, RequireGpuUsesSyncGpuForDirtyLiveResource) {
+    DummySyncKind::reset_counters();
+    ResourceManagerT<rhi::kFramesInFlight, MeshResourceKind, TextureResourceKind, DummySyncKind> manager{};
+
+    const auto handle = manager.create<DummySyncKind>(DummyCpu{.value = 3});
+    auto& initial_gpu = manager.require_gpu<DummySyncKind>(handle, *reinterpret_cast<rhi::Device*>(0x1));
+    EXPECT_EQ(initial_gpu.value, 3);
+    EXPECT_EQ(DummySyncKind::upload_count, 1);
+    EXPECT_EQ(DummySyncKind::sync_count, 0);
+
+    manager.update_cpu<DummySyncKind>(handle, [](auto& cpu) {
+        cpu.value = 9;
+    });
+
+    auto& synced_gpu = manager.require_gpu<DummySyncKind>(handle, *reinterpret_cast<rhi::Device*>(0x1));
+    EXPECT_EQ(synced_gpu.value, 9);
+    EXPECT_EQ(DummySyncKind::upload_count, 1);
+    EXPECT_EQ(DummySyncKind::sync_count, 1);
 }
 
 } // namespace rtr::resource::test

@@ -96,6 +96,11 @@ rtr_add_test(
     rtr::runtime
 )
 rtr_add_test(
+    test_framework_deformable_mesh_sync
+    framework/integration/framework_deformable_mesh_sync_test.cpp
+    rtr::runtime
+)
+rtr_add_test(
     test_pipeline_base
     system/render/pipeline_base_test.cpp
     rtr::runtime
@@ -164,6 +169,11 @@ rtr_add_test(
 rtr_add_integration_test(
     test_framework_deformable_mesh_component
     framework/component/framework_deformable_mesh_component_test.cpp
+    rtr::runtime
+)
+rtr_add_test(
+    test_sine_wave_deformer
+    framework/component/sine_wave_deformer_test.cpp
     rtr::runtime
 )
 rtr_add_test(

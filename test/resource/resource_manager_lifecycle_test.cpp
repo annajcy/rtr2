@@ -121,6 +121,44 @@ TEST(ResourceManagerLifecycleTest, UnloadedHandleCannotAccessCpuOrGpu) {
     );
 }
 
+TEST(ResourceManagerLifecycleTest, UpdateCpuMutatesLiveMeshResource) {
+    ResourceManager manager{};
+    const auto handle = manager.create<rtr::resource::DeformableMeshResourceKind>(make_triangle_mesh());
+
+    manager.update_cpu<rtr::resource::DeformableMeshResourceKind>(handle, [](auto& mesh) {
+        mesh.vertices[1].position = {2.0f, 3.0f, 4.0f};
+    });
+
+    const auto& cpu = manager.cpu<rtr::resource::DeformableMeshResourceKind>(handle);
+    EXPECT_FLOAT_EQ(cpu.vertices[1].position.x(), 2.0f);
+    EXPECT_FLOAT_EQ(cpu.vertices[1].position.y(), 3.0f);
+    EXPECT_FLOAT_EQ(cpu.vertices[1].position.z(), 4.0f);
+}
+
+TEST(ResourceManagerLifecycleTest, UpdateCpuRejectsInvalidMutation) {
+    ResourceManager manager{};
+    const auto handle = manager.create<rtr::resource::DeformableMeshResourceKind>(make_triangle_mesh());
+    const auto original_cpu = manager.cpu<rtr::resource::DeformableMeshResourceKind>(handle);
+
+    EXPECT_THROW(
+        manager.update_cpu<rtr::resource::DeformableMeshResourceKind>(handle, [](auto& mesh) {
+            mesh.vertices.clear();
+        }),
+        std::invalid_argument
+    );
+
+    const auto& cpu_after_failure = manager.cpu<rtr::resource::DeformableMeshResourceKind>(handle);
+    ASSERT_EQ(cpu_after_failure.vertices.size(), original_cpu.vertices.size());
+    ASSERT_EQ(cpu_after_failure.indices.size(), original_cpu.indices.size());
+    for (std::size_t i = 0; i < original_cpu.vertices.size(); ++i) {
+        EXPECT_FLOAT_EQ(cpu_after_failure.vertices[i].position.x(), original_cpu.vertices[i].position.x());
+        EXPECT_FLOAT_EQ(cpu_after_failure.vertices[i].position.y(), original_cpu.vertices[i].position.y());
+        EXPECT_FLOAT_EQ(cpu_after_failure.vertices[i].position.z(), original_cpu.vertices[i].position.z());
+        EXPECT_FLOAT_EQ(cpu_after_failure.vertices[i].uv.x(), original_cpu.vertices[i].uv.x());
+        EXPECT_FLOAT_EQ(cpu_after_failure.vertices[i].uv.y(), original_cpu.vertices[i].uv.y());
+    }
+}
+
 TEST(ResourceManagerLifecycleTest, CreateTextureThenUnloadIsIdempotent) {
     ResourceManager manager{};
     const auto handle = manager.create<rtr::resource::TextureResourceKind>(

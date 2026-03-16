@@ -42,20 +42,21 @@ public:
     static constexpr std::string_view kDefaultResourceRootDir = "./assets/";
 
 private:
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     struct ResourceRecord {
         typename Kind::cpu_type cpu{};
         typename Kind::options_type options{};
         std::unique_ptr<typename Kind::gpu_type> gpu{};
+        bool cpu_dirty{false};
     };
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     struct RetiredGpu {
         std::uint64_t retire_after_frame{0};
         std::unique_ptr<typename Kind::gpu_type> gpu{};
     };
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     struct ResourceStorage {
         std::uint64_t next_id{1};
         std::unordered_map<ResourceHandle<Kind>, ResourceRecord<Kind>> records{};
@@ -63,8 +64,8 @@ private:
     };
 
     static_assert(
-        ResourceKind<Kind0> && ResourceKind<Kind1> && (ResourceKind<Kinds> && ...),
-        "ResourceManager template parameters must satisfy ResourceKind."
+        BaseResourceKind<Kind0> && BaseResourceKind<Kind1> && (BaseResourceKind<Kinds> && ...),
+        "ResourceManager template parameters must satisfy BaseResourceKind."
     );
     static_assert(
         detail::unique_types<Kind0, Kind1, Kinds...>::value,
@@ -97,7 +98,7 @@ public:
         m_resource_root_dir = std::move(resource_root_dir);
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     ResourceHandle<Kind> create(
         typename Kind::cpu_type cpu,
         typename Kind::options_type options = {}
@@ -112,13 +113,14 @@ public:
         store.records.emplace(handle, ResourceRecord<Kind>{
             .cpu = std::move(cpu),
             .options = std::move(options),
-            .gpu = nullptr
+            .gpu = nullptr,
+            .cpu_dirty = false
         });
         logger()->debug("Resource created (handle={})", handle.value);
         return handle;
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     ResourceHandle<Kind> create_from_relative_path(
         const std::string& rel_path,
         typename Kind::options_type options = {}
@@ -129,7 +131,7 @@ public:
         return create<Kind>(std::move(cpu), std::move(options));
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     void save_cpu_to_relative_path(ResourceHandle<Kind> handle, const std::string& rel_path) {
         const auto abs_path = resolve_resource_path(rel_path);
         const auto& record = require_record<Kind>(handle);
@@ -137,7 +139,7 @@ public:
         Kind::save_to_path(record.cpu, abs_path);
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     void unload(ResourceHandle<Kind> handle) {
         auto& store = storage<Kind>();
         auto it = store.records.find(handle);
@@ -152,32 +154,58 @@ public:
         logger()->debug("Resource unloaded (handle={})", handle.value);
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     const typename Kind::cpu_type& cpu(ResourceHandle<Kind> handle) {
         auto& record = require_record<Kind>(handle);
         ensure_cpu_loaded(record);
         return record.cpu;
     }
 
-    template <ResourceKind Kind>
+    template <MutableResourceKind Kind, typename Fn>
+        requires std::invocable<Fn&, typename Kind::cpu_type&>
+    void update_cpu(ResourceHandle<Kind> handle, Fn&& mutate) {
+        auto& record = require_record<Kind>(handle);
+        ensure_cpu_loaded(record);
+
+        auto updated_cpu = record.cpu;
+        std::forward<Fn>(mutate)(updated_cpu);
+        updated_cpu = Kind::normalize_cpu(std::move(updated_cpu), record.options);
+        Kind::validate_cpu(updated_cpu);
+
+        record.cpu = std::move(updated_cpu);
+        record.cpu_dirty = true;
+    }
+
+    template <BaseResourceKind Kind>
     bool alive(ResourceHandle<Kind> handle) const {
         const auto& store = storage<Kind>();
         return store.records.find(handle) != store.records.end();
     }
 
-    template <ResourceKind Kind>
+    template <ImmutableResourceKind Kind>
     typename Kind::gpu_type& require_gpu(ResourceHandle<Kind> handle, rhi::Device& device) {
         auto& record = require_record<Kind>(handle);
         ensure_cpu_loaded(record);
 
-        if (record.gpu) {
+        if (!record.gpu) {
+            logger()->debug("Handle={} triggering first GPU upload.", handle.value);
+            record.gpu = std::make_unique<typename Kind::gpu_type>(
+                Kind::upload_to_gpu(device, record.cpu, record.options)
+            );
+            record.cpu_dirty = false;
             return *record.gpu;
         }
 
-        logger()->debug("Handle={} triggering first GPU upload.", handle.value);
-        record.gpu = std::make_unique<typename Kind::gpu_type>(
-            Kind::upload_to_gpu(device, record.cpu, record.options)
-        );
+        if (!record.cpu_dirty) {
+            return *record.gpu;
+        }
+
+        if constexpr (MutableResourceKind<Kind>) {
+            logger()->debug("Handle={} syncing dirty mutable CPU resource to existing GPU allocation.", handle.value);
+            Kind::sync_gpu(device, record.cpu, *record.gpu, record.options);
+            record.cpu_dirty = false;
+        }
+
         return *record.gpu;
     }
 
@@ -211,7 +239,7 @@ private:
         return utils::get_logger("resource.manager");
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     ResourceStorage<Kind>& storage() {
         static_assert(
             detail::contains_kind_v<Kind, Kind0, Kind1, Kinds...>,
@@ -220,7 +248,7 @@ private:
         return std::get<ResourceStorage<Kind>>(m_storages);
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     const ResourceStorage<Kind>& storage() const {
         static_assert(
             detail::contains_kind_v<Kind, Kind0, Kind1, Kinds...>,
@@ -248,7 +276,7 @@ private:
         return m_current_frame_serial + static_cast<std::uint64_t>(FramesInFlight);
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     void ensure_cpu_loaded(const ResourceRecord<Kind>& record) const {
         try {
             Kind::validate_cpu(record.cpu);
@@ -258,7 +286,7 @@ private:
         }
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     void retire_gpu(ResourceRecord<Kind>& record) {
         if (!record.gpu) {
             return;
@@ -273,7 +301,7 @@ private:
         logger()->debug("Retired GPU allocation (release_after_frame={})", retire_frame);
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     ResourceRecord<Kind>& require_record(ResourceHandle<Kind> handle) {
         auto& store = storage<Kind>();
         const auto it = store.records.find(handle);
@@ -284,7 +312,7 @@ private:
         return it->second;
     }
 
-    template <ResourceKind Kind>
+    template <BaseResourceKind Kind>
     const ResourceRecord<Kind>& require_record(ResourceHandle<Kind> handle) const {
         const auto& store = storage<Kind>();
         const auto it = store.records.find(handle);

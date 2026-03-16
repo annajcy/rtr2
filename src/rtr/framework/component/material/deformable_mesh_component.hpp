@@ -21,12 +21,6 @@ private:
     resource::ResourceManager& m_resources;
     resource::DeformableMeshHandle m_mesh{};
 
-    std::vector<rhi::DynamicMesh::Vertex> m_pending_vertices;
-    bool m_vertices_dirty{false};
-
-    std::vector<pbpt::math::Vec3> m_pending_normals;
-    bool m_normals_dirty{false};
-
 public:
     explicit DeformableMeshComponent(
         core::GameObject& owner,
@@ -74,16 +68,6 @@ public:
 
     system::render::MeshView mesh_view(rhi::Device& device) override {
         auto& dm = m_resources.require_gpu<resource::DeformableMeshResourceKind>(m_mesh, device);
-        
-        if (m_vertices_dirty) {
-            dm.update_vertices(m_pending_vertices);
-            m_vertices_dirty = false;
-        }
-        if (m_normals_dirty) {
-            dm.update_normals(m_pending_normals);
-            m_normals_dirty = false;
-        }
-
         return system::render::MeshView{
             .vertex_buffer = dm.vertex_buffer(),
             .index_buffer  = dm.index_buffer(),
@@ -91,14 +75,24 @@ public:
         };
     }
 
-    void update_positions(std::span<const rhi::DynamicMesh::Vertex> vertices) {
-        m_pending_vertices.assign(vertices.begin(), vertices.end());
-        m_vertices_dirty = true;
-    }
+    void apply_deformed_surface(std::span<const pbpt::math::Vec3> positions,
+                                std::span<const pbpt::math::Vec3> normals) {
+        if (!m_resources.alive<resource::DeformableMeshResourceKind>(m_mesh)) {
+            throw std::runtime_error("DeformableMeshComponent mesh handle is not alive.");
+        }
 
-    void update_normals(std::span<const pbpt::math::Vec3> normals) {
-        m_pending_normals.assign(normals.begin(), normals.end());
-        m_normals_dirty = true;
+        const auto& current_mesh = m_resources.cpu<resource::DeformableMeshResourceKind>(m_mesh);
+        const auto vertex_count = current_mesh.vertices.size();
+        if (positions.size() != vertex_count || normals.size() != vertex_count) {
+            throw std::invalid_argument("DeformableMeshComponent::apply_deformed_surface size mismatch.");
+        }
+
+        m_resources.update_cpu<resource::DeformableMeshResourceKind>(m_mesh, [&](auto& mesh) {
+            for (std::size_t i = 0; i < vertex_count; ++i) {
+                mesh.vertices[i].position = positions[i];
+                mesh.vertices[i].normal   = normals[i];
+            }
+        });
     }
 };
 

@@ -70,6 +70,10 @@ struct DeformableMeshResourceKind {
     static gpu_type upload_to_gpu(rhi::Device& device, const cpu_type& mesh, const options_type&) {
         return rhi::DynamicMesh(device, mesh);
     }
+
+    static void sync_gpu(rhi::Device&, const cpu_type& mesh, gpu_type& gpu, const options_type&) {
+        gpu.update_vertices(mesh.vertices);
+    }
 };
 
 struct TextureCreateOptions {
@@ -160,12 +164,11 @@ struct TextureResourceKind {
 };
 
 template <class Kind>
-concept ResourceKind = requires(
+concept BaseResourceKind = requires(
     typename Kind::cpu_type cpu,
     const typename Kind::cpu_type const_cpu,
     const typename Kind::options_type options,
-    const std::filesystem::path& path,
-    rhi::Device& device
+    const std::filesystem::path& path
 ) {
     typename Kind::cpu_type;
     typename Kind::gpu_type;
@@ -175,7 +178,25 @@ concept ResourceKind = requires(
     { Kind::normalize_cpu(std::move(cpu), options) } -> std::same_as<typename Kind::cpu_type>;
     { Kind::load_from_path(path, options) } -> std::same_as<typename Kind::cpu_type>;
     { Kind::save_to_path(const_cpu, path) } -> std::same_as<void>;
+};
+
+template <class Kind>
+concept ImmutableResourceKind = BaseResourceKind<Kind> && requires(
+    rhi::Device& device,
+    const typename Kind::cpu_type const_cpu,
+    const typename Kind::options_type options
+) {
     { Kind::upload_to_gpu(device, const_cpu, options) } -> std::same_as<typename Kind::gpu_type>;
+};
+
+template <class Kind>
+concept MutableResourceKind = ImmutableResourceKind<Kind> && requires(
+    rhi::Device& device,
+    const typename Kind::cpu_type const_cpu,
+    typename Kind::gpu_type& gpu,
+    const typename Kind::options_type options
+) {
+    { Kind::sync_gpu(device, const_cpu, gpu, options) } -> std::same_as<void>;
 };
 
 } // namespace rtr::resource

@@ -1,12 +1,12 @@
 #pragma once
 
 #include <pbpt/math/math.h>
+#include <cmath>
 #include <vector>
 
 #include "rtr/framework/component/component.hpp"
 #include "rtr/framework/component/material/deformable_mesh_component.hpp"
 #include "rtr/framework/core/game_object.hpp"
-#include "rtr/rhi/device.hpp"
 #include "rtr/system/physics/common/normal_recompute.hpp"
 
 namespace rtr::examples {
@@ -24,7 +24,7 @@ public:
 
     using Component::Component;
 
-    void on_update(const framework::core::FrameTickContext& ctx) override {
+    void on_fixed_update(const framework::core::FixedTickContext& ctx) override {
         if (!enabled()) {
             return;
         }
@@ -42,7 +42,7 @@ public:
             }
         }
 
-        m_accumulated_time += ctx.delta_seconds;
+        m_accumulated_time += ctx.fixed_delta_seconds;
 
         std::vector<pbpt::math::Vec3> current_positions(m_original_positions.size());
         for (size_t i = 0; i < m_original_positions.size(); ++i) {
@@ -53,15 +53,7 @@ public:
         }
 
         auto normals = system::physics::recompute_vertex_normals(current_positions, m_indices);
-
-        std::vector<rhi::DynamicMesh::Vertex> update_vertices(current_positions.size());
-        for (size_t i = 0; i < current_positions.size(); ++i) {
-            update_vertices[i].position = current_positions[i];
-            update_vertices[i].normal   = normals[i];
-            update_vertices[i].uv       = pbpt::math::Vec2{0.0f};
-        }
-
-        renderer->update_positions(update_vertices);
+        renderer->apply_deformed_surface(current_positions, normals);
     }
 };
 

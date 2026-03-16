@@ -63,16 +63,6 @@ public:
         std::memcpy(m_vertex_buffer.mapped_data(), new_vertices.data(), new_vertices.size() * sizeof(Vertex));
     }
 
-    void update_normals(std::span<const pbpt::math::Vec3> new_normals) {
-        if (new_normals.size() != m_vertex_count) {
-            throw std::invalid_argument("DynamicMesh update_normals: size mismatch.");
-        }
-        Vertex* mapped_vertices = static_cast<Vertex*>(m_vertex_buffer.mapped_data());
-        for (size_t i = 0; i < m_vertex_count; ++i) {
-            mapped_vertices[i].normal = new_normals[i];
-        }
-    }
-
     vk::Buffer vertex_buffer() const { return *m_vertex_buffer.buffer(); }
     vk::Buffer index_buffer() const { return *m_index_buffer.buffer(); }
     uint32_t vertex_count() const { return m_vertex_count; }
