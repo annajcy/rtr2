@@ -88,11 +88,13 @@ public:
         const auto local_vertices = local_vertices_from_renderer();
         if (!has_registered_collider()) {
             system::physics::Collider collider;
-            collider.shape = system::physics::MeshShape{.local_vertices = local_vertices};
-            m_collider_id = m_physics_world.create_collider(rigid_body.rigid_body_id(), std::move(collider));
-            m_registered = true;
+            collider.shape                    = system::physics::MeshShape{.local_vertices = local_vertices};
+            collider.local_transform.position = m_local_position;
+            collider.local_transform.rotation = m_local_rotation;
+            collider.local_transform.scale    = m_local_scale;
+            m_collider_id                     = m_physics_world.create_collider(rigid_body.rigid_body_id(), std::move(collider));
+            m_registered                      = true;
         }
-        sync_to_physics();
     }
 
     void on_disable() override {
@@ -106,47 +108,19 @@ public:
 
     void on_destroy() override {}
 
-    void sync_to_physics() override {
-        const auto local_vertices = local_vertices_from_renderer();
-
-        if (!has_registered_collider()) {
-            auto* rigid_body = owner().get_component<RigidBody>();
-            if (rigid_body == nullptr || !rigid_body->has_rigid_body()) {
-                return;
-            }
-            system::physics::Collider collider;
-            collider.shape = system::physics::MeshShape{.local_vertices = local_vertices};
-            m_collider_id = m_physics_world.create_collider(rigid_body->rigid_body_id(), std::move(collider));
-            m_registered = true;
-        }
-
-        auto* collider = physics_collider();
-        if (collider == nullptr) {
-            return;
-        }
-
-        collider->shape = system::physics::MeshShape{.local_vertices = std::move(local_vertices)};
-        collider->local_transform.position = m_local_position;
-        collider->local_transform.rotation = m_local_rotation;
-        collider->local_transform.scale = m_local_scale;
-    }
-
     pbpt::math::Vec3 local_position() const { return m_local_position; }
     void set_local_position(const pbpt::math::Vec3& local_position) {
         m_local_position = sanitize_position(local_position);
-        sync_to_physics();
     }
 
     pbpt::math::Quat local_rotation() const { return m_local_rotation; }
     void set_local_rotation(const pbpt::math::Quat& local_rotation) {
         m_local_rotation = sanitize_rotation(local_rotation);
-        sync_to_physics();
     }
 
     pbpt::math::Vec3 local_scale() const { return m_local_scale; }
     void set_local_scale(const pbpt::math::Vec3& local_scale) {
         m_local_scale = sanitize_scale(local_scale);
-        sync_to_physics();
     }
 };
 

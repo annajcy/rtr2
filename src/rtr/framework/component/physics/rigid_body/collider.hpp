@@ -17,20 +17,6 @@ protected:
 
     bool has_registered_collider() const { return m_registered && m_physics_world.has_collider(m_collider_id); }
 
-    system::physics::Collider* physics_collider() {
-        if (!has_registered_collider()) {
-            return nullptr;
-        }
-        return &m_physics_world.get_collider(m_collider_id);
-    }
-
-    const system::physics::Collider* physics_collider() const {
-        if (!has_registered_collider()) {
-            return nullptr;
-        }
-        return &m_physics_world.get_collider(m_collider_id);
-    }
-
     void throw_if_owner_already_has_collider() const {
         if (owner().get_component<Collider>() != nullptr) {
             throw std::runtime_error("GameObject already has a collider.");
@@ -50,8 +36,7 @@ public:
         : Component(owner), m_physics_world(world) {}
 
     bool has_collider() const { return has_registered_collider(); }
-
-    virtual void sync_to_physics() = 0;
+    system::physics::ColliderID collider_id() const { return m_collider_id; }
 };
 
 }  // namespace rtr::framework::component

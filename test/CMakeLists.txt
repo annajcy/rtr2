@@ -75,6 +75,14 @@ rtr_add_test(
     system/physics/rigid_body/rigid_body_world_test.cpp
 )
 rtr_add_test(
+    test_cloth_mesh_topology_builder
+    system/physics/cloth/cloth_mesh_topology_builder_test.cpp
+)
+rtr_add_test(
+    test_cloth_state
+    system/physics/cloth/cloth_state_test.cpp
+)
+rtr_add_test(
     test_physics_system
     system/physics/physics_system/physics_system_test.cpp
 )
@@ -93,6 +101,11 @@ rtr_add_test(
 rtr_add_test(
     test_framework_forward_scene_view_builder
     framework/integration/framework_forward_scene_view_builder_test.cpp
+    rtr::runtime
+)
+rtr_add_test(
+    test_framework_scene_physics_step
+    framework/integration/framework_scene_physics_step_test.cpp
     rtr::runtime
 )
 rtr_add_test(
@@ -169,6 +182,11 @@ rtr_add_test(
 rtr_add_integration_test(
     test_framework_deformable_mesh_component
     framework/component/framework_deformable_mesh_component_test.cpp
+    rtr::runtime
+)
+rtr_add_test(
+    test_framework_cloth_component
+    framework/component/framework_cloth_component_test.cpp
     rtr::runtime
 )
 rtr_add_test(

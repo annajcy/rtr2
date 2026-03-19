@@ -11,6 +11,7 @@
 
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/world.hpp"
+#include "rtr/framework/integration/physics/scene_physics_step.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/frame_constants.hpp"
 #include "rtr/system/input/input_system.hpp"
@@ -205,7 +206,11 @@ public:
                             };
                             m_world.fixed_tick(fixed_ctx);
                             if (auto* active_scene = m_world.active_scene(); active_scene != nullptr) {
-                                m_physics_system.step(*active_scene, static_cast<float>(fixed_ctx.fixed_delta_seconds));
+                                framework::integration::physics::step_scene_physics(
+                                    *active_scene,
+                                    m_physics_system,
+                                    static_cast<float>(fixed_ctx.fixed_delta_seconds)
+                                );
                             }
                             accumulator -= m_config.fixed_delta_seconds;
                             ++fixed_steps;

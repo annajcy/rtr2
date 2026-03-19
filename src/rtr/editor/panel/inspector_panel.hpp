@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <string>
 
 #include "imgui.h"
 
@@ -13,6 +14,7 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/camera_control/trackball_camera_controller.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
+#include "rtr/framework/component/physics/cloth/cloth_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/mesh_collider.hpp"
@@ -204,6 +206,47 @@ private:
             }
 
             ImGui::Text("Mesh Handle: %llu", static_cast<unsigned long long>(def_mesh_comp->mesh_handle().value));
+        }
+    }
+
+    static void draw_cloth_component_editor(framework::core::GameObject& game_object) {
+        auto* cloth = game_object.get_component<framework::component::ClothComponent>();
+        if (cloth == nullptr) {
+            return;
+        }
+
+        if (ImGui::CollapsingHeader("ClothComponent", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool enabled = cloth->enabled();
+            if (ImGui::Checkbox("Enabled##cloth_component", &enabled)) {
+                game_object.set_component_enabled<framework::component::ClothComponent>(enabled);
+                logger()->debug("ClothComponent enabled updated (game_object_id={}, enabled={}).", game_object.id(),
+                                enabled);
+            }
+
+            ImGui::Text("Registered: %s", cloth->has_cloth() ? "Yes" : "No");
+            ImGui::Text("Cloth ID: %llu", static_cast<unsigned long long>(cloth->cloth_id()));
+            ImGui::Text("Default Vertex Mass: %.3f", cloth->params().default_vertex_mass);
+
+            const auto& pinned_vertices = cloth->pinned_vertices();
+            ImGui::Text("Pinned Vertices: %zu", pinned_vertices.size());
+            if (!pinned_vertices.empty()) {
+                std::string pinned_label;
+                pinned_label.reserve(pinned_vertices.size() * 6);
+                for (std::size_t i = 0; i < pinned_vertices.size(); ++i) {
+                    if (i > 0) {
+                        pinned_label += ", ";
+                    }
+                    pinned_label += std::to_string(pinned_vertices[i]);
+                }
+                ImGui::TextWrapped("Pinned IDs: %s", pinned_label.c_str());
+            }
+
+            if (cloth->has_cloth()) {
+                const auto& instance = cloth->cloth();
+                ImGui::Text("Vertex Count: %zu", instance.state.vertex_count());
+            } else {
+                ImGui::TextDisabled("Physics cloth is not registered.");
+            }
         }
     }
 
@@ -790,6 +833,7 @@ public:
         draw_camera_editor(*scene, *game_object);
         draw_static_mesh_component_editor(*game_object);
         draw_deformable_mesh_component_editor(*game_object);
+        draw_cloth_component_editor(*game_object);
         draw_point_light_editor(*game_object);
         draw_rigid_body_editor(*game_object);
         draw_sphere_collider_editor(ctx, *game_object);

@@ -9,6 +9,7 @@
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/integration/physics/rigid_body_scene_sync.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
@@ -82,7 +83,7 @@ TEST(FrameworkColliderComponentTest, StaticRigidBodyCanOwnBoxColliderAndDestroyR
     EXPECT_FALSE(physics_world.has_collider(collider_ids.front()));
 }
 
-TEST(FrameworkColliderComponentTest, SphereColliderSyncsFullLocalTransformToPhysicsCollider) {
+TEST(FrameworkColliderComponentTest, SphereColliderSettersDeferPhysicsSyncUntilScenePrePass) {
     system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
 
@@ -97,8 +98,18 @@ TEST(FrameworkColliderComponentTest, SphereColliderSyncsFullLocalTransformToPhys
 
     const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
     ASSERT_EQ(collider_ids.size(), 1u);
-    const auto& collider = physics_world.get_collider(collider_ids.front());
+    const auto& stale_collider = physics_world.get_collider(collider_ids.front());
 
+    EXPECT_NEAR(stale_collider.local_transform.position.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(stale_collider.local_transform.position.y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(stale_collider.local_transform.position.z(), 0.0f, 1e-5f);
+    EXPECT_NEAR(stale_collider.local_transform.scale.x(), 1.0f, 1e-5f);
+    EXPECT_NEAR(stale_collider.local_transform.scale.y(), 1.0f, 1e-5f);
+    EXPECT_NEAR(stale_collider.local_transform.scale.z(), 1.0f, 1e-5f);
+
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
+
+    const auto& collider = physics_world.get_collider(collider_ids.front());
     EXPECT_NEAR(collider.local_transform.position.x(), 1.0f, 1e-5f);
     EXPECT_NEAR(collider.local_transform.position.y(), 2.0f, 1e-5f);
     EXPECT_NEAR(collider.local_transform.position.z(), 3.0f, 1e-5f);
@@ -111,7 +122,7 @@ TEST(FrameworkColliderComponentTest, SphereColliderSyncsFullLocalTransformToPhys
     EXPECT_NEAR(collider.local_transform.rotation.z(), sphere.local_rotation().z(), 1e-5f);
 }
 
-TEST(FrameworkColliderComponentTest, BoxColliderSyncsFullLocalTransformToPhysicsCollider) {
+TEST(FrameworkColliderComponentTest, BoxColliderSettersDeferPhysicsSyncUntilScenePrePass) {
     system::physics::RigidBodyWorld physics_world;
     core::Scene                   scene(1);
 
@@ -126,8 +137,18 @@ TEST(FrameworkColliderComponentTest, BoxColliderSyncsFullLocalTransformToPhysics
 
     const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
     ASSERT_EQ(collider_ids.size(), 1u);
-    const auto& collider = physics_world.get_collider(collider_ids.front());
+    const auto& stale_collider = physics_world.get_collider(collider_ids.front());
 
+    EXPECT_NEAR(stale_collider.local_transform.position.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(stale_collider.local_transform.position.y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(stale_collider.local_transform.position.z(), 0.0f, 1e-5f);
+    EXPECT_NEAR(stale_collider.local_transform.scale.x(), 1.0f, 1e-5f);
+    EXPECT_NEAR(stale_collider.local_transform.scale.y(), 1.0f, 1e-5f);
+    EXPECT_NEAR(stale_collider.local_transform.scale.z(), 1.0f, 1e-5f);
+
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
+
+    const auto& collider = physics_world.get_collider(collider_ids.front());
     EXPECT_NEAR(collider.local_transform.position.x(), -1.0f, 1e-5f);
     EXPECT_NEAR(collider.local_transform.position.y(), 0.5f, 1e-5f);
     EXPECT_NEAR(collider.local_transform.position.z(), 2.0f, 1e-5f);
@@ -150,6 +171,8 @@ TEST(FrameworkColliderComponentTest, PlaneColliderSyncsWorldNormalWithNodeRotati
     auto& rigid_body = go.add_component<RigidBody>(physics_world);
     rigid_body.set_type(system::physics::RigidBodyType::Static);
     (void)go.add_component<PlaneCollider>(physics_world, pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
+
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
 
     const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
     ASSERT_EQ(collider_ids.size(), 1u);
@@ -181,6 +204,34 @@ TEST(FrameworkColliderComponentTest, MeshColliderReadsLocalVerticesFromStaticMes
     ASSERT_NE(mesh_shape, nullptr);
     ASSERT_EQ(mesh_shape->local_vertices.size(), 3u);
     EXPECT_NEAR(mesh_shape->local_vertices[0].x(), 0.2f, 1e-5f);
+}
+
+TEST(FrameworkColliderComponentTest, SphereColliderRadiusChangeAppliesOnNextScenePrePass) {
+    system::physics::RigidBodyWorld physics_world;
+    core::Scene scene(1);
+
+    auto& go = scene.create_game_object("sphere");
+    auto& rigid_body = go.add_component<RigidBody>(physics_world);
+    auto& sphere = go.add_component<SphereCollider>(physics_world, 0.5f);
+
+    const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
+    ASSERT_EQ(collider_ids.size(), 1u);
+
+    sphere.set_radius(1.25f);
+
+    const auto* stale_shape = std::get_if<system::physics::SphereShape>(
+        &physics_world.get_collider(collider_ids.front()).shape
+    );
+    ASSERT_NE(stale_shape, nullptr);
+    EXPECT_NEAR(stale_shape->radius, 0.5f, 1e-5f);
+
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
+
+    const auto* synced_shape = std::get_if<system::physics::SphereShape>(
+        &physics_world.get_collider(collider_ids.front()).shape
+    );
+    ASSERT_NE(synced_shape, nullptr);
+    EXPECT_NEAR(synced_shape->radius, 1.25f, 1e-5f);
 }
 
 }  // namespace rtr::framework::component::test

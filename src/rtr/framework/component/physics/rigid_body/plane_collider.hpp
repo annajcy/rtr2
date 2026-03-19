@@ -55,11 +55,13 @@ public:
         auto& rigid_body = owner_rigid_body_or_throw();
         if (!has_registered_collider()) {
             system::physics::Collider collider;
-            collider.shape = system::physics::PlaneShape{.normal_local = m_normal_local};
-            m_collider_id = m_physics_world.create_collider(rigid_body.rigid_body_id(), std::move(collider));
-            m_registered = true;
+            collider.shape                    = system::physics::PlaneShape{.normal_local = m_normal_local};
+            collider.local_transform.position = m_local_position;
+            collider.local_transform.rotation = m_local_rotation;
+            collider.local_transform.scale    = pbpt::math::Vec3{1.0f};
+            m_collider_id                     = m_physics_world.create_collider(rigid_body.rigid_body_id(), std::move(collider));
+            m_registered                      = true;
         }
-        sync_to_physics();
     }
 
     void on_disable() override {
@@ -73,45 +75,19 @@ public:
 
     void on_destroy() override {}
 
-    void sync_to_physics() override {
-        if (!has_registered_collider()) {
-            auto* rigid_body = owner().get_component<RigidBody>();
-            if (rigid_body == nullptr || !rigid_body->has_rigid_body()) {
-                return;
-            }
-            system::physics::Collider collider;
-            collider.shape = system::physics::PlaneShape{.normal_local = m_normal_local};
-            m_collider_id = m_physics_world.create_collider(rigid_body->rigid_body_id(), std::move(collider));
-            m_registered = true;
-        }
-
-        auto* collider = physics_collider();
-        if (collider == nullptr) {
-            return;
-        }
-
-        collider->shape = system::physics::PlaneShape{.normal_local = m_normal_local};
-        collider->local_transform.position = m_local_position;
-        collider->local_transform.rotation = m_local_rotation;
-        collider->local_transform.scale = pbpt::math::Vec3{1.0f};
-    }
-
     pbpt::math::Vec3 normal_local() const { return m_normal_local; }
     void set_normal_local(const pbpt::math::Vec3& normal_local) {
         m_normal_local = sanitize_normal(normal_local);
-        sync_to_physics();
     }
 
     pbpt::math::Vec3 local_position() const { return m_local_position; }
     void set_local_position(const pbpt::math::Vec3& local_position) {
         m_local_position = sanitize_position(local_position);
-        sync_to_physics();
     }
 
     pbpt::math::Quat local_rotation() const { return m_local_rotation; }
     void set_local_rotation(const pbpt::math::Quat& local_rotation) {
         m_local_rotation = sanitize_rotation(local_rotation);
-        sync_to_physics();
     }
 };
 
