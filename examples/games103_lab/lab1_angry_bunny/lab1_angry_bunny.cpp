@@ -18,7 +18,7 @@
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/static_mesh_component.hpp"
-#include "rtr/framework/component/physics/rigid_body/mesh_collider.hpp"
+#include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/system/input/input_types.hpp"
@@ -29,6 +29,8 @@ int main() {
     const pbpt::math::Vec3 kResetPosition{0.0f, 0.6f, 0.0f};
     const pbpt::math::Vec3 kLaunchVelocity{3.5f, 5.0f, 0.0f};
     const pbpt::math::Vec3 kInitialAngularVelocity{0.0f, 4.5f, 0.0f};
+    const pbpt::math::Vec3 kBunnyColliderCenter{-0.0168f, 0.1102f, -0.0015f};
+    const pbpt::math::Vec3 kBunnyColliderHalfExtents{0.0800f, 0.0800f, 0.0650f};
 
     try {
         rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
@@ -84,7 +86,10 @@ int main() {
         inverse_inertia_tensor[1][1] = 1.0f;
         inverse_inertia_tensor[2][2] = 0.6f;
         bunny_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor);
-        (void)bunny_go.add_component<rtr::framework::component::MeshCollider>(runtime.physics_system().rigid_body_world());
+        (void)bunny_go.add_component<rtr::framework::component::BoxCollider>(
+            runtime.physics_system().rigid_body_world(),
+            kBunnyColliderHalfExtents,
+            kBunnyColliderCenter);
         (void)bunny_go.add_component<rtr::examples::games103_lab::lab1_angry_bunny::AngryBunnyController>(
             runtime.input_system().state(), kLaunchVelocity, kInitialAngularVelocity, kResetPosition);
 
