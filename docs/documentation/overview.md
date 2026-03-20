@@ -88,6 +88,14 @@ Handles user input from keyboard, mouse, and gamepads.
 - **Input State:** Tracks the current state of all input devices.
 - **Input Events:** Propagates input changes to the rest of the engine.
 
+### Physics System (`src/rtr/system/physics`)
+
+Owns the current rigid-body and cloth runtime.
+
+- **PhysicsSystem:** Holds both `RigidBodyWorld` and `ClothWorld`.
+- **Fixed-Step Integration:** The framework layer uses `step_scene_physics(...)` to synchronize scene state into physics and write simulation results back.
+- **Documentation Entry:** See `docs/documentation/system/physics/` for the runtime overview, integration guide, cloth simulation notes, and rigid-body dynamics write-up.
+
 ## RHI (`src/rtr/rhi`)
 
 **Rendering Hardware Interface**: Low-level RAII wrappers for Vulkan objects.

@@ -1,126 +1,320 @@
 # 刚体动力学理论与实现 (Rigid Body Dynamics)
 
-本文档结合基础理论，说明当前代码库中的刚体模拟实现。这里描述的是现在的 `PhysicsSystem -> RigidBodyWorld -> collision pair generation` 结构，而不是旧版 `PhysicsWorld` / Leapfrog 设计。
+本文档说明当前 RTR2 里已经实现的刚体子系统。它讨论的是当前 `PhysicsSystem -> RigidBodyWorld -> collision/ + solver` 这一条真实路径，而不是旧版 `PhysicsWorld` 设计，也不是整个 physics runtime 的总览。
 
-## 一、 刚体动力学基础 (Introduction)
+## 运行时位置
 
-**核心目标：**
-物理引擎模拟的核心是随着时间推移，不断更新刚体集合的状态变量 $s^{[k]} = \{v, x, \omega, q\}$。
+在当前引擎里，刚体只是 physics system 的一部分：
 
-**运动拆解与方程表示：**
-由于刚体不会发生形变，其在空间中的所有复杂运动都可以被完美拆分为两部分：平移（Translation） 和 旋转（Rotation）。
-刚体上任意一点的当前世界坐标可以表示为 $x + Rr_i$，即先通过局部坐标 $r_i$ 和旋转矩阵 $R$ 进行旋转计算，再加上刚体质心的平移位置 $x$。在引擎中，物体的 `position` 就是此处的质心平移 $x$，而 `orientation` (四元数) 则对应这里的旋转矩阵 $R$。 
+- scene/physics 边界由 `step_scene_physics(...)` 处理；
+- `PhysicsSystem::step(dt)` 当前会先调用 `RigidBodyWorld::step(dt)`，再调用 `ClothWorld::step(dt)`；
+- 本页只聚焦 `RigidBodyWorld` 内部使用的数值算法与接触求解流程。
 
-## 二、 平移运动与数值积分 (Translational Motion)
+## 状态变量
 
-平移运动的状态变量包含物理位置 $x$ 和线性速度 $v$（详见代码 `TranslationState`）。
+当前刚体运行时围绕这几类状态展开：
 
-**数值积分方法对比：**
-位置和速度的更新本质上是在计算积分，即估算速度/加速度曲线下方的面积：
-- **显式欧拉 (Explicit Euler)**：一阶精度，使用时间段起点 $t^{[0]}$ 的速度作为矩形高度。截断误差为 $O(\Delta t^2)$。
-- **隐式欧拉 (Implicit Euler)**：一阶精度，使用时间段终点 $t^{[1]}$ 的速度作为矩形高度。截断误差同样为 $O(\Delta t^2)$。
-- **中点法 (Mid-point)**：二阶精度，使用时间段中点 $t^{[0.5]}$ 的速度作为高度。其一阶导数带来的误差可以相互抵消，最终截断误差缩小至 $O(\Delta t^3)$。
+| 状态 | 作用 |
+| --- | --- |
+| `translation.position` | 刚体质心位置 |
+| `translation.linear_velocity` | 线速度 |
+| `rotation.orientation` | 四元数朝向 |
+| `rotation.angular_velocity` | 角速度 |
+| `forces.accumulated_force` | 当前帧累计外力 |
+| `forces.accumulated_torque` | 当前帧累计力矩 |
+| `mass / inverse_mass` | 平移质量属性 |
+| `inverse_inertia_tensor_ref` | 刚体局部参考系下的逆惯性张量 |
 
-**半隐式欧拉积分 (Semi-implicit Euler) 代码实现：**
-为了在实现复杂度和稳定性之间取得平衡，当前引擎在 `RigidBodyWorld::integrate_body` 中采用半隐式欧拉更新：
+Dynamic 刚体的权威运行时状态保存在 `RigidBodyWorld`，而 scene graph 中的 transform 只是输入源或回写目标。
 
-```cpp
-const auto acc = rb.state().inverse_mass() * rb.state().forces.accumulated_force;
-rb.state().translation.linear_velocity += acc * delta_seconds;
-rb.state().translation.linear_velocity *= rb.linear_decay();
-rb.state().translation.position += rb.state().translation.linear_velocity * delta_seconds;
+## 当前每帧算法总流程
+
+`RigidBodyWorld::step(dt)` 的核心流程如下：
+
+```text
+for each rigid body:
+    integrate_body(body, dt)
+
+contacts = collect_contacts()
+solver_contacts = build_solver_contacts(contacts)
+
+for velocity iteration in [0, velocity_iterations):
+    for each solver contact:
+        apply_velocity_impulses(contact)
+
+for position iteration in [0, position_iterations):
+    for each solver contact:
+        apply_position_correction(contact)
+
+for each rigid body:
+    clear accumulated force / torque
 ```
 
-这里的顺序很关键：先更新速度，再用更新后的速度推进位置，这就是标准的 semi-implicit Euler。
+这是一条典型的“先积分、再构建接触快照、再做冲量求解、最后清力”的离散刚体管线。
 
-**常见受力计算 (Force Computation)：**
-- **重力 (Gravity Force)**：$f_{gravity} = M\mathbf{g}$。如果 `use_gravity()` 打开，系统会在积分前把重力加到力累加器中。
-- **外力累加 (Force Accumulation)**：用户代码或框架逻辑施加的外力进入 `state.forces.accumulated_force`，再通过逆质量转成线加速度。
+### 代码对应关系
 
-## 三、 旋转运动与四元数 (Rotational Motion)
+- `RigidBodyWorld::step(...)`
+- 文件：`src/rtr/system/physics/rigid_body/rigid_body_world.hpp`
 
-旋转运动的状态变量包含四元数 $q$（表示朝向）和角速度 $\omega$（方向代表旋转轴，大小代表旋转速率）（详见代码 `RotationalState`）。
+## 平移积分
 
-**为什么选择四元数？**
-- **矩阵 (Matrix)**：有 9 个元素但只有 3 个自由度，存在严重冗余，不直观，且很难定义其时间导数。
-- **欧拉角 (Euler Angles)**：虽然直观，但在某些轴向对齐时会导致自由度丢失，即万向节死锁（Gimbal Lock），同样难以定义时间导数。
-- **四元数 (Quaternion)**：使用四个数字即可无死角地表示 3D 旋转，计算高效，是诸如 Unity 等游戏引擎的内置首选表示法。表示绕轴 $v$ 旋转 $\theta$ 角度的四元数公式：$q = [\cos\frac{\theta}{2} \quad \mathbf{v}]$（其中向量部分的长度为 $\sin\frac{\theta}{2}$）。
-引擎代码中使用 `pbpt::math::Quat` 来执行极高效率的旋转更新计算。
+当前线性积分使用 semi-implicit Euler：
 
-**旋转动力学的核心物理量：**
-- **力矩 (Torque, $\tau$)**：相当于平移运动中的力（Force），即代码中的 `state.forces.accumulated_torque`。计算公式为受力点的世界力臂向量和力的叉乘：$\tau_i = (Rr_i) \times f_i$。
-- **惯性张量 (Inertia, $I$)**：相当于平移运动中的质量（Mass）。由于物体在旋转，其世界坐标下的惯性张量需要根据当前的旋转矩阵 $R$ 实时更新：$I^{-1} = R I_{ref}^{-1} R^T$。代码里刚体存储的是自身的局部逆惯性张量 (`m_inverse_inertia_tensor_ref`)。
-  在系统中封装在 `RigidBodyWorld::inverse_inertia_tensor_world`：
-  ```cpp
-  const auto rotation_matrix = body.state().rotation.orientation.to_mat3();
-  return rotation_matrix * body.inverse_inertia_tensor_ref() * pbpt::math::transpose(rotation_matrix);
-  ```
+$$
+\mathbf{a} = m^{-1} \mathbf{f}
+$$
 
-## 四、 完整的刚体更新循环 (Simulation Implementation)
+$$
+\mathbf{v}^{k+1} = \mathbf{v}^k + \mathbf{a} \Delta t
+$$
 
-在 `RigidBodyWorld::step` 中，每一帧通过给定时间步长 $\Delta t$，按如下顺序更新状态集合 $s = \{v, x, \omega, q\}$：
+$$
+\mathbf{v}^{k+1} \leftarrow \mathbf{v}^{k+1} \cdot \text{linear\_decay}
+$$
 
-1. **积分 Dynamic 刚体**
-   对每个 awake 的 Dynamic 刚体，系统会：
-   - 在需要时加入重力，
-   - 根据累计外力积分线速度，
-   - 施加线速度衰减，
-   - 用更新后的线速度推进位置，
-   - 计算世界空间逆惯性张量，
-   - 根据累计力矩积分角速度，
-   - 施加角速度衰减，
-   - 推进四元数朝向并重新归一化。
-   
-2. **构建 Contact Snapshot**
-   系统遍历 collider 对，跳过同 body 和 static-static 组合，将 collider 转成 `WorldCollider`，并调用 `collision/` 中对应的 `ContactPairTrait<...>::generate(...)`。
+$$
+\mathbf{x}^{k+1} = \mathbf{x}^k + \mathbf{v}^{k+1} \Delta t
+$$
 
-3. **把几何接触提升为求解接触**
-   有效的 `ContactResult` 会先转成 rigid-body 模块内部的 `Contact`，再转成 `SolverContact`。这一阶段会计算：
-   - body id 和 collider id，
-   - 接触力臂 `r_a`、`r_b`，
-   - 世界空间逆惯性张量，
-   - 法线与切线方向，
-   - 法向/切向 effective mass，
-   - restitution bias，
-   - 当前帧内初始化为 0 的累计冲量。
+其中：
 
-4. **速度阶段：Projected Gauss-Seidel**
-   系统对同一帧 snapshot 迭代 `velocity_iterations` 次。对每个 contact：
-   - 求法向冲量，
-   - 以累计形式更新并 clamp 到非负，
-   - 将实际增量冲量施加到两个刚体，
-   - 再求切向冲量，
-   - 将摩擦冲量幅值限制在 `mu * normal_impulse_sum` 内。
+- 若 `use_gravity()` 为 true，会先把 `gravity() * mass` 加到力累加器；
+- `linear_decay` 是一个显式的速度衰减系数；
+- 更新顺序是先速度、后位置，因此属于 semi-implicit Euler，而不是最朴素的 explicit Euler。
 
-5. **位置阶段：穿透修正**
-   系统再执行 `position_iterations` 轮位置修正，使用 snapshot 中保存的法线和穿透深度来缓解 interpenetration。这个阶段不会在同一帧内重建接触几何。
+### 代码对应关系
 
-6. **清空外力**
-   求解结束后，每个 rigid body 都会清空力和力矩累加器，为下一帧的外部驱动做准备。
+- `RigidBodyWorld::integrate_body(...)`
+- `RigidBodyWorld::gravity()`
 
-## 五、 旋转更新细节
+## 旋转积分
 
-当前朝向更新使用标准的四元数导数形式：
+旋转部分同样是“先角速度、后朝向”的更新：
 
-```cpp
-const auto angular_velocity_quat = pbpt::math::Quat(
-    0.0f,
-    rb.state().rotation.angular_velocity.x(),
-    rb.state().rotation.angular_velocity.y(),
-    rb.state().rotation.angular_velocity.z());
-rb.state().rotation.orientation +=
-    0.5f * delta_seconds * angular_velocity_quat * rb.state().rotation.orientation;
-rb.state().rotation.orientation = pbpt::math::normalize(rb.state().rotation.orientation);
+1. 把局部参考系中的逆惯性张量转到世界空间：
+
+$$
+I^{-1}_{world} = R I^{-1}_{ref} R^T
+$$
+
+2. 用累计力矩计算角加速度：
+
+$$
+\boldsymbol{\alpha} = I^{-1}_{world} \boldsymbol{\tau}
+$$
+
+3. 更新角速度并施加 `angular_decay`：
+
+$$
+\boldsymbol{\omega}^{k+1} = \boldsymbol{\omega}^{k} + \boldsymbol{\alpha} \Delta t
+$$
+
+4. 用四元数导数推进朝向，并在每步后归一化：
+
+$$
+\dot{q} = \frac{1}{2} \omega_q q
+$$
+
+其中 $\omega_q = [0, \omega_x, \omega_y, \omega_z]$。
+
+当前实现选择四元数，是因为它比欧拉角更稳定，也比直接操作旋转矩阵更紧凑。
+
+### 代码对应关系
+
+- `RigidBodyWorld::integrate_body(...)`
+- `RigidBodyWorld::inverse_inertia_tensor_world(...)`
+
+## 接触生成：从碰撞检测到 solver contact
+
+当前系统把“几何接触生成”和“刚体 solver 数据”明确分成两层。
+
+### 第一步：枚举碰撞体对
+
+`collect_contacts()` 会遍历所有 collider pair，并跳过：
+
+- 同一个 rigid body 上的 collider 对；
+- 两边都不是 awake dynamic body 的组合。
+
+通过这一步，系统避免对 static-static、static-kinematic 这类不会产生当前 solver 结果的组合做无效求解。
+
+### 第二步：调用 `collision/` 生成几何接触
+
+`generate_contact_from_pair(...)` 会把 collider 先转成 `WorldCollider`，然后调用：
+
+- `ContactPairTrait<SphereShape, SphereShape>::generate(...)`
+- `ContactPairTrait<SphereShape, BoxShape>::generate(...)`
+- `ContactPairTrait<BoxShape, PlaneShape>::generate(...)`
+- 等等
+
+`collision/` 只返回几何层的 `ContactResult`，里面包含穿透深度、接触点、法线等信息。
+
+### 第三步：提升成 `SolverContact`
+
+`build_solver_contacts(...)` 会把几何接触提升成 solver 需要的结构，补齐：
+
+- `body_a / body_b`
+- `collider_a / collider_b`
+- 接触点到质心的力臂 `r_a / r_b`
+- 世界空间逆惯性张量
+- tangent 方向
+- normal / tangent effective mass
+- restitution bias
+- 本帧内累计的法向与切向冲量
+
+这里有一个关键设计：**solver contact 只是当前帧的快照**。每次 `step(dt)` 都重新收集、重新构建，不做 persistent manifold 和 warm starting。
+
+### Effective Mass
+
+当前实现先构造：
+
+$$
+M_{eff} =
+(m_a^{-1} + m_b^{-1}) I
+- [r_a]_{\times} I_a^{-1} [r_a]_{\times}
+- [r_b]_{\times} I_b^{-1} [r_b]_{\times}
+$$
+
+然后再把它分别投影到法向和切向：
+
+$$
+m_n = \mathbf{n} \cdot (M_{eff}\mathbf{n}), \qquad
+m_t = \mathbf{t} \cdot (M_{eff}\mathbf{t})
+$$
+
+它们就是后续法向冲量和摩擦冲量的分母。
+
+### 代码对应关系
+
+- `RigidBodyWorld::collect_contacts(...)`
+- `RigidBodyWorld::generate_contact_from_pair(...)`
+- `RigidBodyWorld::build_solver_contacts(...)`
+- `src/rtr/system/physics/collision/*.hpp`
+- `src/rtr/system/physics/rigid_body/contact.hpp`
+
+## 速度阶段：Projected Gauss-Seidel (PGS)
+
+当前求解器使用逐接触、逐迭代的 PGS。
+
+### 接触点相对速度
+
+先计算接触点相对速度：
+
+$$
+\mathbf{v}_{rel} =
+(\mathbf{v}_b + \boldsymbol{\omega}_b \times \mathbf{r}_b)
+- (\mathbf{v}_a + \boldsymbol{\omega}_a \times \mathbf{r}_a)
+$$
+
+### 法向冲量
+
+如果法向 effective mass 足够大，则计算：
+
+$$
+\Delta \lambda_n =
+- \frac{v_{rel,n} - b_{rest}}{m_n}
+$$
+
+这里：
+
+- $v_{rel,n} = \mathbf{v}_{rel} \cdot \mathbf{n}$
+- $b_{rest}$ 是 restitution bias
+
+当前实现使用**累计冲量**：
+
+- 先保存 `previous_normal_impulse_sum`
+- 再算 `next_normal_impulse_sum = max(previous + delta, 0)`
+- 实际施加的是两者差值 `actual_delta_normal_impulse`
+
+这样可以自然地保证法向冲量不变成“拉力”。
+
+### 切向摩擦冲量
+
+法向冲量更新后，会重新读取接触点相对速度，再沿切向求一个增量摩擦冲量。累计后的切向冲量被 clamp 到：
+
+$$
+[-\mu \lambda_n,\ \mu \lambda_n]
+$$
+
+其中：
+
+- $\mu = \sqrt{\mu_a \mu_b}$
+- `normal_impulse_sum` 就是当前帧累计的法向冲量
+
+这对应一个典型的库仑摩擦圆锥在线性化后的区间约束。
+
+### PGS 流程图
+
+```text
+for each solver iteration:
+    for each contact:
+        read current body velocities
+        solve normal impulse
+        clamp accumulated normal impulse >= 0
+        apply normal impulse
+        solve tangent impulse
+        clamp tangent impulse by friction limit
+        apply tangent impulse
 ```
 
-这不是当前代码中的“半步长角速度”积分，而是直接的 semi-implicit 更新，并通过归一化抑制数值误差。
+### 代码对应关系
 
-## 六、 `collision` 与求解器的边界
+- `RigidBodyWorld::apply_velocity_impulses(...)`
+- `RigidBodyWorld::apply_impulse_at_contact(...)`
+- `RigidBodyWorld::combined_restitution(...)`
+- `RigidBodyWorld::combined_friction(...)`
 
-当前刚体求解器有意持有耦合侧类型：
+## 位置阶段：穿透修正
 
-- `rigid_body/collider.hpp` 定义带 `RigidBodyID` 的 body-attached collider。
-- `rigid_body/contact.hpp` 定义 `Contact` 和 `SolverContact`。
-- `collision/contact.hpp` 只保留 `ContactResult` 和 `ContactPairTrait`。
+速度求解之后，当前实现还会再做若干轮位置修正。
 
-这样做可以让碰撞检测保持可复用，同时保证 solver-facing state 保留在 rigid-body 模块内部。
+对每个 `SolverContact`：
+
+- 取当前 contact snapshot 中的 penetration；
+- 乘以固定比例 `0.8`，得到 `corrected_penetration`；
+- 按两边 inverse mass 的比例分配位移修正；
+- 更新 `contact.penetration`，但**不重建接触几何**。
+
+它的目标不是做高精度几何约束投影，而是用一个简单、离散的 correction pass 缓解 interpenetration。
+
+这也解释了当前实现的一个边界：
+
+- 位置阶段使用的是“本帧先前收集到的 contact snapshot”；
+- 它不会在同一帧内重新做碰撞检测；
+- 因此穿透很深或几何变化很快时，效果会有限。
+
+### 代码对应关系
+
+- `RigidBodyWorld::apply_position_correction(...)`
+- `RigidBodyWorld::step(...)`
+
+## `collision/` 与 `rigid_body/` 的职责边界
+
+当前目录边界是有意设计的：
+
+- `collision/` 只负责纯几何层面的世界碰撞体和接触生成；
+- `rigid_body/` 负责 body id、solver contact、冲量求解和运行时耦合状态。
+
+这样做的好处是：
+
+- 碰撞检测逻辑能保持几何可复用；
+- 刚体求解器需要的耦合状态不会泄露到纯碰撞层。
+
+## 当前简化与限制
+
+当前刚体求解器仍然是一个可用但保守的 v1：
+
+- 没有 persistent contact manifold。
+- 没有 warm starting。
+- 没有 continuous collision detection。
+- 位置修正阶段不重建接触几何。
+- solver contact 只在当前帧有效。
+
+这些简化让实现更直接，也更容易对照课程或教科书理解，但它们都会影响高速度、高穿透或复杂堆叠场景下的稳定性。
+
+## 关键代码入口
+
+- `src/rtr/system/physics/rigid_body/rigid_body_world.hpp`
+- `src/rtr/system/physics/rigid_body/contact.hpp`
+- `src/rtr/system/physics/collision/contact.hpp`
+- `src/rtr/framework/integration/physics/rigid_body_scene_sync.hpp`

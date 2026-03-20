@@ -53,6 +53,8 @@ nav:
               - Camera and Coordinates: documentation/system/render/camera-coordinate-conventions.md
           - Physics:
               - Overview: documentation/system/physics/overview.md
+              - Runtime Integration: documentation/system/physics/runtime-integration.md
+              - Cloth Simulation: documentation/system/physics/cloth-simulation.md
               - Rigid Body Dynamics: documentation/system/physics/rigid-body-dynamics.md
       - Utils: documentation/utils.md
   - Profiling:

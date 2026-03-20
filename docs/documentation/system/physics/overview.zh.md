@@ -1,73 +1,102 @@
 # 物理系统总览 (Overview)
 
-本文档描述 `rtr2` 当前的 `rtr::system::physics` 架构。现阶段这套物理系统是一个“仅刚体”的运行时：`PhysicsSystem` 负责总调度，`RigidBodyWorld` 负责实际模拟，`collision` 模块负责共享的几何接触检测。
+本文档描述当前 `rtr::system::physics` 的真实运行时结构。现在的 physics system 不再是“仅刚体”运行时：`PhysicsSystem` 同时持有 `RigidBodyWorld` 与 `ClothWorld`，框架层通过 `step_scene_physics()` 负责 scene graph 和两个物理 world 之间的同步。
+
+## 当前能力与边界
+
+当前 physics system 已经包含：
+
+- 刚体状态积分、基础碰撞检测与碰撞响应求解。
+- mass-spring cloth、pinned vertex、重力、阻尼、fixed-step substeps。
+- scene graph 与 physics world 的双向同步。
+- cloth 顶点回写和法线重算。
+
+当前明确**不包含**：
+
+- cloth collision。
+- cloth self-collision。
+- cloth / rigid-body coupling。
+- implicit cloth solver。
+- PBD / XPBD cloth。
+- FEM / water runtime。
 
 ## 架构总览
 
-当前物理模块可以分为以下几个层次：
+1. **`PhysicsSystem`**
+   当前物理运行时的总容器，内部持有一个 `RigidBodyWorld` 和一个 `ClothWorld`。它本身只负责调用 `RigidBodyWorld::step(dt)` 与 `ClothWorld::step(dt)`，不直接做 scene 同步。
 
-1. **`PhysicsSystem`（运行时总调度器）**
-   - **职责**：作为 `AppRuntime` 当前持有的物理运行时入口。
-   - **交互流程**：`PhysicsSystem::step(scene, dt)` 会先把框架层的位姿和碰撞体状态同步进刚体世界，再调用 `RigidBodyWorld::step(dt)`，最后把动态刚体的结果回写到 scene graph。
-2. **`rigid_body_scene_sync.hpp`（场景到刚体系统的适配层）**
-   - **职责**：连接 `GameObject` 组件与刚体模拟状态。
-   - **输入同步**：把 scene graph 中的 world transform、scale、collider 参数同步到 `RigidBodyWorld`。
-   - **输出同步**：在 fixed tick 结束后，把 `RigidBodyWorld` 中 Dynamic 刚体的位姿写回 scene graph。
-3. **`RigidBodyWorld`（核心模拟世界）**
-   - **职责**：维护全部刚体和附着在刚体上的碰撞体，负责运动积分、接触收集与碰撞响应求解。
-   - **核心管线 (`step`)**：每次 fixed step 中，先积分 Dynamic 刚体，再构建一份仅在当前帧有效的 contact snapshot，随后执行速度阶段的 PGS 迭代和位置阶段的穿透修正，最后清空外力累加器。
-   - **范围边界**：当前这个 world 只管理 rigid body，不包含 cloth / FEM / water 的运行时。
-4. **`RigidBody` (刚体数据容器)**
-   - **职责**：保存刚体的运动状态（`RigidBodyState`）、摩擦和恢复系数、sleep/awake 状态、质量属性，以及力/力矩累加器。
-4. **`collision/`（几何接触层）**
-   - **职责**：提供纯碰撞检测相关的数据结构和两两碰撞接触生成逻辑。
-   - **包含内容**：`ColliderShape`、`WorldCollider`、`ContactResult`、`ContactPairTrait<...>::generate(...)`。
-   - **边界定义**：这一层不持有刚体 id，也不持有求解阶段的 contact cache；这些耦合类型放在 `rigid_body/` 内。
+2. **Framework Integration (`src/rtr/framework/integration/physics/`)**
+   负责把 scene graph 中的组件状态同步到物理运行时，再把模拟结果写回 scene graph 和 renderer。权威入口是 `step_scene_physics(scene, physics_system, dt)`。
 
-## 当前目录结构
+3. **`RigidBodyWorld`**
+   保存刚体、附着碰撞体、接触快照和冲量求解过程。当前算法是 semi-implicit Euler 积分 + 接触生成 + PGS 速度求解 + penetration correction。
+
+4. **`ClothWorld`**
+   保存 cloth instance、spring network 与 cloth state。当前算法是显式 mass-spring + semi-implicit Euler + substeps + damping。
+
+5. **Scene Graph / Renderer**
+   scene graph 仍然是运行时对象组织和渲染可见表示；但是 dynamic rigid body 的权威位姿在 `RigidBodyWorld`，cloth 的权威顶点状态在 `ClothWorld`。
+
+## Fixed Tick 运行数据流
+
+当前 fixed tick 路径如下：
 
 ```text
-src/rtr/system/physics/
-  physics_system.hpp
-  common/
-    physics_ids.hpp
-    physics_material.hpp
-    physics_step_context.hpp
-  collision/
-    collider_shape.hpp
-    contact.hpp
-    sphere_sphere.hpp
-    sphere_box.hpp
-    sphere_plane.hpp
-    box_box.hpp
-    box_plane.hpp
-    mesh_plane.hpp
-    plane_common.hpp
-  rigid_body/
-    rigid_body.hpp
-    rigid_body_type.hpp
-    collider.hpp
-    contact.hpp
-    rigid_body_world.hpp
+AppRuntime fixed tick
+    |
+    v
+step_scene_physics(scene, physics_system, dt)
+    |
+    +--> sync_scene_to_rigid_body(scene, rigid_body_world)
+    +--> sync_scene_to_cloth(scene, cloth_world)
+    +--> PhysicsSystem::step(dt)
+    |       |
+    |       +--> RigidBodyWorld::step(dt)
+    |       \--> ClothWorld::step(dt)
+    +--> sync_rigid_body_to_scene(scene, rigid_body_world)
+    \--> sync_cloth_to_scene(scene, cloth_world)
 ```
 
-## Fixed Tick 运行契约
+这条路径有两个关键点：
 
-当前运行时的 fixed-step 路径是：
+- `PhysicsSystem::step()` 只做 world 内部求解，不负责 scene/physics 边界。
+- 当前调用顺序是**先 rigid body，后 cloth**。
 
-1. `AppRuntime` 累积时间并执行 fixed updates。
-2. 每个 fixed tick 调用 `PhysicsSystem::step(scene, fixed_dt)`。
-3. `sync_scene_to_rigid_body(scene, rigid_body_world)` 同步输入。
-4. `RigidBodyWorld::step(fixed_dt)` 执行积分和碰撞响应。
-5. `sync_rigid_body_to_scene(scene, rigid_body_world)` 将 Dynamic 刚体结果写回 scene。
+## 状态权威与所有权
 
-因此，Dynamic 刚体的权威模拟状态保存在 `RigidBodyWorld` 中，而 scene graph 仍然是渲染和编辑器侧可见的表示。
+| 位置 | 保存内容 | 谁是权威 |
+| --- | --- | --- |
+| Scene Graph | `GameObject`、节点层级、组件挂载、渲染可见对象 | 框架层 |
+| `RigidBodyWorld` | 刚体位置/速度/朝向/角速度、collider、solver contacts | Dynamic rigid body 运行时权威 |
+| `ClothWorld` | cloth 顶点位置、速度、质量、pinned mask、spring network | Cloth 运行时权威 |
+| `DeformableMeshComponent` | 供 renderer 使用的当前局部顶点与法线副本 | Cloth 输出缓存，不是权威模拟状态 |
 
-## `collision` 与 `rigid_body` 的职责边界
+因此：
 
-当前边界是有意这样划分的：
+- Dynamic rigid body 开始模拟后，不应再把 scene graph transform 当成权威状态。
+- Cloth 注册后，顶点运行时状态保存在 `ClothWorld`，`sync_cloth_to_scene()` 只是把结果回写到 renderer。
 
-- `collision/` 只负责纯几何和接触生成。
-- `rigid_body/` 负责 `Collider`、`Contact`、`SolverContact` 以及冲量求解。
+## 算法地图
 
-这样做的目的，是让碰撞对检测逻辑保持可复用，同时把刚体 id、累计冲量和求解阶段的状态留在真正使用它们的 rigid-body 模块内部。
+| 子系统 | 主要状态 | 当前算法 | 主要入口 | 当前不做 |
+| --- | --- | --- | --- | --- |
+| Rigid Body | 刚体平移/旋转状态、碰撞体、solver contacts | semi-implicit Euler + contact generation + PGS + positional correction | `RigidBodyWorld::step()` | CCD、persistent manifold、warm starting |
+| Cloth | 顶点位置/速度/质量、spring network、pinned mask | explicit mass-spring + semi-implicit Euler + substeps + spring/global damping | `build_cloth_spring_network()`、`ClothWorld::step()` | collision、自碰撞、PBD/XPBD、implicit solver |
+| Framework Integration | scene graph、physics worlds、renderer mesh | fixed tick scene/physics sync | `step_scene_physics()` | 自动 cloth attach target、cloth 外部驱动同步 |
+
+## 目录与代码入口
+
+当前最关键的入口文件是：
+
+- `src/rtr/system/physics/physics_system.hpp`
+- `src/rtr/framework/integration/physics/scene_physics_step.hpp`
+- `src/rtr/framework/integration/physics/rigid_body_scene_sync.hpp`
+- `src/rtr/framework/integration/physics/cloth_scene_sync.hpp`
+- `src/rtr/system/physics/rigid_body/rigid_body_world.hpp`
+- `src/rtr/system/physics/cloth/cloth_world.hpp`
+
+## 延伸阅读
+
+- 运行时集成：`runtime-integration.zh.md`
+- 布料模拟与调参：`cloth-simulation.zh.md`
+- 刚体算法与碰撞响应：`rigid-body-dynamics.zh.md`
