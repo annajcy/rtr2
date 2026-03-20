@@ -83,6 +83,14 @@ rtr_add_test(
     system/physics/cloth/cloth_state_test.cpp
 )
 rtr_add_test(
+    test_cloth_spring
+    system/physics/cloth/cloth_spring_test.cpp
+)
+rtr_add_test(
+    test_cloth_world
+    system/physics/cloth/cloth_world_test.cpp
+)
+rtr_add_test(
     test_physics_system
     system/physics/physics_system/physics_system_test.cpp
 )

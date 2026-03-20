@@ -39,7 +39,16 @@ TEST(ScenePhysicsStepTest, HelperRunsPhysicsSystemAndSyncsClothStateToRenderer) 
     auto& renderer = go.add_component<rtr::framework::component::DeformableMeshComponent>(resources, handle);
     auto& cloth = go.add_component<rtr::framework::component::ClothComponent>(
         physics_system.cloth_world(),
-        std::vector<rtr::system::physics::VertexID>{0}
+        std::vector<rtr::system::physics::VertexID>{0},
+        rtr::system::physics::ClothParams{
+            .default_vertex_mass = 1.0f,
+            .gravity = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
+            .edge_stiffness = 0.0f,
+            .bend_stiffness = 0.0f,
+            .spring_damping = 0.0f,
+            .velocity_damping = 0.0f,
+            .substeps = 1u,
+        }
     );
 
     auto& instance = cloth.cloth();

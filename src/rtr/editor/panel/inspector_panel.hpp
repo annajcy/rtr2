@@ -226,6 +226,15 @@ private:
             ImGui::Text("Registered: %s", cloth->has_cloth() ? "Yes" : "No");
             ImGui::Text("Cloth ID: %llu", static_cast<unsigned long long>(cloth->cloth_id()));
             ImGui::Text("Default Vertex Mass: %.3f", cloth->params().default_vertex_mass);
+            ImGui::Text("Gravity: [%.2f, %.2f, %.2f]",
+                        cloth->params().gravity.x(),
+                        cloth->params().gravity.y(),
+                        cloth->params().gravity.z());
+            ImGui::Text("Edge Stiffness: %.3f", cloth->params().edge_stiffness);
+            ImGui::Text("Bend Stiffness: %.3f", cloth->params().bend_stiffness);
+            ImGui::Text("Spring Damping: %.3f", cloth->params().spring_damping);
+            ImGui::Text("Velocity Damping: %.3f", cloth->params().velocity_damping);
+            ImGui::Text("Substeps: %u", cloth->params().substeps);
 
             const auto& pinned_vertices = cloth->pinned_vertices();
             ImGui::Text("Pinned Vertices: %zu", pinned_vertices.size());
@@ -244,6 +253,7 @@ private:
             if (cloth->has_cloth()) {
                 const auto& instance = cloth->cloth();
                 ImGui::Text("Vertex Count: %zu", instance.state.vertex_count());
+                ImGui::Text("Spring Count: %zu", instance.spring_network.spring_count());
             } else {
                 ImGui::TextDisabled("Physics cloth is not registered.");
             }

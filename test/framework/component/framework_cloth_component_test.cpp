@@ -53,6 +53,8 @@ TEST(FrameworkClothComponentTest, RegistersTopologyAndPinnedVerticesIntoClothWor
     const auto& instance = cloth.cloth();
     EXPECT_EQ(instance.topology.vertex_count, 4);
     EXPECT_EQ(instance.state.vertex_count(), 4u);
+    EXPECT_EQ(instance.spring_network.spring_count(system::physics::ClothSpringKind::Edge), 5u);
+    EXPECT_EQ(instance.spring_network.spring_count(system::physics::ClothSpringKind::Bend), 1u);
     EXPECT_EQ(instance.topology.rest_position(0), pbpt::math::Vec3(0.0f, 0.0f, 0.0f));
     EXPECT_EQ(instance.topology.rest_position(1), pbpt::math::Vec3(1.0f, 0.0f, 0.0f));
     EXPECT_TRUE(instance.state.pinned(0));
