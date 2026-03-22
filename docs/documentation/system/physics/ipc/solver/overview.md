@@ -1,13 +1,26 @@
 # IPC Solver Overview
 
-The `solver/` directory is reserved for the future nonlinear solve pipeline on top of IPC state and energies.
+The `solver/` directory contains the current nonlinear solve utilities for IPC state updates.
 
-Expected responsibilities include:
+## Current Files
 
-- global system assembly
-- Newton steps
+- `line_search.hpp`
+  Armijo backtracking line search for energy descent along a proposed search direction.
+- `newton_solver.hpp`
+  A minimal Newton solver that works on global energy / gradient / Hessian callbacks, supports per-DOF Dirichlet masks, and uses sparse reduced solves.
+
+## Scope
+
+The current solver layer is responsible for:
+
+- Newton steps in global DOF space
 - line search
-- convergence criteria
-- boundary-condition projection and future contact solve orchestration
+- convergence checks
+- reduced solves under per-DOF fixed masks
 
-Like `energy/`, this directory is currently a placeholder so the documentation mirrors the source layout before solver code lands.
+It does not yet include:
+
+- PSD projection
+- CCD step clipping
+- contact-aware filtering
+- friction solve orchestration

@@ -64,6 +64,21 @@
 - [ ] `compute_x_hat()` 含重力修正
 - [ ] 总能量/梯度/Hessian 装配路径打通
 
+### Phase 4b: IPCSystem 接入 PhysicsSystem
+
+- [ ] `PhysicsSystem` 新增 `ipc_system()` 访问器
+- [ ] `IPCBodyComponent` 完成（body_index + TetSurfaceResult 缓存）
+- [ ] `ipc_scene_sync.hpp` 完成：`sync_ipc_to_scene()` 将 IPC DOF 写回 DeformableMeshComponent
+- [ ] `scene_physics_step.hpp` 新增 IPC step + sync 调用
+
+### Phase 4c: IPC Demo
+
+- [ ] `examples/editor/ipc_falling_block_editor.cpp` 完成
+- [ ] `examples/CMakeLists.txt` 新增 target
+- [ ] demo 编译运行：方块在窗口中可见
+- [ ] demo 运行时：方块在重力下下落，DeformableMesh 每帧更新
+- [ ] demo 运行时：光照法线正确（无黑面）
+
 ### Phase 5: 测试
 
 - [ ] `ipc_tet_smoke_test.cpp` SingleStepNoNaN 通过
@@ -76,7 +91,6 @@
 
 - [ ] tet elastic energy FD gradient check
 - [ ] inertial energy FD gradient check
-- [ ] headless demo 入口
 
 ## Day 1 结束时必须回答的问题
 

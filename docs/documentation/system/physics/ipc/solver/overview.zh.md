@@ -1,13 +1,26 @@
 # IPC Solver 总览
 
-`solver/` 目录预留给未来建立在 IPC state 和能量之上的非线性求解管线。
+`solver/` 目录放的是当前 IPC 的非线性求解工具。
 
-未来这里预计会负责：
+## 当前文件
 
-- 全局系统装配
-- Newton 迭代
+- `line_search.hpp`
+  沿给定搜索方向做 Armijo backtracking line search。
+- `newton_solver.hpp`
+  一个最小可用的 Newton 求解器，工作在全局 energy / gradient / Hessian 回调之上，支持 per-DOF Dirichlet mask，并使用 sparse reduced solve。
+
+## 当前范围
+
+这一层目前负责：
+
+- 全局 DOF 空间中的 Newton 步
 - line search
 - 收敛判定
-- 边界条件投影和未来接触求解编排
+- 在 per-DOF fixed mask 下的 reduced solve
 
-和 `energy/` 一样，这个目录目前还是占位状态，主要目的是在 solver 代码真正落地之前，让文档结构先和源码目录对齐。
+目前还不包含：
+
+- PSD projection
+- CCD 步长裁剪
+- contact-aware filtering
+- friction solve orchestration

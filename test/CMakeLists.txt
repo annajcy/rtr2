@@ -119,6 +119,16 @@ rtr_add_test(
     Eigen3::Eigen
 )
 rtr_add_test(
+    test_ipc_line_search
+    system/physics/ipc/line_search_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_newton_solver
+    system/physics/ipc/newton_solver_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
     test_eigen_compile
     system/physics/ipc/eigen_compile_test.cpp
     Eigen3::Eigen

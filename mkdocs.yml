@@ -79,6 +79,8 @@ nav:
                       - Tet Mesh Convert: documentation/system/physics/ipc/model/tet_mesh_convert.md
                   - Solver:
                       - Overview: documentation/system/physics/ipc/solver/overview.md
+                      - Line Search: documentation/system/physics/ipc/solver/line_search.md
+                      - Newton Solver: documentation/system/physics/ipc/solver/newton_solver.md
               # END AUTO-GENERATED PHYSICS NAV
       - Utils: documentation/utils.md
   - Profiling:
