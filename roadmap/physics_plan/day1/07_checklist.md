@@ -42,6 +42,7 @@
 ### Phase 2: 能量模块
 
 - [ ] `energy/inertial_energy.hpp` 完成
+- [ ] `energy/gravity_energy.hpp` 完成
 - [ ] `energy/tet_material_model.hpp` 抽象完成
 - [ ] `energy/tet_fixed_corotated_energy.hpp` 完成（至少 energy + PK1）
 - [ ] `energy/tet_elastic_assembler.hpp` 完成

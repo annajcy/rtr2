@@ -79,8 +79,19 @@ rtr_add_test(
     system/physics/physics_system/physics_system_test.cpp
 )
 rtr_add_test(
-    test_tet_surface_extract
-    system/physics/ipc/tet_surface_extract_test.cpp
+    test_tet_mesh_convert
+    system/physics/ipc/tet_mesh_convert_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_state
+    system/physics/ipc/ipc_state_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_tet_body
+    system/physics/ipc/tet_body_test.cpp
+    Eigen3::Eigen
 )
 rtr_add_test(
     test_eigen_compile

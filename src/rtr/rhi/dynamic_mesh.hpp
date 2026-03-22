@@ -15,6 +15,13 @@
 namespace rtr::rhi {
 
 class DynamicMesh {
+private:
+    std::reference_wrapper<Device> m_device;
+    uint32_t m_vertex_count{0};
+    uint32_t m_index_count{0};
+    Buffer m_vertex_buffer;
+    Buffer m_index_buffer;
+    
 public:
     using Vertex = utils::ObjVertex;
 
@@ -67,13 +74,6 @@ public:
     vk::Buffer index_buffer() const { return *m_index_buffer.buffer(); }
     uint32_t vertex_count() const { return m_vertex_count; }
     uint32_t index_count() const { return m_index_count; }
-
-private:
-    std::reference_wrapper<Device> m_device;
-    uint32_t m_vertex_count{0};
-    uint32_t m_index_count{0};
-    Buffer m_vertex_buffer;
-    Buffer m_index_buffer;
 };
 
 } // namespace rtr::rhi

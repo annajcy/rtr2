@@ -75,6 +75,44 @@ ipc_state.hpp
             <- ipc_system.hpp
 ```
 
+## 理论→代码对照表
+
+| 课程笔记 | Section | Day 1 代码文件 | 对应内容 |
+|----------|---------|---------------|----------|
+| Lec 1 | §4.3 | `inertial_energy.hpp` | $E_I$ 的定义和导数 |
+| Lec 1 | §4.3 | `gravity_energy.hpp` | 独立重力势能项 |
+| Lec 1 | §4.4 | `line_search.hpp` | Backtracking line search |
+| Lec 1 | §4.4 | `newton_solver.hpp` | Projected Newton 主循环 |
+| Lec 2 | §3.5-3.7 | `tet_elastic_assembler.hpp` | 局部→全局装配 |
+| Lec 3 | §4 | `newton_solver.hpp` | Dirichlet DOF elimination |
+| Lec 7 | §1.4 | `tet_elastic_assembler.hpp` | $F = D_s D_m^{-1}$ |
+| Lec 7 | §3 | `tet_fixed_corotated_energy.hpp` | SVD / polar decomposition |
+| Lec 7 | §5.2 | `tet_fixed_corotated_energy.hpp` | Fixed corotated $\Psi$ |
+| Lec 7 | §5.5 | `tet_material_model.hpp` | Lame 参数 |
+| Lec 8 | §2 | `tet_fixed_corotated_energy.hpp` | PK1 stress $P$ |
+| Lec 8 | §4-5 | `tet_fixed_corotated_energy.hpp` | Stress derivative / Hessian |
+| Lec 10 | §2-3 | `ipc_state.hpp` | FEM 离散 → 全局 DOF 向量 |
+| Lec 10 | §3 | `tet_body.hpp` | Shape functions = 重心坐标 |
+| Lec 10 | §4 | `tet_body.hpp` + `ipc_system.hpp` | Mass lumping |
+| Lec 10 | §5 | `tet_elastic_assembler.hpp` | $f^{int} = -V_e P \nabla N_a$ |
+
+课程笔记根目录：`/Users/jinceyang/Desktop/cg_course/physics_based_simulation/`
+
+参考代码：`solid-sim-tutorial/6_inv_free/`（Neo-Hookean FEM 完整实现）
+
+### 推荐复习顺序（1.5 小时）
+
+1. **Lec 1 §4.3**（15 min）— 优化重构，$E(x)$ 两项的物理意义
+2. **Lec 7 §1.4**（10 min）— $F = D_s D_m^{-1}$ 的推导和直觉
+3. **Lec 7 §5.2**（10 min）— Fixed corotated 公式
+4. **Lec 8 §2**（10 min）— PK1 stress 定义
+5. **Lec 10 §5.1-5.5**（15 min）— $F$ 在单元内是常量，节点力 $= -V_e P \nabla N_a$
+6. **Lec 3 §4**（15 min）— DOF elimination 实现方式
+7. **Lec 1 §4.4**（10 min）— Backtracking line search
+8. **Lec 2 §3.5-3.7**（10 min）— 局部→全局稀疏装配
+
+---
+
 ## 成功标准
 
 - `IPCState` 统一管理所有 DOF

@@ -1,5 +1,47 @@
 # Phase 3: Newton Solver + Line Search
 
+## 理论基础
+
+### Newton 法作为优化器
+
+**参考：Lec 1 §4.1, 4.3-4.4**
+
+$\nabla E(x) = 0$ 就是 root-finding。Newton 步 = 对能量做二阶近似后取极小值：
+
+$$
+\nabla^2 E(x^i) \cdot p = -\nabla E(x^i) \quad \Rightarrow \quad H \Delta x = -g
+$$
+
+其中 $\nabla^2 E = M/h^2 + \Delta t^2 \nabla^2 P$。
+
+### Over-Shooting 和 Line Search
+
+**参考：Lec 1 §4.2, 4.4**
+
+Newton 方向可能正确但步长过大（Lec 1 §4.2 的 1D 例子：$E(x)=\sqrt{1+x^2}$，从 $x_0=2$ 跳到 $x_1=-8$）。
+
+解决方案：
+1. **SPD Projection**：保证 $H$ 正定 → 搜索方向一定是下降方向
+2. **Backtracking Line Search**：$\alpha=1$ 开始，如果能量没降就减半，直到 $E(x+\alpha p) \le E(x) + c \cdot \alpha \cdot g^T p$
+
+每次迭代保证 $E(x^{i+1}) < E(x^i)$ — 单调能量下降。
+
+### Dirichlet 边界条件：DOF Elimination
+
+**参考：Lec 3 全文，重点 §4**
+
+固定顶点如何并入 Newton 迭代？采用 DOF Elimination（Lec 3 §4.2-4.3）：
+
+- 当前点已满足约束 $Ax = b$，Newton 增量必须满足 $A\Delta x = 0$
+- 对 sticky DBC，$A$ 是 selection matrix，$\Delta x_B = 0$
+- 实现：受约束行列非对角元清零，对角元设 1，梯度分量设 0
+
+Line search 不会破坏约束（Lec 3 §4.4）：$\Delta x_B = 0$ → 不管 $\alpha$ 多少，$x_B + \alpha \cdot 0 = x_B$。
+
+参考代码：`solid-sim-tutorial/2_dirichlet/time_integrator.py` 中 `search_dir(...)`，`6_inv_free/time_integrator.py` 中的 line search。
+
+---
+
 ## File 1: `solver/line_search.hpp`
 
 Day 1 只做基础回溯 Armijo line search，不做 CCD。

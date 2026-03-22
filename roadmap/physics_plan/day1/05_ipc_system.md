@@ -80,14 +80,11 @@ private:
 
 ### compute_x_hat()
 
+$\hat{x}$ 是纯惯性预测位置，不含外力：
+
 ```cpp
-m_x_hat = m_state.x_prev;
-for (std::size_t i = 0; i < m_state.dof_count(); i += 3) {
-    m_x_hat[i+0] += m_config.dt * m_state.v[i+0];
-    m_x_hat[i+1] += m_config.dt * m_state.v[i+1] + m_config.dt * m_config.dt * m_config.gravity.y();
-    m_x_hat[i+2] += m_config.dt * m_state.v[i+2];
-}
-// gravity 的 x/z 分量同理，如果 gravity 不只是 y 方向
+// x_hat = x_prev + dt * v  （纯惯性，重力由 GravityEnergy 独立处理）
+m_x_hat = m_state.x_prev + m_config.dt * m_state.v;
 ```
 
 ### 总能量装配
@@ -96,6 +93,7 @@ for (std::size_t i = 0; i < m_state.dof_count(); i += 3) {
 double compute_total_energy(const Eigen::VectorXd& x) {
     double E = 0.0;
     E += InertialEnergy::compute_energy(x, m_x_hat, m_state.mass_diag, m_config.dt);
+    E += GravityEnergy::compute_energy(x, m_state.mass_diag, m_config.gravity);
     for (const auto& body : m_tet_bodies) {
         E += TetElasticAssembler::compute_energy(body, /* x */, *m_material);
     }
@@ -104,7 +102,31 @@ double compute_total_energy(const Eigen::VectorXd& x) {
 }
 ```
 
-gradient 和 Hessian 同理，用 `+=` 模式累加。
+gradient 同理，三项用 `+=` 模式累加：
+
+```cpp
+void compute_total_gradient(const Eigen::VectorXd& x, Eigen::VectorXd& gradient) {
+    gradient.setZero();
+    InertialEnergy::compute_gradient(x, m_x_hat, m_state.mass_diag, m_config.dt, gradient);
+    GravityEnergy::compute_gradient(m_state.mass_diag, m_config.gravity, gradient);
+    for (const auto& body : m_tet_bodies) {
+        TetElasticAssembler::compute_gradient(body, /* x */, *m_material, gradient);
+    }
+}
+```
+
+Hessian 只有 inertial + elastic 贡献（gravity 是线性能量，Hessian 为零）：
+
+```cpp
+void compute_total_hessian(const Eigen::VectorXd& x, std::vector<Eigen::Triplet<double>>& triplets) {
+    triplets.clear();
+    InertialEnergy::compute_hessian_triplets(m_state.mass_diag, m_config.dt, triplets);
+    // GravityEnergy: 无 Hessian 贡献（线性能量）
+    for (const auto& body : m_tet_bodies) {
+        TetElasticAssembler::compute_hessian_triplets(body, /* x */, *m_material, triplets);
+    }
+}
+```
 
 ### Day 3 扩展点
 

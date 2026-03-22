@@ -1,5 +1,36 @@
 # Phase 5: 测试与验证
 
+## 理论基础
+
+### 单元→全局装配
+
+**参考：Lec 2 §3.5-3.7**
+
+每个 tet 产生 12×12 局部 Hessian（4 顶点 × 3 DOF），用全局 DOF 索引 scatter 到 triplets，再用 `Eigen::SparseMatrix::setFromTriplets` 构建。
+
+```cpp
+// 对 tet t 的 4 个顶点 v[0..3]
+for (int a = 0; a < 4; ++a)
+    for (int b = 0; b < 4; ++b)
+        for (int di = 0; di < 3; ++di)
+            for (int dj = 0; dj < 3; ++dj)
+                triplets.emplace_back(3*v[a]+di, 3*v[b]+dj, local_H(3*a+di, 3*b+dj));
+```
+
+### 有限差分验证
+
+IPC 从零实现最重要的工程保障。对任意能量 $E(x)$：
+
+$$
+\frac{\partial E}{\partial x_i} \approx \frac{E(x + \epsilon e_i) - E(x - \epsilon e_i)}{2\epsilon}
+$$
+
+Day 1 FD 测试优先级：
+1. inertial energy gradient（二次型，精确到 $10^{-10}$）
+2. tet elastic energy gradient（非线性，精度 ~$10^{-5}$）
+
+---
+
 ## 测试注册
 
 在 `test/CMakeLists.txt` 中新增（需要 link Eigen）：
