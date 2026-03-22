@@ -94,6 +94,31 @@ rtr_add_test(
     Eigen3::Eigen
 )
 rtr_add_test(
+    test_ipc_inertial_energy
+    system/physics/ipc/inertial_energy_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_gravity_energy
+    system/physics/ipc/gravity_energy_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_energy_concept
+    system/physics/ipc/energy_concept_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_fixed_corotated_material
+    system/physics/ipc/fixed_corotated_material_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_material_energy
+    system/physics/ipc/material_energy_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
     test_eigen_compile
     system/physics/ipc/eigen_compile_test.cpp
     Eigen3::Eigen

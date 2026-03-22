@@ -142,8 +142,24 @@ struct TetBody {
     double youngs_modulus{1e5};
     double poisson_ratio{0.3};
 
-    // Boundary
-    std::vector<bool> fixed_vertices;  // true = Dirichlet
+    // Boundary — per-vertex, per-axis Dirichlet constraint
+    // 每个顶点 3 个 bool，分别控制 x/y/z 轴是否固定
+    // {true,true,true} = stick DBC（完全固定）
+    // {false,true,false} = y 轴固定，x/z 自由（沿 xz 平面 slip）
+    // {false,false,false} = 完全自由
+    struct AxisConstraint {
+        std::array<bool, 3> fixed{false, false, false};
+
+        bool is_stick() const { return fixed[0] && fixed[1] && fixed[2]; }
+        bool is_free() const { return !fixed[0] && !fixed[1] && !fixed[2]; }
+        bool any_fixed() const { return fixed[0] || fixed[1] || fixed[2]; }
+    };
+    std::vector<AxisConstraint> vertex_constraints;  // size = vertex_count
+
+    // 便捷接口
+    void fix_vertex(std::size_t v);                        // stick: 固定全部轴
+    void fix_vertex_axis(std::size_t v, int axis);         // slip: 固定单个轴 (0=x,1=y,2=z)
+    void fix_vertex_axes(std::size_t v, std::array<bool,3> axes); // 自由指定
 
     void precompute();  // 计算 Dm_inv, rest_volumes, 质量
 };
@@ -289,7 +305,9 @@ TetBody generate_tet_block(
 );
 ```
 
-Day 1 推荐用 3x3x3 block，顶部一层顶点标记为 fixed。
+Day 1 推荐用 3x3x3 block，顶部一层顶点标记为 stick fixed（`fix_vertex(v)`）。
+
+`vertex_constraints` 在 `generate_tet_block` 后默认全部为 free，由调用方按需设置。
 
 验收：
 - 生成的 mesh 所有 tet 体积 > 0

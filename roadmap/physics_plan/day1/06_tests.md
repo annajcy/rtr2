@@ -97,10 +97,16 @@ TEST(TetBodyTest, TetBlockGeneration)
   - 所有 rest_volumes > 0
   - precompute 不抛异常
 
-TEST(TetBodyTest, FixedVerticesMask)
+TEST(TetBodyTest, StickDBC)
   - 3x3x3 block
-  - 标记 y >= 2.0 的顶点为 fixed
-  - 验证 fixed_vertices 数量正确
+  - 标记 y >= 2.0 的顶点为 stick fixed (fix_vertex)
+  - 验证 vertex_constraints 中 is_stick() 数量正确
+
+TEST(TetBodyTest, AxisAlignedSlipDBC)
+  - 3x3x3 block
+  - 标记底部顶点 (y == 0) 为 y-slip: fix_vertex_axis(v, 1)
+  - 验证 vertex_constraints[v].fixed == {false, true, false}
+  - 验证 is_stick() == false, is_free() == false, any_fixed() == true
 ```
 
 ---
@@ -136,6 +142,16 @@ TEST(IPCTetSmokeTest, EnergyDecreases)
   - 给一些顶点初始速度
   - 观察能量（通过 solver log 或直接算）
   - 多步后系统倾向于静止（惯性能主导的阻尼效果）
+
+TEST(IPCTetSmokeTest, SlipDBCBottomPlane)
+  - 3x3x3 tet block
+  - 底部顶点 (y==0) 设为 y-slip: fix_vertex_axis(v, 1)
+  - 不固定顶部
+  - step 10 次
+  - 验证无 NaN
+  - 验证底部顶点 y 坐标始终 == 0（y 轴锁定）
+  - 验证底部顶点 x/z 坐标可以变化（自由滑动）
+  - 验证非底部顶点在重力下有 y 方向位移
 ```
 
 ---

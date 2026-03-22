@@ -42,10 +42,10 @@ private:
     std::vector<TetBody> m_tet_bodies;
     // std::vector<ObstacleBody> m_obstacle_bodies;  // Day 3
 
-    std::unique_ptr<TetMaterialModel> m_material;
+    FixedCorotatedMaterial m_material;  // concept，编译期多态，无虚函数开销
 
     Eigen::VectorXd m_x_hat;  // 预测位置
-    std::vector<bool> m_free_dof_mask;
+    std::vector<bool> m_free_dof_mask;  // per-DOF, 从 vertex_constraints 展开
 
     void compute_x_hat();
     void build_free_dof_mask();
@@ -75,7 +75,9 @@ private:
 2. compute_x_hat()
 3. newton_solve(state, x_hat, free_dof_mask, ...)
 4. state.v = (state.x - state.x_prev) / dt
-5. 对 fixed vertices: state.v[fixed] = 0
+5. 对 fixed DOFs: state.v[i] = 0  （按 free_dof_mask 逐 DOF 清零）
+   // stick vertex: 3 个分量全清零
+   // slip vertex: 只清零被约束的轴分量，保留自由轴的速度
 ```
 
 ### compute_x_hat()
@@ -95,7 +97,7 @@ double compute_total_energy(const Eigen::VectorXd& x) {
     E += InertialEnergy::compute_energy(x, m_x_hat, m_state.mass_diag, m_config.dt);
     E += GravityEnergy::compute_energy(x, m_state.mass_diag, m_config.gravity);
     for (const auto& body : m_tet_bodies) {
-        E += TetElasticAssembler::compute_energy(body, /* x */, *m_material);
+        E += MaterialEnergy<FixedCorotatedMaterial>::compute_energy(body, x, m_material);
     }
     // Day 3: += BarrierEnergy::compute_energy(...)
     return E;
@@ -110,7 +112,7 @@ void compute_total_gradient(const Eigen::VectorXd& x, Eigen::VectorXd& gradient)
     InertialEnergy::compute_gradient(x, m_x_hat, m_state.mass_diag, m_config.dt, gradient);
     GravityEnergy::compute_gradient(m_state.mass_diag, m_config.gravity, gradient);
     for (const auto& body : m_tet_bodies) {
-        TetElasticAssembler::compute_gradient(body, /* x */, *m_material, gradient);
+        MaterialEnergy<FixedCorotatedMaterial>::compute_gradient(body, x, m_material, gradient);
     }
 }
 ```
@@ -123,7 +125,7 @@ void compute_total_hessian(const Eigen::VectorXd& x, std::vector<Eigen::Triplet<
     InertialEnergy::compute_hessian_triplets(m_state.mass_diag, m_config.dt, triplets);
     // GravityEnergy: 无 Hessian 贡献（线性能量）
     for (const auto& body : m_tet_bodies) {
-        TetElasticAssembler::compute_hessian_triplets(body, /* x */, *m_material, triplets);
+        MaterialEnergy<FixedCorotatedMaterial>::compute_hessian_triplets(body, x, m_material, triplets);
     }
 }
 ```
@@ -156,5 +158,6 @@ class PhysicsSystem {
 验收：
 - `initialize()` 后 `state()` 有正确大小
 - `step()` 一次后顶点位置有变化
-- fixed vertices 保持固定
+- stick DBC vertices 保持完全固定
+- slip DBC vertices 在约束轴上不动，自由轴可以移动
 - 多步 step 后不出 NaN

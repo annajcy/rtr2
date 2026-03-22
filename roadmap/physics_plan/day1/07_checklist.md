@@ -33,7 +33,7 @@
 - [ ] 建目录 `test/system/physics/ipc/solver/`
 - [ ] `core/ipc_state.hpp` 完成
 - [ ] `model/ipc_body.hpp` 完成
-- [ ] `model/tet_body.hpp` 完成（含 precompute）
+- [ ] `model/tet_body.hpp` 完成（含 precompute + AxisConstraint + fix_vertex/fix_vertex_axis）
 - [ ] `model/obstacle_body.hpp` 占位完成
 - [ ] tet block 生成工具完成
 - [ ] `ipc_state_test.cpp` 通过
@@ -43,9 +43,9 @@
 
 - [ ] `energy/inertial_energy.hpp` 完成
 - [ ] `energy/gravity_energy.hpp` 完成
-- [ ] `energy/tet_material_model.hpp` 抽象完成
-- [ ] `energy/tet_fixed_corotated_energy.hpp` 完成（至少 energy + PK1）
-- [ ] `energy/tet_elastic_assembler.hpp` 完成
+- [ ] `energy/tet_material_model.hpp` concept 定义完成
+- [ ] `energy/tet_fixed_corotated_energy.hpp` 完成（至少 energy + PK1），满足 `MaterialModel` concept
+- [ ] `energy/material_energy.hpp` 完成（`MaterialModel` → 全局 DOF 的桥接）
 - [ ] 单 tet energy 手算验证正确
 
 ### Phase 3: Solver
@@ -69,6 +69,7 @@
 - [ ] `ipc_tet_smoke_test.cpp` SingleStepNoNaN 通过
 - [ ] `ipc_tet_smoke_test.cpp` MultiStepStable 通过
 - [ ] `ipc_tet_smoke_test.cpp` ZeroGravityStationary 通过
+- [ ] `ipc_tet_smoke_test.cpp` SlipDBCBottomPlane 通过
 - [ ] cmake build + ctest 全部通过
 
 ### 可选
