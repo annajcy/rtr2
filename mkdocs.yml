@@ -54,8 +54,24 @@ nav:
           - Physics:
               - Overview: documentation/system/physics/overview.md
               - Runtime Integration: documentation/system/physics/runtime-integration.md
-              - Cloth Simulation: documentation/system/physics/cloth-simulation.md
               - Rigid Body Dynamics: documentation/system/physics/rigid-body-dynamics.md
+              # BEGIN AUTO-GENERATED PHYSICS NAV
+              - IPC:
+                  - Overview: documentation/system/physics/ipc/overview.md
+                  - Core:
+                      - Overview: documentation/system/physics/ipc/core/overview.md
+                      - IPC State: documentation/system/physics/ipc/core/ipc_state.md
+                  - Energy:
+                      - Overview: documentation/system/physics/ipc/energy/overview.md
+                  - Model:
+                      - Overview: documentation/system/physics/ipc/model/overview.md
+                      - IPC Body: documentation/system/physics/ipc/model/ipc_body.md
+                      - Obstacle Body: documentation/system/physics/ipc/model/obstacle_body.md
+                      - Tet Body: documentation/system/physics/ipc/model/tet_body.md
+                      - Tet Mesh Convert: documentation/system/physics/ipc/model/tet_mesh_convert.md
+                  - Solver:
+                      - Overview: documentation/system/physics/ipc/solver/overview.md
+              # END AUTO-GENERATED PHYSICS NAV
       - Utils: documentation/utils.md
   - Profiling:
       - MacOS: profiling/macos.md
