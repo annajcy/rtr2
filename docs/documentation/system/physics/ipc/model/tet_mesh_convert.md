@@ -60,7 +60,7 @@ using `surface_vertex_ids`. This removes interior vertices from the render mesh.
 
 There are two entry points:
 
-- `tet_to_mesh(const Eigen::VectorXd& positions, ...)`
+- `tet_to_mesh(const Eigen::VectorXd& positions, ..., vertex_offset)`
 - `tet_to_mesh(const TetGeometry& geometry, ...)`
 
 The first reads vertex positions from a global `3N` DOF vector:
@@ -74,7 +74,15 @@ x_i =
 \end{bmatrix}
 $$
 
-The second reads them from `geometry.rest_positions`.
+When `positions` is the full `IPCState::x`, the optional `vertex_offset` is used to shift body-local surface vertex ids into global vertex ids:
+
+$$
+\text{global vertex id} = \text{vertex offset} + \text{body-local vertex id}
+$$
+
+This is what the scene bridge uses for multi-body write-back.
+
+The second entry point reads positions directly from `geometry.rest_positions`.
 
 ### Step 3: rewrite triangle indices
 
@@ -99,7 +107,9 @@ Surface extraction and remapping depend only on tet topology, so they can be cac
 1. update already-mapped surface vertex positions from the current DOF vector
 2. recompute normals
 
-That is cheaper than repeating boundary extraction every frame.
+When the input DOF vector is a global multi-body `IPCState::x`, the function also accepts a `vertex_offset` so body-local surface ids can be mapped into the correct global slice.
+
+That is cheaper than repeating boundary extraction every frame, and it is the path used by `sync_ipc_to_scene(...)`.
 
 ## Mesh-to-Tet Helpers
 

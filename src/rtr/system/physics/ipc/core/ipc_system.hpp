@@ -110,9 +110,35 @@ public:
     }
 
     const IPCState& state() const { return m_state; }
+    bool initialized() const { return m_initialized; }
     const TetBody& tet_body(std::size_t index) const { return m_tet_bodies.at(index); }
     TetBody& tet_body(std::size_t index) { return m_tet_bodies.at(index); }
     std::size_t tet_body_count() const { return m_tet_bodies.size(); }
+
+    void refresh_tet_body_runtime_data(std::size_t index) {
+        auto& body = m_tet_bodies.at(index);
+        const std::size_t base_vertex = body.info.dof_offset / 3u;
+        const std::size_t original_vertex_count = body.vertex_count();
+
+        body.precompute();
+        body.info.vertex_count = body.vertex_count();
+
+        if (!m_initialized) {
+            return;
+        }
+        if (body.vertex_count() != original_vertex_count) {
+            throw std::logic_error(
+                "IPCSystem cannot refresh a tet body whose vertex count changed after initialization."
+            );
+        }
+
+        for (std::size_t local_vertex = 0; local_vertex < body.vertex_count(); ++local_vertex) {
+            const std::size_t global_vertex = base_vertex + local_vertex;
+            const Eigen::Index base = static_cast<Eigen::Index>(3u * global_vertex);
+            m_state.mass_diag.segment<3>(base).setConstant(body.vertex_masses[local_vertex]);
+        }
+        build_free_dof_mask();
+    }
 
     std::vector<Eigen::Vector3d> get_body_positions(std::size_t body_index) const {
         ensure_initialized();

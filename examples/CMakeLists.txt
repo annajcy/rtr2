@@ -32,6 +32,9 @@ if (TARGET rtr_editor)
   add_executable(deformable_mesh_editor editor/deformable_mesh_editor.cpp)
   target_link_libraries(deformable_mesh_editor PRIVATE rtr::runtime rtr::editor)
 
+  add_executable(ipc_fixed_end_block_editor editor/ipc_fixed_end_block_editor.cpp)
+  target_link_libraries(ipc_fixed_end_block_editor PRIVATE rtr::runtime rtr::editor)
+
   add_executable(lab1_angry_bunny games103_lab/lab1_angry_bunny/lab1_angry_bunny.cpp)
   target_link_libraries(lab1_angry_bunny PRIVATE rtr::runtime rtr::editor)
 endif()

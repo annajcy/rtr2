@@ -60,7 +60,7 @@ $$
 
 当前有两个入口：
 
-- `tet_to_mesh(const Eigen::VectorXd& positions, ...)`
+- `tet_to_mesh(const Eigen::VectorXd& positions, ..., vertex_offset)`
 - `tet_to_mesh(const TetGeometry& geometry, ...)`
 
 前者从全局 `3N` 自由度向量中读取当前顶点坐标：
@@ -73,6 +73,14 @@ x_i =
 \mathbf{x}_{3i+2}
 \end{bmatrix}
 $$
+
+当 `positions` 是完整的 `IPCState::x` 时，可选的 `vertex_offset` 用来把 body-local 的 surface 顶点编号平移成全局顶点编号：
+
+$$
+\text{global vertex id} = \text{vertex offset} + \text{body-local vertex id}
+$$
+
+这也是当前 scene bridge 在多 body 回写时使用的方式。
 
 后者则直接读取 `geometry.rest_positions`。
 
@@ -99,7 +107,9 @@ $$
 1. 用最新的 DOF 向量更新已经映射好的 surface 顶点位置
 2. 重新计算法线
 
-这比每一帧都重新跑一遍边界提取便宜得多。
+当输入是多 body 拼接后的全局 `IPCState::x` 时，这个函数同样支持 `vertex_offset`，从而把 body-local surface id 映射到正确的全局区间。
+
+这比每一帧都重新跑一遍边界提取便宜得多，也是当前 `sync_ipc_to_scene(...)` 走的路径。
 
 ## Mesh 到 Tet 的辅助函数
 

@@ -108,5 +108,22 @@ TEST(IPCSystemTest, EmptySystemStepIsNoOp) {
     EXPECT_EQ(system.state().dof_count(), 0u);
 }
 
+TEST(IPCSystemTest, RefreshTetBodyRuntimeDataUpdatesMassDiagonalAfterDensityChange) {
+    IPCSystem system(IPCConfig{.dt = 0.1, .gravity = Eigen::Vector3d::Zero()});
+    system.add_tet_body(make_single_tet_body());
+    system.initialize();
+
+    const double original_mass = system.state().mass_diag[0];
+    auto& body = system.tet_body(0);
+    auto& material = std::get<FixedCorotatedMaterial>(body.material);
+    material.mass_density = 4.0;
+
+    system.refresh_tet_body_runtime_data(0);
+
+    EXPECT_NEAR(system.state().mass_diag[0], original_mass * 2.0, 1e-12);
+    EXPECT_NEAR(system.state().mass_diag[1], original_mass * 2.0, 1e-12);
+    EXPECT_NEAR(system.state().mass_diag[2], original_mass * 2.0, 1e-12);
+}
+
 }  // namespace
 }  // namespace rtr::system::physics::ipc

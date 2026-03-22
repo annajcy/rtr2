@@ -3,14 +3,15 @@
 RTR2 currently has two physics directions under `src/rtr/system/physics/`:
 
 - a runtime-connected rigid-body subsystem in `rigid_body/`
-- an in-progress IPC/FEM subsystem in `ipc/`
+- a first runtime-connected IPC/FEM deformable path in `ipc/`
 
-`PhysicsSystem` currently owns only `RigidBodyWorld`. The IPC subtree already contains its first batch of data structures, but it is not wired into the runtime loop yet.
+`PhysicsSystem` now owns both `RigidBodyWorld` and `ipc::IPCSystem`. The rigid-body runtime is still the more complete subsystem, but the IPC side already has its first scene bridge and editor example.
 
 ## Current Scope
 
-- Implemented: rigid-body simulation, collision detection/response, scene/physics synchronization, IPC/FEM core data structures.
-- Not implemented: cloth runtime, IPC solver loop, IPC contact/barrier/CCD, rigid-body/IPC coupling.
+- Implemented: rigid-body simulation, collision detection/response, scene/physics synchronization, IPC/FEM core data structures, IPC solver loop, IPC scene write-back, IPC fixed-end demo.
+- Not implemented: cloth runtime, IPC contact/barrier/CCD, rigid-body/IPC coupling.
+  Contact/barrier/CCD and rigid-body/IPC coupling are still future work.
 
 ## Fixed-Step Flow
 
@@ -20,9 +21,11 @@ step_scene_physics(scene, physics_system, dt)
     -> PhysicsSystem::step(dt)
          -> RigidBodyWorld::step(dt)
     -> sync_rigid_body_to_scene(...)
+    -> ipc_system.step()
+    -> sync_ipc_to_scene(...)
 ```
 
-`PhysicsSystem::step()` performs world-local simulation only. Scene synchronization stays in the framework integration layer. The IPC subsystem is not part of this flow yet.
+`PhysicsSystem::step()` still performs world-local rigid-body simulation only. Scene synchronization stays in the framework integration layer, and IPC stepping/write-back are now explicitly part of that fixed-step flow.
 
 ## Runtime Ownership
 
@@ -30,7 +33,7 @@ step_scene_physics(scene, physics_system, dt)
 | --- | --- | --- |
 | Scene Graph | game objects, hierarchy, render-facing components | framework layer |
 | `RigidBodyWorld` | rigid-body state, colliders, contacts, solver state | rigid-body runtime |
-| `ipc::IPCState` | future deformable global nodal state | future deformable runtime |
+| `ipc::IPCSystem` / `ipc::IPCState` | deformable global nodal state, masses, per-body offsets | deformable runtime |
 
 Once dynamic rigid bodies start simulating, scene transforms should no longer be treated as the authoritative dynamic state. The same ownership split is intended for deformables once the IPC runtime loop exists.
 
@@ -52,6 +55,8 @@ That subtree follows the source layout: each `ipc/*.hpp` has its own page, and e
 For runtime-connected physics, continue with:
 
 - [`runtime-integration.md`](runtime-integration.md)
+- [`ipc-scene-bridge.md`](ipc-scene-bridge.md)
+- [`ipc-fixed-end-block-example.md`](ipc-fixed-end-block-example.md)
 - [`rigid-body-dynamics.md`](rigid-body-dynamics.md)
 
 For the deformable data layer, continue with:

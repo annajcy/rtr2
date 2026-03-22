@@ -68,6 +68,21 @@ inline pbpt::math::Vec3 read_position_from_dofs(const Eigen::VectorXd& positions
     );
 }
 
+inline void validate_surface_result(const TetSurfaceResult& surface,
+                                    std::size_t vertex_count,
+                                    std::size_t vertex_offset) {
+    for (const uint32_t vertex_id : surface.surface_vertex_ids) {
+        if (vertex_offset + static_cast<std::size_t>(vertex_id) >= vertex_count) {
+            throw std::out_of_range("TetSurfaceResult surface vertex id out of range.");
+        }
+    }
+    for (const uint32_t vertex_id : surface.surface_indices) {
+        if (vertex_offset + static_cast<std::size_t>(vertex_id) >= vertex_count) {
+            throw std::out_of_range("TetSurfaceResult surface index out of range.");
+        }
+    }
+}
+
 template <typename PositionReader>
 inline utils::ObjMeshData build_surface_mesh(const TetSurfaceResult& surface, PositionReader&& read_position) {
     utils::ObjMeshData mesh{};
@@ -224,14 +239,19 @@ inline TetSurfaceResult extract_tet_surface(const TetBody& body) {
 
 // Build a renderable surface mesh from current IPC DOFs.
 // This is the main Day 1 write-back path: IPCState::x -> ObjMeshData.
-inline utils::ObjMeshData tet_to_mesh(const Eigen::VectorXd& positions, const TetSurfaceResult& surface) {
+inline utils::ObjMeshData tet_to_mesh(const Eigen::VectorXd& positions,
+                                      const TetSurfaceResult& surface,
+                                      std::size_t vertex_offset = 0u) {
     if ((positions.size() % 3) != 0) {
         throw std::invalid_argument("tet_to_mesh positions size must be divisible by 3.");
     }
     const std::size_t vertex_count = static_cast<std::size_t>(positions.size() / 3);
-    tet_mesh_convert_detail::validate_surface_result(surface, vertex_count);
+    tet_mesh_convert_detail::validate_surface_result(surface, vertex_count, vertex_offset);
     return tet_mesh_convert_detail::build_surface_mesh(surface, [&](uint32_t vertex_id) {
-        return tet_mesh_convert_detail::read_position_from_dofs(positions, vertex_id);
+        return tet_mesh_convert_detail::read_position_from_dofs(
+            positions,
+            static_cast<uint32_t>(vertex_offset + static_cast<std::size_t>(vertex_id))
+        );
     });
 }
 
@@ -248,7 +268,8 @@ inline utils::ObjMeshData tet_to_mesh(const TetGeometry& geometry, const TetSurf
 inline void update_mesh_positions(
     utils::ObjMeshData& mesh,
     const Eigen::VectorXd& positions,
-    const TetSurfaceResult& surface
+    const TetSurfaceResult& surface,
+    std::size_t vertex_offset = 0u
 ) {
     if (mesh.vertices.size() != surface.surface_vertex_ids.size()) {
         throw std::invalid_argument("update_mesh_positions mesh vertex count must match surface vertex ids.");
@@ -261,11 +282,14 @@ inline void update_mesh_positions(
     }
 
     const std::size_t vertex_count = static_cast<std::size_t>(positions.size() / 3);
-    tet_mesh_convert_detail::validate_surface_result(surface, vertex_count);
+    tet_mesh_convert_detail::validate_surface_result(surface, vertex_count, vertex_offset);
 
     for (std::size_t i = 0; i < surface.surface_vertex_ids.size(); ++i) {
         mesh.vertices[i].position =
-            tet_mesh_convert_detail::read_position_from_dofs(positions, surface.surface_vertex_ids[i]);
+            tet_mesh_convert_detail::read_position_from_dofs(
+                positions,
+                static_cast<uint32_t>(vertex_offset + static_cast<std::size_t>(surface.surface_vertex_ids[i]))
+            );
     }
 
     tet_mesh_convert_detail::recompute_mesh_normals(mesh);

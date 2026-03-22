@@ -3,14 +3,14 @@
 RTR2 当前在 `src/rtr/system/physics/` 下有两个方向：
 
 - 已接入运行时的刚体子系统 `rigid_body/`
-- 正在建设中的 IPC/FEM 子系统 `ipc/`
+- 已经有第一条运行时集成路径的 IPC/FEM 子系统 `ipc/`
 
-当前 `PhysicsSystem` 只持有 `RigidBodyWorld`。`ipc/` 子树已经有第一批核心数据结构，但还没有接到运行时主循环里。
+当前 `PhysicsSystem` 同时持有 `RigidBodyWorld` 和 `ipc::IPCSystem`。刚体仍然是更完整的运行时子系统，但 IPC 这边已经有 scene bridge 和最小 editor example。
 
 ## 当前范围
 
-- 已实现：刚体模拟、碰撞检测与响应、scene/physics 同步、IPC/FEM 的基础数据结构。
-- 未实现：cloth runtime、IPC 求解循环、IPC contact/barrier/CCD、rigid-body/IPC coupling。
+- 已实现：刚体模拟、碰撞检测与响应、scene/physics 同步、IPC/FEM 的基础数据结构、IPC 求解循环、IPC scene write-back、IPC fixed-end 示例。
+- 未实现：cloth runtime、IPC contact/barrier/CCD、rigid-body/IPC coupling。
 
 ## Fixed Tick 流程
 
@@ -20,9 +20,11 @@ step_scene_physics(scene, physics_system, dt)
     -> PhysicsSystem::step(dt)
          -> RigidBodyWorld::step(dt)
     -> sync_rigid_body_to_scene(...)
+    -> ipc_system.step()
+    -> sync_ipc_to_scene(...)
 ```
 
-`PhysicsSystem::step()` 只负责 world 内部求解。scene 同步仍然放在 framework integration 层。IPC 子系统目前还没有进入这条 fixed tick 路径。
+`PhysicsSystem::step()` 仍然只负责刚体 world 内部求解。scene 同步仍然放在 framework integration 层，而 IPC 的步进和写回现在也已经显式进入这条 fixed tick 路径。
 
 ## 运行时所有权
 
@@ -30,7 +32,7 @@ step_scene_physics(scene, physics_system, dt)
 | --- | --- | --- |
 | Scene Graph | GameObject、层级、渲染相关组件 | framework 层 |
 | `RigidBodyWorld` | 刚体状态、碰撞体、接触和求解状态 | 刚体运行时 |
-| `ipc::IPCState` | 未来 deformable 的全局节点状态 | 未来 deformable 运行时 |
+| `ipc::IPCSystem` / `ipc::IPCState` | deformable 的全局节点状态、质量和 per-body offset | deformable 运行时 |
 
 一旦动态刚体开始模拟，scene transform 就不应再被当成动态状态的权威来源。未来 deformable runtime 建起来以后，也会沿用同样的状态所有权划分。
 
@@ -52,6 +54,8 @@ IPC 的详细文档已经拆到与源码镜像的 [`documentation/system/physics
 如果你关心已经接入运行时的物理路径，继续看：
 
 - [`runtime-integration.md`](runtime-integration.md)
+- [`ipc-scene-bridge.md`](ipc-scene-bridge.md)
+- [`ipc-fixed-end-block-example.md`](ipc-fixed-end-block-example.md)
 - [`rigid-body-dynamics.md`](rigid-body-dynamics.md)
 
 如果你关心 deformable 数据层，继续看：

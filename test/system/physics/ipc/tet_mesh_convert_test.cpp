@@ -154,6 +154,47 @@ TEST(TetMeshConvertTest, UpdateMeshPositions) {
     }
 }
 
+TEST(TetMeshConvertTest, UpdateMeshPositionsSupportsVertexOffset) {
+    TetGeometry geometry{};
+    geometry.rest_positions = {
+        Eigen::Vector3d(0.0, 0.0, 0.0),
+        Eigen::Vector3d(1.0, 0.0, 0.0),
+        Eigen::Vector3d(0.0, 1.0, 0.0),
+        Eigen::Vector3d(0.0, 0.0, 1.0),
+    };
+    geometry.tets = {{{0, 1, 2, 3}}};
+    const TetSurfaceResult surface = extract_tet_surface(geometry);
+
+    Eigen::VectorXd positions(24);
+    positions <<
+        -2.0, 0.0, 0.0,
+        -1.0, 0.0, 0.0,
+        -2.0, 1.0, 0.0,
+        -2.0, 0.0, 1.0,
+         0.5, 0.0, 0.0,
+         1.5, 0.0, 0.0,
+         0.5, 1.0, 0.0,
+         0.5, 0.0, 1.0;
+    utils::ObjMeshData mesh = tet_to_mesh(positions, surface, 4u);
+
+    positions <<
+        -2.0, 0.0, 0.0,
+        -1.0, 0.0, 0.0,
+        -2.0, 1.0, 0.0,
+        -2.0, 0.0, 1.0,
+         1.0, 0.5, 0.0,
+         2.0, 0.5, 0.0,
+         1.0, 1.5, 0.0,
+         1.0, 0.5, 1.0;
+    update_mesh_positions(mesh, positions, surface, 4u);
+
+    ASSERT_EQ(mesh.vertices.size(), 4u);
+    EXPECT_NEAR(mesh.vertices[0].position.x(), 1.0f, 1e-6f);
+    EXPECT_NEAR(mesh.vertices[0].position.y(), 0.5f, 1e-6f);
+    EXPECT_NEAR(mesh.vertices[1].position.x(), 2.0f, 1e-6f);
+    EXPECT_NEAR(mesh.vertices[2].position.y(), 1.5f, 1e-6f);
+}
+
 TEST(TetMeshConvertTest, MeshPositionsToEigen) {
     utils::ObjMeshData mesh{};
     mesh.vertices = {

@@ -67,6 +67,12 @@ rtr_add_test(
     rtr::runtime
 )
 rtr_add_test(
+    test_framework_ipc_scene_sync
+    framework/integration/framework_ipc_scene_sync_test.cpp
+    rtr::runtime
+    Eigen3::Eigen
+)
+rtr_add_test(
     test_collision_detection
     system/physics/collision/collision_detection_test.cpp
 )

@@ -54,6 +54,8 @@ nav:
           - Physics:
               - Overview: documentation/system/physics/overview.md
               - Runtime Integration: documentation/system/physics/runtime-integration.md
+              - IPC Scene Bridge: documentation/system/physics/ipc-scene-bridge.md
+              - IPC Fixed-End Block Example: documentation/system/physics/ipc-fixed-end-block-example.md
               - Rigid Body Dynamics: documentation/system/physics/rigid-body-dynamics.md
               # BEGIN AUTO-GENERATED PHYSICS NAV
               - IPC:

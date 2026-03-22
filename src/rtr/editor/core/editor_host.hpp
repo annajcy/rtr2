@@ -204,7 +204,13 @@ private:
 
 public:
     explicit EditorHost(app::AppRuntime& runtime)
-        : m_context(runtime.world(), runtime.resource_manager(), runtime.renderer(), runtime.input_system()) {}
+        : m_context(
+              runtime.world(),
+              runtime.resource_manager(),
+              runtime.renderer(),
+              runtime.input_system(),
+              runtime.physics_system()
+          ) {}
 
     void reset_layout() {
         m_default_layout_initialized = false;
