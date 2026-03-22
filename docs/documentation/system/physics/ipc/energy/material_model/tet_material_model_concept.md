@@ -20,15 +20,11 @@ Material types do not need to inherit from anything — they just need to satisf
 template <typename M>
 concept TetMaterialModel = requires(const M& material,
                                     const Eigen::Matrix3d& F,
-                                    double rest_volume,
-                                    double youngs_modulus,
-                                    double poisson_ratio) {
-    { material.compute_energy(F, rest_volume, youngs_modulus, poisson_ratio) }
-        -> std::convertible_to<double>;
-    { material.compute_pk1(F, rest_volume, youngs_modulus, poisson_ratio) }
-        -> std::convertible_to<Eigen::Matrix3d>;
-    { material.compute_hessian(F, rest_volume, youngs_modulus, poisson_ratio) }
-        -> std::convertible_to<Eigen::Matrix<double, 9, 9>>;
+                                    double rest_volume) {
+    { material.density() } -> std::convertible_to<double>;
+    { material.compute_energy(F, rest_volume) } -> std::convertible_to<double>;
+    { material.compute_pk1(F, rest_volume) } -> std::convertible_to<Eigen::Matrix3d>;
+    { material.compute_hessian(F, rest_volume) } -> std::convertible_to<Eigen::Matrix<double, 9, 9>>;
 };
 ```
 
@@ -36,6 +32,7 @@ concept TetMaterialModel = requires(const M& material,
 
 | Method | Math | Returns | Notes |
 |--------|------|---------|-------|
+| `density` | $\rho$ | `double` | Mass density, used for lumped mass assembly |
 | `compute_energy` | $V_e \cdot \Psi(F)$ | `double` | Total element energy (density × rest volume) |
 | `compute_pk1` | $P = \partial\Psi/\partial F$ | `Matrix3d` | PK1 stress (**without** $V_e$) |
 | `compute_hessian` | $\partial^2\Psi/\partial F^2$ | `Matrix<9,9>` | F-space Hessian ($F$ flattened to 9D) |
@@ -48,10 +45,8 @@ Note: `compute_energy` includes $V_e$, but `compute_pk1` and `compute_hessian` d
 |-----------|------|---------|
 | `F` | `Matrix3d` | Deformation gradient, $F = D_s D_m^{-1}$ |
 | `rest_volume` | `double` | Reference volume $V_e = \|\det(D_m)\| / 6$ |
-| `youngs_modulus` | `double` | Young's modulus $E$ (stiffness) |
-| `poisson_ratio` | `double` | Poisson ratio $\nu \in (-1, 0.5)$ |
 
-The material model only cares about "given $F$, return energy/stress/Hessian". Building $F$ (extracting $D_s$ from global DOFs) and mapping the result (PK1 → nodal forces) is the assembly layer `MaterialEnergy`'s responsibility.
+The material model now owns its own physical parameters. Building $F$ (extracting $D_s$ from global DOFs) and mapping the result (PK1 → nodal forces) is still the assembly layer `MaterialEnergy`'s responsibility.
 
 ## Current Implementation
 

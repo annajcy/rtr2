@@ -30,7 +30,8 @@ struct RotationData {
 inline void validate_material_inputs(const Eigen::Matrix3d& F,
                                      double rest_volume,
                                      double youngs_modulus,
-                                     double poisson_ratio) {
+                                     double poisson_ratio,
+                                     double density) {
     if (!F.allFinite()) {
         throw std::invalid_argument("FixedCorotatedMaterial requires F to be finite.");
     }
@@ -42,6 +43,9 @@ inline void validate_material_inputs(const Eigen::Matrix3d& F,
     }
     if (!std::isfinite(poisson_ratio) || poisson_ratio <= -1.0 || poisson_ratio >= 0.5) {
         throw std::invalid_argument("FixedCorotatedMaterial requires poisson_ratio in (-1, 0.5).");
+    }
+    if (!std::isfinite(density) || density <= 0.0) {
+        throw std::invalid_argument("FixedCorotatedMaterial requires density to be finite and positive.");
     }
 }
 
@@ -122,11 +126,20 @@ inline Eigen::Matrix3d differential_cofactor_matrix(const Eigen::Matrix3d& F, co
 }  // namespace fixed_corotated_detail
 
 struct FixedCorotatedMaterial {
-    double compute_energy(const Eigen::Matrix3d& F,
-                          double rest_volume,
-                          double youngs_modulus,
-                          double poisson_ratio) const {
-        fixed_corotated_detail::validate_material_inputs(F, rest_volume, youngs_modulus, poisson_ratio);
+    double mass_density{1000.0};
+    double youngs_modulus{1e5};
+    double poisson_ratio{0.3};
+
+    double density() const { return mass_density; }
+
+    double compute_energy(const Eigen::Matrix3d& F, double rest_volume) const {
+        fixed_corotated_detail::validate_material_inputs(
+            F,
+            rest_volume,
+            youngs_modulus,
+            poisson_ratio,
+            mass_density
+        );
 
         const auto lame = fixed_corotated_detail::compute_lame_parameters(youngs_modulus, poisson_ratio);
         const fixed_corotated_detail::RotationData rotation_data =
@@ -137,11 +150,14 @@ struct FixedCorotatedMaterial {
         return rest_volume * density;
     }
 
-    Eigen::Matrix3d compute_pk1(const Eigen::Matrix3d& F,
-                                double rest_volume,
-                                double youngs_modulus,
-                                double poisson_ratio) const {
-        fixed_corotated_detail::validate_material_inputs(F, rest_volume, youngs_modulus, poisson_ratio);
+    Eigen::Matrix3d compute_pk1(const Eigen::Matrix3d& F, double rest_volume) const {
+        fixed_corotated_detail::validate_material_inputs(
+            F,
+            rest_volume,
+            youngs_modulus,
+            poisson_ratio,
+            mass_density
+        );
 
         const auto lame = fixed_corotated_detail::compute_lame_parameters(youngs_modulus, poisson_ratio);
         const fixed_corotated_detail::RotationData rotation_data =
@@ -151,11 +167,14 @@ struct FixedCorotatedMaterial {
         return 2.0 * lame.mu * (F - rotation_data.R) + lame.lambda * (J - 1.0) * cofactor;
     }
 
-    Eigen::Matrix<double, 9, 9> compute_hessian(const Eigen::Matrix3d& F,
-                                                double rest_volume,
-                                                double youngs_modulus,
-                                                double poisson_ratio) const {
-        fixed_corotated_detail::validate_material_inputs(F, rest_volume, youngs_modulus, poisson_ratio);
+    Eigen::Matrix<double, 9, 9> compute_hessian(const Eigen::Matrix3d& F, double rest_volume) const {
+        fixed_corotated_detail::validate_material_inputs(
+            F,
+            rest_volume,
+            youngs_modulus,
+            poisson_ratio,
+            mass_density
+        );
 
         const auto lame = fixed_corotated_detail::compute_lame_parameters(youngs_modulus, poisson_ratio);
         const fixed_corotated_detail::RotationData rotation_data =

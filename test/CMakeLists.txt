@@ -77,6 +77,7 @@ rtr_add_test(
 rtr_add_test(
     test_physics_system
     system/physics/physics_system/physics_system_test.cpp
+    Eigen3::Eigen
 )
 rtr_add_test(
     test_tet_mesh_convert
@@ -119,6 +120,11 @@ rtr_add_test(
     Eigen3::Eigen
 )
 rtr_add_test(
+    test_ipc_system
+    system/physics/ipc/ipc_system_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
     test_ipc_line_search
     system/physics/ipc/line_search_test.cpp
     Eigen3::Eigen
@@ -146,6 +152,7 @@ rtr_add_test(
     test_framework_scene_physics_step
     framework/integration/framework_scene_physics_step_test.cpp
     rtr::runtime
+    Eigen3::Eigen
 )
 rtr_add_test(
     test_pipeline_base

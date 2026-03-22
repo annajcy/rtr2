@@ -45,7 +45,9 @@
 - [ ] `energy/gravity_energy.hpp` 完成
 - [ ] `energy/tet_material_model.hpp` concept 定义完成
 - [ ] `energy/tet_fixed_corotated_energy.hpp` 完成（至少 energy + PK1），满足 `MaterialModel` concept
+- [ ] `energy/material_model/tet_material_variant.hpp` 完成（`TetMaterialVariant` = `std::variant<FixedCorotated, ...>`）
 - [ ] `energy/material_energy.hpp` 完成（`MaterialModel` → 全局 DOF 的桥接）
+- [ ] `material_energy_variant` 命名空间完成（`std::visit` dispatch per-body material）
 - [ ] 单 tet energy 手算验证正确
 
 ### Phase 3: Solver

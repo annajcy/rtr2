@@ -137,10 +137,15 @@ struct TetBody {
     std::vector<Eigen::Matrix3d> Dm_inv;     // inv(Dm) for each tet
     std::vector<double> rest_volumes;         // |det(Dm)| / 6
 
-    // Material
+    // Material — 物理参数
     double density{1000.0};    // kg/m^3
     double youngs_modulus{1e5};
     double poisson_ratio{0.3};
+
+    // Material — 本构模型（per-body variant dispatch）
+    // youngs_modulus/poisson_ratio 描述"多硬多弹"
+    // material variant 描述"用什么应力-应变关系"
+    TetMaterialVariant material{FixedCorotatedMaterial{}};
 
     // Boundary — per-vertex, per-axis Dirichlet constraint
     // 每个顶点 3 个 bool，分别控制 x/y/z 轴是否固定

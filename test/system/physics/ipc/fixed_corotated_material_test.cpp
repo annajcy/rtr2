@@ -18,30 +18,36 @@ Eigen::Matrix<double, 9, 1> flatten(const Eigen::Matrix3d& matrix) {
 }
 
 TEST(FixedCorotatedMaterialTest, IdentityHasZeroEnergyAndStress) {
-    const FixedCorotatedMaterial material{};
+    const FixedCorotatedMaterial material{
+        .mass_density = 1200.0,
+        .youngs_modulus = 1e5,
+        .poisson_ratio = 0.3,
+    };
     const Eigen::Matrix3d F = Eigen::Matrix3d::Identity();
 
-    EXPECT_DOUBLE_EQ(material.compute_energy(F, 1.0, 1e5, 0.3), 0.0);
-    EXPECT_TRUE(material.compute_pk1(F, 1.0, 1e5, 0.3).isZero(1e-12));
+    EXPECT_DOUBLE_EQ(material.density(), 1200.0);
+    EXPECT_DOUBLE_EQ(material.compute_energy(F, 1.0), 0.0);
+    EXPECT_TRUE(material.compute_pk1(F, 1.0).isZero(1e-12));
 
-    const auto hessian = material.compute_hessian(F, 1.0, 1e5, 0.3);
+    const auto hessian = material.compute_hessian(F, 1.0);
     EXPECT_TRUE(hessian.allFinite());
 }
 
 TEST(FixedCorotatedMaterialTest, Pk1MatchesFiniteDifferenceEnergyGradient) {
-    const FixedCorotatedMaterial material{};
+    const FixedCorotatedMaterial material{
+        .mass_density = 1000.0,
+        .youngs_modulus = 100.0,
+        .poisson_ratio = 0.3,
+    };
     Eigen::Matrix3d F;
     F << 1.05, 0.02, 0.00,
          0.01, 0.97, 0.03,
          0.00, -0.02, 1.01;
 
     constexpr double rest_volume = 0.5;
-    constexpr double youngs_modulus = 100.0;
-    constexpr double poisson_ratio = 0.3;
     constexpr double epsilon = 1e-6;
 
-    const Eigen::Matrix<double, 9, 1> expected =
-        rest_volume * flatten(material.compute_pk1(F, rest_volume, youngs_modulus, poisson_ratio));
+    const Eigen::Matrix<double, 9, 1> expected = rest_volume * flatten(material.compute_pk1(F, rest_volume));
 
     for (int j = 0; j < 9; ++j) {
         Eigen::Matrix3d F_plus = F;
@@ -49,8 +55,8 @@ TEST(FixedCorotatedMaterialTest, Pk1MatchesFiniteDifferenceEnergyGradient) {
         Eigen::Map<Eigen::Matrix<double, 9, 1>>(F_plus.data())[j] += epsilon;
         Eigen::Map<Eigen::Matrix<double, 9, 1>>(F_minus.data())[j] -= epsilon;
 
-        const double energy_plus = material.compute_energy(F_plus, rest_volume, youngs_modulus, poisson_ratio);
-        const double energy_minus = material.compute_energy(F_minus, rest_volume, youngs_modulus, poisson_ratio);
+        const double energy_plus = material.compute_energy(F_plus, rest_volume);
+        const double energy_minus = material.compute_energy(F_minus, rest_volume);
         const double finite_difference = (energy_plus - energy_minus) / (2.0 * epsilon);
 
         const double tolerance = 1e-5 * std::max(1.0, std::abs(expected[j]));
@@ -66,28 +72,29 @@ TEST(FixedCorotatedMaterialTest, StretchAndCompressionIncreaseEnergy) {
     Eigen::Matrix3d compression = Eigen::Matrix3d::Identity();
     compression(0, 0) = 0.9;
 
-    const double identity_energy = material.compute_energy(identity, 1.0, 1e5, 0.3);
-    const double stretch_energy = material.compute_energy(stretch, 1.0, 1e5, 0.3);
-    const double compression_energy = material.compute_energy(compression, 1.0, 1e5, 0.3);
+    const double identity_energy = material.compute_energy(identity, 1.0);
+    const double stretch_energy = material.compute_energy(stretch, 1.0);
+    const double compression_energy = material.compute_energy(compression, 1.0);
 
     EXPECT_GT(stretch_energy, identity_energy);
     EXPECT_GT(compression_energy, identity_energy);
 }
 
 TEST(FixedCorotatedMaterialTest, HessianMatchesFiniteDifferenceOfPk1) {
-    const FixedCorotatedMaterial material{};
+    const FixedCorotatedMaterial material{
+        .mass_density = 900.0,
+        .youngs_modulus = 150.0,
+        .poisson_ratio = 0.25,
+    };
     Eigen::Matrix3d F;
     F << 1.03, 0.02, -0.01,
          0.01, 0.98, 0.04,
          -0.02, 0.01, 1.05;
 
     constexpr double rest_volume = 0.5;
-    constexpr double youngs_modulus = 150.0;
-    constexpr double poisson_ratio = 0.25;
     constexpr double epsilon = 1e-6;
 
-    const Eigen::Matrix<double, 9, 9> analytic_hessian =
-        material.compute_hessian(F, rest_volume, youngs_modulus, poisson_ratio);
+    const Eigen::Matrix<double, 9, 9> analytic_hessian = material.compute_hessian(F, rest_volume);
 
     for (int j = 0; j < 9; ++j) {
         Eigen::Matrix3d F_plus = F;
@@ -95,8 +102,8 @@ TEST(FixedCorotatedMaterialTest, HessianMatchesFiniteDifferenceOfPk1) {
         Eigen::Map<Eigen::Matrix<double, 9, 1>>(F_plus.data())[j] += epsilon;
         Eigen::Map<Eigen::Matrix<double, 9, 1>>(F_minus.data())[j] -= epsilon;
 
-        const Eigen::Matrix3d P_plus = material.compute_pk1(F_plus, rest_volume, youngs_modulus, poisson_ratio);
-        const Eigen::Matrix3d P_minus = material.compute_pk1(F_minus, rest_volume, youngs_modulus, poisson_ratio);
+        const Eigen::Matrix3d P_plus = material.compute_pk1(F_plus, rest_volume);
+        const Eigen::Matrix3d P_minus = material.compute_pk1(F_minus, rest_volume);
         const Eigen::Matrix<double, 9, 1> finite_difference =
             (flatten(P_plus) - flatten(P_minus)) / (2.0 * epsilon);
 

@@ -22,9 +22,7 @@
 
 - `info`
 - `vertex_masses`
-- `density`
-- `youngs_modulus`
-- `poisson_ratio`
+- `material`
 - `fixed_vertices`
 
 ## 参考构型预计算
@@ -73,7 +71,9 @@ $$
 
 也就是每个 tet 的总质量 `\rho V_e` 平均分给它的四个顶点。结果保存在 `vertex_masses` 中，后面再写入 `IPCState::mass_diag`。
 
-## 为什么 `fixed_vertices` 放在 `TetBody`
+## 为什么 `material` 和 `fixed_vertices` 放在 `TetBody`
+
+`material` 表示 body 级的本构模型选择，以及和它绑定的物理参数。相同的 rest mesh 可以搭配不同材料律和不同参数集，所以整个 material object 都应该留在 `TetBody`，而不是塞进 `TetGeometry`。
 
 `fixed_vertices` 表示顶点是否被 Dirichlet 约束固定。它是 body 级边界条件，而不是几何属性，所以应该和材料、质量一起留在 `TetBody`，而不是塞进 `TetGeometry`。
 

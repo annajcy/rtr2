@@ -15,6 +15,10 @@ $$
 E(x) = \sum_e V_e \cdot \Psi(F_e), \quad F_e = D_s(x) \cdot D_m^{-1}
 $$
 
+The file also provides `material_energy_variant::*` helpers, which dispatch `TetBody::material` through `std::visit` and then forward into the templated `MaterialEnergy<...>` implementation.
+
+`MaterialEnergy` no longer reads `youngs_modulus` or `poisson_ratio` from `TetBody`. The material object itself owns all constitutive parameters.
+
 ## Helper Functions
 
 ### `build_Ds`: extract current-configuration edge vectors from global DOFs

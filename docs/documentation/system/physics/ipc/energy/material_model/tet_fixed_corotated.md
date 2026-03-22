@@ -4,15 +4,22 @@
 
 ## API
 
-`FixedCorotatedMaterial` provides three `const` methods satisfying the `TetMaterialModel` concept:
+`FixedCorotatedMaterial` provides the current `TetMaterialModel` interface:
 
-- `compute_energy(F, rest_volume, youngs_modulus, poisson_ratio)` → `double`
-- `compute_pk1(F, rest_volume, youngs_modulus, poisson_ratio)` → `Matrix3d`
-- `compute_hessian(F, rest_volume, youngs_modulus, poisson_ratio)` → `Matrix<double, 9, 9>`
+- `density()` → `double`
+- `compute_energy(F, rest_volume)` → `double`
+- `compute_pk1(F, rest_volume)` → `Matrix3d`
+- `compute_hessian(F, rest_volume)` → `Matrix<double, 9, 9>`
+
+It also stores:
+
+- `mass_density`
+- `youngs_modulus`
+- `poisson_ratio`
 
 ## Lame Parameters
 
-Engineering parameters (Young's modulus $E$, Poisson ratio $\nu$) → Lame parameters:
+Engineering parameters stored inside the material (Young's modulus $E$, Poisson ratio $\nu$) → Lame parameters:
 
 $$
 \mu = \frac{E}{2(1+\nu)}, \qquad \lambda = \frac{E\nu}{(1+\nu)(1-2\nu)}

@@ -12,6 +12,7 @@ inline void step_scene_physics(core::Scene& scene,
     sync_scene_to_rigid_body(scene, physics_system.rigid_body_world());
     physics_system.step(delta_seconds);
     sync_rigid_body_to_scene(scene, physics_system.rigid_body_world());
+    physics_system.ipc_system().step();
 }
 
 }  // namespace rtr::framework::integration::physics

@@ -55,9 +55,11 @@ TetBody make_solver_test_body() {
         Eigen::Vector3d(0.0, 0.0, 1.0),
     };
     body.geometry.tets = {{{0, 1, 2, 3}}};
-    body.density = 2.0;
-    body.youngs_modulus = 200.0;
-    body.poisson_ratio = 0.3;
+    body.material = FixedCorotatedMaterial{
+        .mass_density = 2.0,
+        .youngs_modulus = 200.0,
+        .poisson_ratio = 0.3,
+    };
     body.precompute();
     body.info.dof_offset = 0;
     return body;

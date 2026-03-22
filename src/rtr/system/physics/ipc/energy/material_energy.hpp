@@ -3,6 +3,8 @@
 #include <array>
 #include <cstddef>
 #include <stdexcept>
+#include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <Eigen/Core>
@@ -104,12 +106,7 @@ public:
             const Eigen::Matrix3d Ds =
                 material_energy_detail::build_Ds(input.x, input.body.info.dof_offset, tet);
             const Eigen::Matrix3d F = Ds * input.body.geometry.Dm_inv[tet_index];
-            total_energy += input.material.compute_energy(
-                F,
-                input.body.geometry.rest_volumes[tet_index],
-                input.body.youngs_modulus,
-                input.body.poisson_ratio
-            );
+            total_energy += input.material.compute_energy(F, input.body.geometry.rest_volumes[tet_index]);
         }
         return total_energy;
     }
@@ -127,12 +124,7 @@ public:
             const Eigen::Matrix3d& Dm_inv = input.body.geometry.Dm_inv[tet_index];
             const Eigen::Matrix3d F = Ds * Dm_inv;
             const double rest_volume = input.body.geometry.rest_volumes[tet_index];
-            const Eigen::Matrix3d P = input.material.compute_pk1(
-                F,
-                rest_volume,
-                input.body.youngs_modulus,
-                input.body.poisson_ratio
-            );
+            const Eigen::Matrix3d P = input.material.compute_pk1(F, rest_volume);
             const auto grad_N = material_energy_detail::compute_shape_gradients(Dm_inv);
 
             for (int local_vertex = 0; local_vertex < 4; ++local_vertex) {
@@ -155,12 +147,7 @@ public:
             const Eigen::Matrix3d& Dm_inv = input.body.geometry.Dm_inv[tet_index];
             const Eigen::Matrix3d F = Ds * Dm_inv;
             const double rest_volume = input.body.geometry.rest_volumes[tet_index];
-            Eigen::Matrix<double, 9, 9> hessian_F = input.material.compute_hessian(
-                F,
-                rest_volume,
-                input.body.youngs_modulus,
-                input.body.poisson_ratio
-            );
+            Eigen::Matrix<double, 9, 9> hessian_F = input.material.compute_hessian(F, rest_volume);
             hessian_F = 0.5 * (hessian_F + hessian_F.transpose());
 
             const auto grad_N = material_energy_detail::compute_shape_gradients(Dm_inv);
@@ -189,5 +176,60 @@ public:
         }
     }
 };
+
+namespace material_energy_variant {
+
+inline double compute_energy(const TetBody& body, const Eigen::VectorXd& x) {
+    return std::visit(
+        [&](const auto& material) {
+            return MaterialEnergy<std::decay_t<decltype(material)>>::compute_energy(
+                typename MaterialEnergy<std::decay_t<decltype(material)>>::Input{
+                    .body = body,
+                    .x = x,
+                    .material = material,
+                }
+            );
+        },
+        body.material
+    );
+}
+
+inline void compute_gradient(const TetBody& body,
+                             const Eigen::VectorXd& x,
+                             Eigen::VectorXd& gradient) {
+    std::visit(
+        [&](const auto& material) {
+            MaterialEnergy<std::decay_t<decltype(material)>>::compute_gradient(
+                typename MaterialEnergy<std::decay_t<decltype(material)>>::Input{
+                    .body = body,
+                    .x = x,
+                    .material = material,
+                },
+                gradient
+            );
+        },
+        body.material
+    );
+}
+
+inline void compute_hessian_triplets(const TetBody& body,
+                                     const Eigen::VectorXd& x,
+                                     std::vector<Eigen::Triplet<double>>& triplets) {
+    std::visit(
+        [&](const auto& material) {
+            MaterialEnergy<std::decay_t<decltype(material)>>::compute_hessian_triplets(
+                typename MaterialEnergy<std::decay_t<decltype(material)>>::Input{
+                    .body = body,
+                    .x = x,
+                    .material = material,
+                },
+                triplets
+            );
+        },
+        body.material
+    );
+}
+
+}  // namespace material_energy_variant
 
 }  // namespace rtr::system::physics::ipc

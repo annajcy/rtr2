@@ -24,8 +24,11 @@ TetBody make_single_tet_body() {
         Eigen::Vector3d(0.0, 0.0, 1.0),
     };
     body.geometry.tets = {{{0, 1, 2, 3}}};
-    body.youngs_modulus = 100.0;
-    body.poisson_ratio = 0.3;
+    body.material = FixedCorotatedMaterial{
+        .mass_density = 1000.0,
+        .youngs_modulus = 100.0,
+        .poisson_ratio = 0.3,
+    };
     body.precompute();
     return body;
 }
@@ -56,12 +59,7 @@ TEST(MaterialEnergyTest, SingleTetEnergyMatchesDirectMaterialCall) {
     };
 
     const Eigen::Matrix3d F = build_F(body, x);
-    const double expected_energy = material.compute_energy(
-        F,
-        body.geometry.rest_volumes[0],
-        body.youngs_modulus,
-        body.poisson_ratio
-    );
+    const double expected_energy = material.compute_energy(F, body.geometry.rest_volumes[0]);
 
     EXPECT_NEAR(MaterialEnergy<FixedCorotatedMaterial>::compute_energy(input), expected_energy, 1e-12);
 }

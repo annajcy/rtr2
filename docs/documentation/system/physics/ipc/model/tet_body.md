@@ -22,9 +22,7 @@ This separation keeps pure geometry tasks independent from body-level physics at
 
 - `info`
 - `vertex_masses`
-- `density`
-- `youngs_modulus`
-- `poisson_ratio`
+- `material`
 - `fixed_vertices`
 
 ## Rest-Shape Precompute
@@ -73,7 +71,9 @@ $$
 
 Each tet contributes total mass `\rho V_e`, then distributes it equally to its four vertices. The result is stored in `vertex_masses` and later meant to be written into `IPCState::mass_diag`.
 
-## Why `fixed_vertices` Lives in `TetBody`
+## Why `material` and `fixed_vertices` Live in `TetBody`
+
+`material` is a body-level constitutive choice together with its own physical parameters. The same rest mesh could be simulated with different material laws and different parameter sets, so the whole material object belongs in `TetBody`.
 
 `fixed_vertices` is a body-level boundary-condition mask, not a geometric property. It answers whether a vertex is currently pinned by a Dirichlet condition, so it belongs next to material and mass data rather than inside `TetGeometry`.
 

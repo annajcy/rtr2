@@ -4,11 +4,14 @@
 #include <cmath>
 #include <cstddef>
 #include <stdexcept>
+#include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <Eigen/Core>
 #include <Eigen/LU>
 
+#include "rtr/system/physics/ipc/energy/material_model/tet_material_variant.hpp"
 #include "rtr/system/physics/ipc/model/ipc_body.hpp"
 
 namespace rtr::system::physics::ipc {
@@ -90,10 +93,7 @@ struct TetBody {
     TetGeometry geometry{};
 
     std::vector<double> vertex_masses{};
-
-    double density{1000.0};
-    double youngs_modulus{1e5};
-    double poisson_ratio{0.3};
+    TetMaterialVariant material{FixedCorotatedMaterial{}};
 
     std::vector<bool> fixed_vertices{};
 
@@ -116,6 +116,13 @@ public:
         geometry.precompute_rest_data();
         normalize_fixed_vertices();
         vertex_masses.assign(vertex_count(), 0.0);
+
+        const double density = std::visit(
+            [](const auto& tet_material) {
+                return static_cast<double>(tet_material.density());
+            },
+            material
+        );
 
         for (std::size_t tet_index = 0; tet_index < geometry.tet_count(); ++tet_index) {
             const double tet_vertex_mass = density * geometry.rest_volumes[tet_index] / 4.0;

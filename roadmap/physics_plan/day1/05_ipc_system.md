@@ -1,8 +1,110 @@
 # Phase 4: IPCSystem 组装
 
-## File: `core/ipc_system.hpp`
+## Per-Body Material Variant
 
-Day 1 的 IPCSystem 是一个独立的 simulation driver，不接入 PhysicsSystem 主循环。
+### 设计动机
+
+之前的方案是 IPCSystem 持有一个全局 `FixedCorotatedMaterial m_material`，所有 body 共用。这有两个问题：
+
+1. **不同 body 可能需要不同材料模型**：比如一个用 FixedCorotated，另一个用 NeoHookean
+2. **材料模型是 body 的固有属性**，不应该由 system 统一持有
+
+新方案：**TetBody 自己存储一个 `TetMaterialVariant`**，每个 body 携带自己的材料模型。
+
+### `TetMaterialVariant` 类型定义
+
+```cpp
+// energy/material_model/tet_material_variant.hpp
+#pragma once
+
+#include <variant>
+#include "rtr/system/physics/ipc/energy/material_model/tet_fixed_corotated.hpp"
+// #include "rtr/system/physics/ipc/energy/material_model/tet_neo_hookean.hpp"  // Day 2+
+
+namespace rtr::system::physics::ipc {
+
+/// Day 1 只有一种材料，但 variant 框架已就位
+using TetMaterialVariant = std::variant<
+    FixedCorotatedMaterial
+    // NeoHookeanMaterial,  // Day 2+
+    // StVKMaterial,        // Day 2+
+>;
+
+}  // namespace rtr::system::physics::ipc
+```
+
+### TetBody 变更
+
+```cpp
+struct TetBody {
+    IPCBodyInfo info{.type = IPCBodyType::Tet};
+    TetGeometry geometry{};
+
+    std::vector<double> vertex_masses{};
+
+    double density{1000.0};
+    double youngs_modulus{1e5};
+    double poisson_ratio{0.3};
+
+    TetMaterialVariant material{FixedCorotatedMaterial{}};  // 新增：per-body 材料
+
+    std::vector<bool> fixed_vertices{};
+    // ...
+};
+```
+
+`youngs_modulus` 和 `poisson_ratio` 仍然留在 TetBody 上，因为它们是**物理参数**（所有材料模型都需要），而 `material` 是**本构模型**（同样的 $E$、$\nu$ 在不同模型下给出不同的应力-应变关系）。
+
+### MaterialEnergy 的 Variant Dispatch
+
+`MaterialEnergy` 的模板参数从编译期固定变为通过 `std::visit` 在 variant 上运行时 dispatch：
+
+```cpp
+// 新增：variant-aware 版本
+namespace material_energy_variant {
+
+inline double compute_energy(const TetBody& body, const Eigen::VectorXd& x) {
+    return std::visit([&](const auto& material) {
+        return MaterialEnergy<std::decay_t<decltype(material)>>::compute_energy(
+            {.body = body, .x = x, .material = material});
+    }, body.material);
+}
+
+inline void compute_gradient(const TetBody& body, const Eigen::VectorXd& x,
+                             Eigen::VectorXd& gradient) {
+    std::visit([&](const auto& material) {
+        MaterialEnergy<std::decay_t<decltype(material)>>::compute_gradient(
+            {.body = body, .x = x, .material = material}, gradient);
+    }, body.material);
+}
+
+inline void compute_hessian_triplets(const TetBody& body, const Eigen::VectorXd& x,
+                                     std::vector<Eigen::Triplet<double>>& triplets) {
+    std::visit([&](const auto& material) {
+        MaterialEnergy<std::decay_t<decltype(material)>>::compute_hessian_triplets(
+            {.body = body, .x = x, .material = material}, triplets);
+    }, body.material);
+}
+
+}  // namespace material_energy_variant
+```
+
+**关键点**：`std::visit` 的 lambda 接收 `const auto& material`，编译器为 variant 中的每个类型生成一份特化——**内循环仍然是模板 inline，没有虚函数开销**。运行时 dispatch 只发生一次（在 variant 的 type index 上做 switch），之后整个 per-tet 循环都是单态内联的。
+
+### 性能分析
+
+```
+std::visit 开销（per body per step）:
+  1 次 variant index 检查 → 分支预测几乎必中（同一 body 的类型不会变）
+  之后全部是模板内联的 per-tet 循环
+
+vs 之前的方案（IPCSystem 持有 m_material）:
+  0 次 dispatch，纯编译期
+
+差异：每 body 多一次可预测分支。对于内循环 O(T) 的 tet 遍历来说可忽略。
+```
+
+## File: `core/ipc_system.hpp`
 
 ### 接口
 
@@ -42,7 +144,7 @@ private:
     std::vector<TetBody> m_tet_bodies;
     // std::vector<ObstacleBody> m_obstacle_bodies;  // Day 3
 
-    FixedCorotatedMaterial m_material;  // concept，编译期多态，无虚函数开销
+    // 不再持有 m_material —— 材料模型由每个 TetBody 自己携带
 
     Eigen::VectorXd m_x_hat;  // 预测位置
     std::vector<bool> m_free_dof_mask;  // per-DOF, 从 vertex_constraints 展开
@@ -91,13 +193,15 @@ m_x_hat = m_state.x_prev + m_config.dt * m_state.v;
 
 ### 总能量装配
 
+通过 `material_energy_variant` 命名空间的帮助函数，每个 body 自动 dispatch 到自己的材料模型：
+
 ```cpp
 double compute_total_energy(const Eigen::VectorXd& x) {
     double E = 0.0;
     E += InertialEnergy::compute_energy(x, m_x_hat, m_state.mass_diag, m_config.dt);
     E += GravityEnergy::compute_energy(x, m_state.mass_diag, m_config.gravity);
     for (const auto& body : m_tet_bodies) {
-        E += MaterialEnergy<FixedCorotatedMaterial>::compute_energy(body, x, m_material);
+        E += material_energy_variant::compute_energy(body, x);  // variant dispatch
     }
     // Day 3: += BarrierEnergy::compute_energy(...)
     return E;
@@ -112,7 +216,7 @@ void compute_total_gradient(const Eigen::VectorXd& x, Eigen::VectorXd& gradient)
     InertialEnergy::compute_gradient(x, m_x_hat, m_state.mass_diag, m_config.dt, gradient);
     GravityEnergy::compute_gradient(m_state.mass_diag, m_config.gravity, gradient);
     for (const auto& body : m_tet_bodies) {
-        MaterialEnergy<FixedCorotatedMaterial>::compute_gradient(body, x, m_material, gradient);
+        material_energy_variant::compute_gradient(body, x, gradient);  // variant dispatch
     }
 }
 ```
@@ -125,10 +229,12 @@ void compute_total_hessian(const Eigen::VectorXd& x, std::vector<Eigen::Triplet<
     InertialEnergy::compute_hessian_triplets(m_state.mass_diag, m_config.dt, triplets);
     // GravityEnergy: 无 Hessian 贡献（线性能量）
     for (const auto& body : m_tet_bodies) {
-        MaterialEnergy<FixedCorotatedMaterial>::compute_hessian_triplets(body, x, m_material, triplets);
+        material_energy_variant::compute_hessian_triplets(body, x, triplets);  // variant dispatch
     }
 }
 ```
+
+**对比旧方案**：原来是 `MaterialEnergy<FixedCorotatedMaterial>::compute_energy(body, x, m_material)`，material 类型在 IPCSystem 编译时固定。现在是 `material_energy_variant::compute_energy(body, x)`，material 从 body.material variant 中取，调用方不需要知道具体类型。
 
 ### Day 3 扩展点
 
@@ -410,6 +516,7 @@ int main() {
 
     // 1. 生成 tet block（3×3×3 网格，spacing=0.3，起始于 y=2 处）
     auto body = ipc::generate_tet_block(3, 3, 3, 0.3, Eigen::Vector3d{-0.45, 2.0, -0.45});
+    body.material = ipc::FixedCorotatedMaterial{};  // per-body 材料（Day 2+ 可换成其他模型）
 
     // 2. 底面 y-slip DBC：y ≈ 2.0 的顶点约束 y 轴
     //    （实际 demo 中不约束，让方块自由落体；或约束底面模拟平面接触）

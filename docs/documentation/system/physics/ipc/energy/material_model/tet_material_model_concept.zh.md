@@ -20,15 +20,11 @@
 template <typename M>
 concept TetMaterialModel = requires(const M& material,
                                     const Eigen::Matrix3d& F,
-                                    double rest_volume,
-                                    double youngs_modulus,
-                                    double poisson_ratio) {
-    { material.compute_energy(F, rest_volume, youngs_modulus, poisson_ratio) }
-        -> std::convertible_to<double>;
-    { material.compute_pk1(F, rest_volume, youngs_modulus, poisson_ratio) }
-        -> std::convertible_to<Eigen::Matrix3d>;
-    { material.compute_hessian(F, rest_volume, youngs_modulus, poisson_ratio) }
-        -> std::convertible_to<Eigen::Matrix<double, 9, 9>>;
+                                    double rest_volume) {
+    { material.density() } -> std::convertible_to<double>;
+    { material.compute_energy(F, rest_volume) } -> std::convertible_to<double>;
+    { material.compute_pk1(F, rest_volume) } -> std::convertible_to<Eigen::Matrix3d>;
+    { material.compute_hessian(F, rest_volume) } -> std::convertible_to<Eigen::Matrix<double, 9, 9>>;
 };
 ```
 
@@ -36,6 +32,7 @@ concept TetMaterialModel = requires(const M& material,
 
 | 方法 | 数学 | 返回 | 说明 |
 |------|------|------|------|
+| `density` | $\rho$ | `double` | 质量密度，用于 lumped mass 装配 |
 | `compute_energy` | $V_e \cdot \Psi(F)$ | `double` | 单元总能量（密度 × rest volume） |
 | `compute_pk1` | $P = \partial\Psi/\partial F$ | `Matrix3d` | PK1 stress（**不含** $V_e$） |
 | `compute_hessian` | $\partial^2\Psi/\partial F^2$ | `Matrix<9,9>` | F-space Hessian（$F$ 展平为 9 维） |
@@ -48,10 +45,8 @@ concept TetMaterialModel = requires(const M& material,
 |------|------|------|
 | `F` | `Matrix3d` | 形变梯度，$F = D_s D_m^{-1}$ |
 | `rest_volume` | `double` | 参考构型体积 $V_e = \|\det(D_m)\| / 6$ |
-| `youngs_modulus` | `double` | 杨氏模量 $E$（刚度） |
-| `poisson_ratio` | `double` | 泊松比 $\nu \in (-1, 0.5)$ |
 
-材料模型只关心"给定 $F$，返回能量/应力/Hessian"。$F$ 的构建（从全局 DOF 提取 $D_s$）和结果的映射（PK1 → 节点力）都属于装配层 `MaterialEnergy` 的职责。
+材料模型现在自己持有物理参数。$F$ 的构建（从全局 DOF 提取 $D_s$）和结果的映射（PK1 → 节点力）仍然属于装配层 `MaterialEnergy` 的职责。
 
 ## 当前实现
 

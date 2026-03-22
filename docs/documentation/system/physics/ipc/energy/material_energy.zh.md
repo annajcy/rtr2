@@ -15,6 +15,10 @@ $$
 E(x) = \sum_e V_e \cdot \Psi(F_e), \quad F_e = D_s(x) \cdot D_m^{-1}
 $$
 
+这个文件现在还提供了 `material_energy_variant::*` 辅助函数，用 `std::visit` 对 `TetBody::material` 做 dispatch，再转发到模板化的 `MaterialEnergy<...>` 实现。
+
+`MaterialEnergy` 不再从 `TetBody` 读取 `youngs_modulus` 或 `poisson_ratio`。这些本构参数现在完全由 material object 自己持有。
+
 ## 前置工具函数
 
 ### `build_Ds`：从全局 DOF 提取当前构型边向量

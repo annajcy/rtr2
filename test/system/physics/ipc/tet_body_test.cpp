@@ -16,7 +16,11 @@ TEST(TetBodyTest, SingleTetPrecompute) {
         Eigen::Vector3d(0.0, 0.0, 1.0),
     };
     body.geometry.tets = {{{0, 1, 2, 3}}};
-    body.density = 12.0;
+    body.material = FixedCorotatedMaterial{
+        .mass_density = 12.0,
+        .youngs_modulus = 1e5,
+        .poisson_ratio = 0.3,
+    };
 
     body.precompute();
 

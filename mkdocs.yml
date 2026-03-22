@@ -61,12 +61,14 @@ nav:
                   - Core:
                       - Overview: documentation/system/physics/ipc/core/overview.md
                       - IPC State: documentation/system/physics/ipc/core/ipc_state.md
+                      - IPC System: documentation/system/physics/ipc/core/ipc_system.md
                   - Energy:
                       - Overview: documentation/system/physics/ipc/energy/overview.md
                       - Material Model:
                           - Overview: documentation/system/physics/ipc/energy/material_model/overview.md
                           - Tet Fixed Corotated: documentation/system/physics/ipc/energy/material_model/tet_fixed_corotated.md
                           - Tet Material Model Concept: documentation/system/physics/ipc/energy/material_model/tet_material_model_concept.md
+                          - Tet Material Variant: documentation/system/physics/ipc/energy/material_model/tet_material_variant.md
                       - Energy Concept: documentation/system/physics/ipc/energy/energy_concept.md
                       - Gravity Energy: documentation/system/physics/ipc/energy/gravity_energy.md
                       - Inertial Energy: documentation/system/physics/ipc/energy/inertial_energy.md
