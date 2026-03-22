@@ -7,7 +7,7 @@
 #include "rtr/framework/component/component.hpp"
 #include "rtr/framework/component/material/deformable_mesh_component.hpp"
 #include "rtr/framework/core/game_object.hpp"
-#include "rtr/system/physics/common/normal_recompute.hpp"
+#include "rtr/system/physics/normal_recompute.hpp"
 
 namespace rtr::examples {
 

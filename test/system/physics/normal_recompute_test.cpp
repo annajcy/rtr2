@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "rtr/system/physics/common/normal_recompute.hpp"
+#include "rtr/system/physics/normal_recompute.hpp"
 
 using namespace rtr::system::physics;
 

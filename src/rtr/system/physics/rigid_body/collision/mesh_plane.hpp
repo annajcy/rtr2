@@ -1,8 +1,8 @@
 #pragma once
 
-#include "rtr/system/physics/collision/collider_shape.hpp"
-#include "rtr/system/physics/collision/contact.hpp"
-#include "rtr/system/physics/collision/plane_common.hpp"
+#include "rtr/system/physics/rigid_body/collision/collider_shape.hpp"
+#include "rtr/system/physics/rigid_body/collision/contact.hpp"
+#include "rtr/system/physics/rigid_body/collision/plane_common.hpp"
 
 namespace rtr::system::physics {
 

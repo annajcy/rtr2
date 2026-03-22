@@ -4,6 +4,22 @@
 
 按顺序执行，每完成一项打勾。
 
+### Phase -1: 清理 Physics 目录
+
+- [ ] `collision/` 移入 `rigid_body/collision/`
+- [ ] 修改 `rigid_body_world.hpp`、`collider.hpp`、`contact.hpp` 的 collision include 路径
+- [ ] `common/` 文件分流：ids/material/step_context -> `rigid_body/`
+- [ ] `normal_recompute.hpp` 提到 `physics/` 顶层
+- [ ] 删除 `cloth/` 全链路（源/框架/编辑器/测试/示例）
+- [ ] 修改 `physics_system.hpp`：去掉 ClothWorld
+- [ ] 修改 `scene_physics_step.hpp`：去掉 cloth sync
+- [ ] 修改 `inspector_panel.hpp`：去掉 cloth include
+- [ ] `fem/tet_surface_extract.hpp` 移到 `ipc/model/`
+- [ ] 删除 `coupling/`、`common/`（如已空）
+- [ ] 新建 `ipc/{core,model,energy,solver}/` 目录
+- [ ] 更新 `test/CMakeLists.txt`：删 cloth 测试、改 collision 测试路径
+- [ ] `cmake --build` 成功 + 现有测试通过
+
 ### Phase 0: Eigen 引入
 
 - [ ] `conanfile.py` 加 `eigen/3.4.0`

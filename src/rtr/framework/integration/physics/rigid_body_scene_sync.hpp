@@ -10,7 +10,7 @@
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
-#include "rtr/system/physics/collision/collider_shape.hpp"
+#include "rtr/system/physics/rigid_body/collision/collider_shape.hpp"
 #include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
 
 namespace rtr::framework::integration::physics {

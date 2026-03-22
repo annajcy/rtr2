@@ -32,14 +32,8 @@ if (TARGET rtr_editor)
   add_executable(deformable_mesh_editor editor/deformable_mesh_editor.cpp)
   target_link_libraries(deformable_mesh_editor PRIVATE rtr::runtime rtr::editor)
 
-  add_executable(cloth_bunny_editor editor/cloth_bunny_editor.cpp)
-  target_link_libraries(cloth_bunny_editor PRIVATE rtr::runtime rtr::editor)
-
   add_executable(lab1_angry_bunny games103_lab/lab1_angry_bunny/lab1_angry_bunny.cpp)
   target_link_libraries(lab1_angry_bunny PRIVATE rtr::runtime rtr::editor)
-
-  add_executable(lab2_cloth games103_lab/lab2_cloth/lab2_cloth.cpp)
-  target_link_libraries(lab2_cloth PRIVATE rtr::runtime rtr::editor)
 endif()
 
 add_executable(shadertoy runtime/shadertoy.cpp)

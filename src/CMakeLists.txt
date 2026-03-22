@@ -10,6 +10,7 @@ target_include_directories(rtr_runtime INTERFACE
 
 target_link_libraries(rtr_runtime INTERFACE
   stb_impl
+  Eigen3::Eigen
   glfw
   Vulkan::Loader
   spdlog::spdlog

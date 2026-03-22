@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
-#include "rtr/system/physics/fem/tet_surface_extract.hpp"
+#include "rtr/system/physics/ipc/model/tet_surface_extract.hpp"
 #include <array>
 #include <vector>
 
-using namespace rtr::system::physics::fem;
+using namespace rtr::system::physics::ipc;
 
 TEST(TetSurfaceExtract, SingleTetrahedron) {
     uint32_t vertex_count = 4;

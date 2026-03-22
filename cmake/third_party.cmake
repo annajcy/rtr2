@@ -7,6 +7,7 @@ else()
 endif()
 
 find_package(VulkanLoader   CONFIG REQUIRED)
+find_package(Eigen3         CONFIG REQUIRED)
 find_package(glfw3          CONFIG REQUIRED)
 find_package(nlohmann_json  CONFIG REQUIRED)
 find_package(TinyGLTF       CONFIG REQUIRED)

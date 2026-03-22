@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace rtr::system::physics::fem {
+namespace rtr::system::physics::ipc {
 
 struct TetSurfaceResult {
     std::vector<uint32_t> surface_indices;    // triangle indices
@@ -89,4 +89,4 @@ inline TetSurfaceResult extract_tet_surface(
     return result;
 }
 
-} // namespace rtr::system::physics::fem
+} // namespace rtr::system::physics::ipc

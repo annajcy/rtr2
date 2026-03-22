@@ -29,16 +29,35 @@
 
 ## 执行顺序
 
-```
-Phase 0: Eigen 引入与构建验证          (~30 min)
-Phase 1: 核心数据结构                   (~1.5 hr)
-Phase 2: 能量模块                       (~2 hr)
-Phase 3: Newton solver + line search    (~1.5 hr)
-Phase 4: IPCSystem 组装                 (~1 hr)
-Phase 5: 测试与验证                     (~1.5 hr)
+```text
+Phase -1: 清理 Physics 目录结构          (~1 hr)
+Phase  0: Eigen 引入与构建验证           (~30 min)
+Phase  1: 核心数据结构                   (~1.5 hr)
+Phase  2: 能量模块                       (~2 hr)
+Phase  3: Newton solver + line search    (~1.5 hr)
+Phase  4: IPCSystem 组装                 (~1 hr)
+Phase  5: 测试与验证                     (~1.5 hr)
 ```
 
 详见各阶段文件。
+
+Phase -1 必须最先做：把 collision 合并进 rigid_body，删除 cloth/fem/common/coupling，新建 ipc 目录。这样后续所有代码直接写入干净的目录结构。
+
+## 清理后的 Physics 目录结构
+
+```text
+src/rtr/system/physics/
+├── physics_system.hpp
+├── normal_recompute.hpp
+├── rigid_body/              # 保留 + collision 合并
+│   ├── collision/           # 从 physics/collision/ 移入
+│   └── ...
+└── ipc/                     # 新建
+    ├── core/
+    ├── model/
+    ├── energy/
+    └── solver/
+```
 
 ## 文件依赖图
 

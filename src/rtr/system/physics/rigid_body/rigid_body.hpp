@@ -8,7 +8,7 @@
 #include "pbpt/math/complex/quaternion.hpp"
 #include "pbpt/math/matrix/matrix.hpp"
 #include "pbpt/math/spatial/vector.hpp"
-#include "rtr/system/physics/common/physics_ids.hpp"
+#include "rtr/system/physics/rigid_body/physics_ids.hpp"
 #include "rtr/system/physics/rigid_body/rigid_body_type.hpp"
 
 namespace rtr::system::physics {

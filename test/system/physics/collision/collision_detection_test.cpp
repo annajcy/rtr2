@@ -5,13 +5,13 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/system/physics/collision/box_box.hpp"
-#include "rtr/system/physics/collision/box_plane.hpp"
-#include "rtr/system/physics/collision/contact.hpp"
-#include "rtr/system/physics/collision/mesh_plane.hpp"
-#include "rtr/system/physics/collision/sphere_box.hpp"
-#include "rtr/system/physics/collision/sphere_plane.hpp"
-#include "rtr/system/physics/collision/sphere_sphere.hpp"
+#include "rtr/system/physics/rigid_body/collision/box_box.hpp"
+#include "rtr/system/physics/rigid_body/collision/box_plane.hpp"
+#include "rtr/system/physics/rigid_body/collision/contact.hpp"
+#include "rtr/system/physics/rigid_body/collision/mesh_plane.hpp"
+#include "rtr/system/physics/rigid_body/collision/sphere_box.hpp"
+#include "rtr/system/physics/rigid_body/collision/sphere_plane.hpp"
+#include "rtr/system/physics/rigid_body/collision/sphere_sphere.hpp"
 
 namespace rtr::system::physics::test {
 

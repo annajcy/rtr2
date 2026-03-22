@@ -75,36 +75,21 @@ rtr_add_test(
     system/physics/rigid_body/rigid_body_world_test.cpp
 )
 rtr_add_test(
-    test_cloth_mesh_topology_builder
-    system/physics/cloth/cloth_mesh_topology_builder_test.cpp
-)
-rtr_add_test(
-    test_cloth_state
-    system/physics/cloth/cloth_state_test.cpp
-)
-rtr_add_test(
-    test_cloth_spring
-    system/physics/cloth/cloth_spring_test.cpp
-)
-rtr_add_test(
-    test_cloth_world
-    system/physics/cloth/cloth_world_test.cpp
-)
-rtr_add_test(
     test_physics_system
     system/physics/physics_system/physics_system_test.cpp
 )
 rtr_add_test(
     test_tet_surface_extract
-    system/physics/fem/tet_surface_extract_test.cpp
+    system/physics/ipc/tet_surface_extract_test.cpp
+)
+rtr_add_test(
+    test_eigen_compile
+    system/physics/ipc/eigen_compile_test.cpp
+    Eigen3::Eigen
 )
 rtr_add_test(
     test_normal_recompute
-    system/physics/common/normal_recompute_test.cpp
-)
-rtr_add_test(
-    test_deformable_mesh_state
-    system/physics/common/deformable_mesh_state_test.cpp
+    system/physics/normal_recompute_test.cpp
 )
 rtr_add_test(
     test_framework_forward_scene_view_builder
@@ -114,11 +99,6 @@ rtr_add_test(
 rtr_add_test(
     test_framework_scene_physics_step
     framework/integration/framework_scene_physics_step_test.cpp
-    rtr::runtime
-)
-rtr_add_test(
-    test_framework_deformable_mesh_sync
-    framework/integration/framework_deformable_mesh_sync_test.cpp
     rtr::runtime
 )
 rtr_add_test(
@@ -190,11 +170,6 @@ rtr_add_test(
 rtr_add_integration_test(
     test_framework_deformable_mesh_component
     framework/component/framework_deformable_mesh_component_test.cpp
-    rtr::runtime
-)
-rtr_add_test(
-    test_framework_cloth_component
-    framework/component/framework_cloth_component_test.cpp
     rtr::runtime
 )
 rtr_add_test(

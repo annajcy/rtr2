@@ -21,7 +21,7 @@
 #include "rtr/framework/component/material/deformable_mesh_component.hpp"
 #include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/system/input/input_types.hpp"
-#include "rtr/system/physics/common/normal_recompute.hpp"
+#include "rtr/system/physics/normal_recompute.hpp"
 #include "sine_wave_deformer.hpp"
 
 int main() {

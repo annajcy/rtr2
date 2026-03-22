@@ -2,8 +2,8 @@
 
 #include <pbpt/math/math.h>
 
-#include "rtr/system/physics/collision/contact.hpp"
-#include "rtr/system/physics/common/physics_ids.hpp"
+#include "rtr/system/physics/rigid_body/collision/contact.hpp"
+#include "rtr/system/physics/rigid_body/physics_ids.hpp"
 
 namespace rtr::system::physics {
 
