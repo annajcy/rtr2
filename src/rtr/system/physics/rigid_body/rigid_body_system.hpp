@@ -9,6 +9,7 @@
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -24,6 +25,7 @@
 #include "rtr/system/physics/rigid_body/collision/sphere_plane.hpp"
 #include "rtr/system/physics/rigid_body/collision/sphere_sphere.hpp"
 #include "rtr/system/physics/rigid_body/rigid_body.hpp"
+#include "rtr/framework/core/types.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::system::physics::rb {
@@ -99,8 +101,13 @@ private:
     }
 
     std::unordered_map<RigidBodyID, RigidBody>   m_rigid_bodies{};
+    std::unordered_map<framework::core::GameObjectId, RigidBodyID> m_owner_to_rigid_body{};
+    std::unordered_map<RigidBodyID, framework::core::GameObjectId> m_rigid_body_to_owner{};
     std::unordered_map<ColliderID, Collider>     m_colliders{};
+    std::unordered_map<framework::core::GameObjectId, ColliderID> m_owner_to_collider{};
+    std::unordered_map<ColliderID, framework::core::GameObjectId> m_collider_to_owner{};
     std::unordered_multimap<RigidBodyID, ColliderID> m_colliders_by_body{};
+    std::unordered_set<framework::core::GameObjectId> m_scene_sync_dirty_owners{};
     RigidBodyID                                  m_next_rigid_body_id{0};
     ColliderID                                   m_next_collider_id{0};
     pbpt::math::Vec3                             m_gravity{0.0f, -9.81f, 0.0f};
@@ -437,6 +444,60 @@ public:
     static constexpr std::uint32_t kDefaultVelocityIterations = 8;
     static constexpr std::uint32_t kDefaultPositionIterations = 3;
 
+    std::optional<RigidBodyID> try_get_rigid_body_id_for_owner(framework::core::GameObjectId owner_id) const {
+        const auto it = m_owner_to_rigid_body.find(owner_id);
+        if (it == m_owner_to_rigid_body.end()) {
+            return std::nullopt;
+        }
+        return it->second;
+    }
+
+    bool has_rigid_body_for_owner(framework::core::GameObjectId owner_id) const {
+        return try_get_rigid_body_id_for_owner(owner_id).has_value();
+    }
+
+    std::vector<framework::core::GameObjectId> rigid_body_owner_ids() const {
+        std::vector<framework::core::GameObjectId> owner_ids{};
+        owner_ids.reserve(m_owner_to_rigid_body.size());
+        for (const auto& [owner_id, body_id] : m_owner_to_rigid_body) {
+            if (m_rigid_bodies.contains(body_id)) {
+                owner_ids.push_back(owner_id);
+            }
+        }
+        return owner_ids;
+    }
+
+    RigidBody* try_get_rigid_body_for_owner(framework::core::GameObjectId owner_id) {
+        const auto id = try_get_rigid_body_id_for_owner(owner_id);
+        if (!id.has_value()) {
+            return nullptr;
+        }
+        return &m_rigid_bodies.at(*id);
+    }
+
+    const RigidBody* try_get_rigid_body_for_owner(framework::core::GameObjectId owner_id) const {
+        const auto id = try_get_rigid_body_id_for_owner(owner_id);
+        if (!id.has_value()) {
+            return nullptr;
+        }
+        return &m_rigid_bodies.at(*id);
+    }
+
+    RigidBodyID create_or_replace_rigid_body(framework::core::GameObjectId owner_id, RigidBody rigid_body) {
+        if (const auto existing_id = try_get_rigid_body_id_for_owner(owner_id); existing_id.has_value()) {
+            auto& existing_body = m_rigid_bodies.at(*existing_id);
+            existing_body = std::move(rigid_body);
+            m_scene_sync_dirty_owners.erase(owner_id);
+            return *existing_id;
+        }
+
+        const RigidBodyID id = create_rigid_body(std::move(rigid_body));
+        m_owner_to_rigid_body[owner_id] = id;
+        m_rigid_body_to_owner[id] = owner_id;
+        m_scene_sync_dirty_owners.erase(owner_id);
+        return id;
+    }
+
     RigidBodyID create_rigid_body(RigidBody rigid_body = RigidBody{}) {
         const RigidBodyID id = m_next_rigid_body_id++;
         m_rigid_bodies[id]   = std::move(rigid_body);
@@ -467,13 +528,98 @@ public:
         return id;
     }
 
+    std::optional<ColliderID> try_get_collider_id_for_owner(framework::core::GameObjectId owner_id) const {
+        const auto it = m_owner_to_collider.find(owner_id);
+        if (it == m_owner_to_collider.end()) {
+            return std::nullopt;
+        }
+        return it->second;
+    }
+
+    bool has_collider_for_owner(framework::core::GameObjectId owner_id) const {
+        return try_get_collider_id_for_owner(owner_id).has_value();
+    }
+
+    std::vector<framework::core::GameObjectId> collider_owner_ids() const {
+        std::vector<framework::core::GameObjectId> owner_ids{};
+        owner_ids.reserve(m_owner_to_collider.size());
+        for (const auto& [owner_id, collider_id] : m_owner_to_collider) {
+            if (m_colliders.contains(collider_id)) {
+                owner_ids.push_back(owner_id);
+            }
+        }
+        return owner_ids;
+    }
+
+    Collider* try_get_collider_for_owner(framework::core::GameObjectId owner_id) {
+        const auto id = try_get_collider_id_for_owner(owner_id);
+        if (!id.has_value()) {
+            return nullptr;
+        }
+        return &m_colliders.at(*id);
+    }
+
+    const Collider* try_get_collider_for_owner(framework::core::GameObjectId owner_id) const {
+        const auto id = try_get_collider_id_for_owner(owner_id);
+        if (!id.has_value()) {
+            return nullptr;
+        }
+        return &m_colliders.at(*id);
+    }
+
+    ColliderID create_or_replace_collider(framework::core::GameObjectId owner_id,
+                                          framework::core::GameObjectId body_owner_id,
+                                          Collider collider = Collider{}) {
+        const auto body_id = try_get_rigid_body_id_for_owner(body_owner_id);
+        if (!body_id.has_value()) {
+            throw std::out_of_range("Collider owner body does not exist.");
+        }
+        collider.rigid_body_id = *body_id;
+
+        if (const auto existing_id = try_get_collider_id_for_owner(owner_id); existing_id.has_value()) {
+            auto& existing_collider = m_colliders.at(*existing_id);
+            remove_body_index_entry(existing_collider.rigid_body_id, *existing_id);
+            existing_collider = std::move(collider);
+            m_colliders_by_body.emplace(*body_id, *existing_id);
+            return *existing_id;
+        }
+
+        const ColliderID id = create_collider(*body_id, std::move(collider));
+        m_owner_to_collider[owner_id] = id;
+        m_collider_to_owner[id] = owner_id;
+        return id;
+    }
+
     bool has_rigid_body(RigidBodyID id) const { return m_rigid_bodies.count(id) > 0; }
     bool has_collider(ColliderID id) const { return m_colliders.count(id) > 0; }
+
+    bool remove_rigid_body_for_owner(framework::core::GameObjectId owner_id) {
+        const auto id = try_get_rigid_body_id_for_owner(owner_id);
+        if (!id.has_value()) {
+            return false;
+        }
+        return remove_rigid_body(*id);
+    }
+
+    bool remove_collider_for_owner(framework::core::GameObjectId owner_id) {
+        const auto id = try_get_collider_id_for_owner(owner_id);
+        if (!id.has_value()) {
+            return false;
+        }
+        return remove_collider(*id);
+    }
 
     bool remove_rigid_body(RigidBodyID id) {
         if (!has_rigid_body(id)) {
             logger()->warn("remove_rigid_body ignored: rigid body {} does not exist.", id);
             return false;
+        }
+
+        const auto owner_it = m_rigid_body_to_owner.find(id);
+        const bool has_owner = owner_it != m_rigid_body_to_owner.end();
+        const auto owner_id = has_owner ? owner_it->second : framework::core::kInvalidGameObjectId;
+        if (has_owner && has_collider_for_owner(owner_id)) {
+            (void)remove_collider_for_owner(owner_id);
         }
 
         const auto collider_ids = colliders_for_body(id);
@@ -482,6 +628,11 @@ public:
         }
         const auto removed = m_rigid_bodies.erase(id) > 0;
         if (removed) {
+            if (has_owner) {
+                m_owner_to_rigid_body.erase(owner_id);
+                m_rigid_body_to_owner.erase(id);
+                m_scene_sync_dirty_owners.erase(owner_id);
+            }
             logger()->debug("Rigid body removed (rigid_body_id={}, removed_colliders={}, body_count={}).",
                             id,
                             collider_ids.size(),
@@ -495,8 +646,13 @@ public:
             logger()->debug("remove_collider ignored: collider {} does not exist.", id);
             return false;
         }
+        const auto owner_it = m_collider_to_owner.find(id);
         const auto owner_body_id = get_collider(id).rigid_body_id;
         remove_collider_internal(id);
+        if (owner_it != m_collider_to_owner.end()) {
+            m_owner_to_collider.erase(owner_it->second);
+            m_collider_to_owner.erase(owner_it);
+        }
         logger()->debug("Collider removed (collider_id={}, owner_rigid_body_id={}, collider_count={}).",
                         id,
                         owner_body_id,
@@ -525,6 +681,14 @@ public:
             result.push_back(it->second);
         }
         return result;
+    }
+
+    bool is_scene_sync_dirty_for_owner(framework::core::GameObjectId owner_id) const {
+        return m_scene_sync_dirty_owners.contains(owner_id);
+    }
+
+    void clear_scene_sync_dirty_for_owner(framework::core::GameObjectId owner_id) {
+        m_scene_sync_dirty_owners.erase(owner_id);
     }
 
     const pbpt::math::Vec3& gravity() const { return m_gravity; }
@@ -592,6 +756,16 @@ public:
         for (auto& [id, rb] : m_rigid_bodies) {
             (void)id;
             rb.clear_forces();
+        }
+
+        for (const auto& [owner_id, body_id] : m_owner_to_rigid_body) {
+            const auto it = m_rigid_bodies.find(body_id);
+            if (it == m_rigid_bodies.end()) {
+                continue;
+            }
+            if (it->second.type() == RigidBodyType::Dynamic) {
+                m_scene_sync_dirty_owners.insert(owner_id);
+            }
         }
 
         if (!solver_contacts.empty() && log->should_log(spdlog::level::debug)) {

@@ -8,25 +8,27 @@
 
 ```cpp
 sync_scene_to_rigid_body(scene, physics_system.rigid_body_system());
-physics_system.step(dt);
+sync_scene_to_ipc(scene, physics_system.ipc_system());
+
+physics_system.rigid_body_system().step(dt);
 sync_rigid_body_to_scene(scene, physics_system.rigid_body_system());
 
-physics_system.ipc_system().step();
+physics_system.ipc_system().step(dt);
 sync_ipc_to_scene(scene, physics_system.ipc_system());
 ```
 
 这里有两个关键点：
 
-- `PhysicsSystem::step(dt)` 目前只推进 `rb::RigidBodySystem`。
-- IPC 的 `step()` 和 IPC -> scene 的回写，都显式放在 framework integration 层完成。
+- 刚体和 IPC 的 step 都显式写在 framework integration 层；
+- scene -> runtime 的同步发生在求解前，runtime -> scene 的同步发生在求解后。
 
-## 为什么 IPC 不放进 `PhysicsSystem::step()`
+## 为什么现在由 framework 显式推进两个子系统
 
 刚体子系统直接使用 runtime fixed tick 传入的 `dt`。
 
-IPC 子系统则有自己的 `IPCConfig::dt`，内部执行的是 backward Euler 下的非线性优化求解。把 `ipc_system().step()` 留在 `scene_physics_step` 这一层，可以明确保留 deformable runtime 的固定时间步边界，同时让 scene 写回的位置也更清晰。
+IPC 子系统现在也直接消费 runtime fixed tick 传入的 `dt`，内部执行的是 backward Euler 下的非线性优化求解。把 `rigid_body_system().step(dt)` 和 `ipc_system().step(dt)` 都显式留在 `scene_physics_step` 这一层，可以更清楚地保留 fixed-step 边界，也让 pre-sync / post-sync 的顺序更直接。
 
-当前 example 里会把 `AppRuntimeConfig::fixed_delta_seconds` 设成 `0.01`，与默认的 `IPCConfig::dt` 对齐。
+当前 example 里通常会把 `AppRuntimeConfig::fixed_delta_seconds` 设成 `0.01`，这也比较适合 deformable 求解器设置。
 
 ## Scene / Physics / Renderer 的状态所有权
 
@@ -56,12 +58,12 @@ rb::RigidBodySystem -> sync_rigid_body_to_scene(...) -> Scene
 
 ## IPC 方向
 
-IPC 当前采用稍微不同的所有权方式：
+IPC 当前仍然采用稍微不同的所有权方式：
 
-- scene -> IPC 主要发生在注册时，而不是每帧
-- IPC -> scene 会在每个 fixed tick 的 `ipc_system().step()` 之后发生
+- scene -> IPC 是 dirty 驱动的 source 同步，而不是每帧 scene transform 覆盖
+- IPC -> scene 会在每个 fixed tick 的 `ipc_system().step(dt)` 之后发生
 
-原因是当前 `TetBody` 会在初始化后注册到 `IPCSystem` 中，之后节点状态由 deformable runtime 自己维护，scene graph 不会每帧反向覆盖这些节点位置。
+原因是当前 `TetBody` 一旦注册到 `IPCSystem`，节点状态就由 deformable runtime 自己维护，scene graph 不会每帧反向覆盖这些节点位置。
 
 这条桥接链上的关键对象是：
 
@@ -87,9 +89,9 @@ GameObject / Components
              |
              \--> sync_ipc_to_scene(...)
 
-rb::RigidBodySystem <----- PhysicsSystem::step(dt)
+rb::RigidBodySystem::step(dt)
 
-ipc::IPCSystem::step()
+ipc::IPCSystem::step(dt)
     -> 更新 IPCState::x
     -> sync_ipc_to_scene(...)
     -> apply_deformed_surface(...)

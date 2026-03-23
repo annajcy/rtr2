@@ -5,7 +5,7 @@ This page documents the rigid-body half of the current RTR2 physics runtime. The
 ## Runtime Context
 
 - Scene/physics synchronization is performed by `step_scene_physics(...)`.
-- `PhysicsSystem::step(dt)` currently advances `rb::RigidBodySystem`.
+- `step_scene_physics(...)` explicitly calls `rb::RigidBodySystem::step(dt)`.
 - This page focuses only on `rb::RigidBodySystem`.
 
 ## Current Pipeline

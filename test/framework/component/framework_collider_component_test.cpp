@@ -2,30 +2,28 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
-#include "rtr/framework/component/physics/rigid_body/mesh_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/physics/rigid_body_scene_sync.hpp"
-#include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 namespace rtr::framework::component::test {
 
 namespace {
 
-utils::ObjMeshData make_triangle_mesh() {
-    utils::ObjMeshData mesh{};
-    mesh.vertices = {
-        {.position = pbpt::math::Vec3{0.2f, -0.2f, 0.0f}},
-        {.position = pbpt::math::Vec3{0.4f, -0.2f, 0.0f}},
-        {.position = pbpt::math::Vec3{0.6f, 0.2f, 0.0f}},
-    };
-    mesh.indices = {0, 1, 2};
-    return mesh;
+system::physics::rb::RigidBodyID body_id_for(const system::physics::rb::RigidBodySystem& physics_world,
+                                             const core::GameObject& go) {
+    const auto body_id = physics_world.try_get_rigid_body_id_for_owner(go.id());
+    EXPECT_TRUE(body_id.has_value());
+    return *body_id;
+}
+
+std::vector<system::physics::rb::ColliderID> colliders_for(const system::physics::rb::RigidBodySystem& physics_world,
+                                                           const core::GameObject& go) {
+    return physics_world.colliders_for_body(body_id_for(physics_world, go));
 }
 
 }  // namespace
@@ -35,7 +33,7 @@ TEST(FrameworkColliderComponentTest, SphereColliderThrowsWhenRigidBodyIsMissing)
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("sphere");
-    EXPECT_THROW((void)go.add_component<SphereCollider>(physics_world, 0.5f), std::runtime_error);
+    EXPECT_THROW((void)go.add_component<SphereCollider>(0.5f), std::runtime_error);
 }
 
 TEST(FrameworkColliderComponentTest, BoxColliderThrowsWhenRigidBodyIsMissing) {
@@ -43,8 +41,7 @@ TEST(FrameworkColliderComponentTest, BoxColliderThrowsWhenRigidBodyIsMissing) {
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("box");
-    EXPECT_THROW((void)go.add_component<BoxCollider>(physics_world, pbpt::math::Vec3{1.0f, 1.0f, 1.0f}),
-                 std::runtime_error);
+    EXPECT_THROW((void)go.add_component<BoxCollider>(pbpt::math::Vec3{1.0f, 1.0f, 1.0f}), std::runtime_error);
 }
 
 TEST(FrameworkColliderComponentTest, PlaneColliderThrowsWhenRigidBodyIsMissing) {
@@ -52,17 +49,7 @@ TEST(FrameworkColliderComponentTest, PlaneColliderThrowsWhenRigidBodyIsMissing) 
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("plane");
-    EXPECT_THROW((void)go.add_component<PlaneCollider>(physics_world), std::runtime_error);
-}
-
-TEST(FrameworkColliderComponentTest, MeshColliderThrowsWhenStaticMeshComponentIsMissing) {
-    system::physics::rb::RigidBodySystem physics_world;
-    resource::ResourceManager     resources;
-    core::Scene                   scene(1);
-
-    auto& go = scene.create_game_object("mesh");
-    (void)go.add_component<RigidBody>(physics_world);
-    EXPECT_THROW((void)go.add_component<MeshCollider>(physics_world), std::runtime_error);
+    EXPECT_THROW((void)go.add_component<PlaneCollider>(), std::runtime_error);
 }
 
 TEST(FrameworkColliderComponentTest, StaticRigidBodyCanOwnBoxColliderAndDestroyRemovesCollider) {
@@ -70,16 +57,18 @@ TEST(FrameworkColliderComponentTest, StaticRigidBodyCanOwnBoxColliderAndDestroyR
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("wall");
-    auto& rigid_body = go.add_component<RigidBody>(physics_world);
+    auto& rigid_body = go.add_component<RigidBody>();
     rigid_body.set_type(system::physics::rb::RigidBodyType::Static);
-    (void)go.add_component<BoxCollider>(physics_world, pbpt::math::Vec3{1.0f, 1.0f, 1.0f});
+    (void)go.add_component<BoxCollider>(pbpt::math::Vec3{1.0f, 1.0f, 1.0f});
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
 
-    const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
+    const auto collider_ids = colliders_for(physics_world, go);
     ASSERT_EQ(collider_ids.size(), 1u);
     EXPECT_TRUE(physics_world.has_collider(collider_ids.front()));
 
     EXPECT_TRUE(scene.destroy_game_object(go.id()));
-    EXPECT_FALSE(physics_world.has_rigid_body(rigid_body.rigid_body_id()));
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
+    EXPECT_FALSE(physics_world.has_rigid_body_for_owner(go.id()));
     EXPECT_FALSE(physics_world.has_collider(collider_ids.front()));
 }
 
@@ -88,15 +77,16 @@ TEST(FrameworkColliderComponentTest, SphereColliderSettersDeferPhysicsSyncUntilS
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("sphere");
-    auto& rigid_body = go.add_component<RigidBody>(physics_world);
-    auto& sphere = go.add_component<SphereCollider>(physics_world, 0.5f);
+    auto& rigid_body = go.add_component<RigidBody>();
+    auto& sphere = go.add_component<SphereCollider>(0.5f);
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
 
     sphere.set_local_position(pbpt::math::Vec3{1.0f, 2.0f, 3.0f});
     sphere.set_local_rotation(
         pbpt::math::angle_axis(pbpt::math::radians(30.0f), pbpt::math::Vec3{0.0f, 1.0f, 0.0f}));
     sphere.set_local_scale(pbpt::math::Vec3{2.0f, 3.0f, 4.0f});
 
-    const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
+    const auto collider_ids = colliders_for(physics_world, go);
     ASSERT_EQ(collider_ids.size(), 1u);
     const auto& stale_collider = physics_world.get_collider(collider_ids.front());
 
@@ -127,15 +117,16 @@ TEST(FrameworkColliderComponentTest, BoxColliderSettersDeferPhysicsSyncUntilScen
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("box");
-    auto& rigid_body = go.add_component<RigidBody>(physics_world);
-    auto& box = go.add_component<BoxCollider>(physics_world, pbpt::math::Vec3{0.5f, 0.75f, 1.0f});
+    auto& rigid_body = go.add_component<RigidBody>();
+    auto& box = go.add_component<BoxCollider>(pbpt::math::Vec3{0.5f, 0.75f, 1.0f});
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
 
     box.set_local_position(pbpt::math::Vec3{-1.0f, 0.5f, 2.0f});
     box.set_local_rotation(
         pbpt::math::angle_axis(pbpt::math::radians(45.0f), pbpt::math::Vec3{1.0f, 0.0f, 0.0f}));
     box.set_local_scale(pbpt::math::Vec3{1.5f, 2.0f, 2.5f});
 
-    const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
+    const auto collider_ids = colliders_for(physics_world, go);
     ASSERT_EQ(collider_ids.size(), 1u);
     const auto& stale_collider = physics_world.get_collider(collider_ids.front());
 
@@ -168,13 +159,13 @@ TEST(FrameworkColliderComponentTest, PlaneColliderSyncsWorldNormalWithNodeRotati
     auto& go = scene.create_game_object("plane");
     go.node().set_local_rotation(
         pbpt::math::angle_axis(pbpt::math::radians(90.0f), pbpt::math::Vec3{0.0f, 1.0f, 0.0f}));
-    auto& rigid_body = go.add_component<RigidBody>(physics_world);
+    auto& rigid_body = go.add_component<RigidBody>();
     rigid_body.set_type(system::physics::rb::RigidBodyType::Static);
-    (void)go.add_component<PlaneCollider>(physics_world, pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
+    (void)go.add_component<PlaneCollider>(pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
 
     integration::physics::sync_scene_to_rigid_body(scene, physics_world);
 
-    const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
+    const auto collider_ids = colliders_for(physics_world, go);
     ASSERT_EQ(collider_ids.size(), 1u);
     const auto world_collider = physics_world.get_world_collider(collider_ids.front());
     const auto* world_plane = std::get_if<system::physics::rb::WorldPlane>(&world_collider);
@@ -184,37 +175,16 @@ TEST(FrameworkColliderComponentTest, PlaneColliderSyncsWorldNormalWithNodeRotati
     EXPECT_NEAR(world_plane->normal.z(), 0.0f, 1e-5f);
 }
 
-TEST(FrameworkColliderComponentTest, MeshColliderReadsLocalVerticesFromStaticMeshComponent) {
-    system::physics::rb::RigidBodySystem physics_world;
-    resource::ResourceManager     resources;
-    core::Scene                   scene(1);
-    const auto mesh_handle = resources.create<resource::MeshResourceKind>(make_triangle_mesh());
-
-    auto& go = scene.create_game_object("mesh");
-    auto& rigid_body = go.add_component<RigidBody>(physics_world);
-    auto& mesh_renderer = go.add_component<StaticMeshComponent>(resources, mesh_handle);
-    auto& mesh = go.add_component<MeshCollider>(physics_world);
-
-    const auto local_vertices = mesh_renderer.local_vertices();
-    ASSERT_EQ(local_vertices.size(), 3u);
-    const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
-    ASSERT_EQ(collider_ids.size(), 1u);
-    const auto& collider = physics_world.get_collider(collider_ids.front());
-    const auto* mesh_shape = std::get_if<system::physics::rb::MeshShape>(&collider.shape);
-    ASSERT_NE(mesh_shape, nullptr);
-    ASSERT_EQ(mesh_shape->local_vertices.size(), 3u);
-    EXPECT_NEAR(mesh_shape->local_vertices[0].x(), 0.2f, 1e-5f);
-}
-
 TEST(FrameworkColliderComponentTest, SphereColliderRadiusChangeAppliesOnNextScenePrePass) {
     system::physics::rb::RigidBodySystem physics_world;
     core::Scene scene(1);
 
     auto& go = scene.create_game_object("sphere");
-    auto& rigid_body = go.add_component<RigidBody>(physics_world);
-    auto& sphere = go.add_component<SphereCollider>(physics_world, 0.5f);
+    auto& rigid_body = go.add_component<RigidBody>();
+    auto& sphere = go.add_component<SphereCollider>(0.5f);
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
 
-    const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
+    const auto collider_ids = colliders_for(physics_world, go);
     ASSERT_EQ(collider_ids.size(), 1u);
 
     sphere.set_radius(1.25f);

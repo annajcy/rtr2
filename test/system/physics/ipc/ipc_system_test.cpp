@@ -25,7 +25,7 @@ TetBody make_single_tet_body() {
 }
 
 TEST(IPCSystemTest, InitializeAssemblesGlobalStateFromTetBodies) {
-    IPCSystem system(IPCConfig{.dt = 0.1, .gravity = Eigen::Vector3d::Zero()});
+    IPCSystem system(IPCConfig{.gravity = Eigen::Vector3d::Zero()});
     TetBody body = make_single_tet_body();
 
     const IPCBodyID body_id = system.create_tet_body(body);
@@ -51,7 +51,6 @@ TEST(IPCSystemTest, InitializeAssemblesGlobalStateFromTetBodies) {
 
 TEST(IPCSystemTest, StepMovesFreeBodyUnderGravity) {
     IPCSystem system(IPCConfig{
-        .dt = 0.1,
         .gravity = Eigen::Vector3d(0.0, -9.81, 0.0),
         .solver_params = NewtonSolverParams{
             .max_iterations = 8,
@@ -64,7 +63,7 @@ TEST(IPCSystemTest, StepMovesFreeBodyUnderGravity) {
 
     system.initialize();
     const auto initial_positions = system.get_body_positions(body_id);
-    system.step();
+    system.step(0.1);
     const auto next_positions = system.get_body_positions(body_id);
 
     ASSERT_EQ(initial_positions.size(), next_positions.size());
@@ -77,7 +76,6 @@ TEST(IPCSystemTest, StepMovesFreeBodyUnderGravity) {
 
 TEST(IPCSystemTest, FixedVerticesRemainPinnedAndVelocityIsZero) {
     IPCSystem system(IPCConfig{
-        .dt = 0.1,
         .gravity = Eigen::Vector3d(0.0, -9.81, 0.0),
         .solver_params = NewtonSolverParams{
             .max_iterations = 12,
@@ -92,7 +90,7 @@ TEST(IPCSystemTest, FixedVerticesRemainPinnedAndVelocityIsZero) {
     const Eigen::Vector3d fixed_rest = body.geometry.rest_positions[0];
 
     const IPCBodyID body_id = system.create_tet_body(std::move(body));
-    system.step();
+    system.step(0.1);
 
     const auto positions = system.get_body_positions(body_id);
     ASSERT_EQ(positions.size(), 4u);
@@ -103,12 +101,12 @@ TEST(IPCSystemTest, FixedVerticesRemainPinnedAndVelocityIsZero) {
 
 TEST(IPCSystemTest, EmptySystemStepIsNoOp) {
     IPCSystem system{};
-    EXPECT_NO_THROW(system.step());
+    EXPECT_NO_THROW(system.step(0.1));
     EXPECT_EQ(system.state().dof_count(), 0u);
 }
 
 TEST(IPCSystemTest, StableIdsRemainValidAfterRemovingAnotherBody) {
-    IPCSystem system(IPCConfig{.dt = 0.1, .gravity = Eigen::Vector3d::Zero()});
+    IPCSystem system(IPCConfig{.gravity = Eigen::Vector3d::Zero()});
 
     const IPCBodyID body_id_a = system.create_tet_body(make_single_tet_body());
     TetBody body_b = make_single_tet_body();
@@ -125,7 +123,7 @@ TEST(IPCSystemTest, StableIdsRemainValidAfterRemovingAnotherBody) {
     EXPECT_FALSE(system.has_tet_body(body_id_a));
     EXPECT_TRUE(system.has_tet_body(body_id_b));
 
-    system.step();
+    system.step(0.1);
 
     const auto positions = system.get_body_positions(body_id_b);
     ASSERT_EQ(positions.size(), 4u);
@@ -134,7 +132,6 @@ TEST(IPCSystemTest, StableIdsRemainValidAfterRemovingAnotherBody) {
 
 TEST(IPCSystemTest, RebuildPreservesExistingBodyStateWhenNewBodyIsAdded) {
     IPCSystem system(IPCConfig{
-        .dt = 0.1,
         .gravity = Eigen::Vector3d(0.0, -9.81, 0.0),
         .solver_params = NewtonSolverParams{
             .max_iterations = 8,
@@ -145,7 +142,7 @@ TEST(IPCSystemTest, RebuildPreservesExistingBodyStateWhenNewBodyIsAdded) {
     });
 
     const IPCBodyID body_id_a = system.create_tet_body(make_single_tet_body());
-    system.step();
+    system.step(0.1);
     const auto moved_positions = system.get_body_positions(body_id_a);
 
     TetBody body_b = make_single_tet_body();
@@ -165,13 +162,13 @@ TEST(IPCSystemTest, RebuildPreservesExistingBodyStateWhenNewBodyIsAdded) {
     ASSERT_EQ(new_body_positions.size(), 4u);
     EXPECT_GT(new_body_positions[0].x(), 1.0);
 
-    system.step();
+    system.step(0.1);
     const auto advanced_positions = system.get_body_positions(body_id_a);
     EXPECT_LT(advanced_positions[0].y(), preserved_positions[0].y());
 }
 
 TEST(IPCSystemTest, RefreshTetBodyRuntimeDataUpdatesMassDiagonalAfterDensityChange) {
-    IPCSystem system(IPCConfig{.dt = 0.1, .gravity = Eigen::Vector3d::Zero()});
+    IPCSystem system(IPCConfig{.gravity = Eigen::Vector3d::Zero()});
     const IPCBodyID body_id = system.create_tet_body(make_single_tet_body());
     system.initialize();
 

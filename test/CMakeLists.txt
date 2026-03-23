@@ -257,6 +257,7 @@ rtr_add_test(
 rtr_add_test(
     test_framework_ipc_tet_component
     framework/component/framework_ipc_tet_component_test.cpp
+    rtr::runtime
     Eigen3::Eigen
 )
 rtr_add_test(

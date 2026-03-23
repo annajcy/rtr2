@@ -84,10 +84,9 @@ int main() {
             go.node().set_local_rotation(rotation);
             go.node().set_local_scale(scale);
             (void)go.add_component<rtr::framework::component::StaticMeshComponent>(runtime.resource_manager(), quad_mesh, color);
-            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system());
+            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>();
             rigid_body.set_type(rtr::system::physics::rb::RigidBodyType::Static);
-            (void)go.add_component<rtr::framework::component::BoxCollider>(
-                runtime.physics_system().rigid_body_system(), pbpt::math::Vec3{0.5f, 0.5f, 0.05f});
+            (void)go.add_component<rtr::framework::component::BoxCollider>(pbpt::math::Vec3{0.5f, 0.5f, 0.05f});
         };
 
         add_panel("floor", pbpt::math::Vec3{0.0f, -1.0f, 0.0f},
@@ -120,10 +119,9 @@ int main() {
             go.node().set_local_scale({0.2f, 0.2f, 0.2f});
             (void)go.add_component<rtr::framework::component::StaticMeshComponent>(runtime.resource_manager(), sphere_mesh, spawn.color);
 
-            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system());
-            (void)go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_system(), 1.0f);
-            runtime.physics_system().rigid_body_system().get_rigid_body(rigid_body.rigid_body_id()).state().translation.linear_velocity =
-                spawn.velocity;
+            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>();
+            (void)go.add_component<rtr::framework::component::SphereCollider>(1.0f);
+            rigid_body.set_linear_velocity(spawn.velocity);
         }
 
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{

@@ -4,20 +4,16 @@
 
 #include "gtest/gtest.h"
 
-#include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
-#include "rtr/framework/component/physics/rigid_body/mesh_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/integration/physics/rigid_body_scene_sync.hpp"
-#include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/physics/rigid_body/collision/box_box.hpp"
 #include "rtr/system/physics/rigid_body/collision/box_plane.hpp"
 #include "rtr/system/physics/rigid_body/collision/contact.hpp"
-#include "rtr/system/physics/rigid_body/collision/mesh_plane.hpp"
 #include "rtr/system/physics/rigid_body/collision/sphere_box.hpp"
 #include "rtr/system/physics/rigid_body/collision/sphere_plane.hpp"
 #include "rtr/system/physics/rigid_body/collision/sphere_sphere.hpp"
@@ -57,15 +53,51 @@ pbpt::math::Mat3 diagonal_inverse_inertia(const pbpt::math::Float x,
     return result;
 }
 
-utils::ObjMeshData make_offcenter_triangle_mesh() {
-    utils::ObjMeshData mesh{};
-    mesh.vertices = {
-        {.position = pbpt::math::Vec3{0.2f, -0.2f, 0.0f}},
-        {.position = pbpt::math::Vec3{0.4f, -0.2f, 0.0f}},
-        {.position = pbpt::math::Vec3{0.6f, 0.2f, 0.0f}},
-    };
-    mesh.indices = {0, 1, 2};
-    return mesh;
+system::physics::rb::RigidBody make_source_body(
+    pbpt::math::Float mass = 1.0f,
+    system::physics::rb::RigidBodyType type = system::physics::rb::RigidBodyType::Dynamic,
+    bool use_gravity = true,
+    const pbpt::math::Mat3& inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros(),
+    pbpt::math::Float restitution = 0.0f,
+    pbpt::math::Float friction = 0.0f,
+    pbpt::math::Float linear_decay = 1.0f,
+    pbpt::math::Float angular_decay = 1.0f) {
+    system::physics::rb::RigidBody source_body{};
+    source_body.state().mass = mass;
+    source_body.set_type(type);
+    source_body.set_use_gravity(use_gravity);
+    source_body.set_restitution(restitution);
+    source_body.set_friction(friction);
+    source_body.set_linear_decay(linear_decay);
+    source_body.set_angular_decay(angular_decay);
+    source_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
+    return source_body;
+}
+
+system::physics::rb::RigidBodyID body_id_for(const PhysicsStepper& physics,
+                                             const framework::core::GameObject& game_object) {
+    const auto body_id = physics.world().try_get_rigid_body_id_for_owner(game_object.id());
+    EXPECT_TRUE(body_id.has_value());
+    return *body_id;
+}
+
+system::physics::rb::RigidBody& body_for(PhysicsStepper& physics,
+                                         const framework::core::GameObject& game_object) {
+    auto* body = physics.world().try_get_rigid_body_for_owner(game_object.id());
+    EXPECT_NE(body, nullptr);
+    return *body;
+}
+
+const system::physics::rb::RigidBody& body_for(const PhysicsStepper& physics,
+                                               const framework::core::GameObject& game_object) {
+    const auto* body = physics.world().try_get_rigid_body_for_owner(game_object.id());
+    EXPECT_NE(body, nullptr);
+    return *body;
+}
+
+std::vector<system::physics::rb::ColliderID> colliders_for(const PhysicsStepper& physics,
+                                                           const framework::core::GameObject& game_object) {
+    return physics.world().colliders_for_body(body_id_for(physics, game_object));
 }
 
 }  // namespace
@@ -76,7 +108,7 @@ TEST(PhysicsSceneIntegrationTest, FixedTickAppliesGravityAndSyncsBackToSceneGrap
 
     auto& moving = scene.create_game_object("moving");
     moving.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
-    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics.world());
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>();
 
     for (std::uint64_t i = 0; i < 10; ++i) {
         physics.fixed_tick(scene, framework::core::FixedTickContext{
@@ -99,7 +131,7 @@ TEST(PhysicsSceneIntegrationTest, DisableGravityStopsAutomaticFalling) {
 
     auto& moving = scene.create_game_object("moving");
     moving.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
-    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics.world());
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>();
     rigid_body.set_use_gravity(false);
 
     for (std::uint64_t i = 0; i < 10; ++i) {
@@ -120,7 +152,7 @@ TEST(PhysicsSceneIntegrationTest, UpwardForceCanCancelGravity) {
 
     auto& moving = scene.create_game_object("moving");
     moving.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
-    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics.world());
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>();
 
     for (std::uint64_t i = 0; i < 10; ++i) {
         rigid_body.add_force(pbpt::math::Vec3{0.0f, 9.81f * rigid_body.mass(), 0.0f});
@@ -140,7 +172,7 @@ TEST(PhysicsSceneIntegrationTest, FixedTickClearsAccumulatedForce) {
     framework::core::Scene scene(1);
 
     auto& moving = scene.create_game_object("moving");
-    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics.world());
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>();
     rigid_body.add_force(pbpt::math::Vec3{1.0f, 2.0f, 3.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
@@ -148,7 +180,7 @@ TEST(PhysicsSceneIntegrationTest, FixedTickClearsAccumulatedForce) {
                                          .fixed_tick_index    = 0,
                                      });
 
-    const auto& state = physics.world().get_rigid_body(rigid_body.rigid_body_id()).state();
+    const auto& state = body_for(physics, moving).state();
     EXPECT_NEAR(state.forces.accumulated_force.x(), 0.0f, 1e-5f);
     EXPECT_NEAR(state.forces.accumulated_force.y(), 0.0f, 1e-5f);
     EXPECT_NEAR(state.forces.accumulated_force.z(), 0.0f, 1e-5f);
@@ -159,7 +191,7 @@ TEST(PhysicsSceneIntegrationTest, TorqueUpdatesAngularVelocityAndSyncsRotation) 
     framework::core::Scene scene(1);
 
     auto& spinning = scene.create_game_object("spinning");
-    auto& rigid_body = spinning.add_component<framework::component::RigidBody>(physics.world());
+    auto& rigid_body = spinning.add_component<framework::component::RigidBody>();
     rigid_body.set_use_gravity(false);
     pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
     inverse_inertia_tensor_ref[1][1] = 1.0f;
@@ -183,7 +215,7 @@ TEST(PhysicsSceneIntegrationTest, ZeroInverseInertiaPreventsRotation) {
     framework::core::Scene scene(1);
 
     auto& spinning = scene.create_game_object("spinning");
-    auto& rigid_body = spinning.add_component<framework::component::RigidBody>(physics.world());
+    auto& rigid_body = spinning.add_component<framework::component::RigidBody>();
     rigid_body.set_use_gravity(false);
 
     for (std::uint64_t i = 0; i < 10; ++i) {
@@ -207,7 +239,7 @@ TEST(PhysicsSceneIntegrationTest, ForceAtCenterProducesNoTorque) {
     framework::core::Scene scene(1);
 
     auto& moving = scene.create_game_object("moving");
-    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics.world());
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>();
     rigid_body.set_use_gravity(false);
     pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
     inverse_inertia_tensor_ref[1][1] = 1.0f;
@@ -228,7 +260,7 @@ TEST(PhysicsSceneIntegrationTest, OffCenterForceProducesTranslationAndRotation) 
     framework::core::Scene scene(1);
 
     auto& moving = scene.create_game_object("moving");
-    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics.world());
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>();
     rigid_body.set_use_gravity(false);
     pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
     inverse_inertia_tensor_ref[1][1] = 1.0f;
@@ -250,7 +282,7 @@ TEST(PhysicsSceneIntegrationTest, ResetDynamicsAndPositionInvalidateLeapfrogStat
 
     auto& moving = scene.create_game_object("moving");
     moving.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
-    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics.world());
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>();
     pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
     inverse_inertia_tensor_ref[1][1] = 1.0f;
     rigid_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
@@ -284,7 +316,7 @@ TEST(PhysicsSceneIntegrationTest, SetOrientationNormalizesAndSyncsBackToSceneGra
     framework::core::Scene scene(1);
 
     auto& moving = scene.create_game_object("moving");
-    auto& rigid_body = moving.add_component<framework::component::RigidBody>(physics.world());
+    auto& rigid_body = moving.add_component<framework::component::RigidBody>();
     rigid_body.set_use_gravity(false);
 
     const pbpt::math::Quat raw_orientation =
@@ -306,15 +338,20 @@ TEST(PhysicsSceneIntegrationTest, DestroyRemovesRigidBodyFromRigidBodySystem) {
     framework::core::Scene scene(1);
 
     auto& moving               = scene.create_game_object("moving");
-    auto& rigid_body_component = moving.add_component<framework::component::RigidBody>(physics.world());
-    (void)moving.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
-    const auto rigid_body_id = rigid_body_component.rigid_body_id();
+    auto& rigid_body_component = moving.add_component<framework::component::RigidBody>();
+    (void)moving.add_component<framework::component::SphereCollider>(0.5f);
+    physics.fixed_tick(scene, framework::core::FixedTickContext{
+                                         .fixed_delta_seconds = 0.1,
+                                         .fixed_tick_index    = 0,
+                                     });
+    const auto rigid_body_id = body_id_for(physics, moving);
     const auto collider_ids  = physics.world().colliders_for_body(rigid_body_id);
     ASSERT_EQ(collider_ids.size(), 1u);
 
     EXPECT_TRUE(physics.world().has_rigid_body(rigid_body_id));
     EXPECT_TRUE(physics.world().has_collider(collider_ids.front()));
     EXPECT_TRUE(scene.destroy_game_object(moving.id()));
+    sync_scene_to_rigid_body(scene, physics.world());
     EXPECT_FALSE(physics.world().has_rigid_body(rigid_body_id));
     EXPECT_FALSE(physics.world().has_collider(collider_ids.front()));
 }
@@ -325,10 +362,9 @@ TEST(PhysicsSceneIntegrationTest, StaticBodyTransformSyncsColliderOnNextFixedTic
 
     auto& wall = scene.create_game_object("wall");
     wall.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
-    auto& wall_body = wall.add_component<framework::component::RigidBody>(physics.world());
+    auto& wall_body = wall.add_component<framework::component::RigidBody>();
     wall_body.set_type(RigidBodyType::Static);
-    (void)wall.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{0.5f, 0.5f, 0.5f});
+    (void)wall.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{0.5f, 0.5f, 0.5f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
@@ -341,7 +377,7 @@ TEST(PhysicsSceneIntegrationTest, StaticBodyTransformSyncsColliderOnNextFixedTic
                                          .fixed_tick_index    = 1,
                                      });
 
-    const auto wall_colliders = physics.world().colliders_for_body(wall_body.rigid_body_id());
+    const auto wall_colliders = colliders_for(physics, wall);
     ASSERT_EQ(wall_colliders.size(), 1u);
     const auto world_collider = physics.world().get_world_collider(wall_colliders.front());
     const auto* world_box = std::get_if<WorldBox>(&world_collider);
@@ -357,20 +393,18 @@ TEST(PhysicsSceneIntegrationTest, DynamicSpheresCollideAndStayStoppedOnNextTick)
 
     auto& left = scene.create_game_object("left");
     left.node().set_local_position(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
-    auto& left_body   = left.add_component<framework::component::RigidBody>(physics.world());
-    (void)left.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+    auto& left_body   = left.add_component<framework::component::RigidBody>();
+    (void)left.add_component<framework::component::SphereCollider>(0.5f);
     left_body.set_use_gravity(false);
 
     auto& right = scene.create_game_object("right");
     right.node().set_local_position(pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
-    auto& right_body   = right.add_component<framework::component::RigidBody>(physics.world());
-    (void)right.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+    auto& right_body   = right.add_component<framework::component::RigidBody>();
+    (void)right.add_component<framework::component::SphereCollider>(0.5f);
     right_body.set_use_gravity(false);
 
-    auto& left_physics_body  = physics.world().get_rigid_body(left_body.rigid_body_id());
-    auto& right_physics_body = physics.world().get_rigid_body(right_body.rigid_body_id());
-    left_physics_body.state().translation.linear_velocity  = pbpt::math::Vec3{1.0f, 0.0f, 0.0f};
-    right_physics_body.state().translation.linear_velocity = pbpt::math::Vec3{-1.0f, 0.0f, 0.0f};
+    left_body.set_linear_velocity(pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
+    right_body.set_linear_velocity(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.6,
@@ -388,8 +422,8 @@ TEST(PhysicsSceneIntegrationTest, DynamicSpheresCollideAndStayStoppedOnNextTick)
     EXPECT_NEAR(left_body.linear_velocity().x(), 0.0f, 1e-4f);
     EXPECT_NEAR(right_body.linear_velocity().x(), 0.0f, 1e-4f);
 
-    const auto left_colliders  = physics.world().colliders_for_body(left_body.rigid_body_id());
-    const auto right_colliders = physics.world().colliders_for_body(right_body.rigid_body_id());
+    const auto left_colliders  = colliders_for(physics, left);
+    const auto right_colliders = colliders_for(physics, right);
     ASSERT_EQ(left_colliders.size(), 1u);
     ASSERT_EQ(right_colliders.size(), 1u);
     const auto left_world_collider = physics.world().get_world_collider(left_colliders.front());
@@ -410,15 +444,14 @@ TEST(PhysicsSceneIntegrationTest, FallingSphereStaysNearStaticRotatedBoxSurface)
     floor.node().set_local_position(pbpt::math::Vec3{0.0f, -0.5f, 0.0f});
     floor.node().set_local_rotation(
         pbpt::math::angle_axis(pbpt::math::radians(15.0f), pbpt::math::Vec3{0.0f, 0.0f, 1.0f}));
-    auto& floor_body = floor.add_component<framework::component::RigidBody>(physics.world());
+    auto& floor_body = floor.add_component<framework::component::RigidBody>();
     floor_body.set_type(RigidBodyType::Static);
-    (void)floor.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{2.5f, 0.25f, 2.5f});
+    (void)floor.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{2.5f, 0.25f, 2.5f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
-    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(physics.world());
-    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+    auto& sphere_body = sphere.add_component<framework::component::RigidBody>();
+    (void)sphere.add_component<framework::component::SphereCollider>(0.5f);
 
     for (std::uint64_t i = 0; i < 90; ++i) {
         physics.fixed_tick(scene, framework::core::FixedTickContext{
@@ -427,8 +460,8 @@ TEST(PhysicsSceneIntegrationTest, FallingSphereStaysNearStaticRotatedBoxSurface)
                                          });
     }
 
-    const auto sphere_colliders = physics.world().colliders_for_body(sphere_body.rigid_body_id());
-    const auto floor_colliders  = physics.world().colliders_for_body(floor_body.rigid_body_id());
+    const auto sphere_colliders = colliders_for(physics, sphere);
+    const auto floor_colliders  = colliders_for(physics, floor);
     ASSERT_EQ(sphere_colliders.size(), 1u);
     ASSERT_EQ(floor_colliders.size(), 1u);
     const auto sphere_world_collider = physics.world().get_world_collider(sphere_colliders.front());
@@ -448,19 +481,16 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxClearsOnlyNormalVelocity
 
     auto& wall = scene.create_game_object("wall");
     wall.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
-    auto& wall_body = wall.add_component<framework::component::RigidBody>(physics.world());
+    auto& wall_body = wall.add_component<framework::component::RigidBody>();
     wall_body.set_type(RigidBodyType::Static);
-    (void)wall.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{0.2f, 2.0f, 2.0f});
+    (void)wall.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{0.2f, 2.0f, 2.0f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
-    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(physics.world());
-    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+    auto& sphere_body = sphere.add_component<framework::component::RigidBody>();
+    (void)sphere.add_component<framework::component::SphereCollider>(0.5f);
     sphere_body.set_use_gravity(false);
-
-    auto& physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
-    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, 1.0f, 0.0f};
+    sphere_body.set_linear_velocity(pbpt::math::Vec3{2.0f, 1.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.25,
@@ -473,8 +503,8 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxClearsOnlyNormalVelocity
     EXPECT_NEAR(sphere_body.angular_velocity().y(), 0.0f, 1e-5f);
     EXPECT_NEAR(sphere_body.angular_velocity().z(), 0.0f, 1e-5f);
 
-    const auto sphere_colliders = physics.world().colliders_for_body(sphere_body.rigid_body_id());
-    const auto wall_colliders   = physics.world().colliders_for_body(wall_body.rigid_body_id());
+    const auto sphere_colliders = colliders_for(physics, sphere);
+    const auto wall_colliders   = colliders_for(physics, wall);
     ASSERT_EQ(sphere_colliders.size(), 1u);
     ASSERT_EQ(wall_colliders.size(), 1u);
     const auto sphere_world_collider = physics.world().get_world_collider(sphere_colliders.front());
@@ -494,18 +524,22 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticFloorFrictionProducesAngula
     auto& floor = scene.create_game_object("floor");
     floor.node().set_local_position(pbpt::math::Vec3{0.0f, -0.5f, 0.0f});
     (void)floor.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f);
-    (void)floor.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
+        make_source_body(1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f));
+    (void)floor.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 0.2f, 0.0f});
-    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.25f);
-    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(make_source_body(
+        1.0f,
+        RigidBodyType::Dynamic,
+        false,
+        diagonal_inverse_inertia(0.0f, 0.0f, 1.0f),
+        0.0f,
+        0.25f
+    ));
+    (void)sphere.add_component<framework::component::SphereCollider>(0.5f);
 
-    auto& physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
-    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, -1.0f, 0.0f};
+    sphere_body.set_linear_velocity(pbpt::math::Vec3{2.0f, -1.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
@@ -523,18 +557,16 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxUsesMaxRestitutionForBou
 
     auto& wall = scene.create_game_object("wall");
     auto& wall_body = wall.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.2f, 0.0f);
-    (void)wall.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{0.2f, 2.0f, 2.0f});
+        make_source_body(1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.2f, 0.0f));
+    (void)wall.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{0.2f, 2.0f, 2.0f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
     auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.8f, 0.0f);
-    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+        make_source_body(1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.8f, 0.0f));
+    (void)sphere.add_component<framework::component::SphereCollider>(0.5f);
 
-    auto& physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
-    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, 0.0f, 0.0f};
+    sphere_body.set_linear_velocity(pbpt::math::Vec3{2.0f, 0.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.25,
@@ -553,18 +585,16 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticFloorFrictionReducesTangent
     auto& floor = scene.create_game_object("floor");
     floor.node().set_local_position(pbpt::math::Vec3{0.0f, -0.5f, 0.0f});
     (void)floor.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f);
-    (void)floor.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
+        make_source_body(1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f));
+    (void)floor.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 0.2f, 0.0f});
     auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 0.25f);
-    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+        make_source_body(1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 0.25f));
+    (void)sphere.add_component<framework::component::SphereCollider>(0.5f);
 
-    auto& physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
-    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, -1.0f, 0.0f};
+    sphere_body.set_linear_velocity(pbpt::math::Vec3{2.0f, -1.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
@@ -582,18 +612,16 @@ TEST(PhysicsSceneIntegrationTest, ZeroInverseInertiaKeepsCollisionFromAddingAngu
     auto& floor = scene.create_game_object("floor");
     floor.node().set_local_position(pbpt::math::Vec3{0.0f, -0.5f, 0.0f});
     (void)floor.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f);
-    (void)floor.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
+        make_source_body(1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f));
+    (void)floor.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 0.2f, 0.0f});
     auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 0.25f);
-    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+        make_source_body(1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 0.25f));
+    (void)sphere.add_component<framework::component::SphereCollider>(0.5f);
 
-    auto& physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
-    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, -1.0f, 0.0f};
+    sphere_body.set_linear_velocity(pbpt::math::Vec3{2.0f, -1.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
@@ -613,18 +641,16 @@ TEST(PhysicsSceneIntegrationTest, ZeroFrictionPreservesTangentialVelocity) {
     auto& floor = scene.create_game_object("floor");
     floor.node().set_local_position(pbpt::math::Vec3{0.0f, -0.5f, 0.0f});
     (void)floor.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.0f);
-    (void)floor.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
+        make_source_body(1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.0f));
+    (void)floor.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 0.2f, 0.0f});
     auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 0.0f);
-    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+        make_source_body(1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 0.0f));
+    (void)sphere.add_component<framework::component::SphereCollider>(0.5f);
 
-    auto& physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
-    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, -1.0f, 0.0f};
+    sphere_body.set_linear_velocity(pbpt::math::Vec3{2.0f, -1.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
@@ -640,19 +666,29 @@ TEST(PhysicsSceneIntegrationTest, DynamicBodiesOffCenterCollisionProducesFiniteA
     framework::core::Scene scene(1);
 
     auto& box = scene.create_game_object("box");
-    auto& box_body = box.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.36f);
-    (void)box.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{0.2f, 2.0f, 2.0f});
+    auto& box_body = box.add_component<framework::component::RigidBody>(make_source_body(
+        1.0f,
+        RigidBodyType::Dynamic,
+        false,
+        diagonal_inverse_inertia(0.0f, 0.0f, 1.0f),
+        0.0f,
+        0.36f
+    ));
+    (void)box.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{0.2f, 2.0f, 2.0f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{-1.0f, 0.6f, 0.0f});
-    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.25f);
-    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+    auto& sphere_body = sphere.add_component<framework::component::RigidBody>(make_source_body(
+        1.0f,
+        RigidBodyType::Dynamic,
+        false,
+        diagonal_inverse_inertia(0.0f, 0.0f, 1.0f),
+        0.0f,
+        0.25f
+    ));
+    (void)sphere.add_component<framework::component::SphereCollider>(0.5f);
 
-    auto& sphere_physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
-    sphere_physics_body.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, -1.0f, 0.0f};
+    sphere_body.set_linear_velocity(pbpt::math::Vec3{2.0f, -1.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.25,
@@ -669,35 +705,6 @@ TEST(PhysicsSceneIntegrationTest, DynamicBodiesOffCenterCollisionProducesFiniteA
     EXPECT_GT(std::abs(box_body.angular_velocity().z()), 1e-4f);
 }
 
-TEST(PhysicsSceneIntegrationTest, DynamicMeshCollidesWithStaticPlaneAndGeneratesAngularVelocity) {
-    PhysicsStepper            physics;
-    resource::ResourceManager resources;
-    framework::core::Scene    scene(1);
-    const auto mesh_handle = resources.create<resource::MeshResourceKind>(make_offcenter_triangle_mesh());
-
-    auto& floor = scene.create_game_object("floor");
-    auto& floor_body = floor.add_component<framework::component::RigidBody>(physics.world());
-    floor_body.set_type(RigidBodyType::Static);
-    (void)floor.add_component<framework::component::PlaneCollider>(
-        physics.world(), pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
-
-    auto& mesh_go = scene.create_game_object("mesh");
-    mesh_go.node().set_local_position(pbpt::math::Vec3{0.0f, 0.1f, 0.0f});
-    auto& mesh_body = mesh_go.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.25f);
-    (void)mesh_go.add_component<framework::component::StaticMeshComponent>(resources, mesh_handle);
-    (void)mesh_go.add_component<framework::component::MeshCollider>(physics.world());
-    mesh_body.set_linear_velocity(pbpt::math::Vec3{0.0f, -1.0f, 0.0f});
-
-    physics.fixed_tick(scene, framework::core::FixedTickContext{
-                                         .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
-                                     });
-
-    EXPECT_GT(mesh_body.linear_velocity().y(), -0.25f);
-    EXPECT_GT(std::abs(mesh_body.angular_velocity().z()), 1e-4f);
-}
-
 TEST(PhysicsSceneIntegrationTest, SolverIterationsReducePenetrationAcrossStackedContacts) {
     PhysicsStepper         physics;
     framework::core::Scene scene(1);
@@ -706,21 +713,20 @@ TEST(PhysicsSceneIntegrationTest, SolverIterationsReducePenetrationAcrossStacked
 
     auto& floor = scene.create_game_object("floor");
     (void)floor.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.0f);
-    (void)floor.add_component<framework::component::PlaneCollider>(
-        physics.world(), pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
+        make_source_body(1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.0f));
+    (void)floor.add_component<framework::component::PlaneCollider>(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
 
     auto& lower = scene.create_game_object("lower");
     lower.node().set_local_position(pbpt::math::Vec3{0.0f, 0.45f, 0.0f});
     auto& lower_body = lower.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, true, pbpt::math::Mat3::zeros(), 0.0f, 0.0f);
-    (void)lower.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+        make_source_body(1.0f, RigidBodyType::Dynamic, true, pbpt::math::Mat3::zeros(), 0.0f, 0.0f));
+    (void)lower.add_component<framework::component::SphereCollider>(0.5f);
 
     auto& upper = scene.create_game_object("upper");
     upper.node().set_local_position(pbpt::math::Vec3{0.0f, 1.30f, 0.0f});
     auto& upper_body = upper.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, true, pbpt::math::Mat3::zeros(), 0.0f, 0.0f);
-    (void)upper.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+        make_source_body(1.0f, RigidBodyType::Dynamic, true, pbpt::math::Mat3::zeros(), 0.0f, 0.0f));
+    (void)upper.add_component<framework::component::SphereCollider>(0.5f);
 
     for (std::uint64_t i = 0; i < 180; ++i) {
         physics.fixed_tick(scene, framework::core::FixedTickContext{
@@ -734,8 +740,8 @@ TEST(PhysicsSceneIntegrationTest, SolverIterationsReducePenetrationAcrossStacked
     EXPECT_TRUE(std::isfinite(lower_body.linear_velocity().y()));
     EXPECT_TRUE(std::isfinite(upper_body.linear_velocity().y()));
 
-    const auto lower_colliders = physics.world().colliders_for_body(lower_body.rigid_body_id());
-    const auto upper_colliders = physics.world().colliders_for_body(upper_body.rigid_body_id());
+    const auto lower_colliders = colliders_for(physics, lower);
+    const auto upper_colliders = colliders_for(physics, upper);
     ASSERT_EQ(lower_colliders.size(), 1u);
     ASSERT_EQ(upper_colliders.size(), 1u);
 
@@ -769,18 +775,16 @@ TEST(PhysicsSceneIntegrationTest, AccumulatedFrictionDoesNotReverseTangentialVel
     auto& floor = scene.create_game_object("floor");
     floor.node().set_local_position(pbpt::math::Vec3{0.0f, -0.5f, 0.0f});
     (void)floor.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 1.0f);
-    (void)floor.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
+        make_source_body(1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 1.0f));
+    (void)floor.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{2.0f, 0.25f, 2.0f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 0.2f, 0.0f});
     auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 1.0f);
-    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+        make_source_body(1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 1.0f));
+    (void)sphere.add_component<framework::component::SphereCollider>(0.5f);
 
-    auto& physics_body = physics.world().get_rigid_body(sphere_body.rigid_body_id());
-    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{0.4f, -1.0f, 0.0f};
+    sphere_body.set_linear_velocity(pbpt::math::Vec3{0.4f, -1.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
@@ -798,15 +802,14 @@ TEST(PhysicsSceneIntegrationTest, DynamicSphereCollidesWithStaticPlaneAndCorrect
 
     auto& floor = scene.create_game_object("floor");
     (void)floor.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f);
-    (void)floor.add_component<framework::component::PlaneCollider>(
-        physics.world(), pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
+        make_source_body(1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f));
+    (void)floor.add_component<framework::component::PlaneCollider>(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
 
     auto& sphere = scene.create_game_object("sphere");
     sphere.node().set_local_position(pbpt::math::Vec3{0.0f, 0.2f, 0.0f});
     auto& sphere_body = sphere.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 0.25f);
-    (void)sphere.add_component<framework::component::SphereCollider>(physics.world(), 0.5f);
+        make_source_body(1.0f, RigidBodyType::Dynamic, false, pbpt::math::Mat3::zeros(), 0.0f, 0.25f));
+    (void)sphere.add_component<framework::component::SphereCollider>(0.5f);
     sphere_body.set_linear_velocity(pbpt::math::Vec3{2.0f, -1.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
@@ -821,7 +824,7 @@ TEST(PhysicsSceneIntegrationTest, DynamicSphereCollidesWithStaticPlaneAndCorrect
     EXPECT_TRUE(std::isfinite(sphere_body.linear_velocity().y()));
     EXPECT_GT(sphere_body.linear_velocity().y(), -0.25f);
 
-    const auto sphere_colliders = physics.world().colliders_for_body(sphere_body.rigid_body_id());
+    const auto sphere_colliders = colliders_for(physics, sphere);
     ASSERT_EQ(sphere_colliders.size(), 1u);
     const auto sphere_world_collider = physics.world().get_world_collider(sphere_colliders.front());
     const auto* world_sphere = std::get_if<WorldSphere>(&sphere_world_collider);
@@ -841,16 +844,20 @@ TEST(PhysicsSceneIntegrationTest, DynamicBoxCollidesWithStaticPlaneAndGeneratesA
 
     auto& floor = scene.create_game_object("floor");
     (void)floor.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f);
-    (void)floor.add_component<framework::component::PlaneCollider>(
-        physics.world(), pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
+        make_source_body(1.0f, RigidBodyType::Static, false, pbpt::math::Mat3::zeros(), 0.0f, 0.36f));
+    (void)floor.add_component<framework::component::PlaneCollider>(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
 
     auto& box = scene.create_game_object("box");
     box.node().set_local_position(pbpt::math::Vec3{0.5f, 0.1f, 0.0f});
-    auto& box_body = box.add_component<framework::component::RigidBody>(
-        physics.world(), 1.0f, RigidBodyType::Dynamic, false, diagonal_inverse_inertia(0.0f, 0.0f, 1.0f), 0.0f, 0.25f);
-    (void)box.add_component<framework::component::BoxCollider>(
-        physics.world(), pbpt::math::Vec3{0.4f, 0.25f, 0.4f});
+    auto& box_body = box.add_component<framework::component::RigidBody>(make_source_body(
+        1.0f,
+        RigidBodyType::Dynamic,
+        false,
+        diagonal_inverse_inertia(0.0f, 0.0f, 1.0f),
+        0.0f,
+        0.25f
+    ));
+    (void)box.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{0.4f, 0.25f, 0.4f});
     box_body.set_linear_velocity(pbpt::math::Vec3{2.0f, -1.0f, 0.0f});
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
@@ -866,7 +873,7 @@ TEST(PhysicsSceneIntegrationTest, DynamicBoxCollidesWithStaticPlaneAndGeneratesA
     EXPECT_GT(box_body.linear_velocity().y(), -0.25f);
     EXPECT_GT(std::abs(box_body.angular_velocity().z()), 1e-4f);
 
-    const auto box_colliders = physics.world().colliders_for_body(box_body.rigid_body_id());
+    const auto box_colliders = colliders_for(physics, box);
     ASSERT_EQ(box_colliders.size(), 1u);
     const auto box_world_collider = physics.world().get_world_collider(box_colliders.front());
     const auto* world_box = std::get_if<WorldBox>(&box_world_collider);

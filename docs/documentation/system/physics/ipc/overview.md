@@ -22,7 +22,7 @@ What is not implemented yet:
 - global system assembly
 - Newton or line-search solve loops
 - collision barrier and CCD terms
-- runtime integration into `PhysicsSystem::step()`
+- runtime integration through `step_scene_physics(...)` and `ipc_system.step(dt)`
 
 ## Module Relationships
 

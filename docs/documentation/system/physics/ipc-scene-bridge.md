@@ -22,15 +22,14 @@ That means the runtime needs a bridge layer that:
 
 ## `IPCTetComponent`
 
-`IPCTetComponent` is the scene-side cache object for one IPC tet body.
+`IPCTetComponent` is the scene-side authoring/cache object for one IPC tet body.
 
 It stores:
 
-- `IPCSystem&`: the runtime world this component registers into;
-- `body_id`: the stable runtime handle for the currently registered body;
 - `source_body`: the authoring/source `TetBody` used for re-registration;
 - `surface_cache`: the cached `TetSurfaceResult` from one-time boundary extraction;
 - `mesh_cache`: a reusable `ObjMeshData` that can be updated in place every frame.
+- dirty/lifecycle flags that tell the scene-sync layer what needs to be pushed into runtime.
 
 ### What It Is Not Responsible For
 
@@ -55,9 +54,10 @@ IPCTetComponent.mesh_cache
 
 This separation matters because it keeps responsibilities clean:
 
-- `IPCTetComponent` owns the volumetric source data and lifecycle registration;
+- `IPCTetComponent` owns the volumetric source data and scene-side caches;
 - `DeformableMeshComponent` owns the render-facing mesh handle;
-- `sync_ipc_to_scene(...)` writes runtime deformation back into that mesh.
+- `sync_scene_to_ipc(...)` performs runtime create/remove/update;
+- `sync_ipc_to_scene(...)` writes runtime deformation back into the mesh.
 
 ## Registration Flow
 
@@ -66,13 +66,13 @@ The current minimum registration flow for one IPC tet object is:
 ```text
 1. Build TetBody
 2. Mark fixed vertices / choose material
-3. add IPCTetComponent(ipc_system, std::move(source_body))
-4. let IPCTetComponent::on_enable() call create_tet_body(...)
+3. add IPCTetComponent(std::move(source_body))
 5. create DeformableMesh resource from ipc_tet.mesh_cache()
 6. add DeformableMeshComponent to the same GameObject
+7. let sync_scene_to_ipc(scene, ipc_system) create or update the runtime tet body
 ```
 
-No external manual `add_tet_body(...)` or `initialize()` call is required anymore. `IPCSystem` rebuilds its global state automatically on the next `step()` when registration changes.
+No external manual `add_tet_body(...)` or `initialize()` call is required anymore. `IPCSystem` rebuilds its global state automatically on the next `step(delta_seconds)` when registration changes.
 
 ## `sync_ipc_to_scene(...)`
 
@@ -82,14 +82,14 @@ For each active object:
 
 1. find `IPCTetComponent`;
 2. find the colocated `DeformableMeshComponent`;
-3. skip if the component is currently unregistered;
-4. look up the referenced tet body by `IPCBodyID` in `IPCSystem`;
+3. skip if no runtime tet body currently exists for that `GameObject`;
+4. look up the tet body by owner id in `IPCSystem`;
 5. recover that body's global vertex offset from `body.info.dof_offset / 3`;
 6. update `mesh_cache` in place from the global DOF vector;
 7. extract positions and normals;
 8. call `apply_deformed_surface(...)`.
 
-## Why `IPCBodyID` and `dof_offset` Both Exist
+## Why owner lookup and `dof_offset` both matter
 
 `TetSurfaceResult.surface_vertex_ids` are **body-local** vertex ids.  
 `IPCState::x`, on the other hand, is a **global** concatenated `3N` vector across all bodies.
@@ -100,7 +100,7 @@ $$
 \text{global vertex id} = \text{body vertex offset} + \text{local surface vertex id}
 $$
 
-`IPCBodyID` answers "which runtime body?", while `dof_offset` answers "where does that body's vertex block begin in the current global state vector?".
+The scene bridge first resolves "which runtime body belongs to this `GameObject`?" through `IPCSystem`'s owner mapping, and then uses `dof_offset` to answer "where does that body's vertex block begin in the current global state vector?".
 
 This is why the `tet_mesh_convert.hpp` write-back helpers accept a `vertex_offset` parameter for runtime use.
 
@@ -110,25 +110,25 @@ The framework-side fixed-step order is now:
 
 ```cpp
 sync_scene_to_rigid_body(scene, physics_system.rigid_body_system());
-physics_system.step(dt);
+sync_scene_to_ipc(scene, physics_system.ipc_system());
+
+physics_system.rigid_body_system().step(dt);
 sync_rigid_body_to_scene(scene, physics_system.rigid_body_system());
 
-physics_system.ipc_system().step();
+physics_system.ipc_system().step(dt);
 sync_ipc_to_scene(scene, physics_system.ipc_system());
 ```
 
 The rigid-body path remains a classic pre-sync / solve / post-sync flow.
 
-The IPC path is slightly different:
-
-- scene -> IPC happens at registration time, not every frame;
-- IPC -> scene happens after every `ipc_system().step()`.
+The IPC path is also a pre-sync / solve / post-sync flow now, but its scene-side input is still limited to source-body/material/cache changes rather than per-frame node transforms.
 
 ## Current Limits
 
 The bridge is intentionally small:
 
 - runtime registration is component-driven, but still assumes tet topology is not edited every frame;
+- `IPCTetComponent` itself does not hold an `IPCSystem&` or runtime body handle;
 - it does not stream scene transforms back into IPC nodal positions every frame;
 - it does not handle contact objects or obstacle bodies yet;
 - it expects `IPCTetComponent` and `DeformableMeshComponent` to appear together on the same `GameObject`.

@@ -70,7 +70,7 @@ int main() {
         bunny_go.node().set_local_position(kResetPosition);
         bunny_go.node().set_local_scale({10.0f, 10.0f, 10.0f});
 
-        auto& rigid_body = bunny_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system());
+        auto& rigid_body = bunny_go.add_component<rtr::framework::component::RigidBody>();
         pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
         inverse_inertia_tensor_ref[0][0] = 0.6f;
         inverse_inertia_tensor_ref[1][1] = 1.0f;
@@ -81,8 +81,7 @@ int main() {
         reset_position.set_threshold_y(kThresholdY);
         reset_position.set_reset_position(kResetPosition);
 
-        auto& physics_body = runtime.physics_system().rigid_body_system().get_rigid_body(rigid_body.rigid_body_id());
-        physics_body.state().rotation.angular_velocity = kInitialAngularVelocity;
+        rigid_body.set_angular_velocity(kInitialAngularVelocity);
 
         auto&      ground_go   = scene.create_game_object("ground");
         const auto ground_mesh = runtime.resource_manager().create_from_relative_path<rtr::resource::MeshResourceKind>(

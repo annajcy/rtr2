@@ -19,7 +19,7 @@ int main() {
         auto& spinner = scene.create_game_object("torque_spinner");
         spinner.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
 
-        auto& rigid_body = spinner.add_component<rtr::framework::component::RigidBody>(physics_world);
+        auto& rigid_body = spinner.add_component<rtr::framework::component::RigidBody>();
         rigid_body.set_use_gravity(false);
         pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
         inverse_inertia_tensor_ref[1][1] = 1.0f;

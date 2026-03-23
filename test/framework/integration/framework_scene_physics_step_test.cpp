@@ -34,10 +34,7 @@ TEST(ScenePhysicsStepTest, HelperStepsAndSyncsIPCDeformableMesh) {
     auto body = rtr::system::physics::ipc::generate_tet_block(1, 1, 1, 0.25, Eigen::Vector3d(0.0, 1.0, 0.0));
 
     auto& go = scene.create_game_object("ipc_body");
-    auto& ipc_tet = go.add_component<rtr::framework::component::IPCTetComponent>(
-        physics_system.ipc_system(),
-        std::move(body)
-    );
+    auto& ipc_tet = go.add_component<rtr::framework::component::IPCTetComponent>(std::move(body));
     const auto mesh_handle = resources.create<rtr::resource::DeformableMeshResourceKind>(ipc_tet.mesh_cache());
     (void)go.add_component<rtr::framework::component::DeformableMeshComponent>(
         resources, mesh_handle, pbpt::math::Vec4{1.0f, 1.0f, 1.0f, 1.0f}

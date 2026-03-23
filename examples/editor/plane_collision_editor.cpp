@@ -62,7 +62,7 @@ void sync_camera_aspect(rtr::app::RuntimeContext& ctx) {
 
 void reset_dynamic_body(rtr::framework::core::GameObject& game_object,
                         rtr::framework::component::RigidBody& rigid_body,
-                        rtr::system::physics::rb::RigidBodySystem& physics_world,
+                        rtr::system::physics::rb::RigidBodySystem& /*physics_world*/,
                         const pbpt::math::Vec3& position,
                         const pbpt::math::Quat& orientation,
                         const pbpt::math::Vec3& linear_velocity,
@@ -73,10 +73,8 @@ void reset_dynamic_body(rtr::framework::core::GameObject& game_object,
     rigid_body.set_position(position);
     rigid_body.set_orientation(orientation);
     rigid_body.reset_dynamics();
-
-    auto& body = physics_world.get_rigid_body(rigid_body.rigid_body_id());
-    body.state().translation.linear_velocity = linear_velocity;
-    body.state().rotation.angular_velocity   = angular_velocity;
+    rigid_body.set_linear_velocity(linear_velocity);
+    rigid_body.set_angular_velocity(angular_velocity);
 }
 
 }  // namespace
@@ -150,12 +148,11 @@ int main() {
             go.node().set_local_rotation(rotation);
             go.node().set_local_scale(scale);
             (void)go.add_component<rtr::framework::component::StaticMeshComponent>(runtime.resource_manager(), quad_mesh, color);
-            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system());
+            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>();
             rigid_body.set_type(rtr::system::physics::rb::RigidBodyType::Static);
             rigid_body.set_restitution(restitution);
             rigid_body.set_friction(friction);
-            (void)go.add_component<rtr::framework::component::PlaneCollider>(
-                runtime.physics_system().rigid_body_system(), pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
+            (void)go.add_component<rtr::framework::component::PlaneCollider>(pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
         };
 
         (void)add_plane("ramp_plane",
@@ -178,11 +175,11 @@ int main() {
         sphere_go.node().set_local_scale({0.48f, 0.48f, 0.48f});
         (void)sphere_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), sphere_mesh, pbpt::math::Vec4{0.95f, 0.66f, 0.26f, 1.0f});
-        auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system());
+        auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>();
         sphere_body.set_restitution(0.8f);
         sphere_body.set_friction(0.86f);
         sphere_body.set_inverse_inertia_tensor_ref(diagonal_inverse_inertia(1.0f, 1.0f, 1.0f));
-        (void)sphere_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_system(), 1.0f);
+        (void)sphere_go.add_component<rtr::framework::component::SphereCollider>(1.0f);
 
         struct StackBoxEntry {
             rtr::framework::core::GameObject*            game_object{nullptr};
@@ -205,8 +202,7 @@ int main() {
             (void)box_go.add_component<rtr::framework::component::StaticMeshComponent>(
                 runtime.resource_manager(), cube_mesh, stack_colors[index]);
 
-            auto& box_body =
-                box_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system(), 1.0f);
+            auto& box_body = box_go.add_component<rtr::framework::component::RigidBody>();
             box_body.set_mass(1.0f);
             box_body.set_restitution(0.02f);
             box_body.set_friction(0.18f);
@@ -214,8 +210,7 @@ int main() {
             box_body.set_angular_decay(0.90f);
             box_body.set_inverse_inertia_tensor_ref(
                 diagonal_inverse_inertia(kCubeInverseInertia, kCubeInverseInertia, kCubeInverseInertia));
-            (void)box_go.add_component<rtr::framework::component::BoxCollider>(
-                runtime.physics_system().rigid_body_system(), pbpt::math::Vec3{0.5f, 0.5f, 0.5f});
+            (void)box_go.add_component<rtr::framework::component::BoxCollider>(pbpt::math::Vec3{0.5f, 0.5f, 0.5f});
 
             stack_boxes.push_back(StackBoxEntry{.game_object = &box_go, .rigid_body = &box_body});
         }

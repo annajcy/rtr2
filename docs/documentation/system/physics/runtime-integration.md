@@ -8,25 +8,27 @@ The authoritative runtime entry point is `step_scene_physics(scene, physics_syst
 
 ```cpp
 sync_scene_to_rigid_body(scene, physics_system.rigid_body_system());
-physics_system.step(dt);
+sync_scene_to_ipc(scene, physics_system.ipc_system());
+
+physics_system.rigid_body_system().step(dt);
 sync_rigid_body_to_scene(scene, physics_system.rigid_body_system());
 
-physics_system.ipc_system().step();
+physics_system.ipc_system().step(dt);
 sync_ipc_to_scene(scene, physics_system.ipc_system());
 ```
 
 Two details matter here:
 
-- `PhysicsSystem::step(dt)` currently advances `rb::RigidBodySystem` only.
-- IPC stepping and IPC-to-scene write-back are performed explicitly in the framework integration layer after rigid-body synchronization.
+- rigid-body stepping and IPC stepping are both explicit in the framework integration layer;
+- scene-to-runtime sync happens before solving, runtime-to-scene sync happens after solving.
 
-## Why IPC Is Stepped Outside `PhysicsSystem::step()`
+## Why the framework steps both systems explicitly
 
 The rigid-body system uses the frame/fixed-tick `dt` pushed in from the runtime loop.
 
-The IPC system, by contrast, owns its own `IPCConfig::dt` and solves a nonlinear backward-Euler optimization step. Keeping `ipc_system().step()` outside `PhysicsSystem::step()` makes the fixed-step boundary explicit and keeps scene synchronization around the deformable write-back path.
+The IPC system also consumes the fixed-tick `dt` from the runtime loop and solves a nonlinear backward-Euler optimization step. Keeping both `rigid_body_system().step(dt)` and `ipc_system().step(dt)` explicit in `scene_physics_step(...)` makes the fixed-step boundary obvious and keeps the pre-sync / post-sync structure visible.
 
-In the current demo/example path, `AppRuntimeConfig::fixed_delta_seconds` is set to `0.01` so it matches the default `IPCConfig::dt`.
+In the current demo/example path, `AppRuntimeConfig::fixed_delta_seconds` is often set to `0.01` so it also works well with the deformable solver settings.
 
 ## Scene / Physics / Renderer Ownership
 
@@ -56,12 +58,12 @@ Dynamic rigid bodies write transforms back to the scene graph after simulation. 
 
 ## IPC Direction
 
-IPC currently uses a slightly different ownership pattern:
+IPC still uses a slightly different ownership pattern:
 
-- scene-to-IPC happens at registration time, not every frame;
-- IPC-to-scene happens every fixed tick after `ipc_system().step()`.
+- scene-to-IPC is dirty-driven source synchronization, not per-frame scene-transform overwrite;
+- IPC-to-scene happens every fixed tick after `ipc_system().step(dt)`.
 
-That is because current `TetBody` instances are registered once and then simulated as runtime-owned deformable bodies. The scene graph does not continuously overwrite nodal positions.
+That is because current `TetBody` instances are runtime-owned deformable bodies after registration. The scene graph does not continuously overwrite nodal positions.
 
 The bridge objects are:
 
@@ -87,9 +89,9 @@ GameObject / Components
              |
              \--> sync_ipc_to_scene(...)
 
-rb::RigidBodySystem <----- PhysicsSystem::step(dt)
+rb::RigidBodySystem::step(dt)
 
-ipc::IPCSystem::step()
+ipc::IPCSystem::step(dt)
     -> update IPCState::x
     -> sync_ipc_to_scene(...)
     -> apply_deformed_surface(...)

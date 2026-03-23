@@ -22,7 +22,7 @@
 - 全局系统装配
 - Newton / line search 求解循环
 - contact barrier / CCD
-- 接入 `PhysicsSystem::step()` 的 deformable runtime
+- 通过 `step_scene_physics(...)` 和 `ipc_system.step(dt)` 接入的 deformable runtime
 
 ## 模块关系
 

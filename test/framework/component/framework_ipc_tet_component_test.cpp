@@ -4,6 +4,7 @@
 
 #include "rtr/framework/component/physics/ipc/ipc_tet_component.hpp"
 #include "rtr/framework/core/scene.hpp"
+#include "rtr/framework/integration/physics/ipc_scene_sync.hpp"
 #include "rtr/system/physics/ipc/core/ipc_system.hpp"
 
 namespace rtr::framework::component::test {
@@ -35,20 +36,24 @@ TEST(FrameworkIPCTetComponentTest, EnableRegistersBodyAndDisableRemovesIt) {
     core::Scene scene(1);
     auto& go = scene.create_game_object("ipc_body");
 
-    auto& ipc_tet = go.add_component<IPCTetComponent>(ipc_world, make_single_tet_body());
+    auto& ipc_tet = go.add_component<IPCTetComponent>(make_single_tet_body());
+    integration::physics::sync_scene_to_ipc(scene, ipc_world);
 
-    ASSERT_TRUE(ipc_tet.has_registered_body());
-    const auto initial_body_id = ipc_tet.body_id();
-    EXPECT_TRUE(ipc_world.has_tet_body(initial_body_id));
+    const auto initial_body_id = ipc_world.try_get_tet_body_id_for_owner(go.id());
+    ASSERT_TRUE(initial_body_id.has_value());
+    EXPECT_TRUE(ipc_world.has_tet_body(*initial_body_id));
 
     go.set_component_enabled<IPCTetComponent>(false);
-    EXPECT_FALSE(ipc_tet.has_registered_body());
-    EXPECT_FALSE(ipc_world.has_tet_body(initial_body_id));
+    integration::physics::sync_scene_to_ipc(scene, ipc_world);
+    EXPECT_FALSE(ipc_world.has_tet_body_for_owner(go.id()));
+    EXPECT_FALSE(ipc_world.has_tet_body(*initial_body_id));
 
     go.set_component_enabled<IPCTetComponent>(true);
-    EXPECT_TRUE(ipc_tet.has_registered_body());
-    EXPECT_NE(ipc_tet.body_id(), initial_body_id);
-    EXPECT_TRUE(ipc_world.has_tet_body(ipc_tet.body_id()));
+    integration::physics::sync_scene_to_ipc(scene, ipc_world);
+    const auto next_body_id = ipc_world.try_get_tet_body_id_for_owner(go.id());
+    ASSERT_TRUE(next_body_id.has_value());
+    EXPECT_NE(*next_body_id, *initial_body_id);
+    EXPECT_TRUE(ipc_world.has_tet_body(*next_body_id));
 }
 
 TEST(FrameworkIPCTetComponentTest, ApplyingSourceMaterialUpdatesRuntimeBody) {
@@ -56,16 +61,16 @@ TEST(FrameworkIPCTetComponentTest, ApplyingSourceMaterialUpdatesRuntimeBody) {
     core::Scene scene(1);
     auto& go = scene.create_game_object("ipc_body");
 
-    auto& ipc_tet = go.add_component<IPCTetComponent>(ipc_world, make_single_tet_body());
-    ipc_world.initialize();
+    auto& ipc_tet = go.add_component<IPCTetComponent>(make_single_tet_body());
+    integration::physics::sync_scene_to_ipc(scene, ipc_world);
+    ipc_world.step(0.01);
 
-    auto* source_material = ipc_tet.source_material_if<system::physics::ipc::FixedCorotatedMaterial>();
-    ASSERT_NE(source_material, nullptr);
-    source_material->mass_density = 4.0;
+    ASSERT_TRUE(ipc_tet.set_density(4.0));
 
-    ASSERT_TRUE(ipc_tet.apply_source_material_to_runtime());
-    const auto& runtime_body = ipc_world.get_tet_body(ipc_tet.body_id());
-    const auto& runtime_material = std::get<system::physics::ipc::FixedCorotatedMaterial>(runtime_body.material);
+    integration::physics::sync_scene_to_ipc(scene, ipc_world);
+    const auto* runtime_body = ipc_world.try_get_tet_body_for_owner(go.id());
+    ASSERT_NE(runtime_body, nullptr);
+    const auto& runtime_material = std::get<system::physics::ipc::FixedCorotatedMaterial>(runtime_body->material);
 
     EXPECT_DOUBLE_EQ(runtime_material.mass_density, 4.0);
     EXPECT_GT(ipc_world.state().mass_diag.minCoeff(), 0.0);
@@ -77,21 +82,24 @@ TEST(FrameworkIPCTetComponentTest, ApplyingSourceMaterialWhileDisabledOnlyUpdate
     core::Scene scene(1);
     auto& go = scene.create_game_object("ipc_body");
 
-    auto& ipc_tet = go.add_component<IPCTetComponent>(ipc_world, make_single_tet_body());
-    const auto first_body_id = ipc_tet.body_id();
+    auto& ipc_tet = go.add_component<IPCTetComponent>(make_single_tet_body());
+    integration::physics::sync_scene_to_ipc(scene, ipc_world);
+    const auto first_body_id = ipc_world.try_get_tet_body_id_for_owner(go.id());
+    ASSERT_TRUE(first_body_id.has_value());
 
     go.set_component_enabled<IPCTetComponent>(false);
+    integration::physics::sync_scene_to_ipc(scene, ipc_world);
 
-    auto* source_material = ipc_tet.source_material_if<system::physics::ipc::FixedCorotatedMaterial>();
-    ASSERT_NE(source_material, nullptr);
-    source_material->youngs_modulus = 4321.0;
+    ASSERT_TRUE(ipc_tet.set_youngs_modulus(4321.0));
 
-    EXPECT_FALSE(ipc_tet.apply_source_material_to_runtime());
-    EXPECT_FALSE(ipc_world.has_tet_body(first_body_id));
+    EXPECT_TRUE(ipc_tet.source_dirty());
+    EXPECT_FALSE(ipc_world.has_tet_body(*first_body_id));
 
     go.set_component_enabled<IPCTetComponent>(true);
-    const auto& runtime_body = ipc_world.get_tet_body(ipc_tet.body_id());
-    const auto& runtime_material = std::get<system::physics::ipc::FixedCorotatedMaterial>(runtime_body.material);
+    integration::physics::sync_scene_to_ipc(scene, ipc_world);
+    const auto* runtime_body = ipc_world.try_get_tet_body_for_owner(go.id());
+    ASSERT_NE(runtime_body, nullptr);
+    const auto& runtime_material = std::get<system::physics::ipc::FixedCorotatedMaterial>(runtime_body->material);
     EXPECT_DOUBLE_EQ(runtime_material.youngs_modulus, 4321.0);
 }
 

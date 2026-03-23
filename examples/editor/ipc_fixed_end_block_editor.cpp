@@ -50,10 +50,7 @@ void register_ipc_tet_object(rtr::framework::core::GameObject& game_object,
                              rtr::app::AppRuntime& runtime,
                              rtr::system::physics::ipc::TetBody body,
                              const pbpt::math::Vec4& color) {
-    auto& ipc_component = game_object.add_component<rtr::framework::component::IPCTetComponent>(
-        runtime.physics_system().ipc_system(),
-        std::move(body)
-    );
+    auto& ipc_component = game_object.add_component<rtr::framework::component::IPCTetComponent>(std::move(body));
     const rtr::utils::ObjMeshData initial_mesh = ipc_component.mesh_cache();
     const auto mesh_handle = runtime.resource_manager()
         .create<rtr::resource::DeformableMeshResourceKind>(initial_mesh);

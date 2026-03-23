@@ -8,7 +8,7 @@
 
 ```text
 TetBody
-  -> IPCSystem.step()
+  -> IPCSystem.step(dt)
   -> sync_ipc_to_scene()
   -> DeformableMeshComponent
   -> GPU mesh update
@@ -101,7 +101,7 @@ TetBody
 ```text
 fixed tick
   -> step_scene_physics(...)
-      -> ipc_system.step()
+      -> ipc_system.step(dt)
       -> sync_ipc_to_scene(...)
 ```
 
@@ -115,13 +115,13 @@ fixed tick
 
 ## 时间步对齐
 
-当前 `IPCSystem` 默认使用 `IPCConfig::dt = 0.01`，所以 example 里会显式设置：
+现在 `IPCSystem` 直接使用 `step(delta_seconds)` 传入的时间步，所以 example 里会显式设置：
 
 ```cpp
 AppRuntimeConfig.fixed_delta_seconds = 0.01;
 ```
 
-这样 runtime fixed tick 和 IPC 求解时间步是一致的。
+这样 runtime fixed tick 和 IPC 求解时间步保持一致。
 
 ## 正确运行时应该看到什么
 

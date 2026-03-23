@@ -69,9 +69,9 @@ int main() {
         sphere_go.node().set_local_position({0.0f, 1.5f, 0.0f});
         sphere_go.node().set_local_scale({8.0f, 8.0f, 8.0f});
 
-        auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system());
+        auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>();
         (void)sphere_body;
-        (void)sphere_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_system(), 0.1f);
+        (void)sphere_go.add_component<rtr::framework::component::SphereCollider>(0.1f);
         auto& reset = sphere_go.add_component<rtr::framework::component::ResetPosition>();
         reset.set_threshold_y(-2.0f);
         reset.set_reset_position(pbpt::math::Vec3{0.0f, 1.5f, 0.0f});
@@ -86,10 +86,9 @@ int main() {
             pbpt::math::angle_axis(pbpt::math::radians(-90.0f), pbpt::math::Vec3{1.0f, 0.0f, 0.0f}) *
             pbpt::math::angle_axis(pbpt::math::radians(15.0f), pbpt::math::Vec3{0.0f, 0.0f, 1.0f}));
         floor_go.node().set_local_scale({10.0f, 10.0f, 1.0f});
-        auto& floor_body = floor_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system());
+        auto& floor_body = floor_go.add_component<rtr::framework::component::RigidBody>();
         floor_body.set_type(rtr::system::physics::rb::RigidBodyType::Static);
-        (void)floor_go.add_component<rtr::framework::component::BoxCollider>(
-            runtime.physics_system().rigid_body_system(), pbpt::math::Vec3{0.5f, 0.5f, 0.05f});
+        (void)floor_go.add_component<rtr::framework::component::BoxCollider>(pbpt::math::Vec3{0.5f, 0.5f, 0.05f});
 
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{
             .on_post_update =

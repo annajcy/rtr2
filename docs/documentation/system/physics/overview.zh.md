@@ -17,14 +17,13 @@ RTR2 当前在 `src/rtr/system/physics/` 下有两个方向：
 ```text
 step_scene_physics(scene, physics_system, dt)
     -> sync_scene_to_rigid_body(...)
-    -> PhysicsSystem::step(dt)
-         -> rb::RigidBodySystem::step(dt)
+    -> rb::RigidBodySystem::step(dt)
     -> sync_rigid_body_to_scene(...)
-    -> ipc_system.step()
+    -> ipc_system.step(dt)
     -> sync_ipc_to_scene(...)
 ```
 
-`PhysicsSystem::step()` 仍然只负责刚体 world 内部求解。scene 同步仍然放在 framework integration 层，而 IPC 的步进和写回现在也已经显式进入这条 fixed tick 路径。
+scene 同步仍然放在 framework integration 层，而刚体和 IPC 的步进现在都已经显式进入这条 fixed tick 路径。
 
 ## 运行时所有权
 

@@ -1,6 +1,6 @@
 # `ipc_system.hpp`
 
-`src/rtr/system/physics/ipc/core/ipc_system.hpp` 是 IPC 可变形体仿真的顶层编排器。它将数据结构、能量模块和 Newton 求解器串联成一个统一的 `step()` 接口。
+`src/rtr/system/physics/ipc/core/ipc_system.hpp` 是 IPC 可变形体仿真的顶层编排器。它将数据结构、能量模块和 Newton 求解器串联成一个统一的 `step(delta_seconds)` 接口。
 
 ## 理论基础：Backward Euler 作为优化问题
 
@@ -106,7 +106,6 @@ $$
 
 ```cpp
 struct IPCConfig {
-    double dt{0.01};                               // 固定时间步（秒）
     Eigen::Vector3d gravity{0.0, -9.81, 0.0};     // 重力加速度
     NewtonSolverParams solver_params{};             // Newton 迭代控制
 };
@@ -114,7 +113,6 @@ struct IPCConfig {
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `dt` | 0.01 | IPC 使用固定步长。更小 = 更精确但更多步。典型值：0.005–0.02。 |
 | `gravity` | $(0, -9.81, 0)$ | 标准地球重力。零重力测试时设为零。 |
 | `solver_params` | 见 Newton 文档 | `max_iterations=50`，`gradient_tolerance=1e-6` 等。 |
 
@@ -145,13 +143,13 @@ void rebuild_runtime_state() {
     }
 
     // 阶段 5：构建 DBC mask
-    compute_x_hat();
+    m_x_hat = m_state.x_prev;
     build_free_dof_mask();
     m_initialized = true;
 }
 ```
 
-`initialize()` 现在只是显式触发这次重建的入口。`create_tet_body` / `remove_tet_body` 会把系统标记为 dirty，而 `step()` 会在求解前自动重建。
+`initialize()` 现在只是显式触发这次重建的入口。`create_tet_body` / `remove_tet_body` 会把系统标记为 dirty，而 `step(delta_seconds)` 会在求解前自动重建。
 
 `body.precompute()` 会从每个 body 的 material object 里读取 density，因此 `mass_diag` 的来源是 `TetBody::material`。
 
@@ -187,30 +185,31 @@ void build_free_dof_mask() {
 
 将 per-vertex 约束展开为 per-DOF 布尔值。Newton solver 用这个 mask 从线性系统中消去约束 DOF（见 `newton_solver.hpp` 文档）。
 
-## 时间步进：`step()`
+## 时间步进：`step(delta_seconds)`
 
 ### 完整流程
 
 ```cpp
-void step() {
+void step(double delta_seconds) {
     // 1. 保存上一步状态
     m_state.x_prev = m_state.x;
 
     // 2. 惯性预测
-    compute_x_hat();   // x_hat = x_prev + dt * v
+    compute_x_hat(delta_seconds);   // x_hat = x_prev + dt * v
 
     // 3. 组装 Newton 回调
     NewtonProblem problem{
-        .compute_energy = [this](x) { return compute_total_energy(x); },
-        .compute_gradient = [this](x, g) { compute_total_gradient(x, g); },
-        .compute_hessian_triplets = [this](x, t) { compute_total_hessian(x, t); },
+        .compute_energy = [this, delta_seconds](x) { return compute_total_energy(x, delta_seconds); },
+        .compute_gradient = [this, delta_seconds](x, g) { compute_total_gradient(x, g, delta_seconds); },
+        .compute_hessian_triplets =
+            [this, delta_seconds](x, t) { compute_total_hessian(x, t, delta_seconds); },
     };
 
     // 4. Newton 求解（原地修改 m_state.x）
     solve(m_state, m_x_hat, m_free_dof_mask, problem, m_config.solver_params);
 
     // 5. 更新速度
-    m_state.v = (m_state.x - m_state.x_prev) / m_config.dt;
+    m_state.v = (m_state.x - m_state.x_prev) / delta_seconds;
 
     // 6. 约束 DOF 速度清零
     for 每个 DOF i:
@@ -234,8 +233,8 @@ $$
 $$
 
 ```cpp
-void compute_x_hat() {
-    m_x_hat = m_state.x_prev + m_config.dt * m_state.v;
+void compute_x_hat(double delta_seconds) {
+    m_x_hat = m_state.x_prev + delta_seconds * m_state.v;
 }
 ```
 
@@ -282,7 +281,7 @@ v^{n+1} = \frac{x^{n+1} - x^n}{h}
 $$
 
 ```cpp
-m_state.v = (m_state.x - m_state.x_prev) / m_config.dt;
+m_state.v = (m_state.x - m_state.x_prev) / delta_seconds;
 ```
 
 然后对约束 DOF 的速度清零：
@@ -306,12 +305,12 @@ E(x) = E_{\text{inertial}}(x) + E_{\text{gravity}}(x) + \sum_{b} E_{\text{materi
 $$
 
 ```cpp
-double compute_total_energy(const Eigen::VectorXd& x) const {
+double compute_total_energy(const Eigen::VectorXd& x, double delta_seconds) const {
     double total_energy = 0.0;
 
     // 惯性：(1/2h²) (x - x_hat)^T M (x - x_hat)
     total_energy += InertialEnergy::compute_energy(InertialEnergy::Input{
-        .x = x, .x_hat = m_x_hat, .mass_diag = m_state.mass_diag, .dt = m_config.dt,
+        .x = x, .x_hat = m_x_hat, .mass_diag = m_state.mass_diag, .dt = delta_seconds,
     });
 
     // 重力：-f_g^T x = -Σ m_i * g * x_i

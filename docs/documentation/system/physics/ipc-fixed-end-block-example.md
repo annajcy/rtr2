@@ -8,7 +8,7 @@ The example is not just a visual demo. It is the first end-to-end runtime path t
 
 ```text
 TetBody
-  -> IPCSystem.step()
+  -> IPCSystem.step(dt)
   -> sync_ipc_to_scene()
   -> DeformableMeshComponent
   -> GPU mesh update
@@ -101,7 +101,7 @@ Instead:
 ```text
 fixed tick
   -> step_scene_physics(...)
-      -> ipc_system.step()
+      -> ipc_system.step(dt)
       -> sync_ipc_to_scene(...)
 ```
 
@@ -115,13 +115,13 @@ That is the key architectural difference from the earlier manual-writeback demo 
 
 ## Time-Step Alignment
 
-`IPCSystem` currently defaults to `IPCConfig::dt = 0.01`, so the example sets:
+`IPCSystem` now uses the `dt` passed into `step(delta_seconds)` directly, so the example sets:
 
 ```cpp
 AppRuntimeConfig.fixed_delta_seconds = 0.01;
 ```
 
-This avoids a mismatch between the runtime fixed tick and the IPC solve step.
+This keeps the runtime fixed tick and the IPC solve step aligned.
 
 ## What You Should See
 

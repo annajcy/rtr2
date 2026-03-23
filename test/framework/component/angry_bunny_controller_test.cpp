@@ -18,7 +18,7 @@ TEST(AngryBunnyControllerTest, WaitingStateKeepsBunnySpinningWithoutGravity) {
 
     auto& bunny = scene.create_game_object("bunny");
     bunny.node().set_local_position(pbpt::math::Vec3{0.0f, 0.6f, 0.0f});
-    auto& rigid_body = bunny.add_component<framework::component::RigidBody>(physics_world);
+    auto& rigid_body = bunny.add_component<framework::component::RigidBody>();
     auto& controller = bunny.add_component<AngryBunnyController>(input_state);
 
     scene.fixed_tick(framework::core::FixedTickContext{.fixed_delta_seconds = 1.0 / 60.0, .fixed_tick_index = 0});
@@ -36,7 +36,7 @@ TEST(AngryBunnyControllerTest, LaunchAndResetEdgesUpdateStateOnce) {
 
     auto& bunny = scene.create_game_object("bunny");
     bunny.node().set_local_position(pbpt::math::Vec3{0.0f, 0.6f, 0.0f});
-    auto& rigid_body = bunny.add_component<framework::component::RigidBody>(physics_world);
+    auto& rigid_body = bunny.add_component<framework::component::RigidBody>();
     auto& controller = bunny.add_component<AngryBunnyController>(input_state);
 
     input_state.update_key(system::input::KeyCode::L, system::input::KeyAction::PRESS, system::input::KeyMod::NONE);

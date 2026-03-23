@@ -1,6 +1,6 @@
 # `ipc_system.hpp`
 
-`src/rtr/system/physics/ipc/core/ipc_system.hpp` is the top-level orchestrator of the IPC deformable body simulation. It connects data structures, energy modules, and the Newton solver into a single `step()` interface.
+`src/rtr/system/physics/ipc/core/ipc_system.hpp` is the top-level orchestrator of the IPC deformable body simulation. It connects data structures, energy modules, and the Newton solver into a single `step(delta_seconds)` interface.
 
 ## Theoretical Foundation: Backward Euler as Optimization
 
@@ -106,7 +106,6 @@ The optimization formulation:
 
 ```cpp
 struct IPCConfig {
-    double dt{0.01};                               // fixed time step (seconds)
     Eigen::Vector3d gravity{0.0, -9.81, 0.0};     // gravity acceleration
     NewtonSolverParams solver_params{};             // Newton iteration control
 };
@@ -114,7 +113,6 @@ struct IPCConfig {
 
 | Parameter | Default | Notes |
 |-----------|---------|-------|
-| `dt` | 0.01 | IPC uses fixed-size steps. Smaller = more accurate but more steps. Typical: 0.005–0.02. |
 | `gravity` | $(0, -9.81, 0)$ | Standard Earth gravity. Set to zero for zero-g tests. |
 | `solver_params` | See Newton doc | `max_iterations=50`, `gradient_tolerance=1e-6`, etc. |
 
@@ -145,13 +143,13 @@ void rebuild_runtime_state() {
     }
 
     // Phase 5: Build DBC mask
-    compute_x_hat();
+    m_x_hat = m_state.x_prev;
     build_free_dof_mask();
     m_initialized = true;
 }
 ```
 
-`initialize()` is now just the explicit entry point for this rebuild. Registration changes (`create_tet_body`, `remove_tet_body`) mark the system dirty, and `step()` automatically rebuilds before solving.
+`initialize()` is now just the explicit entry point for this rebuild. Registration changes (`create_tet_body`, `remove_tet_body`) mark the system dirty, and `step(delta_seconds)` automatically rebuilds before solving.
 
 `body.precompute()` reads density from each body's material object, so `mass_diag` is assembled from `TetBody::material`.
 
@@ -188,30 +186,31 @@ void build_free_dof_mask() {
 
 This expands per-vertex constraints to per-DOF booleans. The Newton solver uses this mask to eliminate constrained DOFs from the linear system (see `newton_solver.hpp` doc).
 
-## Time Stepping: `step()`
+## Time Stepping: `step(delta_seconds)`
 
 ### The Complete Flow
 
 ```cpp
-void step() {
+void step(double delta_seconds) {
     // 1. Save previous state
     m_state.x_prev = m_state.x;
 
     // 2. Inertial prediction
-    compute_x_hat();   // x_hat = x_prev + dt * v
+    compute_x_hat(delta_seconds);   // x_hat = x_prev + dt * v
 
     // 3. Assemble Newton callbacks
     NewtonProblem problem{
-        .compute_energy = [this](x) { return compute_total_energy(x); },
-        .compute_gradient = [this](x, g) { compute_total_gradient(x, g); },
-        .compute_hessian_triplets = [this](x, t) { compute_total_hessian(x, t); },
+        .compute_energy = [this, delta_seconds](x) { return compute_total_energy(x, delta_seconds); },
+        .compute_gradient = [this, delta_seconds](x, g) { compute_total_gradient(x, g, delta_seconds); },
+        .compute_hessian_triplets =
+            [this, delta_seconds](x, t) { compute_total_hessian(x, t, delta_seconds); },
     };
 
     // 4. Newton solve (modifies m_state.x in place)
     solve(m_state, m_x_hat, m_free_dof_mask, problem, m_config.solver_params);
 
     // 5. Update velocity
-    m_state.v = (m_state.x - m_state.x_prev) / m_config.dt;
+    m_state.v = (m_state.x - m_state.x_prev) / delta_seconds;
 
     // 6. Zero constrained velocities
     for each DOF i:
@@ -235,8 +234,8 @@ $$
 $$
 
 ```cpp
-void compute_x_hat() {
-    m_x_hat = m_state.x_prev + m_config.dt * m_state.v;
+void compute_x_hat(double delta_seconds) {
+    m_x_hat = m_state.x_prev + delta_seconds * m_state.v;
 }
 ```
 
@@ -283,7 +282,7 @@ v^{n+1} = \frac{x^{n+1} - x^n}{h}
 $$
 
 ```cpp
-m_state.v = (m_state.x - m_state.x_prev) / m_config.dt;
+m_state.v = (m_state.x - m_state.x_prev) / delta_seconds;
 ```
 
 Then zero the velocity on constrained DOFs:
@@ -307,12 +306,12 @@ E(x) = E_{\text{inertial}}(x) + E_{\text{gravity}}(x) + \sum_{b} E_{\text{materi
 $$
 
 ```cpp
-double compute_total_energy(const Eigen::VectorXd& x) const {
+double compute_total_energy(const Eigen::VectorXd& x, double delta_seconds) const {
     double total_energy = 0.0;
 
     // Inertial: (1/2h²) (x - x_hat)^T M (x - x_hat)
     total_energy += InertialEnergy::compute_energy(InertialEnergy::Input{
-        .x = x, .x_hat = m_x_hat, .mass_diag = m_state.mass_diag, .dt = m_config.dt,
+        .x = x, .x_hat = m_x_hat, .mass_diag = m_state.mass_diag, .dt = delta_seconds,
     });
 
     // Gravity: -f_g^T x = -Σ m_i * g * x_i

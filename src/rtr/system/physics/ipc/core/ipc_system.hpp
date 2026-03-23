@@ -1,11 +1,14 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -18,6 +21,7 @@
 #include "rtr/system/physics/ipc/energy/material_energy.hpp"
 #include "rtr/system/physics/ipc/model/tet_body.hpp"
 #include "rtr/system/physics/ipc/solver/newton_solver.hpp"
+#include "rtr/framework/core/types.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::system::physics::ipc {
@@ -26,7 +30,6 @@ using IPCBodyID = std::uint64_t;
 inline constexpr IPCBodyID kInvalidIPCBodyId = std::numeric_limits<IPCBodyID>::max();
 
 struct IPCConfig {
-    double dt{0.01};
     Eigen::Vector3d gravity{0.0, -9.81, 0.0};
     NewtonSolverParams solver_params{};
 };
@@ -34,6 +37,59 @@ struct IPCConfig {
 class IPCSystem {
 public:
     explicit IPCSystem(IPCConfig config = {}) : m_config(std::move(config)) {}
+
+    std::optional<IPCBodyID> try_get_tet_body_id_for_owner(framework::core::GameObjectId owner_id) const {
+        const auto it = m_owner_to_body.find(owner_id);
+        if (it == m_owner_to_body.end()) {
+            return std::nullopt;
+        }
+        return it->second;
+    }
+
+    bool has_tet_body_for_owner(framework::core::GameObjectId owner_id) const {
+        return try_get_tet_body_id_for_owner(owner_id).has_value();
+    }
+
+    std::vector<framework::core::GameObjectId> tet_body_owner_ids() const {
+        std::vector<framework::core::GameObjectId> owner_ids{};
+        owner_ids.reserve(m_owner_to_body.size());
+        for (const auto& [owner_id, body_id] : m_owner_to_body) {
+            if (m_tet_bodies.contains(body_id)) {
+                owner_ids.push_back(owner_id);
+            }
+        }
+        return owner_ids;
+    }
+
+    TetBody* try_get_tet_body_for_owner(framework::core::GameObjectId owner_id) {
+        const auto id = try_get_tet_body_id_for_owner(owner_id);
+        if (!id.has_value()) {
+            return nullptr;
+        }
+        return &m_tet_bodies.at(*id);
+    }
+
+    const TetBody* try_get_tet_body_for_owner(framework::core::GameObjectId owner_id) const {
+        const auto id = try_get_tet_body_id_for_owner(owner_id);
+        if (!id.has_value()) {
+            return nullptr;
+        }
+        return &m_tet_bodies.at(*id);
+    }
+
+    IPCBodyID create_or_replace_tet_body(framework::core::GameObjectId owner_id, TetBody body) {
+        if (const auto existing_id = try_get_tet_body_id_for_owner(owner_id); existing_id.has_value()) {
+            m_tet_bodies[*existing_id] = std::move(body);
+            refresh_tet_body_runtime_data(*existing_id);
+            m_scene_sync_dirty_owners.erase(owner_id);
+            return *existing_id;
+        }
+        const IPCBodyID body_id = create_tet_body(std::move(body));
+        m_owner_to_body[owner_id] = body_id;
+        m_body_to_owner[body_id] = owner_id;
+        m_scene_sync_dirty_owners.erase(owner_id);
+        return body_id;
+    }
 
     IPCBodyID create_tet_body(TetBody body) {
         const IPCBodyID body_id = m_next_body_id++;
@@ -47,10 +103,20 @@ public:
         return id != kInvalidIPCBodyId && m_tet_bodies.contains(id);
     }
 
+    bool remove_tet_body_for_owner(framework::core::GameObjectId owner_id) {
+        const auto body_id = try_get_tet_body_id_for_owner(owner_id);
+        if (!body_id.has_value()) {
+            return false;
+        }
+        return remove_tet_body(*body_id);
+    }
+
     bool remove_tet_body(IPCBodyID id) {
         if (!has_tet_body(id)) {
             return false;
         }
+
+        const auto owner_it = m_body_to_owner.find(id);
 
         m_tet_bodies.erase(id);
         m_body_order.erase(
@@ -59,6 +125,11 @@ public:
         );
         m_body_layouts.erase(id);
         m_needs_rebuild = true;
+        if (owner_it != m_body_to_owner.end()) {
+            m_owner_to_body.erase(owner_it->second);
+            m_scene_sync_dirty_owners.erase(owner_it->second);
+            m_body_to_owner.erase(owner_it);
+        }
 
         if (m_tet_bodies.empty()) {
             clear_runtime_state();
@@ -70,7 +141,10 @@ public:
         rebuild_runtime_state();
     }
 
-    void step() {
+    void step(double delta_seconds) {
+        if (!std::isfinite(delta_seconds) || delta_seconds <= 0.0) {
+            throw std::invalid_argument("IPCSystem step delta_seconds must be positive and finite.");
+        }
         if (m_needs_rebuild || (!m_initialized && !m_tet_bodies.empty())) {
             rebuild_runtime_state();
         }
@@ -79,16 +153,19 @@ public:
         }
 
         m_state.x_prev = m_state.x;
-        compute_x_hat();
+        compute_x_hat(delta_seconds);
 
         const NewtonProblem problem{
-            .compute_energy = [this](const Eigen::VectorXd& x) { return compute_total_energy(x); },
-            .compute_gradient = [this](const Eigen::VectorXd& x, Eigen::VectorXd& gradient) {
-                compute_total_gradient(x, gradient);
+            .compute_energy = [this, delta_seconds](const Eigen::VectorXd& x) {
+                return compute_total_energy(x, delta_seconds);
+            },
+            .compute_gradient = [this, delta_seconds](const Eigen::VectorXd& x, Eigen::VectorXd& gradient) {
+                compute_total_gradient(x, gradient, delta_seconds);
             },
             .compute_hessian_triplets =
-                [this](const Eigen::VectorXd& x, std::vector<Eigen::Triplet<double>>& triplets) {
-                    compute_total_hessian(x, triplets);
+                [this, delta_seconds](const Eigen::VectorXd& x,
+                                      std::vector<Eigen::Triplet<double>>& triplets) {
+                    compute_total_hessian(x, triplets, delta_seconds);
                 },
         };
 
@@ -103,10 +180,15 @@ public:
             );
         }
 
-        m_state.v = (m_state.x - m_state.x_prev) / m_config.dt;
+        m_state.v = (m_state.x - m_state.x_prev) / delta_seconds;
         for (Eigen::Index i = 0; i < m_state.v.size(); ++i) {
             if (!m_free_dof_mask[static_cast<std::size_t>(i)]) {
                 m_state.v[i] = 0.0;
+            }
+        }
+        for (const auto& [owner_id, body_id] : m_owner_to_body) {
+            if (m_tet_bodies.contains(body_id)) {
+                m_scene_sync_dirty_owners.insert(owner_id);
             }
         }
     }
@@ -116,6 +198,14 @@ public:
     std::size_t tet_body_count() const { return m_tet_bodies.size(); }
     const TetBody& get_tet_body(IPCBodyID id) const { return m_tet_bodies.at(id); }
     TetBody& get_tet_body(IPCBodyID id) { return m_tet_bodies.at(id); }
+
+    bool is_scene_sync_dirty_for_owner(framework::core::GameObjectId owner_id) const {
+        return m_scene_sync_dirty_owners.contains(owner_id);
+    }
+
+    void clear_scene_sync_dirty_for_owner(framework::core::GameObjectId owner_id) {
+        m_scene_sync_dirty_owners.erase(owner_id);
+    }
 
     void refresh_tet_body_runtime_data(IPCBodyID id) {
         auto& body = m_tet_bodies.at(id);
@@ -139,7 +229,7 @@ public:
             m_state.mass_diag.segment<3>(base).setConstant(body.vertex_masses[local_vertex]);
         }
         build_free_dof_mask();
-        compute_x_hat();
+        m_x_hat = m_state.x_prev;
     }
 
     std::vector<Eigen::Vector3d> get_body_positions(IPCBodyID body_id) const {
@@ -169,8 +259,11 @@ private:
     IPCConfig m_config{};
     IPCState m_state{};
     std::unordered_map<IPCBodyID, TetBody> m_tet_bodies{};
+    std::unordered_map<framework::core::GameObjectId, IPCBodyID> m_owner_to_body{};
+    std::unordered_map<IPCBodyID, framework::core::GameObjectId> m_body_to_owner{};
     std::vector<IPCBodyID> m_body_order{};
     std::unordered_map<IPCBodyID, BodyLayout> m_body_layouts{};
+    std::unordered_set<framework::core::GameObjectId> m_scene_sync_dirty_owners{};
     IPCBodyID m_next_body_id{0};
     Eigen::VectorXd m_x_hat{};
     std::vector<bool> m_free_dof_mask{};
@@ -188,6 +281,7 @@ private:
         m_x_hat.resize(0);
         m_free_dof_mask.clear();
         m_body_layouts.clear();
+        m_scene_sync_dirty_owners.clear();
         m_initialized = false;
         m_needs_rebuild = false;
     }
@@ -275,12 +369,12 @@ private:
         }
 
         build_free_dof_mask();
-        compute_x_hat();
+        m_x_hat = m_state.x_prev;
         m_initialized = true;
         m_needs_rebuild = false;
     }
 
-    void compute_x_hat() { m_x_hat = m_state.x_prev + m_config.dt * m_state.v; }
+    void compute_x_hat(double delta_seconds) { m_x_hat = m_state.x_prev + delta_seconds * m_state.v; }
 
     void build_free_dof_mask() {
         m_free_dof_mask.assign(m_state.dof_count(), true);
@@ -299,13 +393,13 @@ private:
         }
     }
 
-    double compute_total_energy(const Eigen::VectorXd& x) const {
+    double compute_total_energy(const Eigen::VectorXd& x, double delta_seconds) const {
         double total_energy = 0.0;
         total_energy += InertialEnergy::compute_energy(InertialEnergy::Input{
             .x = x,
             .x_hat = m_x_hat,
             .mass_diag = m_state.mass_diag,
-            .dt = m_config.dt,
+            .dt = delta_seconds,
         });
         total_energy += GravityEnergy::compute_energy(GravityEnergy::Input{
             .x = x,
@@ -318,7 +412,9 @@ private:
         return total_energy;
     }
 
-    void compute_total_gradient(const Eigen::VectorXd& x, Eigen::VectorXd& gradient) const {
+    void compute_total_gradient(const Eigen::VectorXd& x,
+                                Eigen::VectorXd& gradient,
+                                double delta_seconds) const {
         if (gradient.size() != x.size()) {
             throw std::invalid_argument("IPCSystem total gradient buffer must match x size.");
         }
@@ -328,7 +424,7 @@ private:
             .x = x,
             .x_hat = m_x_hat,
             .mass_diag = m_state.mass_diag,
-            .dt = m_config.dt,
+            .dt = delta_seconds,
         }, gradient);
         GravityEnergy::compute_gradient(GravityEnergy::Input{
             .x = x,
@@ -341,13 +437,14 @@ private:
     }
 
     void compute_total_hessian(const Eigen::VectorXd& x,
-                               std::vector<Eigen::Triplet<double>>& triplets) const {
+                               std::vector<Eigen::Triplet<double>>& triplets,
+                               double delta_seconds) const {
         triplets.clear();
         InertialEnergy::compute_hessian_triplets(InertialEnergy::Input{
             .x = x,
             .x_hat = m_x_hat,
             .mass_diag = m_state.mass_diag,
-            .dt = m_config.dt,
+            .dt = delta_seconds,
         }, triplets);
         for (const IPCBodyID body_id : m_body_order) {
             material_energy_variant::compute_hessian_triplets(m_tet_bodies.at(body_id), x, triplets);

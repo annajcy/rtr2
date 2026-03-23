@@ -20,7 +20,7 @@ int main() {
         auto& mover = scene.create_game_object("gravity_reset_mover");
         mover.node().set_local_position(pbpt::math::Vec3{0.0f, 2.0f, 0.0f});
 
-        auto& rigid_body = mover.add_component<rtr::framework::component::RigidBody>(physics_world);
+        auto& rigid_body = mover.add_component<rtr::framework::component::RigidBody>();
         auto& reset = mover.add_component<rtr::framework::component::ResetPosition>();
         reset.set_threshold_y(-1.0f);
         reset.set_reset_position(pbpt::math::Vec3{0.0f, 2.0f, 0.0f});
@@ -41,9 +41,8 @@ int main() {
             physics_world.step(static_cast<float>(fixed_ctx.fixed_delta_seconds));
             rtr::framework::integration::physics::sync_rigid_body_to_scene(scene, physics_world);
 
-            const auto& state = physics_world.get_rigid_body(rigid_body.rigid_body_id()).state();
-            std::cout << tick << ',' << std::fixed << std::setprecision(4) << state.translation.position.y() << ','
-                      << state.translation.linear_velocity.y() << '\n';
+            std::cout << tick << ',' << std::fixed << std::setprecision(4) << rigid_body.position().y() << ','
+                      << rigid_body.linear_velocity().y() << '\n';
         }
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;

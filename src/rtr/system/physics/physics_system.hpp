@@ -15,10 +15,6 @@ public:
     const rb::RigidBodySystem& rigid_body_system() const { return m_rigid_body_system; }
     ipc::IPCSystem& ipc_system() { return m_ipc_system; }
     const ipc::IPCSystem& ipc_system() const { return m_ipc_system; }
-
-    void step(float delta_seconds) {
-        m_rigid_body_system.step(delta_seconds);
-    }
 };
 
 }  // namespace rtr::system::physics

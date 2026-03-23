@@ -384,6 +384,9 @@ public:
     }
 
     void set_world_position_internal(GameObjectId id, const pbpt::math::Vec3& world_pos) {
+        if (checked_record(id).is_dirty) {
+            update_world_transforms();
+        }
         NodeRecord&            node = checked_record(id);
         const pbpt::math::Mat4 parent_world =
             (node.parent_id == kVirtualRootId) ? pbpt::math::Mat4{1.0f} : checked_record(node.parent_id).world_matrix;
@@ -393,6 +396,9 @@ public:
     }
 
     void set_world_rotation_internal(GameObjectId id, const pbpt::math::Quat& world_rot) {
+        if (checked_record(id).is_dirty) {
+            update_world_transforms();
+        }
         NodeRecord&            node       = checked_record(id);
         const pbpt::math::Quat parent_rot = (node.parent_id == kVirtualRootId)
                                                 ? pbpt::math::Quat::identity()
@@ -402,6 +408,9 @@ public:
     }
 
     void set_world_scale_internal(GameObjectId id, const pbpt::math::Vec3& world_scale) {
+        if (checked_record(id).is_dirty) {
+            update_world_transforms();
+        }
         NodeRecord&            node         = checked_record(id);
         const pbpt::math::Vec3 parent_scale = (node.parent_id == kVirtualRootId)
                                                   ? pbpt::math::Vec3{1.0f, 1.0f, 1.0f}

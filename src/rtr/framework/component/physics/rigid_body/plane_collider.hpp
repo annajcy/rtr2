@@ -6,7 +6,6 @@
 #include <pbpt/math/math.h>
 
 #include "rtr/framework/component/physics/rigid_body/collider.hpp"
-#include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 
 namespace rtr::framework::component {
 
@@ -40,11 +39,11 @@ private:
     }
 
 public:
-    explicit PlaneCollider(core::GameObject& owner, system::physics::rb::RigidBodySystem& world,
+    explicit PlaneCollider(core::GameObject& owner,
                            const pbpt::math::Vec3& normal_local = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
                            const pbpt::math::Vec3& local_position = pbpt::math::Vec3{0.0f},
                            const pbpt::math::Quat& local_rotation = pbpt::math::Quat::identity())
-        : Collider(owner, world),
+        : Collider(owner),
           m_normal_local(sanitize_normal(normal_local)),
           m_local_position(sanitize_position(local_position)),
           m_local_rotation(sanitize_rotation(local_rotation)) {}
@@ -52,42 +51,36 @@ public:
     void on_awake() override { throw_if_owner_already_has_collider(); }
 
     void on_enable() override {
-        auto& rigid_body = owner_rigid_body_or_throw();
-        if (!has_registered_collider()) {
-            system::physics::rb::Collider collider;
-            collider.shape                    = system::physics::rb::PlaneShape{.normal_local = m_normal_local};
-            collider.local_transform.position = m_local_position;
-            collider.local_transform.rotation = m_local_rotation;
-            collider.local_transform.scale    = pbpt::math::Vec3{1.0f};
-            m_collider_id                     = m_physics_world.create_collider(rigid_body.rigid_body_id(), std::move(collider));
-            m_registered                      = true;
-        }
+        (void)owner_rigid_body_or_throw();
+        m_should_exist_in_runtime = true;
+        m_lifecycle_dirty = true;
     }
 
     void on_disable() override {
-        if (!m_registered) {
-            return;
-        }
-        (void)m_physics_world.remove_collider(m_collider_id);
-        m_collider_id = system::physics::rb::kInvalidColliderId;
-        m_registered = false;
+        m_should_exist_in_runtime = false;
+        m_lifecycle_dirty = true;
     }
-
-    void on_destroy() override {}
+    void on_destroy() override {
+        m_should_exist_in_runtime = false;
+        m_lifecycle_dirty = true;
+    }
 
     pbpt::math::Vec3 normal_local() const { return m_normal_local; }
     void set_normal_local(const pbpt::math::Vec3& normal_local) {
         m_normal_local = sanitize_normal(normal_local);
+        m_shape_dirty = true;
     }
 
     pbpt::math::Vec3 local_position() const { return m_local_position; }
     void set_local_position(const pbpt::math::Vec3& local_position) {
         m_local_position = sanitize_position(local_position);
+        m_transform_dirty = true;
     }
 
     pbpt::math::Quat local_rotation() const { return m_local_rotation; }
     void set_local_rotation(const pbpt::math::Quat& local_rotation) {
         m_local_rotation = sanitize_rotation(local_rotation);
+        m_transform_dirty = true;
     }
 };
 

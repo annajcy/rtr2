@@ -19,20 +19,18 @@ int main() {
 
         auto& left = scene.create_game_object("left_sphere");
         left.node().set_local_position(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
-        auto& left_body = left.add_component<rtr::framework::component::RigidBody>(physics_world);
-        (void)left.add_component<rtr::framework::component::SphereCollider>(physics_world, 0.5f);
+        auto& left_body = left.add_component<rtr::framework::component::RigidBody>();
+        (void)left.add_component<rtr::framework::component::SphereCollider>(0.5f);
         left_body.set_use_gravity(false);
 
         auto& right = scene.create_game_object("right_sphere");
         right.node().set_local_position(pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
-        auto& right_body = right.add_component<rtr::framework::component::RigidBody>(physics_world);
-        (void)right.add_component<rtr::framework::component::SphereCollider>(physics_world, 0.5f);
+        auto& right_body = right.add_component<rtr::framework::component::RigidBody>();
+        (void)right.add_component<rtr::framework::component::SphereCollider>(0.5f);
         right_body.set_use_gravity(false);
 
-        physics_world.get_rigid_body(left_body.rigid_body_id()).state().translation.linear_velocity =
-            pbpt::math::Vec3{1.0f, 0.0f, 0.0f};
-        physics_world.get_rigid_body(right_body.rigid_body_id()).state().translation.linear_velocity =
-            pbpt::math::Vec3{-1.0f, 0.0f, 0.0f};
+        left_body.set_linear_velocity(pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
+        right_body.set_linear_velocity(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
 
         constexpr double kFixedDt   = 0.1;
         constexpr int    kTickCount = 20;

@@ -7,7 +7,7 @@
 在当前引擎里，刚体只是 physics system 的一部分：
 
 - scene/physics 边界由 `step_scene_physics(...)` 处理；
-- `PhysicsSystem::step(dt)` 当前只推进 `rb::RigidBodySystem`；
+- `step_scene_physics(...)` 会显式调用 `rb::RigidBodySystem::step(dt)`；
 - 本页只聚焦 `rb::RigidBodySystem` 内部使用的数值算法与接触求解流程。
 
 ## 状态变量

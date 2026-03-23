@@ -24,7 +24,7 @@ TEST(FrameworkResetPositionComponentTest, ResetsPositionWhenThresholdIsReached) 
     auto&                         go = scene.create_game_object("falling");
     go.node().set_local_position({0.0f, 2.0f, 0.0f});
 
-    auto& rigid_body     = go.add_component<RigidBody>(physics_world);
+    auto& rigid_body     = go.add_component<RigidBody>();
     auto& reset_position = go.add_component<ResetPosition>();
     reset_position.set_threshold_y(-1.0f);
     reset_position.set_reset_position(pbpt::math::Vec3{0.5f, 3.0f, -0.5f});
@@ -44,7 +44,7 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPrese
     auto&                         go = scene.create_game_object("falling");
     go.node().set_local_position({0.0f, 2.0f, 0.0f});
 
-    auto& rigid_body     = go.add_component<RigidBody>(physics_world);
+    auto& rigid_body     = go.add_component<RigidBody>();
     auto& reset_position = go.add_component<ResetPosition>();
     reset_position.set_threshold_y(-1.0f);
     reset_position.set_reset_position(pbpt::math::Vec3{0.0f, 2.0f, 0.0f});
@@ -83,7 +83,7 @@ TEST(FrameworkResetPositionComponentTest, UpdatedParametersAffectNextFixedTick) 
     auto&                         go = scene.create_game_object("falling");
     go.node().set_local_position({0.0f, 2.0f, 0.0f});
 
-    auto& rigid_body     = go.add_component<RigidBody>(physics_world);
+    auto& rigid_body     = go.add_component<RigidBody>();
     auto& reset_position = go.add_component<ResetPosition>();
     reset_position.set_threshold_y(-0.2f);
     reset_position.set_reset_position(pbpt::math::Vec3{1.0f, 4.0f, 0.0f});

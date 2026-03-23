@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdexcept>
+#include <unordered_set>
 #include <vector>
 
 #include <pbpt/math/math.h>
@@ -13,8 +13,40 @@
 
 namespace rtr::framework::integration::physics {
 
-inline void sync_ipc_to_scene(core::Scene& scene,
-                              const system::physics::ipc::IPCSystem& ipc_system) {
+inline void sync_scene_to_ipc(core::Scene& scene, system::physics::ipc::IPCSystem& ipc_system) {
+    scene.scene_graph().update_world_transforms();
+
+    std::unordered_set<framework::core::GameObjectId> desired_tet_body_owners{};
+    const auto active_nodes = scene.scene_graph().active_nodes();
+    for (const auto id : active_nodes) {
+        auto* game_object = scene.find_game_object(id);
+        if (game_object == nullptr) {
+            continue;
+        }
+
+        auto* ipc_tet = game_object->get_component<component::IPCTetComponent>();
+        if (ipc_tet == nullptr || !ipc_tet->enabled() || !ipc_tet->should_exist_in_runtime()) {
+            continue;
+        }
+
+        desired_tet_body_owners.insert(id);
+        ipc_tet->rebuild_surface_cache_if_dirty();
+
+        if (!ipc_system.has_tet_body_for_owner(id) || ipc_tet->source_dirty() || ipc_tet->lifecycle_dirty()) {
+            (void)ipc_system.create_or_replace_tet_body(id, ipc_tet->source_body());
+            ipc_tet->clear_source_dirty();
+        }
+        ipc_tet->clear_lifecycle_dirty();
+    }
+
+    for (const auto owner_id : ipc_system.tet_body_owner_ids()) {
+        if (!desired_tet_body_owners.contains(owner_id)) {
+            (void)ipc_system.remove_tet_body_for_owner(owner_id);
+        }
+    }
+}
+
+inline void sync_ipc_to_scene(core::Scene& scene, system::physics::ipc::IPCSystem& ipc_system) {
     const auto active_nodes = scene.scene_graph().active_nodes();
     for (const auto id : active_nodes) {
         auto* game_object = scene.find_game_object(id);
@@ -32,17 +64,22 @@ inline void sync_ipc_to_scene(core::Scene& scene,
             continue;
         }
 
-        if (!ipc_tet->has_registered_body()) {
+        if (!ipc_system.has_tet_body_for_owner(id)) {
+            continue;
+        }
+        if (!ipc_system.is_scene_sync_dirty_for_owner(id)) {
+            continue;
+        }
+        if (ipc_tet->source_dirty() || ipc_tet->surface_cache_dirty() || ipc_tet->lifecycle_dirty()) {
             continue;
         }
 
-        const auto body_id = ipc_tet->body_id();
-        if (!ipc_system.has_tet_body(body_id)) {
+        const auto* body = ipc_system.try_get_tet_body_for_owner(id);
+        if (body == nullptr) {
             continue;
         }
 
-        const auto& body = ipc_system.get_tet_body(body_id);
-        const std::size_t vertex_offset = body.info.dof_offset / 3u;
+        const std::size_t vertex_offset = body->info.dof_offset / 3u;
         system::physics::ipc::update_mesh_positions(
             ipc_tet->mesh_cache(),
             ipc_system.state().x,
@@ -60,6 +97,7 @@ inline void sync_ipc_to_scene(core::Scene& scene,
         }
 
         deformable->apply_deformed_surface(positions, normals);
+        ipc_system.clear_scene_sync_dirty_for_owner(id);
     }
 }
 

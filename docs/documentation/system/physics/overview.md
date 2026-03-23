@@ -18,14 +18,13 @@ RTR2 currently has two physics directions under `src/rtr/system/physics/`:
 ```text
 step_scene_physics(scene, physics_system, dt)
     -> sync_scene_to_rigid_body(...)
-    -> PhysicsSystem::step(dt)
-         -> rb::RigidBodySystem::step(dt)
+    -> rb::RigidBodySystem::step(dt)
     -> sync_rigid_body_to_scene(...)
-    -> ipc_system.step()
+    -> ipc_system.step(dt)
     -> sync_ipc_to_scene(...)
 ```
 
-`PhysicsSystem::step()` still performs world-local rigid-body simulation only. Scene synchronization stays in the framework integration layer, and IPC stepping/write-back are now explicitly part of that fixed-step flow.
+Scene synchronization stays in the framework integration layer, and both rigid-body and IPC stepping are now explicit parts of that fixed-step flow.
 
 ## Runtime Ownership
 

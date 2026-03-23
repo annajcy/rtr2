@@ -17,7 +17,6 @@
 #include "rtr/framework/component/physics/ipc/ipc_tet_component.hpp"
 #include "rtr/framework/component/physics/rigid_body/plane_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/box_collider.hpp"
-#include "rtr/framework/component/physics/rigid_body/mesh_collider.hpp"
 #include "rtr/framework/component/physics/rigid_body/reset_position.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
@@ -224,42 +223,33 @@ private:
                                 game_object.id(), enabled);
             }
 
-            ImGui::Text("Registered: %s", ipc_tet->has_registered_body() ? "Yes" : "No");
-            ImGui::Text("Body ID: %llu", static_cast<unsigned long long>(ipc_tet->body_id()));
+            ImGui::Text("Runtime Desired: %s", ipc_tet->should_exist_in_runtime() ? "Yes" : "No");
+            ImGui::Text("Source Dirty: %s", ipc_tet->source_dirty() ? "Yes" : "No");
+            ImGui::Text("Surface Dirty: %s", ipc_tet->surface_cache_dirty() ? "Yes" : "No");
+            ImGui::Text("Lifecycle Dirty: %s", ipc_tet->lifecycle_dirty() ? "Yes" : "No");
             ImGui::Text("Surface Vertices: %llu",
                         static_cast<unsigned long long>(ipc_tet->surface_cache().surface_vertex_ids.size()));
             ImGui::Text("Surface Triangles: %llu",
                         static_cast<unsigned long long>(ipc_tet->surface_cache().surface_indices.size() / 3u));
             const auto* source_body = &ipc_tet->source_body();
-            const auto* runtime_body = ipc_tet->runtime_body();
-            const auto* display_body = runtime_body != nullptr ? runtime_body : source_body;
-
-            if (runtime_body != nullptr) {
-                ImGui::Text("Global Vertex Offset: %llu",
-                            static_cast<unsigned long long>(runtime_body->info.dof_offset / 3u));
-            } else {
-                ImGui::TextDisabled("Runtime body is not currently registered.");
-            }
-
-            ImGui::Text("Body Vertices: %llu", static_cast<unsigned long long>(display_body->vertex_count()));
-            ImGui::Text("Body Tets: %llu", static_cast<unsigned long long>(display_body->tet_count()));
+            ImGui::Text("Body Vertices: %llu", static_cast<unsigned long long>(source_body->vertex_count()));
+            ImGui::Text("Body Tets: %llu", static_cast<unsigned long long>(source_body->tet_count()));
             const std::size_t fixed_vertex_count =
-                static_cast<std::size_t>(std::count(display_body->fixed_vertices.begin(), display_body->fixed_vertices.end(), true));
+                static_cast<std::size_t>(std::count(source_body->fixed_vertices.begin(), source_body->fixed_vertices.end(), true));
             ImGui::Text("Fixed Vertices: %llu", static_cast<unsigned long long>(fixed_vertex_count));
 
             bool material_changed = false;
-            if (auto* material = ipc_tet->source_material_if<rtr::system::physics::ipc::FixedCorotatedMaterial>();
-                material != nullptr) {
+            if (ipc_tet->uses_fixed_corotated_material()) {
                 ImGui::SeparatorText("Material");
                 ImGui::Text("Type: Fixed Corotated");
 
-                float density = static_cast<float>(material->mass_density);
+                float density = static_cast<float>(ipc_tet->density().value_or(0.0));
                 if (ImGui::DragFloat("Density", &density, 1.0f, 0.001f, 100000.0f, "%.3f")) {
-                    material->mass_density = std::max(0.001, static_cast<double>(density));
+                    (void)ipc_tet->set_density(std::max(0.001, static_cast<double>(density)));
                     material_changed = true;
                 }
 
-                float youngs_modulus = static_cast<float>(material->youngs_modulus);
+                float youngs_modulus = static_cast<float>(ipc_tet->youngs_modulus().value_or(0.0));
                 if (ImGui::DragFloat("Young's Modulus",
                                      &youngs_modulus,
                                      100.0f,
@@ -267,14 +257,14 @@ private:
                                      1.0e8f,
                                      "%.3f",
                                      ImGuiSliderFlags_Logarithmic)) {
-                    material->youngs_modulus = std::max(1.0, static_cast<double>(youngs_modulus));
+                    (void)ipc_tet->set_youngs_modulus(std::max(1.0, static_cast<double>(youngs_modulus)));
                     material_changed = true;
                 }
 
-                float poisson_ratio = static_cast<float>(material->poisson_ratio);
+                float poisson_ratio = static_cast<float>(ipc_tet->poisson_ratio().value_or(0.3));
                 if (ImGui::DragFloat("Poisson Ratio", &poisson_ratio, 0.001f, -0.999f, 0.499f, "%.4f")) {
                     poisson_ratio = pbpt::math::clamp(poisson_ratio, -0.999f, 0.499f);
-                    material->poisson_ratio = static_cast<double>(poisson_ratio);
+                    (void)ipc_tet->set_poisson_ratio(static_cast<double>(poisson_ratio));
                     material_changed = true;
                 }
             } else {
@@ -282,9 +272,7 @@ private:
             }
 
             if (material_changed) {
-                (void)ipc_tet->apply_source_material_to_runtime();
-                logger()->debug("IPC tet material updated via inspector (game_object_id={}, body_id={}).",
-                                game_object.id(), ipc_tet->body_id());
+                logger()->debug("IPC tet material updated via inspector (game_object_id={}).", game_object.id());
             }
         }
     }
@@ -344,11 +332,12 @@ private:
                                 enabled);
             }
 
-            ImGui::Text("RigidBody ID: %llu", static_cast<unsigned long long>(rigid_body->rigid_body_id()));
-            if (!rigid_body->has_rigid_body()) {
-                ImGui::TextDisabled("Physics body is not registered.");
-                return;
-            }
+            ImGui::Text("Runtime Desired: %s", rigid_body->should_exist_in_runtime() ? "Yes" : "No");
+            ImGui::Text("Source Dirty: %s", rigid_body->source_dirty() ? "Yes" : "No");
+            ImGui::Text("Transform Dirty: %s", rigid_body->transform_dirty() ? "Yes" : "No");
+            ImGui::Text("Lifecycle Dirty: %s", rigid_body->lifecycle_dirty() ? "Yes" : "No");
+            ImGui::Text("Pending Commands: %llu",
+                        static_cast<unsigned long long>(rigid_body->pending_commands().size()));
 
             pbpt::math::Vec3 position = rigid_body->position();
             if (ImGui::DragFloat3("Position##rigid_body", &position.x(), 0.05f)) {
@@ -617,56 +606,6 @@ private:
         }
     }
 
-    static void draw_mesh_collider_editor(framework::core::GameObject& game_object) {
-        auto* mesh = game_object.get_component<framework::component::MeshCollider>();
-        if (mesh == nullptr) {
-            return;
-        }
-
-        if (ImGui::CollapsingHeader("MeshCollider", ImGuiTreeNodeFlags_DefaultOpen)) {
-            bool enabled = mesh->enabled();
-            if (ImGui::Checkbox("Enabled##mesh_collider", &enabled)) {
-                game_object.set_component_enabled<framework::component::MeshCollider>(enabled);
-                logger()->debug("MeshCollider enabled updated (game_object_id={}, enabled={}).", game_object.id(),
-                                enabled);
-            }
-
-            if (const auto* mesh_comp = game_object.get_component<framework::component::MeshComponent>();
-                mesh_comp != nullptr) {
-                ImGui::Text("Has Valid Mesh: %s", mesh_comp->has_valid_mesh() ? "Yes" : "No");
-            } else {
-                ImGui::TextDisabled("MeshComponent is required on the same GameObject.");
-            }
-
-            pbpt::math::Vec3 local_position = mesh->local_position();
-            if (ImGui::DragFloat3("Local Position##mesh_collider", &local_position.x(), 0.05f)) {
-                mesh->set_local_position(local_position);
-                logger()->debug(
-                    "MeshCollider local_position updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
-                    game_object.id(), local_position.x(), local_position.y(), local_position.z());
-            }
-
-            pbpt::math::Vec3 local_euler = pbpt::math::degrees(pbpt::math::euler_angles(mesh->local_rotation()));
-            if (ImGui::DragFloat3("Local Rotation (deg)##mesh_collider", &local_euler.x(), 0.5f)) {
-                mesh->set_local_rotation(pbpt::math::Quat(pbpt::math::radians(local_euler)));
-                logger()->debug(
-                    "MeshCollider local_rotation updated (game_object_id={}, euler_deg=[{:.3f}, {:.3f}, {:.3f}]).",
-                    game_object.id(), local_euler.x(), local_euler.y(), local_euler.z());
-            }
-
-            pbpt::math::Vec3 local_scale = mesh->local_scale();
-            if (ImGui::DragFloat3("Local Scale##mesh_collider", &local_scale.x(), 0.02f, 0.001f, 1000.0f)) {
-                local_scale.x() = std::max(0.001f, local_scale.x());
-                local_scale.y() = std::max(0.001f, local_scale.y());
-                local_scale.z() = std::max(0.001f, local_scale.z());
-                mesh->set_local_scale(local_scale);
-                logger()->debug(
-                    "MeshCollider local_scale updated (game_object_id={}, value=[{:.4f}, {:.4f}, {:.4f}]).",
-                    game_object.id(), local_scale.x(), local_scale.y(), local_scale.z());
-            }
-        }
-    }
-
     static void draw_reset_position_editor(framework::core::GameObject& game_object) {
         auto* reset_position = game_object.get_component<framework::component::ResetPosition>();
         if (reset_position == nullptr) {
@@ -878,7 +817,6 @@ public:
         draw_sphere_collider_editor(ctx, *game_object);
         draw_box_collider_editor(ctx, *game_object);
         draw_plane_collider_editor(*game_object);
-        draw_mesh_collider_editor(*game_object);
         draw_reset_position_editor(*game_object);
         draw_free_look_editor(*game_object);
         draw_trackball_editor(*game_object);

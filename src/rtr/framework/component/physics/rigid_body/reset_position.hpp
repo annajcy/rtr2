@@ -40,7 +40,7 @@ public:
     void on_enable() override { m_rigid_body = &owner().component_or_throw<RigidBody>(); }
 
     void on_fixed_update(const core::FixedTickContext& /*ctx*/) override {
-        if (m_rigid_body == nullptr || !m_rigid_body->has_rigid_body()) {
+        if (m_rigid_body == nullptr) {
             return;
         }
 
