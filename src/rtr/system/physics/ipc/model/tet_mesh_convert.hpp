@@ -24,7 +24,7 @@ struct TetSurfaceResult {
     std::vector<uint32_t> surface_vertex_ids{};
 };
 
-namespace tet_mesh_convert_detail {
+namespace detail::tet_mesh_convert {
 
 struct Face {
     uint32_t v[3];
@@ -181,18 +181,18 @@ inline void recompute_mesh_normals(utils::ObjMeshData& mesh) {
     }
 }
 
-}  // namespace tet_mesh_convert_detail
+}  // namespace detail::tet_mesh_convert
 
 // Extract the boundary triangles of a tet mesh.
 // The returned indices still reference the original tet vertex ids.
 inline TetSurfaceResult extract_tet_surface(const TetGeometry& geometry) {
-    std::unordered_map<tet_mesh_convert_detail::Face, tet_mesh_convert_detail::FaceData, tet_mesh_convert_detail::FaceHash> face_map{};
+    std::unordered_map<detail::tet_mesh_convert::Face, detail::tet_mesh_convert::FaceData, detail::tet_mesh_convert::FaceHash> face_map{};
     face_map.reserve(geometry.tet_count() * 4u);
 
     auto add_face = [&](uint32_t a, uint32_t b, uint32_t c) {
         std::array<uint32_t, 3> sorted = {a, b, c};
         std::sort(sorted.begin(), sorted.end());
-        tet_mesh_convert_detail::Face face{{sorted[0], sorted[1], sorted[2]}};
+        detail::tet_mesh_convert::Face face{{sorted[0], sorted[1], sorted[2]}};
 
         auto& data = face_map[face];
         data.count += 1;
@@ -246,9 +246,9 @@ inline utils::ObjMeshData tet_to_mesh(const Eigen::VectorXd& positions,
         throw std::invalid_argument("tet_to_mesh positions size must be divisible by 3.");
     }
     const std::size_t vertex_count = static_cast<std::size_t>(positions.size() / 3);
-    tet_mesh_convert_detail::validate_surface_result(surface, vertex_count, vertex_offset);
-    return tet_mesh_convert_detail::build_surface_mesh(surface, [&](uint32_t vertex_id) {
-        return tet_mesh_convert_detail::read_position_from_dofs(
+    detail::tet_mesh_convert::validate_surface_result(surface, vertex_count, vertex_offset);
+    return detail::tet_mesh_convert::build_surface_mesh(surface, [&](uint32_t vertex_id) {
+        return detail::tet_mesh_convert::read_position_from_dofs(
             positions,
             static_cast<uint32_t>(vertex_offset + static_cast<std::size_t>(vertex_id))
         );
@@ -257,9 +257,9 @@ inline utils::ObjMeshData tet_to_mesh(const Eigen::VectorXd& positions,
 
 // Convenience overload for building a render mesh from the rest configuration.
 inline utils::ObjMeshData tet_to_mesh(const TetGeometry& geometry, const TetSurfaceResult& surface) {
-    tet_mesh_convert_detail::validate_surface_result(surface, geometry.vertex_count());
-    return tet_mesh_convert_detail::build_surface_mesh(surface, [&](uint32_t vertex_id) {
-        return tet_mesh_convert_detail::to_pbpt_vec3(geometry.rest_positions[vertex_id]);
+    detail::tet_mesh_convert::validate_surface_result(surface, geometry.vertex_count());
+    return detail::tet_mesh_convert::build_surface_mesh(surface, [&](uint32_t vertex_id) {
+        return detail::tet_mesh_convert::to_pbpt_vec3(geometry.rest_positions[vertex_id]);
     });
 }
 
@@ -282,17 +282,17 @@ inline void update_mesh_positions(
     }
 
     const std::size_t vertex_count = static_cast<std::size_t>(positions.size() / 3);
-    tet_mesh_convert_detail::validate_surface_result(surface, vertex_count, vertex_offset);
+    detail::tet_mesh_convert::validate_surface_result(surface, vertex_count, vertex_offset);
 
     for (std::size_t i = 0; i < surface.surface_vertex_ids.size(); ++i) {
         mesh.vertices[i].position =
-            tet_mesh_convert_detail::read_position_from_dofs(
+            detail::tet_mesh_convert::read_position_from_dofs(
                 positions,
                 static_cast<uint32_t>(vertex_offset + static_cast<std::size_t>(surface.surface_vertex_ids[i]))
             );
     }
 
-    tet_mesh_convert_detail::recompute_mesh_normals(mesh);
+    detail::tet_mesh_convert::recompute_mesh_normals(mesh);
 }
 
 // Mesh->Tet helper only.

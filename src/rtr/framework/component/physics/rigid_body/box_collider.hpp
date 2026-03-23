@@ -49,7 +49,7 @@ private:
     }
 
 public:
-    explicit BoxCollider(core::GameObject& owner, system::physics::RigidBodyWorld& world,
+    explicit BoxCollider(core::GameObject& owner, system::physics::rb::RigidBodySystem& world,
                          const pbpt::math::Vec3& half_extents = pbpt::math::Vec3{0.5f, 0.5f, 0.5f},
                          const pbpt::math::Vec3& local_position = pbpt::math::Vec3{0.0f},
                          const pbpt::math::Quat& local_rotation = pbpt::math::Quat::identity(),
@@ -65,8 +65,8 @@ public:
     void on_enable() override {
         auto& rigid_body = owner_rigid_body_or_throw();
         if (!has_registered_collider()) {
-            system::physics::Collider collider;
-            collider.shape                    = system::physics::BoxShape{.half_extents = m_half_extents};
+            system::physics::rb::Collider collider;
+            collider.shape                    = system::physics::rb::BoxShape{.half_extents = m_half_extents};
             collider.local_transform.position = m_local_position;
             collider.local_transform.rotation = m_local_rotation;
             collider.local_transform.scale    = m_local_scale;
@@ -80,7 +80,7 @@ public:
             return;
         }
         (void)m_physics_world.remove_collider(m_collider_id);
-        m_collider_id = system::physics::kInvalidColliderId;
+        m_collider_id = system::physics::rb::kInvalidColliderId;
         m_registered  = false;
     }
 

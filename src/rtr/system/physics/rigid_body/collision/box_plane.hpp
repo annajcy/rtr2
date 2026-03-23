@@ -6,7 +6,7 @@
 #include "rtr/system/physics/rigid_body/collision/contact.hpp"
 #include "rtr/system/physics/rigid_body/collision/plane_common.hpp"
 
-namespace rtr::system::physics::detail {
+namespace rtr::system::physics::rb::detail::box_plane {
 
 inline std::array<pbpt::math::Vec3, 8> world_box_corners(const WorldBox& box) {
     const auto axis_x = pbpt::math::normalize(box.rotation * pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
@@ -30,14 +30,14 @@ inline std::array<pbpt::math::Vec3, 8> world_box_corners(const WorldBox& box) {
     return corners;
 }
 
-}  // namespace rtr::system::physics::detail
+}  // namespace rtr::system::physics::rb::detail::box_plane
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 template <>
 struct ContactPairTrait<WorldBox, WorldPlane> {
     static ContactResult generate(const WorldBox& box, const WorldPlane& plane) {
-        return detail::average_penetrating_points_against_plane(detail::world_box_corners(box), plane);
+        return detail::plane_common::average_penetrating_points_against_plane(detail::box_plane::world_box_corners(box), plane);
     }
 };
 
@@ -50,4 +50,4 @@ struct ContactPairTrait<WorldPlane, WorldBox> {
     }
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

@@ -118,14 +118,16 @@ struct IPCConfig {
 | `gravity` | $(0, -9.81, 0)$ | Standard Earth gravity. Set to zero for zero-g tests. |
 | `solver_params` | See Newton doc | `max_iterations=50`, `gradient_tolerance=1e-6`, etc. |
 
-## Initialization: `initialize()`
+## Runtime Assembly and `initialize()`
 
 ### What It Does
 
 ```cpp
-void initialize() {
-    // Phase 1: Per-body precompute
-    for (auto& body : m_tet_bodies) {
+void rebuild_runtime_state() {
+    // Phase 1: Preserve old per-body state by IPCBodyID
+    // Phase 2: Per-body precompute and DOF reassignment
+    for (auto body_id : m_body_order) {
+        auto& body = m_tet_bodies.at(body_id);
         body.precompute();           // Dm_inv, rest_volumes, vertex_masses
         body.info.dof_offset = dof_offset;
         body.info.vertex_count = body.vertex_count();
@@ -133,25 +135,25 @@ void initialize() {
         dof_offset += 3u * body.vertex_count();
     }
 
-    // Phase 2: Global state assembly
+    // Phase 3: Global state assembly
     m_state.resize(total_vertices);  // allocate x, x_prev, v, mass_diag (all 3n)
 
-    // Phase 3: Write body data into global vectors
-    for (const auto& body : m_tet_bodies) {
-        for each vertex in body:
-            m_state.x[global] = body.geometry.rest_positions[local]
-            m_state.x_prev[global] = same
-            m_state.mass_diag[global * 3 + 0..2] = body.vertex_masses[local]
+    // Phase 4: Restore old states when IPCBodyID still exists
+    //          otherwise initialize from rest positions
+    for (auto body_id : m_body_order) {
+        const auto& body = m_tet_bodies.at(body_id);
     }
 
-    // Phase 4: Build DBC mask
-    m_x_hat = m_state.x;
+    // Phase 5: Build DBC mask
+    compute_x_hat();
     build_free_dof_mask();
     m_initialized = true;
 }
 ```
 
-`body.precompute()` now reads density from each body's material object, so `mass_diag` is assembled from `TetBody::material` rather than a separate scalar field on `TetBody`.
+`initialize()` is now just the explicit entry point for this rebuild. Registration changes (`create_tet_body`, `remove_tet_body`) mark the system dirty, and `step()` automatically rebuilds before solving.
+
+`body.precompute()` reads density from each body's material object, so `mass_diag` is assembled from `TetBody::material`.
 
 ### DOF Offset Layout
 
@@ -413,15 +415,16 @@ The triplets from different terms are accumulated by `setFromTriplets` with a su
 
 ```cpp
 const IPCState& state() const;                              // full global state
-const TetBody& tet_body(std::size_t index) const;           // body by index
-std::vector<Eigen::Vector3d> get_body_positions(std::size_t body_index) const;
+bool has_tet_body(IPCBodyID id) const;
+const TetBody& get_tet_body(IPCBodyID id) const;            // body by stable ID
+std::vector<Eigen::Vector3d> get_body_positions(IPCBodyID body_id) const;
 ```
 
 `get_body_positions` extracts a body's current vertex positions from the global DOF vector:
 
 ```cpp
-std::vector<Eigen::Vector3d> get_body_positions(std::size_t body_index) const {
-    const auto& body = m_tet_bodies.at(body_index);
+std::vector<Eigen::Vector3d> get_body_positions(IPCBodyID body_id) const {
+    const auto& body = m_tet_bodies.at(body_id);
     std::vector<Eigen::Vector3d> positions{};
     positions.reserve(body.vertex_count());
     const std::size_t base_vertex = body.info.dof_offset / 3u;
@@ -505,11 +508,11 @@ Setup: 1 tet (4 vertices), $h = 0.01$, $g = (0, -9.81, 0)$, $E = 10^5$, $\nu = 0
 
 | Situation | Response |
 |-----------|----------|
-| `step()` before `initialize()` | `throw std::logic_error` |
+| `step()` before any explicit `initialize()` | Auto-rebuilds if bodies exist |
 | Empty body list | `step()` returns immediately (no-op) |
 | Newton doesn't converge | Warning log, simulation continues |
 | `get_body_positions` before init | `throw std::logic_error` |
-| Body index out of range | `throw std::out_of_range` (from `.at()`) |
+| Missing `IPCBodyID` | `throw std::out_of_range` (from `.at()`) |
 
 ## Extension Points
 

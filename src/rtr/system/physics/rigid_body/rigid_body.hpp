@@ -11,7 +11,7 @@
 #include "rtr/system/physics/rigid_body/physics_ids.hpp"
 #include "rtr/system/physics/rigid_body/rigid_body_type.hpp"
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 struct TranslationState {
     pbpt::math::Vec3 position{0.0f};
@@ -154,4 +154,4 @@ public:
     }
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

@@ -9,7 +9,7 @@
 #include "pbpt/math/spatial/vector.hpp"
 #include "rtr/system/physics/rigid_body/physics_ids.hpp"
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 enum class ColliderType {
     Sphere,
@@ -124,4 +124,4 @@ inline WorldCollider to_world_collider(const MeshShape& mesh_shape,
     return world_mesh;
 }
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

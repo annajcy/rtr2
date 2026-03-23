@@ -4,13 +4,13 @@
 #include "rtr/system/physics/rigid_body/collision/contact.hpp"
 #include "rtr/system/physics/rigid_body/collision/plane_common.hpp"
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 template <>
 struct ContactPairTrait<WorldSphere, WorldPlane> {
     static ContactResult generate(const WorldSphere& sphere, const WorldPlane& plane) {
-        const auto plane_normal = detail::normalized_plane_normal(plane);
-        const auto signed_distance = detail::signed_distance_to_plane(sphere.center, plane, plane_normal);
+        const auto plane_normal = detail::plane_common::normalized_plane_normal(plane);
+        const auto signed_distance = detail::plane_common::signed_distance_to_plane(sphere.center, plane, plane_normal);
         if (signed_distance >= sphere.radius) {
             return ContactResult{};
         }
@@ -32,4 +32,4 @@ struct ContactPairTrait<WorldPlane, WorldSphere> {
     }
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

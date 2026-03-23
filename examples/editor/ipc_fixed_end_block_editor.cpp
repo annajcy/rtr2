@@ -50,22 +50,16 @@ void register_ipc_tet_object(rtr::framework::core::GameObject& game_object,
                              rtr::app::AppRuntime& runtime,
                              rtr::system::physics::ipc::TetBody body,
                              const pbpt::math::Vec4& color) {
-    namespace ipc = rtr::system::physics::ipc;
-
-    const ipc::TetSurfaceResult surface = ipc::extract_tet_surface(body);
-    const rtr::utils::ObjMeshData initial_mesh = ipc::tet_to_mesh(body.geometry, surface);
+    auto& ipc_component = game_object.add_component<rtr::framework::component::IPCTetComponent>(
+        runtime.physics_system().ipc_system(),
+        std::move(body)
+    );
+    const rtr::utils::ObjMeshData initial_mesh = ipc_component.mesh_cache();
     const auto mesh_handle = runtime.resource_manager()
         .create<rtr::resource::DeformableMeshResourceKind>(initial_mesh);
 
     (void)game_object.add_component<rtr::framework::component::DeformableMeshComponent>(
         runtime.resource_manager(), mesh_handle, color
-    );
-
-    auto& ipc_system = runtime.physics_system().ipc_system();
-    const std::size_t body_index = ipc_system.tet_body_count();
-    ipc_system.add_tet_body(std::move(body));
-    (void)game_object.add_component<rtr::framework::component::IPCTetComponent>(
-        body_index, surface, initial_mesh
     );
 }
 
@@ -134,9 +128,6 @@ int main() {
             make_fixed_end_block(),
             pbpt::math::Vec4{0.75f, 0.48f, 0.3f, 1.0f}
         );
-
-        runtime.physics_system().ipc_system().initialize();
-
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{
             .on_post_update =
                 [&](rtr::app::RuntimeContext& ctx) {

@@ -7,9 +7,9 @@
 当前权威入口是 `step_scene_physics(scene, physics_system, dt)`：
 
 ```cpp
-sync_scene_to_rigid_body(scene, physics_system.rigid_body_world());
+sync_scene_to_rigid_body(scene, physics_system.rigid_body_system());
 physics_system.step(dt);
-sync_rigid_body_to_scene(scene, physics_system.rigid_body_world());
+sync_rigid_body_to_scene(scene, physics_system.rigid_body_system());
 
 physics_system.ipc_system().step();
 sync_ipc_to_scene(scene, physics_system.ipc_system());
@@ -17,7 +17,7 @@ sync_ipc_to_scene(scene, physics_system.ipc_system());
 
 这里有两个关键点：
 
-- `PhysicsSystem::step(dt)` 目前只推进刚体世界。
+- `PhysicsSystem::step(dt)` 目前只推进 `rb::RigidBodySystem`。
 - IPC 的 `step()` 和 IPC -> scene 的回写，都显式放在 framework integration 层完成。
 
 ## 为什么 IPC 不放进 `PhysicsSystem::step()`
@@ -33,14 +33,14 @@ IPC 子系统则有自己的 `IPCConfig::dt`，内部执行的是 backward Euler
 | 层 | 保存什么 | 谁是运行时权威 |
 | --- | --- | --- |
 | Scene Graph | GameObject、层级、组件关系 | framework 层 |
-| `RigidBodyWorld` | 刚体状态、碰撞体、接触 | 刚体 runtime |
+| `rb::RigidBodySystem` | 刚体状态、碰撞体、接触 | 刚体 runtime |
 | `ipc::IPCSystem` / `ipc::IPCState` | deformable 节点状态、质量、per-body offset | IPC runtime |
 | `DeformableMeshComponent` | 面向渲染的表面 mesh 副本 | 渲染侧缓存 |
 
 这里最重要的边界是：
 
-- 刚体一旦进入模拟，动态位姿以 `RigidBodyWorld` 为准；
-- deformable 一旦进入模拟，节点位置以 `IPCSystem` / `IPCState` 为准；
+- 刚体一旦进入模拟，动态位姿以 `rb::RigidBodySystem` 为准；
+- deformable 一旦进入模拟，节点位置以 `ipc::IPCSystem` / `ipc::IPCState` 为准；
 - `DeformableMeshComponent` 只保存写给 GPU 的表面副本，不是 deformable 运行时的权威状态。
 
 ## 刚体方向
@@ -48,8 +48,8 @@ IPC 子系统则有自己的 `IPCConfig::dt`，内部执行的是 backward Euler
 刚体 runtime 仍然是标准的 pre-sync / solve / post-sync：
 
 ```text
-Scene -> sync_scene_to_rigid_body(...) -> RigidBodyWorld
-RigidBodyWorld -> sync_rigid_body_to_scene(...) -> Scene
+Scene -> sync_scene_to_rigid_body(...) -> rb::RigidBodySystem
+rb::RigidBodySystem -> sync_rigid_body_to_scene(...) -> Scene
 ```
 
 动态刚体在求解后把 transform 写回 scene graph；静态和非动态对象在 pre-pass 中仍由 scene 侧驱动。
@@ -87,9 +87,9 @@ GameObject / Components
              |
              \--> sync_ipc_to_scene(...)
 
-RigidBodyWorld <----- PhysicsSystem::step(dt)
+rb::RigidBodySystem <----- PhysicsSystem::step(dt)
 
-IPCSystem::step()
+ipc::IPCSystem::step()
     -> 更新 IPCState::x
     -> sync_ipc_to_scene(...)
     -> apply_deformed_surface(...)

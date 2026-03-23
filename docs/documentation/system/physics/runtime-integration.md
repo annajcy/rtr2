@@ -7,9 +7,9 @@ This page describes how the framework-level scene/runtime loop connects rigid-bo
 The authoritative runtime entry point is `step_scene_physics(scene, physics_system, dt)`:
 
 ```cpp
-sync_scene_to_rigid_body(scene, physics_system.rigid_body_world());
+sync_scene_to_rigid_body(scene, physics_system.rigid_body_system());
 physics_system.step(dt);
-sync_rigid_body_to_scene(scene, physics_system.rigid_body_world());
+sync_rigid_body_to_scene(scene, physics_system.rigid_body_system());
 
 physics_system.ipc_system().step();
 sync_ipc_to_scene(scene, physics_system.ipc_system());
@@ -17,7 +17,7 @@ sync_ipc_to_scene(scene, physics_system.ipc_system());
 
 Two details matter here:
 
-- `PhysicsSystem::step(dt)` currently advances the rigid-body world only.
+- `PhysicsSystem::step(dt)` currently advances `rb::RigidBodySystem` only.
 - IPC stepping and IPC-to-scene write-back are performed explicitly in the framework integration layer after rigid-body synchronization.
 
 ## Why IPC Is Stepped Outside `PhysicsSystem::step()`
@@ -33,7 +33,7 @@ In the current demo/example path, `AppRuntimeConfig::fixed_delta_seconds` is set
 | Layer | Stores | Runtime authority |
 | --- | --- | --- |
 | Scene Graph | game objects, hierarchy, component wiring | framework layer |
-| `RigidBodyWorld` | rigid-body state, colliders, contacts | rigid-body runtime |
+| `rb::RigidBodySystem` | rigid-body state, colliders, contacts | rigid-body runtime |
 | `ipc::IPCSystem` / `ipc::IPCState` | deformable nodal state, masses, per-body offsets | IPC runtime |
 | `DeformableMeshComponent` | render-facing surface copy for the GPU | renderer-facing cache |
 
@@ -48,8 +48,8 @@ The important split is:
 Rigid-body runtime integration still follows the usual pre-sync / solve / post-sync pattern:
 
 ```text
-Scene -> sync_scene_to_rigid_body(...) -> RigidBodyWorld
-RigidBodyWorld -> sync_rigid_body_to_scene(...) -> Scene
+Scene -> sync_scene_to_rigid_body(...) -> rb::RigidBodySystem
+rb::RigidBodySystem -> sync_rigid_body_to_scene(...) -> Scene
 ```
 
 Dynamic rigid bodies write transforms back to the scene graph after simulation. Static and non-dynamic bodies are still driven from the scene side during the pre-pass.
@@ -87,9 +87,9 @@ GameObject / Components
              |
              \--> sync_ipc_to_scene(...)
 
-RigidBodyWorld <----- PhysicsSystem::step(dt)
+rb::RigidBodySystem <----- PhysicsSystem::step(dt)
 
-IPCSystem::step()
+ipc::IPCSystem::step()
     -> update IPCState::x
     -> sync_ipc_to_scene(...)
     -> apply_deformed_surface(...)

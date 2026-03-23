@@ -32,11 +32,16 @@ inline void sync_ipc_to_scene(core::Scene& scene,
             continue;
         }
 
-        if (ipc_tet->body_index() >= ipc_system.tet_body_count()) {
-            throw std::out_of_range("IPCTetComponent body_index is out of range for IPCSystem.");
+        if (!ipc_tet->has_registered_body()) {
+            continue;
         }
 
-        const auto& body = ipc_system.tet_body(ipc_tet->body_index());
+        const auto body_id = ipc_tet->body_id();
+        if (!ipc_system.has_tet_body(body_id)) {
+            continue;
+        }
+
+        const auto& body = ipc_system.get_tet_body(body_id);
         const std::size_t vertex_offset = body.info.dof_offset / 3u;
         system::physics::ipc::update_mesh_positions(
             ipc_tet->mesh_cache(),

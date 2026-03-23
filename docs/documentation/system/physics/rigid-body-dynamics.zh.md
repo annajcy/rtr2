@@ -1,14 +1,14 @@
-# 刚体动力学理论与实现 (Rigid Body Dynamics)
+# RigidBodySystem 理论与实现
 
-本文档说明当前 RTR2 里已经实现的刚体子系统。它讨论的是当前 `PhysicsSystem -> RigidBodyWorld -> collision/ + solver` 这一条真实路径，而不是旧版 `PhysicsWorld` 设计，也不是整个 physics runtime 的总览。
+本文档说明当前 RTR2 里已经实现的刚体子系统。它讨论的是当前 `PhysicsSystem -> rb::RigidBodySystem -> collision/ + solver` 这一条真实路径，而不是历史上更宽泛的 physics runtime 设想，也不是整个 physics runtime 的总览。
 
 ## 运行时位置
 
 在当前引擎里，刚体只是 physics system 的一部分：
 
 - scene/physics 边界由 `step_scene_physics(...)` 处理；
-- `PhysicsSystem::step(dt)` 当前会先调用 `RigidBodyWorld::step(dt)`，再调用 `ClothWorld::step(dt)`；
-- 本页只聚焦 `RigidBodyWorld` 内部使用的数值算法与接触求解流程。
+- `PhysicsSystem::step(dt)` 当前只推进 `rb::RigidBodySystem`；
+- 本页只聚焦 `rb::RigidBodySystem` 内部使用的数值算法与接触求解流程。
 
 ## 状态变量
 
@@ -25,11 +25,11 @@
 | `mass / inverse_mass` | 平移质量属性 |
 | `inverse_inertia_tensor_ref` | 刚体局部参考系下的逆惯性张量 |
 
-Dynamic 刚体的权威运行时状态保存在 `RigidBodyWorld`，而 scene graph 中的 transform 只是输入源或回写目标。
+Dynamic 刚体的权威运行时状态保存在 `rb::RigidBodySystem`，而 scene graph 中的 transform 只是输入源或回写目标。
 
 ## 当前每帧算法总流程
 
-`RigidBodyWorld::step(dt)` 的核心流程如下：
+`rb::RigidBodySystem::step(dt)` 的核心流程如下：
 
 ```text
 for each rigid body:
@@ -54,8 +54,8 @@ for each rigid body:
 
 ### 代码对应关系
 
-- `RigidBodyWorld::step(...)`
-- 文件：`src/rtr/system/physics/rigid_body/rigid_body_world.hpp`
+- `rb::RigidBodySystem::step(...)`
+- 文件：`src/rtr/system/physics/rigid_body/rigid_body_system.hpp`
 
 ## 平移积分
 
@@ -85,8 +85,8 @@ $$
 
 ### 代码对应关系
 
-- `RigidBodyWorld::integrate_body(...)`
-- `RigidBodyWorld::gravity()`
+- `rb::RigidBodySystem::integrate_body(...)`
+- `rb::RigidBodySystem::gravity()`
 
 ## 旋转积分
 
@@ -122,8 +122,8 @@ $$
 
 ### 代码对应关系
 
-- `RigidBodyWorld::integrate_body(...)`
-- `RigidBodyWorld::inverse_inertia_tensor_world(...)`
+- `rb::RigidBodySystem::integrate_body(...)`
+- `rb::RigidBodySystem::inverse_inertia_tensor_world(...)`
 
 ## 接触生成：从碰撞检测到 solver contact
 
@@ -142,9 +142,9 @@ $$
 
 `generate_contact_from_pair(...)` 会把 collider 先转成 `WorldCollider`，然后调用：
 
-- `ContactPairTrait<SphereShape, SphereShape>::generate(...)`
-- `ContactPairTrait<SphereShape, BoxShape>::generate(...)`
-- `ContactPairTrait<BoxShape, PlaneShape>::generate(...)`
+- `rb::ContactPairTrait<rb::SphereShape, rb::SphereShape>::generate(...)`
+- `rb::ContactPairTrait<rb::SphereShape, rb::BoxShape>::generate(...)`
+- `rb::ContactPairTrait<rb::BoxShape, rb::PlaneShape>::generate(...)`
 - 等等
 
 `collision/` 只返回几何层的 `ContactResult`，里面包含穿透深度、接触点、法线等信息。
@@ -186,9 +186,9 @@ $$
 
 ### 代码对应关系
 
-- `RigidBodyWorld::collect_contacts(...)`
-- `RigidBodyWorld::generate_contact_from_pair(...)`
-- `RigidBodyWorld::build_solver_contacts(...)`
+- `rb::RigidBodySystem::collect_contacts(...)`
+- `rb::RigidBodySystem::generate_contact_from_pair(...)`
+- `rb::RigidBodySystem::build_solver_contacts(...)`
 - `src/rtr/system/physics/collision/*.hpp`
 - `src/rtr/system/physics/rigid_body/contact.hpp`
 
@@ -259,10 +259,10 @@ for each solver iteration:
 
 ### 代码对应关系
 
-- `RigidBodyWorld::apply_velocity_impulses(...)`
-- `RigidBodyWorld::apply_impulse_at_contact(...)`
-- `RigidBodyWorld::combined_restitution(...)`
-- `RigidBodyWorld::combined_friction(...)`
+- `rb::RigidBodySystem::apply_velocity_impulses(...)`
+- `rb::RigidBodySystem::apply_impulse_at_contact(...)`
+- `rb::RigidBodySystem::combined_restitution(...)`
+- `rb::RigidBodySystem::combined_friction(...)`
 
 ## 位置阶段：穿透修正
 
@@ -285,8 +285,8 @@ for each solver iteration:
 
 ### 代码对应关系
 
-- `RigidBodyWorld::apply_position_correction(...)`
-- `RigidBodyWorld::step(...)`
+- `rb::RigidBodySystem::apply_position_correction(...)`
+- `rb::RigidBodySystem::step(...)`
 
 ## `collision/` 与 `rigid_body/` 的职责边界
 
@@ -314,7 +314,7 @@ for each solver iteration:
 
 ## 关键代码入口
 
-- `src/rtr/system/physics/rigid_body/rigid_body_world.hpp`
+- `src/rtr/system/physics/rigid_body/rigid_body_system.hpp`
 - `src/rtr/system/physics/rigid_body/contact.hpp`
 - `src/rtr/system/physics/collision/contact.hpp`
 - `src/rtr/framework/integration/physics/rigid_body_scene_sync.hpp`

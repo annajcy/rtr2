@@ -10,11 +10,11 @@
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/integration/physics/rigid_body_scene_sync.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 int main() {
     try {
-        rtr::system::physics::RigidBodyWorld physics_world;
+        rtr::system::physics::rb::RigidBodySystem physics_world;
         rtr::framework::core::Scene        scene(1);
 
         auto& mover = scene.create_game_object("gravity_reset_mover");

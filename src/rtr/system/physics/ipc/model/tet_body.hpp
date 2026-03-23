@@ -89,12 +89,11 @@ public:
 };
 
 struct TetBody {
+    TetMaterialVariant material{FixedCorotatedMaterial{}};
     IPCBodyInfo info{.type = IPCBodyType::Tet};
     TetGeometry geometry{};
 
     std::vector<double> vertex_masses{};
-    TetMaterialVariant material{FixedCorotatedMaterial{}};
-
     std::vector<bool> fixed_vertices{};
 
     std::size_t vertex_count() const { return geometry.vertex_count(); }

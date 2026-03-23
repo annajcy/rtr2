@@ -48,7 +48,7 @@ private:
     }
 
 public:
-    explicit SphereCollider(core::GameObject& owner, system::physics::RigidBodyWorld& world,
+    explicit SphereCollider(core::GameObject& owner, system::physics::rb::RigidBodySystem& world,
                             pbpt::math::Float radius = 0.5f,
                             const pbpt::math::Vec3& local_position = pbpt::math::Vec3{0.0f},
                             const pbpt::math::Quat& local_rotation = pbpt::math::Quat::identity(),
@@ -64,8 +64,8 @@ public:
     void on_enable() override {
         auto& rigid_body = owner_rigid_body_or_throw();
         if (!has_registered_collider()) {
-            system::physics::Collider collider;
-            collider.shape                    = system::physics::SphereShape{.radius = m_radius};
+            system::physics::rb::Collider collider;
+            collider.shape                    = system::physics::rb::SphereShape{.radius = m_radius};
             collider.local_transform.position = m_local_position;
             collider.local_transform.rotation = m_local_rotation;
             collider.local_transform.scale    = m_local_scale;
@@ -79,7 +79,7 @@ public:
             return;
         }
         (void)m_physics_world.remove_collider(m_collider_id);
-        m_collider_id = system::physics::kInvalidColliderId;
+        m_collider_id = system::physics::rb::kInvalidColliderId;
         m_registered  = false;
     }
 

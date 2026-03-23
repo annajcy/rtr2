@@ -5,7 +5,7 @@
 #include "rtr/system/physics/rigid_body/collision/collider_shape.hpp"
 #include "rtr/system/physics/rigid_body/collision/contact.hpp"
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 template <>
 struct ContactPairTrait<WorldSphere, WorldBox> {
@@ -60,4 +60,4 @@ struct ContactPairTrait<WorldBox, WorldSphere> {
     }
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

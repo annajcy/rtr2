@@ -32,27 +32,24 @@ TEST(ScenePhysicsStepTest, HelperStepsAndSyncsIPCDeformableMesh) {
     rtr::framework::core::Scene scene(1);
 
     auto body = rtr::system::physics::ipc::generate_tet_block(1, 1, 1, 0.25, Eigen::Vector3d(0.0, 1.0, 0.0));
-    const auto surface = rtr::system::physics::ipc::extract_tet_surface(body);
-    const auto initial_mesh = rtr::system::physics::ipc::tet_to_mesh(body.geometry, surface);
-    const auto mesh_handle = resources.create<rtr::resource::DeformableMeshResourceKind>(initial_mesh);
 
     auto& go = scene.create_game_object("ipc_body");
+    auto& ipc_tet = go.add_component<rtr::framework::component::IPCTetComponent>(
+        physics_system.ipc_system(),
+        std::move(body)
+    );
+    const auto mesh_handle = resources.create<rtr::resource::DeformableMeshResourceKind>(ipc_tet.mesh_cache());
     (void)go.add_component<rtr::framework::component::DeformableMeshComponent>(
         resources, mesh_handle, pbpt::math::Vec4{1.0f, 1.0f, 1.0f, 1.0f}
     );
 
-    auto& ipc_system = physics_system.ipc_system();
-    const std::size_t body_index = ipc_system.tet_body_count();
-    ipc_system.add_tet_body(std::move(body));
-    (void)go.add_component<rtr::framework::component::IPCTetComponent>(body_index, surface, initial_mesh);
-    ipc_system.initialize();
-
     step_scene_physics(scene, physics_system, 1.0f / 60.0f);
 
     const auto& cpu_mesh = resources.cpu<rtr::resource::DeformableMeshResourceKind>(mesh_handle);
-    ASSERT_EQ(cpu_mesh.vertices.size(), surface.surface_vertex_ids.size());
-    for (std::size_t i = 0; i < surface.surface_vertex_ids.size(); ++i) {
-        const auto expected = ipc_system.state().position(surface.surface_vertex_ids[i]);
+    const auto& ipc_system = physics_system.ipc_system();
+    ASSERT_EQ(cpu_mesh.vertices.size(), ipc_tet.surface_cache().surface_vertex_ids.size());
+    for (std::size_t i = 0; i < ipc_tet.surface_cache().surface_vertex_ids.size(); ++i) {
+        const auto expected = ipc_system.state().position(ipc_tet.surface_cache().surface_vertex_ids[i]);
         EXPECT_NEAR(cpu_mesh.vertices[i].position.x(), static_cast<float>(expected.x()), 1e-5f);
         EXPECT_NEAR(cpu_mesh.vertices[i].position.y(), static_cast<float>(expected.y()), 1e-5f);
         EXPECT_NEAR(cpu_mesh.vertices[i].position.z(), static_cast<float>(expected.z()), 1e-5f);

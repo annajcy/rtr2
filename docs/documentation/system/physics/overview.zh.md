@@ -5,7 +5,7 @@ RTR2 当前在 `src/rtr/system/physics/` 下有两个方向：
 - 已接入运行时的刚体子系统 `rigid_body/`
 - 已经有第一条运行时集成路径的 IPC/FEM 子系统 `ipc/`
 
-当前 `PhysicsSystem` 同时持有 `RigidBodyWorld` 和 `ipc::IPCSystem`。刚体仍然是更完整的运行时子系统，但 IPC 这边已经有 scene bridge 和最小 editor example。
+当前 `PhysicsSystem` 同时持有 `rb::RigidBodySystem` 和 `ipc::IPCSystem`。刚体仍然是更完整的运行时子系统，但 IPC 这边已经有 scene bridge 和最小 editor example。
 
 ## 当前范围
 
@@ -18,7 +18,7 @@ RTR2 当前在 `src/rtr/system/physics/` 下有两个方向：
 step_scene_physics(scene, physics_system, dt)
     -> sync_scene_to_rigid_body(...)
     -> PhysicsSystem::step(dt)
-         -> RigidBodyWorld::step(dt)
+         -> rb::RigidBodySystem::step(dt)
     -> sync_rigid_body_to_scene(...)
     -> ipc_system.step()
     -> sync_ipc_to_scene(...)
@@ -31,7 +31,7 @@ step_scene_physics(scene, physics_system, dt)
 | 位置 | 保存内容 | 谁是运行时权威 |
 | --- | --- | --- |
 | Scene Graph | GameObject、层级、渲染相关组件 | framework 层 |
-| `RigidBodyWorld` | 刚体状态、碰撞体、接触和求解状态 | 刚体运行时 |
+| `rb::RigidBodySystem` | 刚体状态、碰撞体、接触和求解状态 | 刚体运行时 |
 | `ipc::IPCSystem` / `ipc::IPCState` | deformable 的全局节点状态、质量和 per-body offset | deformable 运行时 |
 
 一旦动态刚体开始模拟，scene transform 就不应再被当成动态状态的权威来源。未来 deformable runtime 建起来以后，也会沿用同样的状态所有权划分。

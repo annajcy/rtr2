@@ -11,7 +11,7 @@
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/integration/physics/rigid_body_scene_sync.hpp"
 #include "rtr/resource/resource_manager.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 namespace rtr::framework::component::test {
 
@@ -31,7 +31,7 @@ utils::ObjMeshData make_triangle_mesh() {
 }  // namespace
 
 TEST(FrameworkColliderComponentTest, SphereColliderThrowsWhenRigidBodyIsMissing) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("sphere");
@@ -39,7 +39,7 @@ TEST(FrameworkColliderComponentTest, SphereColliderThrowsWhenRigidBodyIsMissing)
 }
 
 TEST(FrameworkColliderComponentTest, BoxColliderThrowsWhenRigidBodyIsMissing) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("box");
@@ -48,7 +48,7 @@ TEST(FrameworkColliderComponentTest, BoxColliderThrowsWhenRigidBodyIsMissing) {
 }
 
 TEST(FrameworkColliderComponentTest, PlaneColliderThrowsWhenRigidBodyIsMissing) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("plane");
@@ -56,7 +56,7 @@ TEST(FrameworkColliderComponentTest, PlaneColliderThrowsWhenRigidBodyIsMissing) 
 }
 
 TEST(FrameworkColliderComponentTest, MeshColliderThrowsWhenStaticMeshComponentIsMissing) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     resource::ResourceManager     resources;
     core::Scene                   scene(1);
 
@@ -66,12 +66,12 @@ TEST(FrameworkColliderComponentTest, MeshColliderThrowsWhenStaticMeshComponentIs
 }
 
 TEST(FrameworkColliderComponentTest, StaticRigidBodyCanOwnBoxColliderAndDestroyRemovesCollider) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("wall");
     auto& rigid_body = go.add_component<RigidBody>(physics_world);
-    rigid_body.set_type(system::physics::RigidBodyType::Static);
+    rigid_body.set_type(system::physics::rb::RigidBodyType::Static);
     (void)go.add_component<BoxCollider>(physics_world, pbpt::math::Vec3{1.0f, 1.0f, 1.0f});
 
     const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
@@ -84,7 +84,7 @@ TEST(FrameworkColliderComponentTest, StaticRigidBodyCanOwnBoxColliderAndDestroyR
 }
 
 TEST(FrameworkColliderComponentTest, SphereColliderSettersDeferPhysicsSyncUntilScenePrePass) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("sphere");
@@ -123,7 +123,7 @@ TEST(FrameworkColliderComponentTest, SphereColliderSettersDeferPhysicsSyncUntilS
 }
 
 TEST(FrameworkColliderComponentTest, BoxColliderSettersDeferPhysicsSyncUntilScenePrePass) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("box");
@@ -162,14 +162,14 @@ TEST(FrameworkColliderComponentTest, BoxColliderSettersDeferPhysicsSyncUntilScen
 }
 
 TEST(FrameworkColliderComponentTest, PlaneColliderSyncsWorldNormalWithNodeRotation) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     core::Scene                   scene(1);
 
     auto& go = scene.create_game_object("plane");
     go.node().set_local_rotation(
         pbpt::math::angle_axis(pbpt::math::radians(90.0f), pbpt::math::Vec3{0.0f, 1.0f, 0.0f}));
     auto& rigid_body = go.add_component<RigidBody>(physics_world);
-    rigid_body.set_type(system::physics::RigidBodyType::Static);
+    rigid_body.set_type(system::physics::rb::RigidBodyType::Static);
     (void)go.add_component<PlaneCollider>(physics_world, pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
 
     integration::physics::sync_scene_to_rigid_body(scene, physics_world);
@@ -177,7 +177,7 @@ TEST(FrameworkColliderComponentTest, PlaneColliderSyncsWorldNormalWithNodeRotati
     const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
     ASSERT_EQ(collider_ids.size(), 1u);
     const auto world_collider = physics_world.get_world_collider(collider_ids.front());
-    const auto* world_plane = std::get_if<system::physics::WorldPlane>(&world_collider);
+    const auto* world_plane = std::get_if<system::physics::rb::WorldPlane>(&world_collider);
     ASSERT_NE(world_plane, nullptr);
     EXPECT_NEAR(world_plane->normal.x(), 1.0f, 1e-5f);
     EXPECT_NEAR(world_plane->normal.y(), 0.0f, 1e-5f);
@@ -185,7 +185,7 @@ TEST(FrameworkColliderComponentTest, PlaneColliderSyncsWorldNormalWithNodeRotati
 }
 
 TEST(FrameworkColliderComponentTest, MeshColliderReadsLocalVerticesFromStaticMeshComponent) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     resource::ResourceManager     resources;
     core::Scene                   scene(1);
     const auto mesh_handle = resources.create<resource::MeshResourceKind>(make_triangle_mesh());
@@ -200,14 +200,14 @@ TEST(FrameworkColliderComponentTest, MeshColliderReadsLocalVerticesFromStaticMes
     const auto collider_ids = physics_world.colliders_for_body(rigid_body.rigid_body_id());
     ASSERT_EQ(collider_ids.size(), 1u);
     const auto& collider = physics_world.get_collider(collider_ids.front());
-    const auto* mesh_shape = std::get_if<system::physics::MeshShape>(&collider.shape);
+    const auto* mesh_shape = std::get_if<system::physics::rb::MeshShape>(&collider.shape);
     ASSERT_NE(mesh_shape, nullptr);
     ASSERT_EQ(mesh_shape->local_vertices.size(), 3u);
     EXPECT_NEAR(mesh_shape->local_vertices[0].x(), 0.2f, 1e-5f);
 }
 
 TEST(FrameworkColliderComponentTest, SphereColliderRadiusChangeAppliesOnNextScenePrePass) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     core::Scene scene(1);
 
     auto& go = scene.create_game_object("sphere");
@@ -219,7 +219,7 @@ TEST(FrameworkColliderComponentTest, SphereColliderRadiusChangeAppliesOnNextScen
 
     sphere.set_radius(1.25f);
 
-    const auto* stale_shape = std::get_if<system::physics::SphereShape>(
+    const auto* stale_shape = std::get_if<system::physics::rb::SphereShape>(
         &physics_world.get_collider(collider_ids.front()).shape
     );
     ASSERT_NE(stale_shape, nullptr);
@@ -227,7 +227,7 @@ TEST(FrameworkColliderComponentTest, SphereColliderRadiusChangeAppliesOnNextScen
 
     integration::physics::sync_scene_to_rigid_body(scene, physics_world);
 
-    const auto* synced_shape = std::get_if<system::physics::SphereShape>(
+    const auto* synced_shape = std::get_if<system::physics::rb::SphereShape>(
         &physics_world.get_collider(collider_ids.front()).shape
     );
     ASSERT_NE(synced_shape, nullptr);

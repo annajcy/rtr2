@@ -7,7 +7,7 @@
 #include "rtr/system/physics/rigid_body/collision/collider_shape.hpp"
 #include "rtr/system/physics/rigid_body/collision/contact.hpp"
 
-namespace rtr::system::physics::detail {
+namespace rtr::system::physics::rb::detail::plane_common {
 
 inline pbpt::math::Vec3 normalized_plane_normal(const WorldPlane& plane) {
     return pbpt::math::normalize(plane.normal);
@@ -49,4 +49,4 @@ inline ContactResult average_penetrating_points_against_plane(const PointRange& 
     };
 }
 
-}  // namespace rtr::system::physics::detail
+}  // namespace rtr::system::physics::rb::detail::plane_common

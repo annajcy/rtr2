@@ -14,20 +14,20 @@
 #include "gtest/gtest.h"
 
 #define private public
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 #undef private
 
 namespace rtr::system::physics::test {
 
-TEST(RigidBodyWorldTest, DefaultsIterationsToVelocityEightAndPositionThree) {
-    RigidBodyWorld world;
+TEST(RigidBodySystemTest, DefaultsIterationsToVelocityEightAndPositionThree) {
+    rb::RigidBodySystem world;
 
-    EXPECT_EQ(world.velocity_iterations(), RigidBodyWorld::kDefaultVelocityIterations);
-    EXPECT_EQ(world.position_iterations(), RigidBodyWorld::kDefaultPositionIterations);
+    EXPECT_EQ(world.velocity_iterations(), rb::RigidBodySystem::kDefaultVelocityIterations);
+    EXPECT_EQ(world.position_iterations(), rb::RigidBodySystem::kDefaultPositionIterations);
 }
 
-TEST(RigidBodyWorldTest, SettersUpdateIterations) {
-    RigidBodyWorld world;
+TEST(RigidBodySystemTest, SettersUpdateIterations) {
+    rb::RigidBodySystem world;
 
     world.set_velocity_iterations(4);
     world.set_position_iterations(2);
@@ -36,23 +36,23 @@ TEST(RigidBodyWorldTest, SettersUpdateIterations) {
     EXPECT_EQ(world.position_iterations(), 2u);
 }
 
-TEST(RigidBodyWorldTest, RejectsZeroVelocityIterations) {
-    RigidBodyWorld world;
+TEST(RigidBodySystemTest, RejectsZeroVelocityIterations) {
+    rb::RigidBodySystem world;
 
     EXPECT_THROW(world.set_velocity_iterations(0), std::invalid_argument);
 }
 
-TEST(RigidBodyWorldTest, RejectsZeroPositionIterations) {
-    RigidBodyWorld world;
+TEST(RigidBodySystemTest, RejectsZeroPositionIterations) {
+    rb::RigidBodySystem world;
 
     EXPECT_THROW(world.set_position_iterations(0), std::invalid_argument);
 }
 
-TEST(RigidBodyWorldTest, NormalAccumulatedImpulseCanRollbackWithoutGoingNegative) {
-    RigidBodyWorld world;
+TEST(RigidBodySystemTest, NormalAccumulatedImpulseCanRollbackWithoutGoingNegative) {
+    rb::RigidBodySystem world;
 
-    RigidBody body_a{};
-    body_a.set_type(RigidBodyType::Dynamic);
+    rb::RigidBody body_a{};
+    body_a.set_type(rb::RigidBodyType::Dynamic);
     body_a.set_awake(true);
     body_a.set_use_gravity(false);
     body_a.set_restitution(0.5f);
@@ -60,8 +60,8 @@ TEST(RigidBodyWorldTest, NormalAccumulatedImpulseCanRollbackWithoutGoingNegative
     body_a.state().translation.position = pbpt::math::Vec3{0.0f, 0.0f, 0.0f};
     body_a.state().translation.linear_velocity = pbpt::math::Vec3{2.0f, 0.0f, 0.0f};
 
-    RigidBody body_b{};
-    body_b.set_type(RigidBodyType::Dynamic);
+    rb::RigidBody body_b{};
+    body_b.set_type(rb::RigidBodyType::Dynamic);
     body_b.set_awake(true);
     body_b.set_use_gravity(false);
     body_b.set_restitution(0.5f);
@@ -70,8 +70,8 @@ TEST(RigidBodyWorldTest, NormalAccumulatedImpulseCanRollbackWithoutGoingNegative
 
     const auto body_a_id = world.create_rigid_body(body_a);
     const auto body_b_id = world.create_rigid_body(body_b);
-    (void)world.create_collider(body_a_id, Collider{.shape = SphereShape{.radius = 0.5f}});
-    (void)world.create_collider(body_b_id, Collider{.shape = SphereShape{.radius = 0.5f}});
+    (void)world.create_collider(body_a_id, rb::Collider{.shape = rb::SphereShape{.radius = 0.5f}});
+    (void)world.create_collider(body_b_id, rb::Collider{.shape = rb::SphereShape{.radius = 0.5f}});
 
     const auto contacts = world.collect_contacts();
     auto solver_contacts = world.build_solver_contacts(contacts);

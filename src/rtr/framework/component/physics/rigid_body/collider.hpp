@@ -5,14 +5,14 @@
 #include "rtr/framework/component/component.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/core/game_object.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 namespace rtr::framework::component {
 
 class Collider : public Component {
 protected:
-    system::physics::RigidBodyWorld& m_physics_world;
-    system::physics::ColliderID    m_collider_id{system::physics::kInvalidColliderId};
+    system::physics::rb::RigidBodySystem& m_physics_world;
+    system::physics::rb::ColliderID    m_collider_id{system::physics::rb::kInvalidColliderId};
     bool                           m_registered{false};
 
     bool has_registered_collider() const { return m_registered && m_physics_world.has_collider(m_collider_id); }
@@ -32,11 +32,11 @@ protected:
     }
 
 public:
-    explicit Collider(core::GameObject& owner, system::physics::RigidBodyWorld& world)
+    explicit Collider(core::GameObject& owner, system::physics::rb::RigidBodySystem& world)
         : Component(owner), m_physics_world(world) {}
 
     bool has_collider() const { return has_registered_collider(); }
-    system::physics::ColliderID collider_id() const { return m_collider_id; }
+    system::physics::rb::ColliderID collider_id() const { return m_collider_id; }
 };
 
 }  // namespace rtr::framework::component

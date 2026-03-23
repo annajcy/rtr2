@@ -7,12 +7,12 @@
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/system/input/input_state.hpp"
 #include "rtr/system/input/input_types.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 namespace rtr::examples::games103_lab::lab1_angry_bunny::test {
 
 TEST(AngryBunnyControllerTest, WaitingStateKeepsBunnySpinningWithoutGravity) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     framework::core::Scene        scene(1);
     system::input::InputState     input_state;
 
@@ -30,7 +30,7 @@ TEST(AngryBunnyControllerTest, WaitingStateKeepsBunnySpinningWithoutGravity) {
 }
 
 TEST(AngryBunnyControllerTest, LaunchAndResetEdgesUpdateStateOnce) {
-    system::physics::RigidBodyWorld physics_world;
+    system::physics::rb::RigidBodySystem physics_world;
     framework::core::Scene        scene(1);
     system::input::InputState     input_state;
 

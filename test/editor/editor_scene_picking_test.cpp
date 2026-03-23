@@ -6,13 +6,13 @@
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 namespace rtr::editor::test {
 
 TEST(EditorScenePickingTest, SpherePickUsesColliderLocalScale) {
     resource::ResourceManager      resources;
-    system::physics::RigidBodyWorld  physics_world;
+    system::physics::rb::RigidBodySystem  physics_world;
     framework::core::Scene         scene(1);
 
     auto& go = scene.create_game_object("sphere");
@@ -38,7 +38,7 @@ TEST(EditorScenePickingTest, SpherePickUsesColliderLocalScale) {
 
 TEST(EditorScenePickingTest, BoxPickUsesColliderLocalScale) {
     resource::ResourceManager      resources;
-    system::physics::RigidBodyWorld  physics_world;
+    system::physics::rb::RigidBodySystem  physics_world;
     framework::core::Scene         scene(1);
 
     auto& go = scene.create_game_object("box");

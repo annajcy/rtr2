@@ -8,7 +8,7 @@
 #include "pbpt/math/matrix/matrix_transform.hpp"
 #include "pbpt/math/spatial/vector.hpp"
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 using RigidBodyID = std::uint64_t;
 using ColliderID  = std::uint64_t;
@@ -26,4 +26,4 @@ struct PhysicsTransform {
     }
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

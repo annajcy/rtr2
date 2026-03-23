@@ -21,21 +21,21 @@
 #include "rtr/system/physics/rigid_body/collision/sphere_box.hpp"
 #include "rtr/system/physics/rigid_body/collision/sphere_plane.hpp"
 #include "rtr/system/physics/rigid_body/collision/sphere_sphere.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 namespace rtr::framework::integration::physics::test {
 
-using system::physics::ContactPairTrait;
-using system::physics::RigidBodyType;
-using system::physics::WorldBox;
-using system::physics::WorldSphere;
+using system::physics::rb::ContactPairTrait;
+using system::physics::rb::RigidBodyType;
+using system::physics::rb::WorldBox;
+using system::physics::rb::WorldSphere;
 
 namespace {
 
 class PhysicsStepper {
 public:
-    system::physics::RigidBodyWorld& world() { return m_world; }
-    const system::physics::RigidBodyWorld& world() const { return m_world; }
+    system::physics::rb::RigidBodySystem& world() { return m_world; }
+    const system::physics::rb::RigidBodySystem& world() const { return m_world; }
 
     void fixed_tick(framework::core::Scene& scene, const framework::core::FixedTickContext& ctx) {
         sync_scene_to_rigid_body(scene, m_world);
@@ -44,7 +44,7 @@ public:
     }
 
 private:
-    system::physics::RigidBodyWorld m_world{};
+    system::physics::rb::RigidBodySystem m_world{};
 };
 
 pbpt::math::Mat3 diagonal_inverse_inertia(const pbpt::math::Float x,
@@ -301,7 +301,7 @@ TEST(PhysicsSceneIntegrationTest, SetOrientationNormalizesAndSyncsBackToSceneGra
     EXPECT_NEAR(rotation.length(), 1.0f, 1e-5f);
 }
 
-TEST(PhysicsSceneIntegrationTest, DestroyRemovesRigidBodyFromPhysicsWorld) {
+TEST(PhysicsSceneIntegrationTest, DestroyRemovesRigidBodyFromRigidBodySystem) {
     PhysicsStepper         physics;
     framework::core::Scene scene(1);
 
@@ -746,9 +746,9 @@ TEST(PhysicsSceneIntegrationTest, SolverIterationsReducePenetrationAcrossStacked
     ASSERT_NE(lower_sphere, nullptr);
     ASSERT_NE(upper_sphere, nullptr);
 
-    const auto floor_contact = ContactPairTrait<WorldSphere, system::physics::WorldPlane>::generate(
+    const auto floor_contact = ContactPairTrait<WorldSphere, system::physics::rb::WorldPlane>::generate(
         *lower_sphere,
-        system::physics::WorldPlane{
+        system::physics::rb::WorldPlane{
             .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
             .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
         });
@@ -826,9 +826,9 @@ TEST(PhysicsSceneIntegrationTest, DynamicSphereCollidesWithStaticPlaneAndCorrect
     const auto sphere_world_collider = physics.world().get_world_collider(sphere_colliders.front());
     const auto* world_sphere = std::get_if<WorldSphere>(&sphere_world_collider);
     ASSERT_NE(world_sphere, nullptr);
-    const auto contact = ContactPairTrait<WorldSphere, system::physics::WorldPlane>::generate(
+    const auto contact = ContactPairTrait<WorldSphere, system::physics::rb::WorldPlane>::generate(
         *world_sphere,
-        system::physics::WorldPlane{
+        system::physics::rb::WorldPlane{
             .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
             .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
         });
@@ -871,9 +871,9 @@ TEST(PhysicsSceneIntegrationTest, DynamicBoxCollidesWithStaticPlaneAndGeneratesA
     const auto box_world_collider = physics.world().get_world_collider(box_colliders.front());
     const auto* world_box = std::get_if<WorldBox>(&box_world_collider);
     ASSERT_NE(world_box, nullptr);
-    const auto contact = ContactPairTrait<WorldBox, system::physics::WorldPlane>::generate(
+    const auto contact = ContactPairTrait<WorldBox, system::physics::rb::WorldPlane>::generate(
         *world_box,
-        system::physics::WorldPlane{
+        system::physics::rb::WorldPlane{
             .point = pbpt::math::Vec3{0.0f, 0.0f, 0.0f},
             .normal = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
         });

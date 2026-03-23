@@ -16,7 +16,7 @@
 
 namespace rtr::system::physics::ipc {
 
-namespace material_energy_detail {
+namespace detail::material_energy {
 
 inline void validate_tet_body(const TetBody& body) {
     if (body.geometry.tets.empty()) {
@@ -81,7 +81,7 @@ inline Eigen::Matrix<double, 9, 3> build_dFdx_matrix(const Eigen::Vector3d& grad
     return dFdx;
 }
 
-}  // namespace material_energy_detail
+}  // namespace detail::material_energy
 
 template <TetMaterialModel Material>
 struct MaterialEnergy {
@@ -93,7 +93,7 @@ struct MaterialEnergy {
 
 private:
     static void validate_input(const Input& input) {
-        material_energy_detail::validate_input(input.body, input.x, input.material);
+        detail::material_energy::validate_input(input.body, input.x, input.material);
     }
 
 public:
@@ -104,7 +104,7 @@ public:
         for (std::size_t tet_index = 0; tet_index < input.body.tet_count(); ++tet_index) {
             const auto& tet = input.body.geometry.tets[tet_index];
             const Eigen::Matrix3d Ds =
-                material_energy_detail::build_Ds(input.x, input.body.info.dof_offset, tet);
+                detail::material_energy::build_Ds(input.x, input.body.info.dof_offset, tet);
             const Eigen::Matrix3d F = Ds * input.body.geometry.Dm_inv[tet_index];
             total_energy += input.material.compute_energy(F, input.body.geometry.rest_volumes[tet_index]);
         }
@@ -120,12 +120,12 @@ public:
         for (std::size_t tet_index = 0; tet_index < input.body.tet_count(); ++tet_index) {
             const auto& tet = input.body.geometry.tets[tet_index];
             const Eigen::Matrix3d Ds =
-                material_energy_detail::build_Ds(input.x, input.body.info.dof_offset, tet);
+                detail::material_energy::build_Ds(input.x, input.body.info.dof_offset, tet);
             const Eigen::Matrix3d& Dm_inv = input.body.geometry.Dm_inv[tet_index];
             const Eigen::Matrix3d F = Ds * Dm_inv;
             const double rest_volume = input.body.geometry.rest_volumes[tet_index];
             const Eigen::Matrix3d P = input.material.compute_pk1(F, rest_volume);
-            const auto grad_N = material_energy_detail::compute_shape_gradients(Dm_inv);
+            const auto grad_N = detail::material_energy::compute_shape_gradients(Dm_inv);
 
             for (int local_vertex = 0; local_vertex < 4; ++local_vertex) {
                 const Eigen::Vector3d local_gradient = rest_volume * P * grad_N[local_vertex];
@@ -143,17 +143,17 @@ public:
         for (std::size_t tet_index = 0; tet_index < input.body.tet_count(); ++tet_index) {
             const auto& tet = input.body.geometry.tets[tet_index];
             const Eigen::Matrix3d Ds =
-                material_energy_detail::build_Ds(input.x, input.body.info.dof_offset, tet);
+                detail::material_energy::build_Ds(input.x, input.body.info.dof_offset, tet);
             const Eigen::Matrix3d& Dm_inv = input.body.geometry.Dm_inv[tet_index];
             const Eigen::Matrix3d F = Ds * Dm_inv;
             const double rest_volume = input.body.geometry.rest_volumes[tet_index];
             Eigen::Matrix<double, 9, 9> hessian_F = input.material.compute_hessian(F, rest_volume);
             hessian_F = 0.5 * (hessian_F + hessian_F.transpose());
 
-            const auto grad_N = material_energy_detail::compute_shape_gradients(Dm_inv);
+            const auto grad_N = detail::material_energy::compute_shape_gradients(Dm_inv);
             std::array<Eigen::Matrix<double, 9, 3>, 4> dFdx{};
             for (int local_vertex = 0; local_vertex < 4; ++local_vertex) {
-                dFdx[local_vertex] = material_energy_detail::build_dFdx_matrix(grad_N[local_vertex]);
+                dFdx[local_vertex] = detail::material_energy::build_dFdx_matrix(grad_N[local_vertex]);
             }
 
             for (int a = 0; a < 4; ++a) {

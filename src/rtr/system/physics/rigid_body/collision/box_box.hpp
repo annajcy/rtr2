@@ -8,7 +8,7 @@
 #include "rtr/system/physics/rigid_body/collision/collider_shape.hpp"
 #include "rtr/system/physics/rigid_body/collision/contact.hpp"
 
-namespace rtr::system::physics::detail {
+namespace rtr::system::physics::rb::detail::box_box {
 
 enum class BoxBoxAxisKind {
     FaceA,
@@ -143,17 +143,17 @@ inline pbpt::math::Vec3 approximate_edge_contact_point(const WorldBox& a, const 
     return (pa + pb) * 0.5f;
 }
 
-}  // namespace rtr::system::physics::detail
+}  // namespace rtr::system::physics::rb::detail::box_box
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 template <>
 struct ContactPairTrait<WorldBox, WorldBox> {
     static ContactResult generate(const WorldBox& a, const WorldBox& b) {
         constexpr pbpt::math::Float kEpsilon = 1e-6f;
 
-        const auto axes_a = detail::box_axes(a);
-        const auto axes_b = detail::box_axes(b);
+        const auto axes_a = detail::box_box::box_axes(a);
+        const auto axes_b = detail::box_box::box_axes(b);
         const auto delta  = b.center - a.center;
 
         std::array<std::array<pbpt::math::Float, 3>, 3> rotation{};
@@ -170,7 +170,7 @@ struct ContactPairTrait<WorldBox, WorldBox> {
             }
         }
 
-        detail::BoxBoxBestAxis best_axis{};
+        detail::box_box::BoxBoxBestAxis best_axis{};
 
         for (int i = 0; i < 3; ++i) {
             const auto ra      = a.half_extents[i];
@@ -186,7 +186,7 @@ struct ContactPairTrait<WorldBox, WorldBox> {
             if (translation_a[i] < 0.0f) {
                 normal = -normal;
             }
-            detail::update_best_axis(best_axis, overlap, normal, detail::BoxBoxAxisKind::FaceA, i, -1);
+            detail::box_box::update_best_axis(best_axis, overlap, normal, detail::box_box::BoxBoxAxisKind::FaceA, i, -1);
         }
 
         for (int j = 0; j < 3; ++j) {
@@ -203,7 +203,7 @@ struct ContactPairTrait<WorldBox, WorldBox> {
             if (translation_b[j] < 0.0f) {
                 normal = -normal;
             }
-            detail::update_best_axis(best_axis, overlap, normal, detail::BoxBoxAxisKind::FaceB, -1, j);
+            detail::box_box::update_best_axis(best_axis, overlap, normal, detail::box_box::BoxBoxAxisKind::FaceB, -1, j);
         }
 
         for (int i = 0; i < 3; ++i) {
@@ -215,8 +215,8 @@ struct ContactPairTrait<WorldBox, WorldBox> {
                 }
 
                 const auto axis_normalized = axis / std::sqrt(axis_length_sq);
-                const auto ra              = detail::project_box_radius(a, axes_a, axis_normalized);
-                const auto rb              = detail::project_box_radius(b, axes_b, axis_normalized);
+                const auto ra              = detail::box_box::project_box_radius(a, axes_a, axis_normalized);
+                const auto rb              = detail::box_box::project_box_radius(b, axes_b, axis_normalized);
                 const auto dist            = std::abs(pbpt::math::dot(delta, axis_normalized));
                 const auto overlap         = ra + rb - dist;
                 if (overlap <= 0.0f) {
@@ -227,7 +227,7 @@ struct ContactPairTrait<WorldBox, WorldBox> {
                 if (pbpt::math::dot(delta, normal) < 0.0f) {
                     normal = -normal;
                 }
-                detail::update_best_axis(best_axis, overlap, normal, detail::BoxBoxAxisKind::EdgeEdge, i, j);
+                detail::box_box::update_best_axis(best_axis, overlap, normal, detail::box_box::BoxBoxAxisKind::EdgeEdge, i, j);
             }
         }
 
@@ -235,15 +235,15 @@ struct ContactPairTrait<WorldBox, WorldBox> {
         result.normal      = best_axis.normal;
         result.penetration = best_axis.overlap;
 
-        if (best_axis.kind == detail::BoxBoxAxisKind::EdgeEdge) {
-            result.point = detail::approximate_edge_contact_point(
+        if (best_axis.kind == detail::box_box::BoxBoxAxisKind::EdgeEdge) {
+            result.point = detail::box_box::approximate_edge_contact_point(
                 a, axes_a, best_axis.index_a, b, axes_b, best_axis.index_b, result.normal);
         } else {
-            result.point = detail::approximate_face_contact_point(a, axes_a, b, axes_b, result.normal);
+            result.point = detail::box_box::approximate_face_contact_point(a, axes_a, b, axes_b, result.normal);
         }
 
         return result;
     }
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

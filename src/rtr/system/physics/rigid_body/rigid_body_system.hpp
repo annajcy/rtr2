@@ -26,9 +26,9 @@
 #include "rtr/system/physics/rigid_body/rigid_body.hpp"
 #include "rtr/utils/log.hpp"
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
-class RigidBodyWorld {
+class RigidBodySystem {
 private:
     static std::shared_ptr<spdlog::logger> logger() {
         return utils::get_logger("system.physics.rigid_body.world");
@@ -538,7 +538,7 @@ public:
     void set_velocity_iterations(std::uint32_t iterations) {
         if (iterations == 0) {
             logger()->error("set_velocity_iterations failed: iterations must be greater than zero.");
-            throw std::invalid_argument("RigidBodyWorld velocity_iterations must be greater than zero.");
+            throw std::invalid_argument("RigidBodySystem velocity_iterations must be greater than zero.");
         }
         m_velocity_iterations = iterations;
         logger()->info("Velocity iterations updated to {}.", m_velocity_iterations);
@@ -547,7 +547,7 @@ public:
     void set_position_iterations(std::uint32_t iterations) {
         if (iterations == 0) {
             logger()->error("set_position_iterations failed: iterations must be greater than zero.");
-            throw std::invalid_argument("RigidBodyWorld position_iterations must be greater than zero.");
+            throw std::invalid_argument("RigidBodySystem position_iterations must be greater than zero.");
         }
         m_position_iterations = iterations;
         logger()->info("Position iterations updated to {}.", m_position_iterations);
@@ -627,4 +627,4 @@ public:
     }
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

@@ -39,7 +39,7 @@ struct NewtonProblem {
         compute_hessian_triplets{};
 };
 
-namespace newton_solver_detail {
+namespace detail::newton_solver {
 
 inline void validate_problem(const NewtonProblem& problem) {
     if (!problem.compute_energy || !problem.compute_gradient || !problem.compute_hessian_triplets) {
@@ -184,14 +184,14 @@ inline double evaluate_gradient_norm(const NewtonProblem& problem,
     return masked_inf_norm(gradient, free_dof_mask);
 }
 
-}  // namespace newton_solver_detail
+}  // namespace detail::newton_solver
 
 inline NewtonSolverResult solve(IPCState& state,
                                 const Eigen::VectorXd& x_hat,
                                 const std::vector<bool>& free_dof_mask,
                                 const NewtonProblem& problem,
                                 const NewtonSolverParams& params = {}) {
-    using namespace newton_solver_detail;
+    using namespace detail::newton_solver;
 
     validate_inputs(state, x_hat, free_dof_mask, problem, params);
 

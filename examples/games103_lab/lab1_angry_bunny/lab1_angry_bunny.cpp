@@ -79,7 +79,7 @@ int main() {
         (void)bunny_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), bunny_mesh, pbpt::math::Vec4{0.90f, 0.85f, 0.78f, 1.0f});
         auto& bunny_body = bunny_go.add_component<rtr::framework::component::RigidBody>(
-            runtime.physics_system().rigid_body_world(), 1.0f, rtr::system::physics::RigidBodyType::Dynamic, false,
+            runtime.physics_system().rigid_body_system(), 1.0f, rtr::system::physics::rb::RigidBodyType::Dynamic, false,
             pbpt::math::Mat3::zeros(), 0.2f, 1.2f, 0.99f, 0.985f);
         pbpt::math::Mat3 inverse_inertia_tensor = pbpt::math::Mat3::zeros();
         inverse_inertia_tensor[0][0] = 0.6f;
@@ -87,7 +87,7 @@ int main() {
         inverse_inertia_tensor[2][2] = 0.6f;
         bunny_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor);
         (void)bunny_go.add_component<rtr::framework::component::BoxCollider>(
-            runtime.physics_system().rigid_body_world(),
+            runtime.physics_system().rigid_body_system(),
             kBunnyColliderHalfExtents,
             kBunnyColliderCenter);
         (void)bunny_go.add_component<rtr::examples::games103_lab::lab1_angry_bunny::AngryBunnyController>(
@@ -104,9 +104,9 @@ int main() {
             go.node().set_local_rotation(rotation);
             go.node().set_local_scale(scale);
             (void)go.add_component<rtr::framework::component::StaticMeshComponent>(runtime.resource_manager(), quad_mesh, color);
-            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
-            rigid_body.set_type(rtr::system::physics::RigidBodyType::Static);
-            (void)go.add_component<rtr::framework::component::PlaneCollider>(runtime.physics_system().rigid_body_world(), normal_local);
+            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system());
+            rigid_body.set_type(rtr::system::physics::rb::RigidBodyType::Static);
+            (void)go.add_component<rtr::framework::component::PlaneCollider>(runtime.physics_system().rigid_body_system(), normal_local);
         };
 
         add_plane("ground",

@@ -90,11 +90,11 @@ Handles user input from keyboard, mouse, and gamepads.
 
 ### Physics System (`src/rtr/system/physics`)
 
-Owns the current rigid-body and cloth runtime.
+Owns the current rigid-body and IPC runtime.
 
-- **PhysicsSystem:** Holds both `RigidBodyWorld` and `ClothWorld`.
+- **PhysicsSystem:** Holds both `rb::RigidBodySystem` and `ipc::IPCSystem`.
 - **Fixed-Step Integration:** The framework layer uses `step_scene_physics(...)` to synchronize scene state into physics and write simulation results back.
-- **Documentation Entry:** See `docs/documentation/system/physics/` for the runtime overview, integration guide, cloth simulation notes, and rigid-body dynamics write-up.
+- **Documentation Entry:** See `docs/documentation/system/physics/` for the runtime overview, integration guide, IPC bridge/example notes, and rigid-body dynamics write-up.
 
 ## RHI (`src/rtr/rhi`)
 

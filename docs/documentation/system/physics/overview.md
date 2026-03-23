@@ -5,7 +5,7 @@ RTR2 currently has two physics directions under `src/rtr/system/physics/`:
 - a runtime-connected rigid-body subsystem in `rigid_body/`
 - a first runtime-connected IPC/FEM deformable path in `ipc/`
 
-`PhysicsSystem` now owns both `RigidBodyWorld` and `ipc::IPCSystem`. The rigid-body runtime is still the more complete subsystem, but the IPC side already has its first scene bridge and editor example.
+`PhysicsSystem` now owns both `rb::RigidBodySystem` and `ipc::IPCSystem`. The rigid-body runtime is still the more complete subsystem, but the IPC side already has its first scene bridge and editor example.
 
 ## Current Scope
 
@@ -19,7 +19,7 @@ RTR2 currently has two physics directions under `src/rtr/system/physics/`:
 step_scene_physics(scene, physics_system, dt)
     -> sync_scene_to_rigid_body(...)
     -> PhysicsSystem::step(dt)
-         -> RigidBodyWorld::step(dt)
+         -> rb::RigidBodySystem::step(dt)
     -> sync_rigid_body_to_scene(...)
     -> ipc_system.step()
     -> sync_ipc_to_scene(...)
@@ -32,7 +32,7 @@ step_scene_physics(scene, physics_system, dt)
 | Location | Stores | Runtime authority |
 | --- | --- | --- |
 | Scene Graph | game objects, hierarchy, render-facing components | framework layer |
-| `RigidBodyWorld` | rigid-body state, colliders, contacts, solver state | rigid-body runtime |
+| `rb::RigidBodySystem` | rigid-body state, colliders, contacts, solver state | rigid-body runtime |
 | `ipc::IPCSystem` / `ipc::IPCState` | deformable global nodal state, masses, per-body offsets | deformable runtime |
 
 Once dynamic rigid bodies start simulating, scene transforms should no longer be treated as the authoritative dynamic state. The same ownership split is intended for deformables once the IPC runtime loop exists.

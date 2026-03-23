@@ -4,7 +4,7 @@
 
 #include <pbpt/math/math.h>
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 struct ContactResult {
     pbpt::math::Vec3   point{0.0f};
@@ -32,4 +32,4 @@ struct ContactPairTrait {
     }
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

@@ -210,7 +210,7 @@ private:
         }
     }
 
-    static void draw_ipc_tet_editor(EditorContext& ctx, framework::core::GameObject& game_object) {
+    static void draw_ipc_tet_editor(EditorContext& /*ctx*/, framework::core::GameObject& game_object) {
         auto* ipc_tet = game_object.get_component<framework::component::IPCTetComponent>();
         if (ipc_tet == nullptr) {
             return;
@@ -224,76 +224,67 @@ private:
                                 game_object.id(), enabled);
             }
 
-            ImGui::Text("Body Index: %llu", static_cast<unsigned long long>(ipc_tet->body_index()));
+            ImGui::Text("Registered: %s", ipc_tet->has_registered_body() ? "Yes" : "No");
+            ImGui::Text("Body ID: %llu", static_cast<unsigned long long>(ipc_tet->body_id()));
             ImGui::Text("Surface Vertices: %llu",
                         static_cast<unsigned long long>(ipc_tet->surface_cache().surface_vertex_ids.size()));
             ImGui::Text("Surface Triangles: %llu",
                         static_cast<unsigned long long>(ipc_tet->surface_cache().surface_indices.size() / 3u));
+            const auto* source_body = &ipc_tet->source_body();
+            const auto* runtime_body = ipc_tet->runtime_body();
+            const auto* display_body = runtime_body != nullptr ? runtime_body : source_body;
 
-            auto* physics_system = ctx.physics_system();
-            if (physics_system == nullptr) {
-                ImGui::TextDisabled("PhysicsSystem is not available in this editor context.");
-                return;
+            if (runtime_body != nullptr) {
+                ImGui::Text("Global Vertex Offset: %llu",
+                            static_cast<unsigned long long>(runtime_body->info.dof_offset / 3u));
+            } else {
+                ImGui::TextDisabled("Runtime body is not currently registered.");
             }
 
-            auto& ipc_system = physics_system->ipc_system();
-            if (ipc_tet->body_index() >= ipc_system.tet_body_count()) {
-                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid IPC body index.");
-                return;
-            }
-
-            auto& body = ipc_system.tet_body(ipc_tet->body_index());
-            ImGui::Text("Global Vertex Offset: %llu",
-                        static_cast<unsigned long long>(body.info.dof_offset / 3u));
-            ImGui::Text("Body Vertices: %llu", static_cast<unsigned long long>(body.vertex_count()));
-            ImGui::Text("Body Tets: %llu", static_cast<unsigned long long>(body.tet_count()));
+            ImGui::Text("Body Vertices: %llu", static_cast<unsigned long long>(display_body->vertex_count()));
+            ImGui::Text("Body Tets: %llu", static_cast<unsigned long long>(display_body->tet_count()));
             const std::size_t fixed_vertex_count =
-                static_cast<std::size_t>(std::count(body.fixed_vertices.begin(), body.fixed_vertices.end(), true));
+                static_cast<std::size_t>(std::count(display_body->fixed_vertices.begin(), display_body->fixed_vertices.end(), true));
             ImGui::Text("Fixed Vertices: %llu", static_cast<unsigned long long>(fixed_vertex_count));
 
             bool material_changed = false;
-            std::visit(
-                [&](auto& material) {
-                    using Material = std::decay_t<decltype(material)>;
-                    if constexpr (std::same_as<Material, rtr::system::physics::ipc::FixedCorotatedMaterial>) {
-                        ImGui::SeparatorText("Material");
-                        ImGui::Text("Type: Fixed Corotated");
+            if (auto* material = ipc_tet->source_material_if<rtr::system::physics::ipc::FixedCorotatedMaterial>();
+                material != nullptr) {
+                ImGui::SeparatorText("Material");
+                ImGui::Text("Type: Fixed Corotated");
 
-                        float density = static_cast<float>(material.mass_density);
-                        if (ImGui::DragFloat("Density", &density, 1.0f, 0.001f, 100000.0f, "%.3f")) {
-                            material.mass_density = std::max(0.001, static_cast<double>(density));
-                            material_changed = true;
-                        }
+                float density = static_cast<float>(material->mass_density);
+                if (ImGui::DragFloat("Density", &density, 1.0f, 0.001f, 100000.0f, "%.3f")) {
+                    material->mass_density = std::max(0.001, static_cast<double>(density));
+                    material_changed = true;
+                }
 
-                        float youngs_modulus = static_cast<float>(material.youngs_modulus);
-                        if (ImGui::DragFloat("Young's Modulus",
-                                             &youngs_modulus,
-                                             100.0f,
-                                             1.0f,
-                                             1.0e8f,
-                                             "%.3f",
-                                             ImGuiSliderFlags_Logarithmic)) {
-                            material.youngs_modulus = std::max(1.0, static_cast<double>(youngs_modulus));
-                            material_changed = true;
-                        }
+                float youngs_modulus = static_cast<float>(material->youngs_modulus);
+                if (ImGui::DragFloat("Young's Modulus",
+                                     &youngs_modulus,
+                                     100.0f,
+                                     1.0f,
+                                     1.0e8f,
+                                     "%.3f",
+                                     ImGuiSliderFlags_Logarithmic)) {
+                    material->youngs_modulus = std::max(1.0, static_cast<double>(youngs_modulus));
+                    material_changed = true;
+                }
 
-                        float poisson_ratio = static_cast<float>(material.poisson_ratio);
-                        if (ImGui::DragFloat("Poisson Ratio", &poisson_ratio, 0.001f, -0.999f, 0.499f, "%.4f")) {
-                            poisson_ratio = pbpt::math::clamp(poisson_ratio, -0.999f, 0.499f);
-                            material.poisson_ratio = static_cast<double>(poisson_ratio);
-                            material_changed = true;
-                        }
-                    } else {
-                        ImGui::TextDisabled("Unsupported IPC material for inspector editing.");
-                    }
-                },
-                body.material
-            );
+                float poisson_ratio = static_cast<float>(material->poisson_ratio);
+                if (ImGui::DragFloat("Poisson Ratio", &poisson_ratio, 0.001f, -0.999f, 0.499f, "%.4f")) {
+                    poisson_ratio = pbpt::math::clamp(poisson_ratio, -0.999f, 0.499f);
+                    material->poisson_ratio = static_cast<double>(poisson_ratio);
+                    material_changed = true;
+                }
+            } else {
+                ImGui::TextDisabled("Unsupported IPC material for inspector editing.");
+            }
 
             if (material_changed) {
-                ipc_system.refresh_tet_body_runtime_data(ipc_tet->body_index());
-                logger()->debug("IPC tet material updated via inspector (game_object_id={}, body_index={}).",
-                                game_object.id(), ipc_tet->body_index());
+                (void)ipc_tet->apply_source_material_to_runtime();
+                logger()->debug("IPC tet material updated via inspector (game_object_id={}, body_id={}).",
+                                game_object.id(), ipc_tet->body_id());
             }
         }
     }

@@ -4,7 +4,6 @@
 #include "rtr/framework/core/world.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/input/input_system.hpp"
-#include "rtr/system/physics/physics_system.hpp"
 #include "rtr/system/render/renderer.hpp"
 #include "rtr/utils/log.hpp"
 
@@ -14,15 +13,14 @@ class EditorContext {
 private:
     static std::shared_ptr<spdlog::logger> logger() { return utils::get_logger("editor.context"); }
 
-    framework::core::World&       m_world;
-    resource::ResourceManager&    m_resources;
-    system::render::Renderer&     m_renderer;
-    system::input::InputSystem&   m_input;
-    system::physics::PhysicsSystem* m_physics_system{nullptr};
-    EditorFrameData               m_frame_data{};
-    EditorSelection               m_selection{};
-    EditorGizmoState              m_gizmo_state{};
-    EditorServices                m_services{};
+    framework::core::World&     m_world;
+    resource::ResourceManager&  m_resources;
+    system::render::Renderer&   m_renderer;
+    system::input::InputSystem& m_input;
+    EditorFrameData             m_frame_data{};
+    EditorSelection             m_selection{};
+    EditorGizmoState            m_gizmo_state{};
+    EditorServices              m_services{};
 
 public:
     framework::core::World& world() { return m_world; }
@@ -41,24 +39,9 @@ public:
 
     const system::input::InputSystem& input() const { return m_input; }
 
-    system::physics::PhysicsSystem* physics_system() { return m_physics_system; }
-
-    const system::physics::PhysicsSystem* physics_system() const { return m_physics_system; }
-
     EditorContext(framework::core::World& world, resource::ResourceManager& resources,
                   system::render::Renderer& renderer, system::input::InputSystem& input)
         : m_world(world), m_resources(resources), m_renderer(renderer), m_input(input) {}
-
-    EditorContext(framework::core::World& world,
-                  resource::ResourceManager& resources,
-                  system::render::Renderer& renderer,
-                  system::input::InputSystem& input,
-                  system::physics::PhysicsSystem& physics_system)
-        : m_world(world),
-          m_resources(resources),
-          m_renderer(renderer),
-          m_input(input),
-          m_physics_system(&physics_system) {}
 
     void set_frame_data(const EditorFrameData& frame_data) { m_frame_data = frame_data; }
 

@@ -62,7 +62,7 @@ void sync_camera_aspect(rtr::app::RuntimeContext& ctx) {
 
 void reset_dynamic_body(rtr::framework::core::GameObject& game_object,
                         rtr::framework::component::RigidBody& rigid_body,
-                        rtr::system::physics::RigidBodyWorld& physics_world,
+                        rtr::system::physics::rb::RigidBodySystem& physics_world,
                         const pbpt::math::Vec3& position,
                         const pbpt::math::Quat& orientation,
                         const pbpt::math::Vec3& linear_velocity,
@@ -150,12 +150,12 @@ int main() {
             go.node().set_local_rotation(rotation);
             go.node().set_local_scale(scale);
             (void)go.add_component<rtr::framework::component::StaticMeshComponent>(runtime.resource_manager(), quad_mesh, color);
-            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
-            rigid_body.set_type(rtr::system::physics::RigidBodyType::Static);
+            auto& rigid_body = go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system());
+            rigid_body.set_type(rtr::system::physics::rb::RigidBodyType::Static);
             rigid_body.set_restitution(restitution);
             rigid_body.set_friction(friction);
             (void)go.add_component<rtr::framework::component::PlaneCollider>(
-                runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
+                runtime.physics_system().rigid_body_system(), pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
         };
 
         (void)add_plane("ramp_plane",
@@ -178,11 +178,11 @@ int main() {
         sphere_go.node().set_local_scale({0.48f, 0.48f, 0.48f});
         (void)sphere_go.add_component<rtr::framework::component::StaticMeshComponent>(
             runtime.resource_manager(), sphere_mesh, pbpt::math::Vec4{0.95f, 0.66f, 0.26f, 1.0f});
-        auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
+        auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system());
         sphere_body.set_restitution(0.8f);
         sphere_body.set_friction(0.86f);
         sphere_body.set_inverse_inertia_tensor_ref(diagonal_inverse_inertia(1.0f, 1.0f, 1.0f));
-        (void)sphere_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_world(), 1.0f);
+        (void)sphere_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_system(), 1.0f);
 
         struct StackBoxEntry {
             rtr::framework::core::GameObject*            game_object{nullptr};
@@ -206,7 +206,7 @@ int main() {
                 runtime.resource_manager(), cube_mesh, stack_colors[index]);
 
             auto& box_body =
-                box_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world(), 1.0f);
+                box_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_system(), 1.0f);
             box_body.set_mass(1.0f);
             box_body.set_restitution(0.02f);
             box_body.set_friction(0.18f);
@@ -215,7 +215,7 @@ int main() {
             box_body.set_inverse_inertia_tensor_ref(
                 diagonal_inverse_inertia(kCubeInverseInertia, kCubeInverseInertia, kCubeInverseInertia));
             (void)box_go.add_component<rtr::framework::component::BoxCollider>(
-                runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{0.5f, 0.5f, 0.5f});
+                runtime.physics_system().rigid_body_system(), pbpt::math::Vec3{0.5f, 0.5f, 0.5f});
 
             stack_boxes.push_back(StackBoxEntry{.game_object = &box_go, .rigid_body = &box_body});
         }
@@ -223,7 +223,7 @@ int main() {
         auto reset_demo = [&]() {
             reset_dynamic_body(sphere_go,
                                sphere_body,
-                               runtime.physics_system().rigid_body_world(),
+                               runtime.physics_system().rigid_body_system(),
                                pbpt::math::Vec3{-4.0f, 1.9f, 0.75f},
                                pbpt::math::Quat::identity(),
                                pbpt::math::Vec3{2.9f, -0.2f, -0.1f});
@@ -253,7 +253,7 @@ int main() {
 
                 reset_dynamic_body(*stack_boxes[index].game_object,
                                    *stack_boxes[index].rigid_body,
-                                   runtime.physics_system().rigid_body_world(),
+                                   runtime.physics_system().rigid_body_system(),
                                    position,
                                    orientation,
                                    pbpt::math::Vec3{0.0f},

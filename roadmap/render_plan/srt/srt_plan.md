@@ -34,6 +34,13 @@ SDFGI + ReSTIR 是**无硬件 RT 依赖**的最佳组合：
 - ReSTIR 解决多光源直接光照
 - 全部 compute shader 实现，跨平台
 
+## 前置依赖
+
+- **材质系统** Phase A-D 必须在 SRT Phase 0 之前完成（详见 `material_plan`）
+- **Render Graph** 必须在 SRT Phase 0 之前完成（详见 `render_graph_plan`）
+  - SRT 所有 pass 在 render graph 上声明，barrier 自动管理
+  - Transient 资源（G-Buffer / HDR color 等）由 graph 自动创建
+
 ## 总体策略
 
 ```
@@ -44,7 +51,7 @@ Phase 3: ReSTIR DI        (~4 天)  — reservoir 采样，时空复用，面光
 Phase 4: 降噪与集成       (~2 天)  — denoiser，TAA，tone mapping
 ```
 
-总计约 16 个工作日。
+总计约 16 个工作日（不含前置依赖）。
 
 ## 不做什么
 

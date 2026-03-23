@@ -22,38 +22,32 @@ system::physics::ipc::TetBody make_block(const Eigen::Vector3d& origin) {
 }  // namespace
 
 TEST(IPCSceneSyncTest, SyncWritesBackMeshForBodyWithGlobalOffset) {
+    system::physics::ipc::IPCSystem ipc_system{};
     resource::ResourceManager resources{};
     core::Scene scene(1);
-    system::physics::ipc::IPCSystem ipc_system{};
 
     auto body0 = make_block(Eigen::Vector3d(-1.0, 1.0, 0.0));
     auto body1 = make_block(Eigen::Vector3d(1.0, 1.5, 0.0));
-
-    const auto surface1 = system::physics::ipc::extract_tet_surface(body1);
-    const auto initial_mesh1 = system::physics::ipc::tet_to_mesh(body1.geometry, surface1);
-    const auto mesh_handle = resources.create<resource::DeformableMeshResourceKind>(initial_mesh1);
+    const auto body0_id = ipc_system.create_tet_body(std::move(body0));
+    ASSERT_TRUE(ipc_system.has_tet_body(body0_id));
 
     auto& go = scene.create_game_object("ipc_body");
+    auto& ipc_tet = go.add_component<framework::component::IPCTetComponent>(ipc_system, std::move(body1));
+    const auto mesh_handle = resources.create<resource::DeformableMeshResourceKind>(ipc_tet.mesh_cache());
     (void)go.add_component<framework::component::DeformableMeshComponent>(
         resources, mesh_handle, pbpt::math::Vec4{1.0f, 1.0f, 1.0f, 1.0f}
     );
-
-    ipc_system.add_tet_body(std::move(body0));
-    ipc_system.add_tet_body(std::move(body1));
-    (void)go.add_component<framework::component::IPCTetComponent>(1u, surface1, initial_mesh1);
-
-    ipc_system.initialize();
     ipc_system.step();
 
     sync_ipc_to_scene(scene, ipc_system);
 
     const auto& cpu_mesh = resources.cpu<resource::DeformableMeshResourceKind>(mesh_handle);
-    const auto& body = ipc_system.tet_body(1u);
+    const auto& body = ipc_system.get_tet_body(ipc_tet.body_id());
     const std::size_t base_vertex = body.info.dof_offset / 3u;
 
-    ASSERT_EQ(cpu_mesh.vertices.size(), surface1.surface_vertex_ids.size());
-    for (std::size_t i = 0; i < surface1.surface_vertex_ids.size(); ++i) {
-        const auto expected = ipc_system.state().position(base_vertex + surface1.surface_vertex_ids[i]);
+    ASSERT_EQ(cpu_mesh.vertices.size(), ipc_tet.surface_cache().surface_vertex_ids.size());
+    for (std::size_t i = 0; i < ipc_tet.surface_cache().surface_vertex_ids.size(); ++i) {
+        const auto expected = ipc_system.state().position(base_vertex + ipc_tet.surface_cache().surface_vertex_ids[i]);
         EXPECT_NEAR(cpu_mesh.vertices[i].position.x(), static_cast<float>(expected.x()), 1e-5f);
         EXPECT_NEAR(cpu_mesh.vertices[i].position.y(), static_cast<float>(expected.y()), 1e-5f);
         EXPECT_NEAR(cpu_mesh.vertices[i].position.z(), static_cast<float>(expected.z()), 1e-5f);
@@ -61,43 +55,33 @@ TEST(IPCSceneSyncTest, SyncWritesBackMeshForBodyWithGlobalOffset) {
 }
 
 TEST(IPCSceneSyncTest, MissingDeformableComponentIsSkipped) {
-    core::Scene scene(1);
     system::physics::ipc::IPCSystem ipc_system{};
+    core::Scene scene(1);
 
     auto body = make_block(Eigen::Vector3d(0.0, 1.0, 0.0));
-    const auto surface = system::physics::ipc::extract_tet_surface(body);
-    const auto mesh_cache = system::physics::ipc::tet_to_mesh(body.geometry, surface);
-
     auto& go = scene.create_game_object("ipc_body");
-    ipc_system.add_tet_body(std::move(body));
-    (void)go.add_component<framework::component::IPCTetComponent>(0u, surface, mesh_cache);
+    (void)go.add_component<framework::component::IPCTetComponent>(ipc_system, std::move(body));
 
-    ipc_system.initialize();
     ipc_system.step();
 
     EXPECT_NO_THROW(sync_ipc_to_scene(scene, ipc_system));
 }
 
-TEST(IPCSceneSyncTest, InvalidBodyIndexThrows) {
+TEST(IPCSceneSyncTest, UnregisteredComponentIsSkipped) {
+    system::physics::ipc::IPCSystem ipc_system{};
     resource::ResourceManager resources{};
     core::Scene scene(1);
-    system::physics::ipc::IPCSystem ipc_system{};
 
     auto body = make_block(Eigen::Vector3d(0.0, 1.0, 0.0));
-    const auto surface = system::physics::ipc::extract_tet_surface(body);
-    const auto mesh_cache = system::physics::ipc::tet_to_mesh(body.geometry, surface);
-    const auto mesh_handle = resources.create<resource::DeformableMeshResourceKind>(mesh_cache);
-
     auto& go = scene.create_game_object("ipc_body");
+    auto& ipc_tet = go.add_component<framework::component::IPCTetComponent>(ipc_system, std::move(body));
+    const auto mesh_handle = resources.create<resource::DeformableMeshResourceKind>(ipc_tet.mesh_cache());
     (void)go.add_component<framework::component::DeformableMeshComponent>(
         resources, mesh_handle, pbpt::math::Vec4{1.0f, 1.0f, 1.0f, 1.0f}
     );
-    ipc_system.add_tet_body(std::move(body));
-    (void)go.add_component<framework::component::IPCTetComponent>(1u, surface, mesh_cache);
+    go.set_component_enabled<framework::component::IPCTetComponent>(false);
 
-    ipc_system.initialize();
-
-    EXPECT_THROW(sync_ipc_to_scene(scene, ipc_system), std::out_of_range);
+    EXPECT_NO_THROW(sync_ipc_to_scene(scene, ipc_system));
 }
 
 }  // namespace rtr::framework::integration::physics::test

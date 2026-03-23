@@ -4,12 +4,12 @@
 #include "rtr/system/physics/rigid_body/collision/contact.hpp"
 #include "rtr/system/physics/rigid_body/collision/plane_common.hpp"
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 template <>
 struct ContactPairTrait<WorldMesh, WorldPlane> {
     static ContactResult generate(const WorldMesh& mesh, const WorldPlane& plane) {
-        return detail::average_penetrating_points_against_plane(mesh.vertices, plane);
+        return detail::plane_common::average_penetrating_points_against_plane(mesh.vertices, plane);
     }
 };
 
@@ -22,4 +22,4 @@ struct ContactPairTrait<WorldPlane, WorldMesh> {
     }
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

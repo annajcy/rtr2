@@ -90,11 +90,11 @@
 
 ### 物理系统（`src/rtr/system/physics`）
 
-负责当前运行时中的刚体与布料模拟。
+负责当前运行时中的刚体与 IPC 形变模拟。
 
-- **PhysicsSystem：** 同时持有 `RigidBodyWorld` 与 `ClothWorld`。
-- **Fixed Tick 集成：** 框架层通过 `step_scene_physics(...)` 把 scene graph、刚体世界和 cloth 世界连接起来。
-- **文档入口：** 详见 `docs/documentation/system/physics/` 下的总览、运行时集成、Cloth Simulation 与 Rigid Body Dynamics。
+- **PhysicsSystem：** 同时持有 `rb::RigidBodySystem` 与 `ipc::IPCSystem`。
+- **Fixed Tick 集成：** 框架层通过 `step_scene_physics(...)` 把 scene graph、`rb::RigidBodySystem` 和 IPC 运行时连接起来。
+- **文档入口：** 详见 `docs/documentation/system/physics/` 下的总览、运行时集成、IPC bridge/example 与 Rigid Body Dynamics。
 
 ## RHI（`src/rtr/rhi`）
 

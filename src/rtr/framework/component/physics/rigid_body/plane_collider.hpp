@@ -40,7 +40,7 @@ private:
     }
 
 public:
-    explicit PlaneCollider(core::GameObject& owner, system::physics::RigidBodyWorld& world,
+    explicit PlaneCollider(core::GameObject& owner, system::physics::rb::RigidBodySystem& world,
                            const pbpt::math::Vec3& normal_local = pbpt::math::Vec3{0.0f, 1.0f, 0.0f},
                            const pbpt::math::Vec3& local_position = pbpt::math::Vec3{0.0f},
                            const pbpt::math::Quat& local_rotation = pbpt::math::Quat::identity())
@@ -54,8 +54,8 @@ public:
     void on_enable() override {
         auto& rigid_body = owner_rigid_body_or_throw();
         if (!has_registered_collider()) {
-            system::physics::Collider collider;
-            collider.shape                    = system::physics::PlaneShape{.normal_local = m_normal_local};
+            system::physics::rb::Collider collider;
+            collider.shape                    = system::physics::rb::PlaneShape{.normal_local = m_normal_local};
             collider.local_transform.position = m_local_position;
             collider.local_transform.rotation = m_local_rotation;
             collider.local_transform.scale    = pbpt::math::Vec3{1.0f};
@@ -69,7 +69,7 @@ public:
             return;
         }
         (void)m_physics_world.remove_collider(m_collider_id);
-        m_collider_id = system::physics::kInvalidColliderId;
+        m_collider_id = system::physics::rb::kInvalidColliderId;
         m_registered = false;
     }
 

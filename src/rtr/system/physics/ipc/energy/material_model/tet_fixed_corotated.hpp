@@ -13,7 +13,7 @@
 
 namespace rtr::system::physics::ipc {
 
-namespace fixed_corotated_detail {
+namespace detail::fixed_corotated {
 
 struct LameParameters {
     double mu{0.0};
@@ -123,7 +123,7 @@ inline Eigen::Matrix3d differential_cofactor_matrix(const Eigen::Matrix3d& F, co
     return differential;
 }
 
-}  // namespace fixed_corotated_detail
+}  // namespace detail::fixed_corotated
 
 struct FixedCorotatedMaterial {
     double mass_density{1000.0};
@@ -133,7 +133,7 @@ struct FixedCorotatedMaterial {
     double density() const { return mass_density; }
 
     double compute_energy(const Eigen::Matrix3d& F, double rest_volume) const {
-        fixed_corotated_detail::validate_material_inputs(
+        detail::fixed_corotated::validate_material_inputs(
             F,
             rest_volume,
             youngs_modulus,
@@ -141,9 +141,9 @@ struct FixedCorotatedMaterial {
             mass_density
         );
 
-        const auto lame = fixed_corotated_detail::compute_lame_parameters(youngs_modulus, poisson_ratio);
-        const fixed_corotated_detail::RotationData rotation_data =
-            fixed_corotated_detail::compute_rotation_data(F);
+        const auto lame = detail::fixed_corotated::compute_lame_parameters(youngs_modulus, poisson_ratio);
+        const detail::fixed_corotated::RotationData rotation_data =
+            detail::fixed_corotated::compute_rotation_data(F);
         const double J = F.determinant();
         const double density =
             lame.mu * (F - rotation_data.R).squaredNorm() + 0.5 * lame.lambda * std::pow(J - 1.0, 2.0);
@@ -151,7 +151,7 @@ struct FixedCorotatedMaterial {
     }
 
     Eigen::Matrix3d compute_pk1(const Eigen::Matrix3d& F, double rest_volume) const {
-        fixed_corotated_detail::validate_material_inputs(
+        detail::fixed_corotated::validate_material_inputs(
             F,
             rest_volume,
             youngs_modulus,
@@ -159,16 +159,16 @@ struct FixedCorotatedMaterial {
             mass_density
         );
 
-        const auto lame = fixed_corotated_detail::compute_lame_parameters(youngs_modulus, poisson_ratio);
-        const fixed_corotated_detail::RotationData rotation_data =
-            fixed_corotated_detail::compute_rotation_data(F);
+        const auto lame = detail::fixed_corotated::compute_lame_parameters(youngs_modulus, poisson_ratio);
+        const detail::fixed_corotated::RotationData rotation_data =
+            detail::fixed_corotated::compute_rotation_data(F);
         const double J = F.determinant();
-        const Eigen::Matrix3d cofactor = fixed_corotated_detail::compute_cofactor_matrix(F);
+        const Eigen::Matrix3d cofactor = detail::fixed_corotated::compute_cofactor_matrix(F);
         return 2.0 * lame.mu * (F - rotation_data.R) + lame.lambda * (J - 1.0) * cofactor;
     }
 
     Eigen::Matrix<double, 9, 9> compute_hessian(const Eigen::Matrix3d& F, double rest_volume) const {
-        fixed_corotated_detail::validate_material_inputs(
+        detail::fixed_corotated::validate_material_inputs(
             F,
             rest_volume,
             youngs_modulus,
@@ -176,11 +176,11 @@ struct FixedCorotatedMaterial {
             mass_density
         );
 
-        const auto lame = fixed_corotated_detail::compute_lame_parameters(youngs_modulus, poisson_ratio);
-        const fixed_corotated_detail::RotationData rotation_data =
-            fixed_corotated_detail::compute_rotation_data(F);
+        const auto lame = detail::fixed_corotated::compute_lame_parameters(youngs_modulus, poisson_ratio);
+        const detail::fixed_corotated::RotationData rotation_data =
+            detail::fixed_corotated::compute_rotation_data(F);
         const double J = F.determinant();
-        const Eigen::Matrix3d cofactor = fixed_corotated_detail::compute_cofactor_matrix(F);
+        const Eigen::Matrix3d cofactor = detail::fixed_corotated::compute_cofactor_matrix(F);
 
         Eigen::Matrix<double, 9, 9> hessian = Eigen::Matrix<double, 9, 9>::Zero();
 
@@ -188,13 +188,13 @@ struct FixedCorotatedMaterial {
             Eigen::Matrix3d dF = Eigen::Matrix3d::Zero();
             Eigen::Map<Eigen::Matrix<double, 9, 1>>(dF.data())[j] = 1.0;
 
-            const Eigen::Matrix3d dR = fixed_corotated_detail::differential_rotation(dF, rotation_data);
-            const Eigen::Matrix3d dCof = fixed_corotated_detail::differential_cofactor_matrix(F, dF);
+            const Eigen::Matrix3d dR = detail::fixed_corotated::differential_rotation(dF, rotation_data);
+            const Eigen::Matrix3d dCof = detail::fixed_corotated::differential_cofactor_matrix(F, dF);
             const double dJ = cofactor.cwiseProduct(dF).sum();
             const Eigen::Matrix3d dP = 2.0 * lame.mu * (dF - dR) +
                                        lame.lambda * (dJ * cofactor + (J - 1.0) * dCof);
 
-            hessian.col(j) = fixed_corotated_detail::flatten_matrix(dP);
+            hessian.col(j) = detail::fixed_corotated::flatten_matrix(dP);
         }
 
         return hessian;

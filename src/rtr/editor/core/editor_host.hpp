@@ -208,8 +208,7 @@ public:
               runtime.world(),
               runtime.resource_manager(),
               runtime.renderer(),
-              runtime.input_system(),
-              runtime.physics_system()
+              runtime.input_system()
           ) {}
 
     void reset_layout() {

@@ -26,37 +26,38 @@
 
 它保存：
 
-- `body_index`：这个对象对应 `IPCSystem` 中的哪个 body；
+- `IPCSystem&`：这个组件要注册进哪个 runtime world；
+- `body_id`：当前已注册 runtime body 的稳定句柄；
+- `source_body`：用于重新注册的 authoring/source `TetBody`；
 - `surface_cache`：一次性 boundary extraction 得到的 `TetSurfaceResult`；
 - `mesh_cache`：可以每帧原地更新的 `ObjMeshData`。
 
 ### 它不负责什么
 
-`IPCTetComponent` **不负责**自己生成初始 render mesh。
+`IPCTetComponent` 不拥有 render resource，但它拥有 tet 侧 source data 以及由它导出的 surface cache。
 
-初始 render mesh 的来源仍然是：
+构造阶段会先导出：
 
 ```text
-TetBody
+source TetBody
   -> extract_tet_surface(body)
   -> tet_to_mesh(body.geometry, surface)
-  -> initial ObjMeshData
+  -> mesh_cache
 ```
 
-只有在这份初始 mesh 已经存在之后，才会继续做：
+然后再用这份缓存出来的初始 mesh 创建渲染资源：
 
 ```text
-initial ObjMeshData
+IPCTetComponent.mesh_cache
   -> create DeformableMesh resource
   -> add DeformableMeshComponent
-  -> add IPCTetComponent(body_index, surface, mesh_cache)
 ```
 
 这个职责拆分很重要：
 
-- `TetBody` 提供体网格源数据；
+- `IPCTetComponent` 管 source tet 数据和注册生命周期；
 - `DeformableMeshComponent` 管理渲染侧 mesh handle；
-- `IPCTetComponent` 只保存桥接元数据和缓存。
+- `sync_ipc_to_scene(...)` 负责把 runtime 形变写回这个 mesh。
 
 ## 注册流程
 
@@ -65,16 +66,13 @@ initial ObjMeshData
 ```text
 1. 构造 TetBody
 2. 设置 fixed vertices / material
-3. extract_tet_surface(body)
-4. tet_to_mesh(body.geometry, surface)
-5. 用初始 mesh 创建 DeformableMesh resource
-6. 给 GameObject 挂 DeformableMeshComponent
-7. 把 TetBody 注册进 IPCSystem
-8. 挂 IPCTetComponent(body_index, surface, mesh_cache)
-9. 调 ipc_system.initialize()
+3. 挂 IPCTetComponent(ipc_system, std::move(source_body))
+4. 让 IPCTetComponent::on_enable() 调 create_tet_body(...)
+5. 用 ipc_tet.mesh_cache() 创建 DeformableMesh resource
+6. 给同一个 GameObject 挂 DeformableMeshComponent
 ```
 
-这里 `body_index` 是这条桥上的稳定 key。它让 scene 对象后续可以通过 `ipc_system.tet_body(body_index).info.dof_offset` 找回该 body 在全局状态向量中的起始顶点偏移。
+现在不需要外部手工 `add_tet_body(...)` 或 `initialize()`。只要注册发生变化，`IPCSystem` 会在下一次 `step()` 前自动重建全局状态。
 
 ## `sync_ipc_to_scene(...)`
 
@@ -84,13 +82,14 @@ initial ObjMeshData
 
 1. 找到 `IPCTetComponent`
 2. 找到同一个对象上的 `DeformableMeshComponent`
-3. 在 `IPCSystem` 里找到对应的 tet body
-4. 从 `body.info.dof_offset / 3` 恢复全局顶点偏移
-5. 用全局 DOF 向量原地更新 `mesh_cache`
-6. 提取 positions 和 normals
-7. 调 `apply_deformed_surface(...)`
+3. 如果当前没有注册 runtime body，就跳过
+4. 用 `IPCBodyID` 在 `IPCSystem` 里找到对应 tet body
+5. 从 `body.info.dof_offset / 3` 恢复全局顶点偏移
+6. 用全局 DOF 向量原地更新 `mesh_cache`
+7. 提取 positions 和 normals
+8. 调 `apply_deformed_surface(...)`
 
-## 为什么 `body_index` 不能省略
+## 为什么同时需要 `IPCBodyID` 和 `dof_offset`
 
 `TetSurfaceResult.surface_vertex_ids` 保存的是 **body-local** 顶点编号。  
 而 `IPCState::x` 是所有 body 连接起来的 **global** `3N` 向量。
@@ -101,18 +100,18 @@ $$
 \text{global vertex id} = \text{body vertex offset} + \text{local surface vertex id}
 $$
 
-这也是为什么当前 `tet_mesh_convert.hpp` 的写回接口支持 `vertex_offset` 参数。
+`IPCBodyID` 回答的是“这是哪个 runtime body”，而 `dof_offset` 回答的是“这个 body 在当前全局状态向量里从哪里开始”。
 
-如果没有这个 offset，第二个、第三个 body 在回写时就会错误地从全局状态向量的 body 0 区间读取位置。
+这也是为什么 `tet_mesh_convert.hpp` 的写回接口支持 `vertex_offset` 参数。
 
 ## `scene_physics_step(...)` 中的位置
 
 framework 层当前的 fixed-step 顺序已经变成：
 
 ```cpp
-sync_scene_to_rigid_body(scene, physics_system.rigid_body_world());
+sync_scene_to_rigid_body(scene, physics_system.rigid_body_system());
 physics_system.step(dt);
-sync_rigid_body_to_scene(scene, physics_system.rigid_body_world());
+sync_rigid_body_to_scene(scene, physics_system.rigid_body_system());
 
 physics_system.ipc_system().step();
 sync_ipc_to_scene(scene, physics_system.ipc_system());
@@ -129,7 +128,7 @@ IPC 路径则稍微不同：
 
 这层 bridge 刻意保持很薄：
 
-- 默认假设 `TetBody` 在初始化后静态注册；
+- 注册生命周期现在由 component 驱动，但仍然默认 tet 拓扑不会每帧修改；
 - 不支持每帧把 scene transform 反向写回 deformable 节点；
 - 还没有接 contact object 或 obstacle body；
 - 约定 `IPCTetComponent` 和 `DeformableMeshComponent` 出现在同一个 `GameObject` 上。
