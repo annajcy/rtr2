@@ -80,7 +80,8 @@ nav:
                       - IPC Body: documentation/system/physics/ipc/model/ipc_body.md
                       - Obstacle Body: documentation/system/physics/ipc/model/obstacle_body.md
                       - Tet Body: documentation/system/physics/ipc/model/tet_body.md
-                      - Tet Mesh Convert: documentation/system/physics/ipc/model/tet_mesh_convert.md
+                      - Mesh To Tet: documentation/system/physics/ipc/model/mesh_to_tet.md
+                      - Tet To Mesh: documentation/system/physics/ipc/model/tet_to_mesh.md
                   - Solver:
                       - Overview: documentation/system/physics/ipc/solver/overview.md
                       - Line Search: documentation/system/physics/ipc/solver/line_search.md

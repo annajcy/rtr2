@@ -27,7 +27,7 @@ That means the runtime needs a bridge layer that:
 It stores:
 
 - `source_body`: the authoring/source `TetBody` used for re-registration;
-- `surface_cache`: the cached `TetSurfaceResult` from one-time boundary extraction;
+- `surface_cache`: the cached `TetSurfaceMapping` from one-time boundary extraction;
 - `mesh_cache`: a reusable `ObjMeshData` that can be updated in place every frame.
 - dirty/lifecycle flags that tell the scene-sync layer what needs to be pushed into runtime.
 
@@ -39,8 +39,8 @@ Its constructor derives:
 
 ```text
 source TetBody
-  -> extract_tet_surface(body)
-  -> tet_to_mesh(body.geometry, surface)
+  -> build_tet_surface_mapping(body)
+  -> tet_rest_to_surface_mesh(body.geometry, surface)
   -> mesh_cache
 ```
 
@@ -91,7 +91,7 @@ For each active object:
 
 ## Why owner lookup and `dof_offset` both matter
 
-`TetSurfaceResult.surface_vertex_ids` are **body-local** vertex ids.  
+`TetSurfaceMapping.surface_vertex_ids` are **body-local** vertex ids.  
 `IPCState::x`, on the other hand, is a **global** concatenated `3N` vector across all bodies.
 
 So the bridge must map:
@@ -102,7 +102,7 @@ $$
 
 The scene bridge first resolves "which runtime body belongs to this `GameObject`?" through `IPCSystem`'s owner mapping, and then uses `dof_offset` to answer "where does that body's vertex block begin in the current global state vector?".
 
-This is why the `tet_mesh_convert.hpp` write-back helpers accept a `vertex_offset` parameter for runtime use.
+This is why `tet_to_mesh.hpp` write-back helpers accept a `vertex_offset` parameter for runtime use.
 
 ## `scene_physics_step(...)` Order
 

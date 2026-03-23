@@ -86,8 +86,14 @@ rtr_add_test(
     Eigen3::Eigen
 )
 rtr_add_test(
-    test_tet_mesh_convert
-    system/physics/ipc/tet_mesh_convert_test.cpp
+    test_tet_to_mesh
+    system/physics/ipc/tet_to_mesh_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_mesh_to_tet
+    system/physics/ipc/mesh_to_tet_test.cpp
+    rtr::runtime
     Eigen3::Eigen
 )
 rtr_add_test(

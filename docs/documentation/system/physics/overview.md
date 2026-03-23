@@ -44,7 +44,8 @@ Detailed IPC documentation now lives in the mirrored subtree under [`documentati
 - [`ipc/core/ipc_state.md`](ipc/core/ipc_state.md): global `3N` state layout and equations
 - [`ipc/model/ipc_body.md`](ipc/model/ipc_body.md): body categories and global-DOF mapping metadata
 - [`ipc/model/tet_body.md`](ipc/model/tet_body.md): `TetGeometry`, `TetBody`, rest-shape precompute, and block generators
-- [`ipc/model/tet_mesh_convert.md`](ipc/model/tet_mesh_convert.md): tet-surface extraction and tet-to-render-mesh write-back
+- [`ipc/model/mesh_to_tet.md`](ipc/model/mesh_to_tet.md): `ObjMeshData` to `TetGeometry` / `TetBody`
+- [`ipc/model/tet_to_mesh.md`](ipc/model/tet_to_mesh.md): tet-surface extraction and tet-to-render-mesh write-back
 - [`ipc/model/obstacle_body.md`](ipc/model/obstacle_body.md): current obstacle placeholder semantics
 
 That subtree follows the source layout: each `ipc/*.hpp` has its own page, and each directory has its own `overview.md`.

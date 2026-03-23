@@ -82,7 +82,7 @@ The example uses a small local helper that wraps the setup boilerplate:
 
 ```text
 TetBody
-  -> TetSurfaceResult
+  -> TetSurfaceMapping
   -> initial ObjMeshData
   -> DeformableMesh resource
   -> DeformableMeshComponent

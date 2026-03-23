@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <span>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -17,14 +16,14 @@
 
 namespace rtr::system::physics::ipc {
 
-// Day 1 cache for tet-surface extraction.
-// It supports one-time surface discovery and repeated tet->mesh updates.
-struct TetSurfaceResult {
+struct TetSurfaceMapping {
     std::vector<uint32_t> surface_indices{};
     std::vector<uint32_t> surface_vertex_ids{};
 };
 
-namespace detail::tet_mesh_convert {
+namespace detail::tet_to_mesh {
+
+inline void recompute_mesh_normals(utils::ObjMeshData& mesh);
 
 struct Face {
     uint32_t v[3];
@@ -68,23 +67,37 @@ inline pbpt::math::Vec3 read_position_from_dofs(const Eigen::VectorXd& positions
     );
 }
 
-inline void validate_surface_result(const TetSurfaceResult& surface,
-                                    std::size_t vertex_count,
-                                    std::size_t vertex_offset) {
+inline void validate_surface_mapping(const TetSurfaceMapping& surface,
+                                     std::size_t vertex_count,
+                                     std::size_t vertex_offset) {
     for (const uint32_t vertex_id : surface.surface_vertex_ids) {
         if (vertex_offset + static_cast<std::size_t>(vertex_id) >= vertex_count) {
-            throw std::out_of_range("TetSurfaceResult surface vertex id out of range.");
+            throw std::out_of_range("TetSurfaceMapping surface vertex id out of range.");
         }
     }
     for (const uint32_t vertex_id : surface.surface_indices) {
         if (vertex_offset + static_cast<std::size_t>(vertex_id) >= vertex_count) {
-            throw std::out_of_range("TetSurfaceResult surface index out of range.");
+            throw std::out_of_range("TetSurfaceMapping surface index out of range.");
+        }
+    }
+}
+
+inline void validate_surface_mapping(const TetSurfaceMapping& surface, std::size_t vertex_count) {
+    for (const uint32_t vertex_id : surface.surface_vertex_ids) {
+        if (vertex_id >= vertex_count) {
+            throw std::out_of_range("TetSurfaceMapping surface vertex id out of range.");
+        }
+    }
+    for (const uint32_t vertex_id : surface.surface_indices) {
+        if (vertex_id >= vertex_count) {
+            throw std::out_of_range("TetSurfaceMapping surface index out of range.");
         }
     }
 }
 
 template <typename PositionReader>
-inline utils::ObjMeshData build_surface_mesh(const TetSurfaceResult& surface, PositionReader&& read_position) {
+inline utils::ObjMeshData build_surface_mesh_from_mapping(const TetSurfaceMapping& surface,
+                                                          PositionReader&& read_position) {
     utils::ObjMeshData mesh{};
     mesh.vertices.reserve(surface.surface_vertex_ids.size());
     mesh.indices.reserve(surface.surface_indices.size());
@@ -106,47 +119,13 @@ inline utils::ObjMeshData build_surface_mesh(const TetSurfaceResult& surface, Po
     for (const uint32_t old_index : surface.surface_indices) {
         const auto found = old_to_new.find(old_index);
         if (found == old_to_new.end()) {
-            throw std::invalid_argument("TetSurfaceResult indices reference a non-surface vertex.");
+            throw std::invalid_argument("TetSurfaceMapping indices reference a non-surface vertex.");
         }
         mesh.indices.push_back(found->second);
     }
 
-    std::vector<pbpt::math::Vec3> accum_normals(mesh.vertices.size(), pbpt::math::Vec3(0.0f));
-    for (std::size_t i = 0; i + 2u < mesh.indices.size(); i += 3u) {
-        const uint32_t i0 = mesh.indices[i + 0u];
-        const uint32_t i1 = mesh.indices[i + 1u];
-        const uint32_t i2 = mesh.indices[i + 2u];
-        const pbpt::math::Vec3& p0 = mesh.vertices[i0].position;
-        const pbpt::math::Vec3& p1 = mesh.vertices[i1].position;
-        const pbpt::math::Vec3& p2 = mesh.vertices[i2].position;
-        const pbpt::math::Vec3 face_normal = pbpt::math::normalize(pbpt::math::cross(p1 - p0, p2 - p0));
-        accum_normals[i0] += face_normal;
-        accum_normals[i1] += face_normal;
-        accum_normals[i2] += face_normal;
-    }
-
-    for (std::size_t vertex_index = 0; vertex_index < mesh.vertices.size(); ++vertex_index) {
-        if (pbpt::math::length(accum_normals[vertex_index]) > 0.0f) {
-            mesh.vertices[vertex_index].normal = pbpt::math::normalize(accum_normals[vertex_index]);
-        } else {
-            mesh.vertices[vertex_index].normal = pbpt::math::Vec3(0.0f, 1.0f, 0.0f);
-        }
-    }
-
+    recompute_mesh_normals(mesh);
     return mesh;
-}
-
-inline void validate_surface_result(const TetSurfaceResult& surface, std::size_t vertex_count) {
-    for (const uint32_t vertex_id : surface.surface_vertex_ids) {
-        if (vertex_id >= vertex_count) {
-            throw std::out_of_range("TetSurfaceResult surface vertex id out of range.");
-        }
-    }
-    for (const uint32_t vertex_id : surface.surface_indices) {
-        if (vertex_id >= vertex_count) {
-            throw std::out_of_range("TetSurfaceResult surface index out of range.");
-        }
-    }
 }
 
 inline void recompute_mesh_normals(utils::ObjMeshData& mesh) {
@@ -181,18 +160,17 @@ inline void recompute_mesh_normals(utils::ObjMeshData& mesh) {
     }
 }
 
-}  // namespace detail::tet_mesh_convert
+}  // namespace detail::tet_to_mesh
 
-// Extract the boundary triangles of a tet mesh.
-// The returned indices still reference the original tet vertex ids.
-inline TetSurfaceResult extract_tet_surface(const TetGeometry& geometry) {
-    std::unordered_map<detail::tet_mesh_convert::Face, detail::tet_mesh_convert::FaceData, detail::tet_mesh_convert::FaceHash> face_map{};
+inline TetSurfaceMapping build_tet_surface_mapping(const TetGeometry& geometry) {
+    std::unordered_map<detail::tet_to_mesh::Face, detail::tet_to_mesh::FaceData, detail::tet_to_mesh::FaceHash>
+        face_map{};
     face_map.reserve(geometry.tet_count() * 4u);
 
     auto add_face = [&](uint32_t a, uint32_t b, uint32_t c) {
         std::array<uint32_t, 3> sorted = {a, b, c};
         std::sort(sorted.begin(), sorted.end());
-        detail::tet_mesh_convert::Face face{{sorted[0], sorted[1], sorted[2]}};
+        detail::tet_to_mesh::Face face{{sorted[0], sorted[1], sorted[2]}};
 
         auto& data = face_map[face];
         data.count += 1;
@@ -212,7 +190,7 @@ inline TetSurfaceResult extract_tet_surface(const TetGeometry& geometry) {
         add_face(static_cast<uint32_t>(tet[0]), static_cast<uint32_t>(tet[2]), static_cast<uint32_t>(tet[1]));
     }
 
-    TetSurfaceResult result{};
+    TetSurfaceMapping result{};
     std::vector<bool> is_surface_vertex(geometry.vertex_count(), false);
 
     for (const auto& [_, data] : face_map) {
@@ -233,108 +211,62 @@ inline TetSurfaceResult extract_tet_surface(const TetGeometry& geometry) {
     return result;
 }
 
-inline TetSurfaceResult extract_tet_surface(const TetBody& body) {
-    return extract_tet_surface(body.geometry);
+inline TetSurfaceMapping build_tet_surface_mapping(const TetBody& body) {
+    return build_tet_surface_mapping(body.geometry);
 }
 
-// Build a renderable surface mesh from current IPC DOFs.
-// This is the main Day 1 write-back path: IPCState::x -> ObjMeshData.
-inline utils::ObjMeshData tet_to_mesh(const Eigen::VectorXd& positions,
-                                      const TetSurfaceResult& surface,
-                                      std::size_t vertex_offset = 0u) {
+inline utils::ObjMeshData tet_dofs_to_surface_mesh(const Eigen::VectorXd& positions,
+                                                   const TetSurfaceMapping& surface,
+                                                   std::size_t vertex_offset = 0u) {
     if ((positions.size() % 3) != 0) {
-        throw std::invalid_argument("tet_to_mesh positions size must be divisible by 3.");
+        throw std::invalid_argument("tet_dofs_to_surface_mesh positions size must be divisible by 3.");
     }
     const std::size_t vertex_count = static_cast<std::size_t>(positions.size() / 3);
-    detail::tet_mesh_convert::validate_surface_result(surface, vertex_count, vertex_offset);
-    return detail::tet_mesh_convert::build_surface_mesh(surface, [&](uint32_t vertex_id) {
-        return detail::tet_mesh_convert::read_position_from_dofs(
+    detail::tet_to_mesh::validate_surface_mapping(surface, vertex_count, vertex_offset);
+    return detail::tet_to_mesh::build_surface_mesh_from_mapping(surface, [&](uint32_t vertex_id) {
+        return detail::tet_to_mesh::read_position_from_dofs(
             positions,
             static_cast<uint32_t>(vertex_offset + static_cast<std::size_t>(vertex_id))
         );
     });
 }
 
-// Convenience overload for building a render mesh from the rest configuration.
-inline utils::ObjMeshData tet_to_mesh(const TetGeometry& geometry, const TetSurfaceResult& surface) {
-    detail::tet_mesh_convert::validate_surface_result(surface, geometry.vertex_count());
-    return detail::tet_mesh_convert::build_surface_mesh(surface, [&](uint32_t vertex_id) {
-        return detail::tet_mesh_convert::to_pbpt_vec3(geometry.rest_positions[vertex_id]);
+inline utils::ObjMeshData tet_rest_to_surface_mesh(const TetGeometry& geometry, const TetSurfaceMapping& surface) {
+    detail::tet_to_mesh::validate_surface_mapping(surface, geometry.vertex_count());
+    return detail::tet_to_mesh::build_surface_mesh_from_mapping(surface, [&](uint32_t vertex_id) {
+        return detail::tet_to_mesh::to_pbpt_vec3(geometry.rest_positions[vertex_id]);
     });
 }
 
-// Update an existing ObjMeshData in place using the same cached surface mapping.
-// This only updates positions and recomputes normals.
-inline void update_mesh_positions(
-    utils::ObjMeshData& mesh,
-    const Eigen::VectorXd& positions,
-    const TetSurfaceResult& surface,
-    std::size_t vertex_offset = 0u
-) {
+inline void update_surface_mesh_from_tet_dofs(utils::ObjMeshData& mesh,
+                                              const Eigen::VectorXd& positions,
+                                              const TetSurfaceMapping& surface,
+                                              std::size_t vertex_offset = 0u) {
     if (mesh.vertices.size() != surface.surface_vertex_ids.size()) {
-        throw std::invalid_argument("update_mesh_positions mesh vertex count must match surface vertex ids.");
+        throw std::invalid_argument(
+            "update_surface_mesh_from_tet_dofs mesh vertex count must match surface vertex ids."
+        );
     }
     if (mesh.indices.size() != surface.surface_indices.size()) {
-        throw std::invalid_argument("update_mesh_positions mesh index count must match surface indices.");
+        throw std::invalid_argument(
+            "update_surface_mesh_from_tet_dofs mesh index count must match surface indices."
+        );
     }
     if ((positions.size() % 3) != 0) {
-        throw std::invalid_argument("update_mesh_positions positions size must be divisible by 3.");
+        throw std::invalid_argument("update_surface_mesh_from_tet_dofs positions size must be divisible by 3.");
     }
 
     const std::size_t vertex_count = static_cast<std::size_t>(positions.size() / 3);
-    detail::tet_mesh_convert::validate_surface_result(surface, vertex_count, vertex_offset);
+    detail::tet_to_mesh::validate_surface_mapping(surface, vertex_count, vertex_offset);
 
     for (std::size_t i = 0; i < surface.surface_vertex_ids.size(); ++i) {
-        mesh.vertices[i].position =
-            detail::tet_mesh_convert::read_position_from_dofs(
-                positions,
-                static_cast<uint32_t>(vertex_offset + static_cast<std::size_t>(surface.surface_vertex_ids[i]))
-            );
-    }
-
-    detail::tet_mesh_convert::recompute_mesh_normals(mesh);
-}
-
-// Mesh->Tet helper only.
-// This does not tetrahedralize the surface mesh; it only converts positions
-// into Eigen-friendly storage for a future external tet mesher.
-inline std::vector<Eigen::Vector3d> mesh_positions_to_eigen(const utils::ObjMeshData& mesh) {
-    std::vector<Eigen::Vector3d> positions{};
-    positions.reserve(mesh.vertices.size());
-
-    for (const auto& vertex : mesh.vertices) {
-        positions.emplace_back(
-            static_cast<double>(vertex.position.x()),
-            static_cast<double>(vertex.position.y()),
-            static_cast<double>(vertex.position.z())
+        mesh.vertices[i].position = detail::tet_to_mesh::read_position_from_dofs(
+            positions,
+            static_cast<uint32_t>(vertex_offset + static_cast<std::size_t>(surface.surface_vertex_ids[i]))
         );
     }
 
-    return positions;
-}
-
-// Mesh->Tet helper only.
-// This does not create volumetric tets; it only exposes triangle connectivity
-// as a typed array for a future external tetrahedralizer.
-inline std::vector<std::array<uint32_t, 3>> mesh_triangles(const utils::ObjMeshData& mesh) {
-    if ((mesh.indices.size() % 3u) != 0u) {
-        throw std::invalid_argument("ObjMeshData indices must be triangles (size % 3 == 0).");
-    }
-
-    std::vector<std::array<uint32_t, 3>> triangles{};
-    triangles.reserve(mesh.indices.size() / 3u);
-
-    for (std::size_t i = 0; i + 2u < mesh.indices.size(); i += 3u) {
-        const uint32_t i0 = mesh.indices[i + 0u];
-        const uint32_t i1 = mesh.indices[i + 1u];
-        const uint32_t i2 = mesh.indices[i + 2u];
-        if (i0 >= mesh.vertices.size() || i1 >= mesh.vertices.size() || i2 >= mesh.vertices.size()) {
-            throw std::out_of_range("ObjMeshData indices out of range.");
-        }
-        triangles.push_back({i0, i1, i2});
-    }
-
-    return triangles;
+    detail::tet_to_mesh::recompute_mesh_normals(mesh);
 }
 
 }  // namespace rtr::system::physics::ipc

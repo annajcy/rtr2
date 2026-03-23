@@ -1,5 +1,9 @@
 # Phase 2: Collision Mesh + Broad Phase
 
+> Naming note after the converter refactor:
+> `TetSurfaceResult` -> `TetSurfaceMapping`
+> `extract_tet_surface()` -> `build_tet_surface_mapping()`
+
 ## 目标
 
 构建统一的碰撞几何表示（collision mesh），并实现最小可用的 broad phase 候选对生成。
@@ -8,7 +12,7 @@
 
 IPCSystem 内部的 DOF 是全局展平的 `Eigen::VectorXd`，但接触检测需要的是**表面三角形和边**的拓扑信息。collision mesh 是这两者之间的桥接层。
 
-Day 1 已有的 `TetSurfaceResult`（`extract_tet_surface`）提供了单个 body 的表面三角形和表面顶点映射。collision mesh 在此基础上：
+Day 1 已有的 `TetSurfaceMapping`（`build_tet_surface_mapping`）提供了单个 body 的表面三角形和表面顶点映射。collision mesh 在此基础上：
 
 1. 合并所有 body 的表面几何（tet body 表面 + obstacle body 三角形）
 2. 提取边连接关系
@@ -69,7 +73,7 @@ CollisionMesh build_collision_mesh(
 ```
 
 内部：
-1. 遍历所有 tet body：用 `extract_tet_surface()` 获取表面三角形，`surface_vertex_ids` 映射到全局
+1. 遍历所有 tet body：用 `build_tet_surface_mapping()` 获取表面三角形，`surface_vertex_ids` 映射到全局
 2. 遍历所有 obstacle body：直接取其三角面片
 3. 合并到统一的 collision mesh，记录 body 归属
 

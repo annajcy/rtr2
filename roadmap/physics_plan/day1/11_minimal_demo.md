@@ -1,5 +1,11 @@
 # 最小示例：IPC Fixed-End Block
 
+> Naming note after the converter refactor:
+> `TetSurfaceResult` -> `TetSurfaceMapping`
+> `extract_tet_surface()` -> `build_tet_surface_mapping()`
+> `tet_to_mesh()` -> `tet_rest_to_surface_mesh()` / `tet_dofs_to_surface_mesh()`
+> `update_mesh_positions()` -> `update_surface_mesh_from_tet_dofs()`
+
 ## 目标
 
 先把 IPC 的 scene 桥接生命周期补齐，再写一个最小 editor example 验证整条链路：

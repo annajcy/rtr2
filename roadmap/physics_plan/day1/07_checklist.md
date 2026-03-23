@@ -1,5 +1,7 @@
 # Day 1 Checklist
 
+> Naming note: `TetSurfaceResult` has been renamed to `TetSurfaceMapping` after the mesh/tet converter refactor.
+
 ## 执行顺序与进度追踪
 
 按顺序执行，每完成一项打勾。
@@ -69,7 +71,7 @@
 ### Phase 4b: IPCSystem 接入 PhysicsSystem
 
 - [ ] `PhysicsSystem` 新增 `ipc_system()` 访问器
-- [ ] `IPCBodyComponent` 完成（body_index + TetSurfaceResult 缓存）
+- [ ] `IPCBodyComponent` 完成（body_index + TetSurfaceMapping 缓存）
 - [ ] `ipc_scene_sync.hpp` 完成：`sync_ipc_to_scene()` 将 IPC DOF 写回 DeformableMeshComponent
 - [ ] `scene_physics_step.hpp` 新增 IPC step + sync 调用
 

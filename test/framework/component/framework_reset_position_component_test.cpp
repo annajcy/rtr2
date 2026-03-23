@@ -8,6 +8,7 @@
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
+#include "rtr/framework/integration/physics/rigid_body_scene_sync.hpp"
 #include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 namespace rtr::framework::component::test {
@@ -52,14 +53,19 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPrese
     inverse_inertia_tensor_ref[1][1] = 1.0f;
     rigid_body.set_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
 
-    auto& physics_body = physics_world.get_rigid_body(rigid_body.rigid_body_id());
-    physics_body.state().translation.linear_velocity = pbpt::math::Vec3{0.0f, -3.0f, 0.0f};
-    physics_body.state().rotation.angular_velocity   = pbpt::math::Vec3{0.0f, 2.0f, 0.0f};
-    physics_body.state().forces.accumulated_force    = pbpt::math::Vec3{1.0f, -4.0f, 0.0f};
-    physics_body.state().forces.accumulated_torque   = pbpt::math::Vec3{0.0f, 3.0f, 0.0f};
+    auto* physics_body = physics_world.try_get_rigid_body_for_owner(go.id());
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
+    physics_body = physics_world.try_get_rigid_body_for_owner(go.id());
+    ASSERT_NE(physics_body, nullptr);
+    physics_body->state().translation.linear_velocity = pbpt::math::Vec3{0.0f, -3.0f, 0.0f};
+    physics_body->state().rotation.angular_velocity   = pbpt::math::Vec3{0.0f, 2.0f, 0.0f};
+    physics_body->state().forces.accumulated_force    = pbpt::math::Vec3{1.0f, -4.0f, 0.0f};
+    physics_body->state().forces.accumulated_torque   = pbpt::math::Vec3{0.0f, 3.0f, 0.0f};
+    rigid_body.sync_runtime_state_from(*physics_body);
 
     rigid_body.set_position(pbpt::math::Vec3{0.0f, -1.5f, 0.0f});
     scene.fixed_tick(core::FixedTickContext{.fixed_delta_seconds = 0.1, .fixed_tick_index = 0});
+    integration::physics::sync_scene_to_rigid_body(scene, physics_world);
 
     const auto velocity = rigid_body.linear_velocity();
     EXPECT_NEAR(velocity.x(), 0.0f, 1e-5f);
@@ -69,12 +75,12 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPrese
     EXPECT_NEAR(angular_velocity.x(), 0.0f, 1e-5f);
     EXPECT_NEAR(angular_velocity.y(), 2.0f, 1e-5f);
     EXPECT_NEAR(angular_velocity.z(), 0.0f, 1e-5f);
-    EXPECT_NEAR(physics_body.state().forces.accumulated_force.x(), 0.0f, 1e-5f);
-    EXPECT_NEAR(physics_body.state().forces.accumulated_force.y(), 0.0f, 1e-5f);
-    EXPECT_NEAR(physics_body.state().forces.accumulated_force.z(), 0.0f, 1e-5f);
-    EXPECT_NEAR(physics_body.state().forces.accumulated_torque.x(), 0.0f, 1e-5f);
-    EXPECT_NEAR(physics_body.state().forces.accumulated_torque.y(), 3.0f, 1e-5f);
-    EXPECT_NEAR(physics_body.state().forces.accumulated_torque.z(), 0.0f, 1e-5f);
+    EXPECT_NEAR(physics_body->state().forces.accumulated_force.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(physics_body->state().forces.accumulated_force.y(), 0.0f, 1e-5f);
+    EXPECT_NEAR(physics_body->state().forces.accumulated_force.z(), 0.0f, 1e-5f);
+    EXPECT_NEAR(physics_body->state().forces.accumulated_torque.x(), 0.0f, 1e-5f);
+    EXPECT_NEAR(physics_body->state().forces.accumulated_torque.y(), 3.0f, 1e-5f);
+    EXPECT_NEAR(physics_body->state().forces.accumulated_torque.z(), 0.0f, 1e-5f);
 }
 
 TEST(FrameworkResetPositionComponentTest, UpdatedParametersAffectNextFixedTick) {

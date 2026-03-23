@@ -43,7 +43,8 @@ IPC 的详细文档已经拆到与源码镜像的 [`documentation/system/physics
 - [`ipc/core/ipc_state.md`](ipc/core/ipc_state.md)：全局 `3N` 状态布局和数学公式
 - [`ipc/model/ipc_body.md`](ipc/model/ipc_body.md)：body 类型和全局 DOF 映射元数据
 - [`ipc/model/tet_body.md`](ipc/model/tet_body.md)：`TetGeometry`、`TetBody`、rest-shape 预计算和 block 生成工具
-- [`ipc/model/tet_mesh_convert.md`](ipc/model/tet_mesh_convert.md)：tet surface 提取和 tet 到渲染网格的写回
+- [`ipc/model/mesh_to_tet.md`](ipc/model/mesh_to_tet.md)：`ObjMeshData` 到 `TetGeometry` / `TetBody`
+- [`ipc/model/tet_to_mesh.md`](ipc/model/tet_to_mesh.md)：tet surface 提取和 tet 到渲染网格的写回
 - [`ipc/model/obstacle_body.md`](ipc/model/obstacle_body.md)：当前 obstacle 占位类型的语义
 
 这棵子树严格跟随源码目录：每个 `ipc/*.hpp` 都有自己的页面，每个目录都有自己的 `overview.md`。

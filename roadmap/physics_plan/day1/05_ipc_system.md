@@ -1,5 +1,11 @@
 # Phase 4: IPCSystem 组装
 
+> Naming note after the mesh/tet converter refactor:
+> `tet_mesh_convert.hpp` -> `mesh_tet_converter/tet_to_mesh.hpp`
+> `TetSurfaceResult` -> `TetSurfaceMapping`
+> `extract_tet_surface()` -> `build_tet_surface_mapping()`
+> `update_mesh_positions()` -> `update_surface_mesh_from_tet_dofs()`
+
 ## Per-Body Material Variant
 
 ### 设计动机

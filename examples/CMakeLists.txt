@@ -35,6 +35,11 @@ if (TARGET rtr_editor)
   add_executable(ipc_fixed_end_block_editor editor/ipc_fixed_end_block_editor.cpp)
   target_link_libraries(ipc_fixed_end_block_editor PRIVATE rtr::runtime rtr::editor)
 
+  if(RTR_BUILD_FTETWILD)
+    add_executable(ipc_hanging_bunny_editor editor/ipc_hanging_bunny_editor.cpp)
+    target_link_libraries(ipc_hanging_bunny_editor PRIVATE rtr::runtime rtr::editor)
+  endif()
+
   add_executable(lab1_angry_bunny games103_lab/lab1_angry_bunny/lab1_angry_bunny.cpp)
   target_link_libraries(lab1_angry_bunny PRIVATE rtr::runtime rtr::editor)
 endif()

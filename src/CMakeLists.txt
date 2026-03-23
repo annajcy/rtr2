@@ -20,6 +20,11 @@ target_link_libraries(rtr_runtime INTERFACE
   pbpt::pbpt
 )
 
+if(RTR_BUILD_FTETWILD)
+  target_link_libraries(rtr_runtime INTERFACE $<BUILD_INTERFACE:FloatTetwild>)
+  target_compile_definitions(rtr_runtime INTERFACE $<BUILD_INTERFACE:RTR_HAS_FTETWILD=1>)
+endif()
+
 target_compile_definitions(rtr_runtime INTERFACE
   RTR_DEFAULT_SHADER_OUTPUT_DIR=\"${RTR_DEFAULT_SHADER_OUTPUT_DIR}\"
   RTR_PROJECT_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"

@@ -9,7 +9,7 @@
 #include "rtr/framework/component/physics/ipc/ipc_tet_component.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/system/physics/ipc/core/ipc_system.hpp"
-#include "rtr/system/physics/ipc/model/tet_mesh_convert.hpp"
+#include "rtr/system/physics/ipc/model/mesh_tet_converter/tet_to_mesh.hpp"
 
 namespace rtr::framework::integration::physics {
 
@@ -80,7 +80,7 @@ inline void sync_ipc_to_scene(core::Scene& scene, system::physics::ipc::IPCSyste
         }
 
         const std::size_t vertex_offset = body->info.dof_offset / 3u;
-        system::physics::ipc::update_mesh_positions(
+        system::physics::ipc::update_surface_mesh_from_tet_dofs(
             ipc_tet->mesh_cache(),
             ipc_system.state().x,
             ipc_tet->surface_cache(),

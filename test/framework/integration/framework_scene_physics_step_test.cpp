@@ -9,7 +9,7 @@
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/system/physics/physics_system.hpp"
 #include "rtr/system/physics/ipc/model/tet_body.hpp"
-#include "rtr/system/physics/ipc/model/tet_mesh_convert.hpp"
+#include "rtr/system/physics/ipc/model/mesh_tet_converter/tet_to_mesh.hpp"
 
 namespace rtr::framework::integration::physics::test {
 

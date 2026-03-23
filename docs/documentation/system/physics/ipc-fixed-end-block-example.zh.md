@@ -82,7 +82,7 @@ auto body = ipc::generate_tet_block(6, 2, 2, 0.2, Eigen::Vector3d(-0.6, 1.4, -0.
 
 ```text
 TetBody
-  -> TetSurfaceResult
+  -> TetSurfaceMapping
   -> initial ObjMeshData
   -> DeformableMesh resource
   -> DeformableMeshComponent

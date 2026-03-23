@@ -14,7 +14,8 @@
 - 全局 `3N` 状态向量 `IPCState`
 - body 到全局自由度的映射元数据 `IPCBodyInfo`
 - 四面体参考构型与预计算 `TetGeometry`、`TetBody`
-- tet 到渲染网格的写回工具 `tet_mesh_convert.hpp`
+- surface 到 tet 的 meshing 入口 `mesh_tet_converter/mesh_to_tet.hpp`
+- tet 到渲染网格的写回工具 `mesh_tet_converter/tet_to_mesh.hpp`
 
 当前还没有实现：
 
@@ -33,7 +34,7 @@ TetGeometry / TetBody
     -> 预计算参考构型数据
     -> 装配进 IPCState 全局自由度
     -> 未来的 energy / solver 管线
-    -> tet_to_mesh(...) / update_mesh_positions(...)
+    -> tet_rest_to_surface_mesh(...) / update_surface_mesh_from_tet_dofs(...)
     -> 供渲染使用的 ObjMeshData
 ```
 
@@ -43,8 +44,7 @@ TetGeometry / TetBody
 
 当前 `ipc/` 子树的范围刻意收得比较窄：
 
-- 已支持：节点自由度存储、tet 参考构型、顶点 lumped mass、tet surface 导出
-- 仅辅助用途：为未来外部 tetrahedralizer 提取 mesh positions 和 triangles
-- 还不支持：`ObjMeshData -> TetGeometry`、体网格生成、运行时 deformable 求解循环
+- 已支持：节点自由度存储、tet 参考构型、顶点 lumped mass、tet surface 导出，以及在 `RTR_HAS_FTETWILD` 开启时的 `ObjMeshData -> TetGeometry` / `TetBody`
+- 还不支持：任意拓扑修复、meshing 结果缓存，以及“显示网格独立于 tet boundary”的嵌入路径
 
 具体数据布局和算法说明放在本目录下各个文件对应的页面中。

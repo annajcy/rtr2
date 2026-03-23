@@ -18,9 +18,9 @@
 namespace rtr::system::physics::ipc {
 
 struct NewtonSolverParams {
-    int max_iterations{50};
-    double gradient_tolerance{1e-6};
-    double dx_tolerance{1e-8};
+    int max_iterations{20};
+    double gradient_tolerance{1e-3};
+    double dx_tolerance{1e-5};
     double regularization{1e-8};
     bool use_psd_projection{false};
 };

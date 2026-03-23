@@ -1,5 +1,13 @@
 # Tet ↔ Mesh 互转工具
 
+> Historical note:
+> this plan predates the converter split.
+> Current files are `mesh_tet_converter/mesh_to_tet.hpp` and `mesh_tet_converter/tet_to_mesh.hpp`.
+> Current names are `TetSurfaceMapping`, `build_tet_surface_mapping()`,
+> `tet_rest_to_surface_mesh()`, `tet_dofs_to_surface_mesh()`,
+> `update_surface_mesh_from_tet_dofs()`,
+> `obj_mesh_to_eigen_positions()`, and `obj_mesh_to_triangle_indices()`.
+
 ## 目标
 
 在 IPC 的内部 tet 表示和引擎的 `ObjMeshData` 渲染表示之间实现**双向转换**：

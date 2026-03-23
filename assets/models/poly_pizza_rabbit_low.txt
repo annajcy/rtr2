@@ -1,0 +1,9 @@
+Source: https://poly.pizza/m/dIBHKlCkxOQ
+Downloaded asset: https://static.poly.pizza/a9020744-a7e9-406a-aa7a-3c2d609e312e.glb
+Author: Aya Kawa
+Title: Rabbit
+License: Creative Commons Attribution
+
+Local conversion:
+- Downloaded the source GLB from Poly Pizza.
+- Converted to OBJ with `assimp export assets/models/poly_pizza_rabbit_low.glb assets/models/poly_pizza_rabbit_low.obj`.

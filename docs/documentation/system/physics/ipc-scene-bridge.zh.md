@@ -27,7 +27,7 @@
 它保存：
 
 - `source_body`：用于重新注册的 authoring/source `TetBody`；
-- `surface_cache`：一次性 boundary extraction 得到的 `TetSurfaceResult`；
+- `surface_cache`：一次性 boundary extraction 得到的 `TetSurfaceMapping`；
 - `mesh_cache`：可以每帧原地更新的 `ObjMeshData`。
 - 一组 dirty / lifecycle 标记，用来告诉 scene sync 哪些内容需要推到 runtime。
 
@@ -39,8 +39,8 @@
 
 ```text
 source TetBody
-  -> extract_tet_surface(body)
-  -> tet_to_mesh(body.geometry, surface)
+  -> build_tet_surface_mapping(body)
+  -> tet_rest_to_surface_mesh(body.geometry, surface)
   -> mesh_cache
 ```
 
@@ -91,7 +91,7 @@ IPCTetComponent.mesh_cache
 
 ## 为什么同时需要 owner lookup 和 `dof_offset`
 
-`TetSurfaceResult.surface_vertex_ids` 保存的是 **body-local** 顶点编号。  
+`TetSurfaceMapping.surface_vertex_ids` 保存的是 **body-local** 顶点编号。  
 而 `IPCState::x` 是所有 body 连接起来的 **global** `3N` 向量。
 
 因此 bridge 必须先做：
@@ -102,7 +102,7 @@ $$
 
 scene bridge 会先通过 `IPCSystem` 的 owner 映射回答“这个 `GameObject` 对应哪个 runtime body”，再通过 `dof_offset` 回答“这个 body 在当前全局状态向量里从哪里开始”。
 
-这也是为什么 `tet_mesh_convert.hpp` 的写回接口支持 `vertex_offset` 参数。
+这也是为什么 `tet_to_mesh.hpp` 的写回接口支持 `vertex_offset` 参数。
 
 ## `scene_physics_step(...)` 中的位置
 

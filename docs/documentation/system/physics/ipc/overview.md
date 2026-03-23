@@ -14,7 +14,8 @@ The current implementation focuses on the data that must exist before any FEM or
 - a global `3N` state vector (`IPCState`)
 - body-to-global mapping metadata (`IPCBodyInfo`)
 - tetrahedral rest geometry and precompute (`TetGeometry`, `TetBody`)
-- tet-to-render-mesh write-back (`tet_mesh_convert.hpp`)
+- surface-to-tet meshing (`mesh_tet_converter/mesh_to_tet.hpp`)
+- tet-to-render-mesh write-back (`mesh_tet_converter/tet_to_mesh.hpp`)
 
 What is not implemented yet:
 
@@ -33,7 +34,7 @@ TetGeometry / TetBody
     -> precompute rest-shape data
     -> assemble global DOFs into IPCState
     -> future energy / solver pipeline
-    -> tet_to_mesh(...) / update_mesh_positions(...)
+    -> tet_rest_to_surface_mesh(...) / update_surface_mesh_from_tet_dofs(...)
     -> ObjMeshData for rendering
 ```
 
@@ -43,8 +44,7 @@ TetGeometry / TetBody
 
 The current `ipc/` subtree is deliberately narrow:
 
-- supported: storing nodal DOFs, tet rest geometry, per-vertex lumped mass, and tet surface export
-- helper-only: extracting mesh positions and triangles for a future external tetrahedralizer
-- not supported: `ObjMeshData -> TetGeometry`, volumetric meshing, or a runtime deformable solve loop
+- supported: storing nodal DOFs, tet rest geometry, per-vertex lumped mass, tet surface export, and `ObjMeshData -> TetGeometry` / `TetBody` when `RTR_HAS_FTETWILD` is enabled
+- not supported: topology repair, cached remeshing, or preserving a separate display mesh from the tet boundary
 
 See the per-file pages under this subtree for the detailed data layouts and algorithms.
