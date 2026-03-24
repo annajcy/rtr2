@@ -5,7 +5,7 @@
 #include <memory>
 #include <stdexcept>
 
-#include "rtr/app/app_runtime.hpp"
+#include "rtr/editor/core/editor_app_runtime.hpp"
 #include "rtr/editor/core/editor_capture.hpp"
 #include "rtr/editor/core/editor_host.hpp"
 #include "rtr/editor/panel/hierarchy_panel.hpp"
@@ -13,13 +13,14 @@
 #include "rtr/editor/panel/logger_panel.hpp"
 #include "rtr/editor/panel/scene_view_panel.hpp"
 #include "rtr/editor/panel/stats_panel.hpp"
-#include "rtr/editor/render/forward_editor_pipeline.hpp"
+#include "rtr/editor/render/editor_output_backend.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
 #include "rtr/framework/component/material/deformable_mesh_component.hpp"
 #include "rtr/framework/component/material/static_mesh_component.hpp"
 #include "rtr/framework/component/physics/ipc/ipc_tet_component.hpp"
+#include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
 #include "rtr/system/input/input_types.hpp"
 #include "rtr/system/physics/ipc/model/tet_body.hpp"
 #include "rtr/system/physics/ipc/model/mesh_tet_converter/tet_to_mesh.hpp"
@@ -47,7 +48,7 @@ rtr::system::physics::ipc::TetBody make_fixed_end_block() {
 }
 
 void register_ipc_tet_object(rtr::framework::core::GameObject& game_object,
-                             rtr::app::AppRuntime& runtime,
+                             rtr::editor::EditorAppRuntime& runtime,
                              rtr::system::physics::ipc::TetBody body,
                              const pbpt::math::Vec4& color) {
     auto& ipc_component = game_object.add_component<rtr::framework::component::IPCTetComponent>(std::move(body));
@@ -67,11 +68,12 @@ int main() {
     constexpr uint32_t kHeight = 720;
 
     try {
-        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
+        rtr::editor::EditorAppRuntime runtime(rtr::app::AppRuntimeConfig{
             .window_width = kWidth,
             .window_height = kHeight,
             .window_title = "RTR IPC Fixed-End Block",
             .fixed_delta_seconds = 0.01,
+            .max_fixed_steps_per_frame = 20,
         });
 
         auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);
@@ -81,10 +83,11 @@ int main() {
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
 
-        auto editor_pipeline = std::make_unique<rtr::editor::render::ForwardEditorPipeline>(
-            runtime.renderer().build_pipeline_runtime(), editor_host
+        runtime.renderer().output_backend().bind_editor_host(editor_host);
+        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), runtime.renderer().output_backend());
+        auto editor_pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
+            runtime.renderer().build_pipeline_runtime()
         );
-        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), *editor_pipeline);
         runtime.set_pipeline(std::move(editor_pipeline));
 
         auto& scene = runtime.world().create_scene("ipc_fixed_end_scene");

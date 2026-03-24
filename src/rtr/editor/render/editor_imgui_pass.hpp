@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
@@ -16,7 +17,6 @@
 #include "rtr/rhi/texture.hpp"
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/render_pass.hpp"
-#include "rtr/system/render/render_pipeline.hpp"
 
 namespace rtr::editor::render {
 
@@ -64,8 +64,7 @@ private:
     bool m_scene_hovered{false};
     bool m_scene_focused{false};
     bool m_scene_gizmo_using{false};
-
-    system::render::RenderPipeline& m_owner_pipeline;
+    std::function<void(std::uint32_t, std::uint32_t)> m_scene_viewport_size_callback{};
 
     static ImTextureID descriptor_set_to_texture_id(VkDescriptorSet descriptor_set) {
         if constexpr (std::is_pointer_v<ImTextureID>) {
@@ -84,13 +83,11 @@ private:
     }
 
 public:
-    EditorImGuiPass(const system::render::PipelineRuntime& runtime, std::shared_ptr<EditorHost> editor_host,
-                    system::render::RenderPipeline& owner_pipeline)
+    EditorImGuiPass(const system::render::PipelineRuntime& runtime, std::shared_ptr<EditorHost> editor_host)
         : m_imgui_context(runtime.device, runtime.context, runtime.window, runtime.image_count, runtime.color_format,
                           runtime.depth_format),
           m_editor_host(std::move(editor_host)),
-          m_scene_sampler(rtr::rhi::Sampler::create_default(runtime.device, 1)),
-          m_owner_pipeline(owner_pipeline) {
+          m_scene_sampler(rtr::rhi::Sampler::create_default(runtime.device, 1)) {
         if (!m_editor_host) {
             throw std::invalid_argument("EditorImGuiPass requires non-null editor host.");
         }
@@ -126,6 +123,10 @@ public:
         return m_imgui_context.wants_capture_keyboard();
     }
 
+    void set_scene_viewport_size_callback(std::function<void(std::uint32_t, std::uint32_t)> callback) {
+        m_scene_viewport_size_callback = std::move(callback);
+    }
+
 protected:
     void validate(const RenderPassResources& resources) const override {
         if (resources.scene_image_view == vk::ImageView{} ||
@@ -149,7 +150,7 @@ protected:
         }
 
         vk::RenderingAttachmentInfo color_attachment_info{};
-        color_attachment_info.imageView   = *ctx.swapchain_image_view();
+        color_attachment_info.imageView   = *ctx.output_target().image_view;
         color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
         color_attachment_info.loadOp      = vk::AttachmentLoadOp::eLoad;
         color_attachment_info.storeOp     = vk::AttachmentStoreOp::eStore;
@@ -183,9 +184,9 @@ private:
             m_editor_host->context().gizmo_state().using_gizmo = using_gizmo;
         };
         services.set_scene_viewport_size = [this](std::uint32_t width, std::uint32_t height) {
-            m_owner_pipeline.publish_event<system::render::SceneViewportResizeEvent>(
-                system::render::SceneViewportResizeEvent{.width = width, .height = height}
-            );
+            if (m_scene_viewport_size_callback) {
+                m_scene_viewport_size_callback(width, height);
+            }
         };
     }
 

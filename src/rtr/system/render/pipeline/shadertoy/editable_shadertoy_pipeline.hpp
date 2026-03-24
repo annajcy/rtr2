@@ -2,15 +2,11 @@
 
 #include <array>
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
-#include "rtr/editor/core/editor_capture.hpp"
-#include "rtr/editor/core/editor_host.hpp"
-#include "rtr/editor/render/editor_imgui_pass.hpp"
 #include "rtr/rhi/buffer.hpp"
 #include "rtr/rhi/descriptor.hpp"
 #include "rtr/rhi/shader_module.hpp"
@@ -22,22 +18,19 @@
 #include "rtr/system/render/scene_target_controller.hpp"
 #include "vulkan/vulkan.hpp"
 
-namespace rtr::editor::render {
+namespace rtr::system::render {
 
-struct EditableShaderToyEditorPipelineConfig {
+struct EditableShaderToyPipelineConfig {
     std::string initial_shader_source_path{"shaders/editable_shadertoy_compute.slang"};
     bool auto_reload_enabled{true};
 };
 
-class EditableShaderToyEditorPipeline final : public system::render::RenderPipeline,
-                                              public IEditorInputCaptureSource {
+class EditableShaderToyPipeline final : public RenderPipeline {
 private:
     struct ShaderToyFrameTargets {
-        std::array<system::render::FrameTrackedImage, rhi::kFramesInFlight> offscreen_images;
+        std::array<FrameTrackedImage, rhi::kFramesInFlight> offscreen_images;
 
-        explicit ShaderToyFrameTargets(
-            std::array<system::render::FrameTrackedImage, rhi::kFramesInFlight>&& offscreen_images_in
-        )
+        explicit ShaderToyFrameTargets(std::array<FrameTrackedImage, rhi::kFramesInFlight>&& offscreen_images_in)
             : offscreen_images(std::move(offscreen_images_in)) {}
     };
 
@@ -55,37 +48,31 @@ private:
     std::array<rhi::Buffer, rhi::kFramesInFlight> m_uniform_buffers;
     std::array<std::uint64_t, rhi::kFramesInFlight> m_compute_set_generation{};
 
-    system::render::SceneTargetController<ShaderToyFrameTargets> m_scene_targets;
+    SceneTargetController<ShaderToyFrameTargets> m_scene_targets;
 
     std::array<float, 4> m_params{1.0f, 0.0f, 0.0f, 0.0f};
-    system::render::EditableShaderToyReloadController m_reload_controller;
+    EditableShaderToyReloadController m_reload_controller;
 
-    system::render::ComputePass m_compute_pass;
-    EditorImGuiPass m_editor_pass;
+    ComputePass m_compute_pass;
 
 public:
-    EditableShaderToyEditorPipeline(
-        const system::render::PipelineRuntime& runtime,
-        std::shared_ptr<EditorHost> editor_host,
-        const EditableShaderToyEditorPipelineConfig& config = {}
-    )
-        : system::render::RenderPipeline(runtime),
+    EditableShaderToyPipeline(const PipelineRuntime& runtime, const EditableShaderToyPipelineConfig& config = {})
+        : RenderPipeline(runtime),
           m_offscreen_format(pick_offscreen_format()),
           m_compute_layout(build_compute_layout(m_device)),
           m_descriptor_pool(build_descriptor_pool(m_device, m_compute_layout, static_cast<uint32_t>(rhi::kFramesInFlight))),
           m_compute_sets(vector_to_frame_array(
               m_descriptor_pool.allocate_multiple(m_compute_layout, static_cast<uint32_t>(rhi::kFramesInFlight)),
-              "EditableShaderToyEditorPipeline compute descriptor sets"
+              "EditableShaderToyPipeline compute descriptor sets"
           )),
           m_compute_pipeline_layout(build_pipeline_layout(m_device, m_compute_layout)),
-          m_uniform_buffer_size(sizeof(system::render::ShaderToyUniformBufferObject)),
+          m_uniform_buffer_size(sizeof(ShaderToyUniformBufferObject)),
           m_uniform_buffers(make_per_frame_mapped_uniform_buffers(m_uniform_buffer_size)),
-          m_scene_targets(*this, "EditableShaderToyEditorPipeline"),
+          m_scene_targets(*this, "EditableShaderToyPipeline"),
           m_reload_controller(config.initial_shader_source_path, config.auto_reload_enabled),
-          m_compute_pass(m_compute_pipeline_layout, m_compute_pipeline),
-          m_editor_pass(runtime, std::move(editor_host), *this) {}
+          m_compute_pass(m_compute_pipeline_layout, m_compute_pipeline) {}
 
-    ~EditableShaderToyEditorPipeline() override = default;
+    ~EditableShaderToyPipeline() override = default;
 
     std::array<float, 4>& params() { return m_params; }
     const std::array<float, 4>& params() const { return m_params; }
@@ -100,17 +87,67 @@ public:
 
     void request_shader_reload() { m_reload_controller.request_reload(); }
 
-    const system::render::EditableShaderToyReloadState& reload_state() const {
+    const EditableShaderToyReloadState& reload_state() const {
         return m_reload_controller.reload_state();
     }
 
-    bool wants_imgui_capture_mouse() const override { return m_editor_pass.wants_capture_mouse(); }
-    bool wants_imgui_capture_keyboard() const override { return m_editor_pass.wants_capture_keyboard(); }
+    PipelineFinalOutput final_output(uint32_t frame_index) override {
+        auto& frame_targets = m_scene_targets.require_targets();
+        if (frame_index >= rhi::kFramesInFlight) {
+            throw std::runtime_error("EditableShaderToyPipeline final output frame index out of range.");
+        }
+        return PipelineFinalOutput{
+            .color = frame_targets.offscreen_images[frame_index].view(),
+            .extent = m_scene_targets.scene_extent()
+        };
+    }
 
     void on_resize(int /*w*/, int /*h*/) override {}
 
-    void prepare_frame(const system::render::FramePrepareContext& /*ctx*/) override {
+    void prepare_frame(const FramePrepareContext& /*ctx*/) override {
         check_and_reload_shader();
+    }
+
+    void handle_swapchain_state_change(const FrameScheduler::SwapchainState& /*state*/,
+                                       const SwapchainChangeSummary& diff) override {
+        if (diff.extent_changed) {
+            m_scene_targets.on_swapchain_extent_changed();
+        }
+    }
+
+    void render(FrameContext& ctx) override {
+        const auto extent = ctx.render_extent();
+        if (extent.width == 0 || extent.height == 0) {
+            return;
+        }
+
+        auto& frame_targets = m_scene_targets.ensure(
+            ctx.frame_index(),
+            extent,
+            [this](vk::Extent2D desired_extent) { return create_frame_targets(desired_extent); },
+            [](ShaderToyFrameTargets&) {}
+        );
+
+        const uint32_t frame_index = ctx.frame_index();
+        auto& tracked_offscreen = frame_targets.offscreen_images[frame_index];
+        refresh_compute_descriptor(frame_index, frame_targets);
+
+        if (reload_state().has_valid_program &&
+            static_cast<vk::Pipeline>(m_compute_pipeline) != vk::Pipeline{}) {
+            m_compute_pass.execute(
+                ctx,
+                ComputePass::RenderPassResources{
+                    .uniform_buffer = m_uniform_buffers[frame_index],
+                    .offscreen = tracked_offscreen.view(),
+                    .compute_set = m_compute_sets[frame_index],
+                    .i_params = m_params
+                }
+            );
+        } else {
+            clear_offscreen_black(ctx, tracked_offscreen);
+        }
+
+        transition_offscreen_to_sampled(ctx, tracked_offscreen);
     }
 
 private:
@@ -121,7 +158,7 @@ private:
         }
 
         const auto compile_result =
-            system::render::compile_editable_shadertoy_shader(reload_result.resolved_path);
+            compile_editable_shadertoy_shader(reload_result.resolved_path);
         if (!compile_result.ok) {
             invalidate_program();
             m_reload_controller.apply_compile_failure(
@@ -155,66 +192,6 @@ private:
         }
     }
 
-public:
-    void handle_swapchain_state_change(const system::render::FrameScheduler::SwapchainState& state,
-                                       const system::render::SwapchainChangeSummary& diff) override {
-        if (diff.depth_format_changed) {
-            m_scene_targets.request_recreate();
-        }
-        if (diff.extent_changed) {
-            m_scene_targets.on_swapchain_extent_changed();
-        }
-        m_editor_pass.on_swapchain_recreated(state.image_count, state.color_format, state.depth_format);
-    }
-
-    void render(system::render::FrameContext& ctx) override {
-        using namespace system::render;
-
-        const auto extent = ctx.render_extent();
-        if (extent.width == 0 || extent.height == 0) {
-            return;
-        }
-
-        auto& frame_targets = m_scene_targets.ensure(
-            ctx.frame_index(),
-            extent,
-            [this](vk::Extent2D desired_extent) { return create_frame_targets(desired_extent); },
-            [](ShaderToyFrameTargets&) {}
-        );
-
-        const uint32_t frame_index = ctx.frame_index();
-        auto& tracked_offscreen = frame_targets.offscreen_images[frame_index];
-        refresh_compute_descriptor(frame_index, frame_targets);
-
-        if (reload_state().has_valid_program &&
-            static_cast<vk::Pipeline>(m_compute_pipeline) != vk::Pipeline{}) {
-            m_compute_pass.execute(
-                ctx,
-                ComputePass::RenderPassResources{
-                    .uniform_buffer = m_uniform_buffers[frame_index],
-                    .offscreen = tracked_offscreen.view(),
-                    .compute_set = m_compute_sets[frame_index],
-                    .i_params = m_params
-                }
-            );
-        } else {
-            clear_offscreen_black(ctx, tracked_offscreen);
-        }
-
-        transition_offscreen_to_sampled(ctx, tracked_offscreen);
-        transition_swapchain_to_color(ctx);
-
-        m_editor_pass.execute(
-            ctx,
-            EditorImGuiPass::RenderPassResources{
-                .scene_image_view = *tracked_offscreen.image.image_view(),
-                .scene_image_layout = tracked_offscreen.layout,
-                .scene_extent = {tracked_offscreen.image.width(), tracked_offscreen.image.height()}
-            }
-        );
-    }
-
-private:
     static rhi::DescriptorSetLayout build_compute_layout(rhi::Device& device) {
         rhi::DescriptorSetLayout::Builder compute_layout_builder;
         compute_layout_builder.add_binding(0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eCompute)
@@ -291,7 +268,7 @@ private:
         }
     }
 
-    void clear_offscreen_black(system::render::FrameContext& ctx, system::render::FrameTrackedImage& tracked_offscreen) {
+    void clear_offscreen_black(FrameContext& ctx, FrameTrackedImage& tracked_offscreen) {
         auto& cmd = ctx.cmd().command_buffer();
         const auto [src_stage, src_access] = source_state_for_layout(tracked_offscreen.layout);
 
@@ -321,57 +298,35 @@ private:
         tracked_offscreen.layout = vk::ImageLayout::eTransferDstOptimal;
     }
 
-    void transition_offscreen_to_sampled(
-        system::render::FrameContext& ctx,
-        system::render::FrameTrackedImage& tracked_offscreen
-    ) {
+    void transition_offscreen_to_sampled(FrameContext& ctx, FrameTrackedImage& tracked_offscreen) {
         auto& cmd = ctx.cmd().command_buffer();
         const auto [src_stage, src_access] = source_state_for_layout(tracked_offscreen.layout);
 
-        vk::ImageMemoryBarrier2 offscreen_to_sampled{};
-        offscreen_to_sampled.srcStageMask = src_stage;
-        offscreen_to_sampled.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader;
-        offscreen_to_sampled.srcAccessMask = src_access;
-        offscreen_to_sampled.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
-        offscreen_to_sampled.oldLayout = tracked_offscreen.layout;
-        offscreen_to_sampled.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-        offscreen_to_sampled.image = *tracked_offscreen.image.image();
-        offscreen_to_sampled.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+        vk::ImageMemoryBarrier2 to_sampled{};
+        to_sampled.srcStageMask = src_stage;
+        to_sampled.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader;
+        to_sampled.srcAccessMask = src_access;
+        to_sampled.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
+        to_sampled.oldLayout = tracked_offscreen.layout;
+        to_sampled.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        to_sampled.image = *tracked_offscreen.image.image();
+        to_sampled.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
 
         vk::DependencyInfo dependency{};
         dependency.imageMemoryBarrierCount = 1;
-        dependency.pImageMemoryBarriers = &offscreen_to_sampled;
+        dependency.pImageMemoryBarriers = &to_sampled;
         cmd.pipelineBarrier2(dependency);
 
         tracked_offscreen.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
     }
 
-    void transition_swapchain_to_color(system::render::FrameContext& ctx) {
-        auto& cmd = ctx.cmd().command_buffer();
-
-        vk::ImageMemoryBarrier2 swapchain_to_color{};
-        swapchain_to_color.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe;
-        swapchain_to_color.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-        swapchain_to_color.srcAccessMask = vk::AccessFlagBits2::eNone;
-        swapchain_to_color.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
-        swapchain_to_color.oldLayout = vk::ImageLayout::eUndefined;
-        swapchain_to_color.newLayout = vk::ImageLayout::eColorAttachmentOptimal;
-        swapchain_to_color.image = ctx.swapchain_image();
-        swapchain_to_color.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
-
-        vk::DependencyInfo dependency{};
-        dependency.imageMemoryBarrierCount = 1;
-        dependency.pImageMemoryBarriers = &swapchain_to_color;
-        cmd.pipelineBarrier2(dependency);
-    }
-
-    std::array<system::render::FrameTrackedImage, rhi::kFramesInFlight> create_offscreen_images(
-        vk::Extent2D scene_extent
-    ) const {
-        const vk::ImageUsageFlags usage =
-            vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
-        return make_frame_array<system::render::FrameTrackedImage>([&](uint32_t) {
-            return system::render::FrameTrackedImage{
+    std::array<FrameTrackedImage, rhi::kFramesInFlight> create_offscreen_images(vk::Extent2D scene_extent) const {
+        const vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eStorage |
+                                          vk::ImageUsageFlagBits::eSampled |
+                                          vk::ImageUsageFlagBits::eTransferDst |
+                                          vk::ImageUsageFlagBits::eTransferSrc;
+        return make_frame_array<FrameTrackedImage>([&](uint32_t) {
+            return FrameTrackedImage{
                 rhi::Image(
                     m_device,
                     scene_extent.width,
@@ -406,4 +361,4 @@ private:
     }
 };
 
-}  // namespace rtr::editor::render
+}  // namespace rtr::system::render

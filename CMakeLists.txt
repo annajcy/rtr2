@@ -22,6 +22,11 @@ endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Make imported targets from find_package() globally visible so embedded
+# third-party subprojects (for example geogram/fTetWild) reuse Conan-provided
+# packages instead of silently creating duplicate fallback targets.
+set(CMAKE_FIND_PACKAGE_TARGETS_GLOBAL TRUE)
+
 if(MSVC)
   add_compile_options(/bigobj)
 endif()

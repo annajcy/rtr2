@@ -41,7 +41,7 @@ int main() {
         for (int tick = 0; tick < kTickCount; ++tick) {
             const rtr::framework::core::FixedTickContext fixed_ctx{
                 .fixed_delta_seconds = kFixedDt,
-                .fixed_tick_index    = static_cast<std::uint64_t>(tick),
+                .fixed_tick_serial    = static_cast<std::uint64_t>(tick),
             };
             rtr::framework::integration::physics::sync_scene_to_rigid_body(scene, physics_world);
             physics_world.step(static_cast<float>(fixed_ctx.fixed_delta_seconds));

@@ -7,7 +7,7 @@
 
 #include "imgui.h"
 #include "rtr/editor/core/editor_panel.hpp"
-#include "rtr/editor/render/editable_shadertoy_editor_pipeline.hpp"
+#include "rtr/system/render/pipeline/shadertoy/editable_shadertoy_pipeline.hpp"
 
 namespace rtr::editor {
 
@@ -15,7 +15,7 @@ class EditableShaderToySettingsPanel final : public IEditorPanel {
 private:
     static constexpr std::size_t kPathBufferSize = 1024;
 
-    render::EditableShaderToyEditorPipeline* m_pipeline{nullptr};
+    system::render::EditableShaderToyPipeline* m_pipeline{nullptr};
     bool m_visible{true};
     std::array<char, kPathBufferSize> m_path_buffer{};
 
@@ -43,7 +43,7 @@ private:
     }
 
 public:
-    explicit EditableShaderToySettingsPanel(render::EditableShaderToyEditorPipeline* pipeline)
+    explicit EditableShaderToySettingsPanel(system::render::EditableShaderToyPipeline* pipeline)
         : m_pipeline(pipeline) {
         sync_path_buffer();
     }

@@ -14,6 +14,7 @@ find_package(TinyGLTF       CONFIG REQUIRED)
 find_package(stb            CONFIG REQUIRED)
 find_package(spdlog         CONFIG REQUIRED)
 find_package(slang          CONFIG REQUIRED)
+find_package(TBB            CONFIG REQUIRED)
 find_package(tinyobjloader  CONFIG REQUIRED)
 
 if (RTR_BUILD_EDITOR)

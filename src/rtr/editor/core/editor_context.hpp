@@ -15,7 +15,7 @@ private:
 
     framework::core::World&     m_world;
     resource::ResourceManager&  m_resources;
-    system::render::Renderer&   m_renderer;
+    system::render::IRenderer&  m_renderer;
     system::input::InputSystem& m_input;
     EditorFrameData             m_frame_data{};
     EditorSelection             m_selection{};
@@ -31,16 +31,16 @@ public:
 
     const resource::ResourceManager& resources() const { return m_resources; }
 
-    system::render::Renderer& renderer() { return m_renderer; }
+    system::render::IRenderer& renderer() { return m_renderer; }
 
-    const system::render::Renderer& renderer() const { return m_renderer; }
+    const system::render::IRenderer& renderer() const { return m_renderer; }
 
     system::input::InputSystem& input() { return m_input; }
 
     const system::input::InputSystem& input() const { return m_input; }
 
     EditorContext(framework::core::World& world, resource::ResourceManager& resources,
-                  system::render::Renderer& renderer, system::input::InputSystem& input)
+                  system::render::IRenderer& renderer, system::input::InputSystem& input)
         : m_world(world), m_resources(resources), m_renderer(renderer), m_input(input) {}
 
     void set_frame_data(const EditorFrameData& frame_data) { m_frame_data = frame_data; }
