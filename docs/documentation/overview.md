@@ -14,7 +14,10 @@ ImGui-based tools for scene inspection and engine monitoring.
 
 ### Editor Render (`src/rtr/editor/render`)
 
-Specialized rendering passes for editor-specific overlays (gizmos, grid, etc.).
+Editor-specific composition and output integration.
+
+- **Editor Output Backend:** Consumes a pure scene pipeline output and composites editor UI.
+- **Editor ImGui Pass:** Draws ImGui and scene-view content into the final output target.
 
 -------
 
@@ -77,9 +80,10 @@ Higher-level systems that orchestrate specific engine functions.
 
 Manages the Vulkan rendering pipeline, frame scheduling, and resource synchronization.
 
-- **Renderer:** High-level Vulkan renderer control.
-- **Frame Scheduler:** Manages multi-buffered rendering and swapchain interaction.
-- **Pipelines:** Definition of `IRenderPipeline` and specific implementations.
+- **Renderer:** Swapchain-backed renderer bootstrap parameterized by an output backend.
+- **Frame Scheduler:** Multi-buffered swapchain acquire / submit / present orchestration.
+- **Output Backends:** Realtime present, editor composition, and preview/export output handling.
+- **Pipelines:** Pure content pipelines that render to final offscreen images.
 
 ### Input System (`src/rtr/system/input`)
 

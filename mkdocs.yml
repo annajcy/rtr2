@@ -48,8 +48,47 @@ nav:
   - Headless MCP: headless-mcp.md
   - Documentation:
       - Overview: documentation/overview.md
+      - Editor:
+          - Overview: documentation/editor/overview.md
+          - Render:
+              # BEGIN AUTO-GENERATED EDITOR RENDER NAV
+              - Overview: documentation/editor/render/overview.md
+              - Editor Imgui Pass: documentation/editor/render/editor_imgui_pass.md
+              - Editor Output Backend: documentation/editor/render/editor_output_backend.md
+              # END AUTO-GENERATED EDITOR RENDER NAV
       - System:
           - Render:
+              # BEGIN AUTO-GENERATED RENDER NAV
+              - Overview: documentation/system/render/overview.md
+              - Pass:
+                  - Overview: documentation/system/render/pass/overview.md
+                  - Present Image Pass: documentation/system/render/pass/present_image_pass.md
+                  - Present Pass: documentation/system/render/pass/present_pass.md
+              - Pipeline:
+                  - Overview: documentation/system/render/pipeline/overview.md
+                  - Forward:
+                      - Overview: documentation/system/render/pipeline/forward/overview.md
+                      - Forward Pass: documentation/system/render/pipeline/forward/forward_pass.md
+                      - Forward Pipeline: documentation/system/render/pipeline/forward/forward_pipeline.md
+                      - Forward Scene View: documentation/system/render/pipeline/forward/forward_scene_view.md
+                  - Shadertoy:
+                      - Overview: documentation/system/render/pipeline/shadertoy/overview.md
+                      - Editable Shadertoy Pipeline: documentation/system/render/pipeline/shadertoy/editable_shadertoy_pipeline.md
+                      - Editable Shadertoy Reload Controller: documentation/system/render/pipeline/shadertoy/editable_shadertoy_reload_controller.md
+                      - Shadertoy Compute Pass: documentation/system/render/pipeline/shadertoy/shadertoy_compute_pass.md
+                      - Shadertoy Pipeline: documentation/system/render/pipeline/shadertoy/shadertoy_pipeline.md
+              - Utils:
+                  - Overview: documentation/system/render/utils/overview.md
+                  - Shader Compiler: documentation/system/render/utils/shader_compiler.md
+              - Frame Context: documentation/system/render/frame_context.md
+              - Frame Scheduler: documentation/system/render/frame_scheduler.md
+              - Output Backend: documentation/system/render/output_backend.md
+              - Render Pass: documentation/system/render/render_pass.md
+              - Render Pipeline: documentation/system/render/render_pipeline.md
+              - Render Resource State: documentation/system/render/render_resource_state.md
+              - Renderer: documentation/system/render/renderer.md
+              - Scene Target Controller: documentation/system/render/scene_target_controller.md
+              # END AUTO-GENERATED RENDER NAV
               - Camera and Coordinates: documentation/system/render/camera-coordinate-conventions.md
           - Physics:
               - Overview: documentation/system/physics/overview.md
@@ -77,11 +116,13 @@ nav:
                       - Material Energy: documentation/system/physics/ipc/energy/material_energy.md
                   - Model:
                       - Overview: documentation/system/physics/ipc/model/overview.md
+                      - Mesh Tet Converter:
+                          - Overview: documentation/system/physics/ipc/model/mesh_tet_converter/overview.md
+                          - Mesh To Tet: documentation/system/physics/ipc/model/mesh_tet_converter/mesh_to_tet.md
+                          - Tet To Mesh: documentation/system/physics/ipc/model/mesh_tet_converter/tet_to_mesh.md
                       - IPC Body: documentation/system/physics/ipc/model/ipc_body.md
                       - Obstacle Body: documentation/system/physics/ipc/model/obstacle_body.md
                       - Tet Body: documentation/system/physics/ipc/model/tet_body.md
-                      - Mesh To Tet: documentation/system/physics/ipc/model/mesh_to_tet.md
-                      - Tet To Mesh: documentation/system/physics/ipc/model/tet_to_mesh.md
                   - Solver:
                       - Overview: documentation/system/physics/ipc/solver/overview.md
                       - Line Search: documentation/system/physics/ipc/solver/line_search.md

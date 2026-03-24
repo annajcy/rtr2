@@ -60,6 +60,58 @@ if (s <= 0.0) {
 
 ---
 
+## Barrier 层应直接建立在 `Distance concept` 之上
+
+在 Day 2 之前，barrier 最容易写成两套平行代码：
+
+- 一套 `compute_pt_barrier_*`
+- 一套 `compute_ee_barrier_*`
+
+这种写法短期能跑，但会立刻带来几个问题：
+
+1. PT 和 EE 的链式法则逻辑完全重复
+2. 后续如果 PE / PP 也要用于 CCD 或调试，很难复用
+3. 测试会变成“按原语复制粘贴”
+
+既然 [01_geometry_distances.md](/Users/jinceyang/Desktop/codebase/graphics/rtr2/roadmap/physics_plan/day2/01_geometry_distances.md) 已经决定引入 `Distance` concept，那么 barrier 层就不应该再直接绑死在 PT/EE 的具体实现上，而应当把“距离核 + 标量 barrier + 局部到全局装配”拆开。
+
+### barrier 层的推荐分层
+
+```text
+barrier_function.hpp
+    只负责标量 b(s, s_hat), b'(s), b''(s)
+
+barrier_potential.hpp
+    1. 用 Distance kernel 计算局部 distance result
+    2. 用链式法则组装局部 barrier gradient / Hessian
+    3. 做 PSD projection
+    4. 通过局部->全局映射装配到 global gradient / triplets
+```
+
+### 推荐的泛型思路
+
+对于任意满足 `Distance` concept 的距离核 `D`：
+
+```cpp
+template <Distance D>
+struct PairBarrierResult {
+    double energy{0.0};
+    typename D::Result::Gradient gradient{};
+    typename D::Result::Hessian hessian{};
+    bool active{false};
+};
+```
+
+不过考虑到当前仓库里 `Result` 还没有把 `Gradient/Hessian` 单独 typedef 出来，更现实的第一版可以直接从 `result.gradient` / `result.hessian` 的具体类型推导，不强行把模板系统做得太重。
+
+重点不在“写出最花哨的泛型”，而在于接口层明确规定：
+
+- barrier 不直接知道自己在处理 PT 还是 EE
+- 它只知道输入是一个 `Distance` kernel 的 `Input`
+- kernel 返回 `distance_squared + gradient + hessian`
+
+---
+
 ## 从标量 barrier 到全局 DOF
 
 ### 链式法则
@@ -74,28 +126,65 @@ $$\frac{\partial^2 B}{\partial x^2} = \kappa \sum_{(i,j)} \left(\frac{\partial^2
 
 ### 局部到全局装配
 
-每个接触对 $(i,j)$ 涉及 12 个局部 DOF（PT 或 EE）。局部 12×12 Hessian 需要散装配到全局 $3N \times 3N$ 稀疏矩阵。
+每个接触对首先在**局部距离核空间**完成 barrier 求值，然后再装配到全局 DOF。
+
+对 Day 2 来说，真正进入 contact candidate 的主原语仍然是：
+
+- PT：12 DOF
+- EE：12 DOF
+
+但 barrier 层不应该依赖“它们恰好都是 12 DOF”这个事实来设计接口。更好的组织方式是：
+
+1. 先通过 `Distance::compute(input)` 得到局部 `Result`
+2. 在局部空间应用链式法则
+3. 再由调用者提供的 local-to-global 映射散装配
+
+也就是说，barrier 的核心泛型 helper 只处理“局部结果”，不处理 collision mesh 细节。
 
 装配路径：
-1. 计算局部距离平方 $s$ 和局部 gradient/Hessian
+1. 通过 `Distance::compute(input)` 计算局部距离平方 $s$ 和局部 gradient/Hessian
 2. 计算标量 barrier $b(s)$, $b'(s)$, $b''(s)$
-3. 局部 barrier gradient = $\kappa \cdot b'(s) \cdot \nabla_x s$（12 维）
-4. 局部 barrier Hessian = $\kappa \cdot (b''(s) \cdot \nabla_x s \cdot \nabla_x s^T + b'(s) \cdot \nabla^2_x s)$（12×12）
+3. 局部 barrier gradient = $\kappa \cdot b'(s) \cdot \nabla_x s$
+4. 局部 barrier Hessian = $\kappa \cdot (b''(s) \cdot \nabla_x s \cdot \nabla_x s^T + b'(s) \cdot \nabla^2_x s)$
 5. 对局部 Hessian 做 PSD projection
-6. 通过 vertex_map 散装到全局 gradient 和 triplet 列表
+6. 通过 local-to-global DOF 映射散装到全局 gradient 和 triplet 列表
+
+### 为什么这里适合做成泛型 helper
+
+PT 和 EE 在 barrier 层唯一真正不同的部分是：
+
+- 距离核输入类型不同
+- local-to-global 映射构建方式不同
+
+而下面这些逻辑完全相同：
+
+- 标量 barrier 求值
+- 链式法则
+- PSD projection
+- active / inactive 判断
+
+因此 barrier 层最自然的切分应当是：
+
+```text
+generic pair barrier helper
+    ^
+    | 由 PT / EE candidate wrapper 提供 input 与映射
+    |
+collision candidate specific wrapper
+```
 
 ### PSD Projection
 
-接触 Hessian 可能不正定（距离函数的 Hessian 不一定正定）。必须对每个局部 12×12 Hessian 做 PSD 投影：
+接触 Hessian 可能不正定（距离函数的 Hessian 不一定正定）。必须对每个局部 Hessian 做 PSD 投影。
 
 ```cpp
 // 特征分解
-Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 12, 12>> solver(local_hessian);
+Eigen::SelfAdjointEigenSolver<LocalHessian> solver(local_hessian);
 auto eigenvalues = solver.eigenvalues();
 auto eigenvectors = solver.eigenvectors();
 
 // 截断负特征值
-for (int i = 0; i < 12; ++i) {
+for (int i = 0; i < eigenvalues.size(); ++i) {
     eigenvalues[i] = std::max(eigenvalues[i], 0.0);
 }
 
@@ -138,20 +227,38 @@ namespace barrier {
     double hessian(double s, double s_hat);   // d²b/ds²
 }
 
-// barrier potential 装配到全局
 struct BarrierPotentialConfig {
     double dhat_squared{0.01};   // s_hat
     double kappa{1e4};
+    bool project_hessian_to_psd{true};
 };
 
-double compute_barrier_energy(
+template <Distance D>
+struct PairBarrierResult;
+
+template <Distance D>
+PairBarrierResult<D> compute_pair_barrier(
+    const typename D::Input& input,
+    const BarrierPotentialConfig& config
+);
+
+template <typename LocalVector, typename LocalMatrix>
+void accumulate_pair_barrier_to_global(
+    const LocalVector& local_gradient,
+    const LocalMatrix& local_hessian,
+    std::span<const std::optional<Eigen::Index>> global_dof_map,
+    Eigen::VectorXd* global_gradient,
+    std::vector<Eigen::Triplet<double>>* global_triplets
+);
+
+double compute_total_barrier_energy(
     const Eigen::VectorXd& x,
     const CollisionMesh& collision_mesh,
     const CollisionCandidates& candidates,
     const BarrierPotentialConfig& config
 );
 
-void compute_barrier_gradient(
+void accumulate_total_barrier_gradient(
     const Eigen::VectorXd& x,
     const CollisionMesh& collision_mesh,
     const CollisionCandidates& candidates,
@@ -159,7 +266,7 @@ void compute_barrier_gradient(
     Eigen::VectorXd& gradient  // accumulate
 );
 
-void compute_barrier_hessian_triplets(
+void accumulate_total_barrier_hessian_triplets(
     const Eigen::VectorXd& x,
     const CollisionMesh& collision_mesh,
     const CollisionCandidates& candidates,
@@ -168,18 +275,102 @@ void compute_barrier_hessian_triplets(
 );
 ```
 
+### 推荐的泛型 pair barrier 接口
+
+这一步的核心不是 `compute_total_barrier_*`，而是一个可复用的 pair-level helper。
+
+建议形状：
+
+```cpp
+template <Distance D>
+struct PairBarrierResult {
+    double energy{0.0};
+    decltype(D::compute(std::declval<typename D::Input>()).gradient) gradient{};
+    decltype(D::compute(std::declval<typename D::Input>()).hessian) hessian{};
+    bool active{false};
+};
+
+template <Distance D>
+PairBarrierResult<D> compute_pair_barrier(
+    const typename D::Input& input,
+    const BarrierPotentialConfig& config
+);
+```
+
+内部逻辑统一为：
+
+1. `const auto distance = D::compute(input);`
+2. 如果 `distance.distance_squared >= dhat_squared`，返回 `active=false`
+3. 否则应用标量 barrier 链式法则
+4. 可选做 PSD projection
+
+这样 PT 和 EE 的差异只体现在：
+
+- `D = PointTriangleDistance` 或 `EdgeEdgeDistance`
+- `input` 的组织方式不同
+
+### collision candidate 到 pair barrier 的桥接
+
+`CollisionCandidates` 里存的仍然是 `PTCandidate` / `EECandidate`。因此全局装配层需要两类很薄的 wrapper：
+
+1. 从 candidate + `CollisionMesh` + `x` 读取几何坐标
+2. 组出 `PointTriangleDistance::Input` 或 `EdgeEdgeDistance::Input`
+3. 同时组出局部自由度对应的 `global_dof_map`
+4. 把 `compute_pair_barrier<D>()` 的结果散装到全局
+
+这两层拆开之后，barrier 的主复杂度会从“每种 candidate 手写一遍链式法则”变成“只为每种 candidate 手写输入映射”。
+
+### `global_dof_map` 的推荐语义
+
+因为 Day 2 的 obstacle 顶点不在 `IPCState.x` 内，所以局部原语的某些坐标没有全局 DOF。
+
+最直接的办法是让装配 helper 接受：
+
+```cpp
+std::span<const std::optional<Eigen::Index>> global_dof_map
+```
+
+含义：
+
+- 有值：对应某个全局 DOF，允许装配
+- `nullopt`：对应 obstacle 侧坐标，不装配到 global system
+
+这样同一个 pair barrier helper 可以自然支持：
+
+- deformable vs obstacle
+- deformable vs deformable
+- 未来的 self-contact
+
+而不需要在 barrier 数学层显式写“如果是 obstacle 就跳过”。
+
 ---
 
 ## 输出文件
 
 | 文件 | 内容 |
 |------|------|
+| `src/rtr/system/physics/ipc/geometry/distance_concept.hpp` | barrier 会依赖的距离核统一接口 |
 | `src/rtr/system/physics/ipc/contact/barrier_function.hpp` | 标量 $b(s, \hat{s})$ 及一二阶导数 |
-| `src/rtr/system/physics/ipc/contact/barrier_potential.hpp` | 全局 barrier energy/gradient/Hessian 装配 |
+| `src/rtr/system/physics/ipc/contact/barrier_potential.hpp` | 基于 `Distance` concept 的 pair barrier 与全局装配 |
 
 ## 测试
 
 | 文件 | 内容 |
 |------|------|
 | `test/system/physics/ipc/contact/barrier_function_test.cpp` | 标量 barrier fd check、边界行为 |
-| `test/system/physics/ipc/contact/barrier_potential_test.cpp` | 单个 PT/EE 对的 barrier gradient fd check |
+| `test/system/physics/ipc/contact/barrier_potential_test.cpp` | `compute_pair_barrier<PointTriangleDistance>` / `compute_pair_barrier<EdgeEdgeDistance>` 的 gradient fd check |
+
+### 建议补的测试形状
+
+除了原来的单对 PT/EE fd check，建议明确分三层测：
+
+1. 标量 barrier
+   - `b(s)`、`b'(s)`、`b''(s)` 的有限差分
+2. 泛型 pair barrier
+   - `compute_pair_barrier<PointTriangleDistance>`
+   - `compute_pair_barrier<EdgeEdgeDistance>`
+3. 全局装配
+   - obstacle 顶点对应的 `nullopt` DOF 不会写入全局梯度/Hessian
+   - deformable 顶点贡献能正确落到 `Eigen::VectorXd` 与 triplets
+
+这样测试结构也会和新的接口分层保持一致。

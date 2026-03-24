@@ -17,9 +17,10 @@ MKDOCS_PATH = REPO_ROOT / "mkdocs.yml"
 class Mapping:
     src_root: Path
     docs_root: Path
-    nav_title: str
+    nav_title: str | None
     begin_marker: str
     end_marker: str
+    extra_docs: tuple[Path, ...] = ()
 
 
 MAPPINGS = [
@@ -29,7 +30,31 @@ MAPPINGS = [
         nav_title="IPC",
         begin_marker="# BEGIN AUTO-GENERATED PHYSICS NAV",
         end_marker="# END AUTO-GENERATED PHYSICS NAV",
-    )
+        extra_docs=(
+            REPO_ROOT / "docs/documentation/system/physics/ipc/model/mesh_to_tet.md",
+            REPO_ROOT / "docs/documentation/system/physics/ipc/model/mesh_to_tet.zh.md",
+            REPO_ROOT / "docs/documentation/system/physics/ipc/model/tet_to_mesh.md",
+            REPO_ROOT / "docs/documentation/system/physics/ipc/model/tet_to_mesh.zh.md",
+        ),
+    ),
+    Mapping(
+        src_root=REPO_ROOT / "src/rtr/system/render",
+        docs_root=REPO_ROOT / "docs/documentation/system/render",
+        nav_title=None,
+        begin_marker="# BEGIN AUTO-GENERATED RENDER NAV",
+        end_marker="# END AUTO-GENERATED RENDER NAV",
+        extra_docs=(
+            REPO_ROOT / "docs/documentation/system/render/camera-coordinate-conventions.md",
+            REPO_ROOT / "docs/documentation/system/render/camera-coordinate-conventions.zh.md",
+        ),
+    ),
+    Mapping(
+        src_root=REPO_ROOT / "src/rtr/editor/render",
+        docs_root=REPO_ROOT / "docs/documentation/editor/render",
+        nav_title=None,
+        begin_marker="# BEGIN AUTO-GENERATED EDITOR RENDER NAV",
+        end_marker="# END AUTO-GENERATED EDITOR RENDER NAV",
+    ),
 ]
 
 ACRONYMS = {
@@ -90,7 +115,7 @@ def validate_mapping(mapping: Mapping) -> list[str]:
         if path.is_file()
     }
 
-    for doc in sorted(actual - expected):
+    for doc in sorted(actual - expected - set(mapping.extra_docs)):
         errors.append(f"orphan documentation file: {doc.relative_to(REPO_ROOT)}")
 
     return errors
@@ -124,6 +149,9 @@ def build_dir_nav(src_dir: Path, docs_dir: Path, indent: int) -> list[str]:
 
 
 def generate_nav_block(mapping: Mapping, anchor_indent: int) -> list[str]:
+    if mapping.nav_title is None:
+        return build_dir_nav(mapping.src_root, mapping.docs_root, anchor_indent)
+
     indent = " " * anchor_indent
     lines = [f"{indent}- {mapping.nav_title}:"]
     lines.extend(build_dir_nav(mapping.src_root, mapping.docs_root, anchor_indent + 4))

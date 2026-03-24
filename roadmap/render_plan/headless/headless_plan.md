@@ -24,6 +24,11 @@
 
 这样可以显著降低一次性修改 `Context + Device + Renderer + Pipeline` 带来的风险。
 
+对应的详细文档分开维护：
+
+- `v0` 详细计划：`roadmap/render_plan/headless/headless_plan_v0.md`
+- `v1` 详细计划：`roadmap/render_plan/headless/headless_plan_v1.md`
+
 ### 2. 优先抽象“输出后端”，不是“Window”
 
 现有系统真正的硬耦合，不在 `Window` 本身，而在下面三处：
@@ -772,6 +777,20 @@ GPU readback 完成后，把 CPU 像素数据丢给后台线程写 PNG，避免 
 ### 目标
 
 在 `v0` 已经验证离线导出工作流有效后，再去掉 GLFW / surface / swapchain 依赖，做真正的 headless Vulkan 初始化。
+
+这里有一个需要固定的边界：
+
+- 保留当前 `OfflineImageOutputBackend`
+  - 它继续作为 `v0` 的 preview / offline-export backend
+  - 它仍然可以依赖窗口、surface、swapchain，并提供“边渲染边预览”的能力
+- `v1` 新增真正的 headless 路径
+  - 无窗口
+  - 无 surface
+  - 无 swapchain
+  - 无 preview / present 能力
+  - 只负责离屏渲染与导出
+
+也就是说，`v1` 不是“把当前 Offline backend 改造成 headless”，而是“在保留 preview backend 的前提下，再增加一条真正无显示能力的 offscreen-only backend/runtime”。
 
 ### 这一阶段才需要处理的内容
 
