@@ -19,6 +19,7 @@
 #include "rtr/system/physics/ipc/energy/gravity_energy.hpp"
 #include "rtr/system/physics/ipc/energy/inertial_energy.hpp"
 #include "rtr/system/physics/ipc/energy/material_energy.hpp"
+#include "rtr/system/physics/ipc/model/obstacle_body.hpp"
 #include "rtr/system/physics/ipc/model/tet_body.hpp"
 #include "rtr/system/physics/ipc/solver/newton_solver.hpp"
 #include "rtr/framework/core/types.hpp"
@@ -99,8 +100,27 @@ public:
         return body_id;
     }
 
+    IPCBodyID create_obstacle_body(ObstacleBody body) {
+        body.info.type = IPCBodyType::Obstacle;
+        body.info.dof_offset = 0u;
+        body.info.vertex_count = body.vertex_count();
+        body.validate();
+        if (body.edges.empty() && !body.triangles.empty()) {
+            body.build_edges();
+        }
+
+        const IPCBodyID body_id = m_next_body_id++;
+        m_obstacle_bodies.emplace(body_id, std::move(body));
+        m_obstacle_body_order.push_back(body_id);
+        return body_id;
+    }
+
     bool has_tet_body(IPCBodyID id) const {
         return id != kInvalidIPCBodyId && m_tet_bodies.contains(id);
+    }
+
+    bool has_obstacle_body(IPCBodyID id) const {
+        return id != kInvalidIPCBodyId && m_obstacle_bodies.contains(id);
     }
 
     bool remove_tet_body_for_owner(framework::core::GameObjectId owner_id) {
@@ -134,6 +154,18 @@ public:
         if (m_tet_bodies.empty()) {
             clear_runtime_state();
         }
+        return true;
+    }
+
+    bool remove_obstacle_body(IPCBodyID id) {
+        if (!has_obstacle_body(id)) {
+            return false;
+        }
+        m_obstacle_bodies.erase(id);
+        m_obstacle_body_order.erase(
+            std::remove(m_obstacle_body_order.begin(), m_obstacle_body_order.end(), id),
+            m_obstacle_body_order.end()
+        );
         return true;
     }
 
@@ -196,8 +228,13 @@ public:
     const IPCState& state() const { return m_state; }
     bool initialized() const { return m_initialized; }
     std::size_t tet_body_count() const { return m_tet_bodies.size(); }
+    std::size_t obstacle_body_count() const { return m_obstacle_bodies.size(); }
+    const std::vector<IPCBodyID>& tet_body_ids() const { return m_body_order; }
+    const std::vector<IPCBodyID>& obstacle_body_ids() const { return m_obstacle_body_order; }
     const TetBody& get_tet_body(IPCBodyID id) const { return m_tet_bodies.at(id); }
     TetBody& get_tet_body(IPCBodyID id) { return m_tet_bodies.at(id); }
+    const ObstacleBody& get_obstacle_body(IPCBodyID id) const { return m_obstacle_bodies.at(id); }
+    ObstacleBody& get_obstacle_body(IPCBodyID id) { return m_obstacle_bodies.at(id); }
 
     bool is_scene_sync_dirty_for_owner(framework::core::GameObjectId owner_id) const {
         return m_scene_sync_dirty_owners.contains(owner_id);
@@ -259,9 +296,11 @@ private:
     IPCConfig m_config{};
     IPCState m_state{};
     std::unordered_map<IPCBodyID, TetBody> m_tet_bodies{};
+    std::unordered_map<IPCBodyID, ObstacleBody> m_obstacle_bodies{};
     std::unordered_map<framework::core::GameObjectId, IPCBodyID> m_owner_to_body{};
     std::unordered_map<IPCBodyID, framework::core::GameObjectId> m_body_to_owner{};
     std::vector<IPCBodyID> m_body_order{};
+    std::vector<IPCBodyID> m_obstacle_body_order{};
     std::unordered_map<IPCBodyID, BodyLayout> m_body_layouts{};
     std::unordered_set<framework::core::GameObjectId> m_scene_sync_dirty_owners{};
     IPCBodyID m_next_body_id{0};

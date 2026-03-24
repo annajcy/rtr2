@@ -102,6 +102,29 @@ The optimization formulation:
 | **Solver** | `newton_solver.hpp`, `line_search.hpp` | Nonlinear solve with DBC and line search |
 | **System** | `ipc_system.hpp` | Orchestration: assemble, solve, update |
 
+## Body Registration Split
+
+`IPCSystem` now owns two different body registries:
+
+- deformable `TetBody` objects, which participate in global DOF assembly
+- static `ObstacleBody` objects, which are registered for contact preprocessing but do not enter `IPCState`
+
+This split is important for IPC contact architecture:
+
+- tet bodies affect `m_state`, `m_free_dof_mask`, mass assembly, and Newton solves
+- obstacle bodies provide static surface geometry for `contact/collision_mesh.hpp`
+
+The obstacle-side API is intentionally thin:
+
+```cpp
+IPCBodyID create_obstacle_body(ObstacleBody body);
+bool has_obstacle_body(IPCBodyID id) const;
+bool remove_obstacle_body(IPCBodyID id);
+const ObstacleBody& get_obstacle_body(IPCBodyID id) const;
+```
+
+Registering an obstacle does not mark the solver state dirty, because the obstacle has no deformable DOFs to rebuild.
+
 ## `IPCConfig`
 
 ```cpp
@@ -152,6 +175,13 @@ void rebuild_runtime_state() {
 `initialize()` is now just the explicit entry point for this rebuild. Registration changes (`create_tet_body`, `remove_tet_body`) mark the system dirty, and `step(delta_seconds)` automatically rebuilds before solving.
 
 `body.precompute()` reads density from each body's material object, so `mass_diag` is assembled from `TetBody::material`.
+
+Obstacle bodies are deliberately excluded from this rebuild. They remain available through `get_obstacle_body(...)`, but they do not contribute to:
+
+- `total_vertices`
+- `m_state.resize(...)`
+- `mass_diag`
+- `m_free_dof_mask`
 
 ### DOF Offset Layout
 
@@ -218,6 +248,16 @@ void step(double delta_seconds) {
             m_state.v[i] = 0.0;
 }
 ```
+
+## Relation to Contact Preprocessing
+
+`IPCSystem` itself does not build contact candidates, but it is the data source that makes the contact layer possible:
+
+- `tet_body_ids()` and `get_tet_body(...)` provide deformable surface sources
+- `obstacle_body_ids()` and `get_obstacle_body(...)` provide static surface sources
+- `state()` provides the current deformable coordinates
+
+That is why the contact layer can be implemented as a thin bridge on top of `IPCSystem` instead of becoming entangled with solver internals.
 
 ### Phase-by-Phase Theory
 

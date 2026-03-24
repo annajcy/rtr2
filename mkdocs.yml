@@ -99,6 +99,10 @@ nav:
               # BEGIN AUTO-GENERATED PHYSICS NAV
               - IPC:
                   - Overview: documentation/system/physics/ipc/overview.md
+                  - Contact:
+                      - Overview: documentation/system/physics/ipc/contact/overview.md
+                      - Collision Candidates: documentation/system/physics/ipc/contact/collision_candidates.md
+                      - Collision Mesh: documentation/system/physics/ipc/contact/collision_mesh.md
                   - Core:
                       - Overview: documentation/system/physics/ipc/core/overview.md
                       - IPC State: documentation/system/physics/ipc/core/ipc_state.md

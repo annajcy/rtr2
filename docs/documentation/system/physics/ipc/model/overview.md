@@ -8,7 +8,7 @@ Current files:
 - `src/rtr/system/physics/ipc/model/tet_body.hpp`: tetrahedral geometry, rest-shape precompute, body-level material data, and block generators
 - `src/rtr/system/physics/ipc/model/mesh_tet_converter/mesh_to_tet.hpp`: `ObjMeshData` to `TetGeometry` / `TetBody`
 - `src/rtr/system/physics/ipc/model/mesh_tet_converter/tet_to_mesh.hpp`: tet-surface extraction and tet-to-render-mesh conversion
-- `src/rtr/system/physics/ipc/model/obstacle_body.hpp`: placeholder obstacle body type
+- `src/rtr/system/physics/ipc/model/obstacle_body.hpp`: static obstacle triangle mesh data plus validation and edge extraction
 
 This layer answers:
 
@@ -16,5 +16,6 @@ This layer answers:
 - how one body maps into the global `IPCState`
 - how surface meshes are tetrahedralized
 - how tet geometry is turned into a renderable surface mesh
+- how static obstacle geometry is represented without entering the solver DOF vector
 
 It does not yet answer how energies, gradients, Hessians, or line searches are computed. Those belong to the future `energy/` and `solver/` layers.

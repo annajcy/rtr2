@@ -157,6 +157,16 @@ rtr_add_test(
     Eigen3::Eigen
 )
 rtr_add_test(
+    test_ipc_collision_mesh
+    system/physics/ipc/contact/collision_mesh_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_collision_candidates
+    system/physics/ipc/contact/collision_candidates_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
     test_ipc_fixed_corotated_material
     system/physics/ipc/fixed_corotated_material_test.cpp
     Eigen3::Eigen

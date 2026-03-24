@@ -102,6 +102,29 @@ $$
 | **求解器** | `newton_solver.hpp`, `line_search.hpp` | 带 DBC 和 line search 的非线性求解 |
 | **系统** | `ipc_system.hpp` | 编排：装配、求解、更新 |
 
+## Body 注册的两条路径
+
+`IPCSystem` 现在持有两套不同的 body 注册表：
+
+- deformable `TetBody`，它们会参与全局 DOF 装配
+- static `ObstacleBody`，它们只供 contact 预处理使用，不进入 `IPCState`
+
+这一区分对 IPC 接触架构很重要：
+
+- tet body 会影响 `m_state`、`m_free_dof_mask`、质量装配和 Newton 求解
+- obstacle body 只为 `contact/collision_mesh.hpp` 提供静态表面几何
+
+obstacle 侧 API 刻意保持很薄：
+
+```cpp
+IPCBodyID create_obstacle_body(ObstacleBody body);
+bool has_obstacle_body(IPCBodyID id) const;
+bool remove_obstacle_body(IPCBodyID id);
+const ObstacleBody& get_obstacle_body(IPCBodyID id) const;
+```
+
+注册 obstacle 不会把求解器状态标记为 dirty，因为 obstacle 本身没有需要重建的 deformable DOF。
+
 ## `IPCConfig`
 
 ```cpp
@@ -152,6 +175,13 @@ void rebuild_runtime_state() {
 `initialize()` 现在只是显式触发这次重建的入口。`create_tet_body` / `remove_tet_body` 会把系统标记为 dirty，而 `step(delta_seconds)` 会在求解前自动重建。
 
 `body.precompute()` 会从每个 body 的 material object 里读取 density，因此 `mass_diag` 的来源是 `TetBody::material`。
+
+Obstacle body 刻意不参与这次 rebuild。它们仍然可以通过 `get_obstacle_body(...)` 读取，但不会贡献到：
+
+- `total_vertices`
+- `m_state.resize(...)`
+- `mass_diag`
+- `m_free_dof_mask`
 
 ### DOF Offset 布局
 
@@ -217,6 +247,16 @@ void step(double delta_seconds) {
             m_state.v[i] = 0.0;
 }
 ```
+
+## 与 Contact 预处理的关系
+
+`IPCSystem` 自己不直接构建 contact candidates，但它是 contact 层能够成立的数据来源：
+
+- `tet_body_ids()` 和 `get_tet_body(...)` 提供 deformable surface 来源
+- `obstacle_body_ids()` 和 `get_obstacle_body(...)` 提供 static surface 来源
+- `state()` 提供当前 deformable 坐标
+
+也正因为如此，contact 层才能作为建立在 `IPCSystem` 之上的一层薄桥接，而不用和求解器内部细节缠在一起。
 
 ### 逐阶段理论
 

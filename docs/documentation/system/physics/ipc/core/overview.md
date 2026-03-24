@@ -5,7 +5,7 @@ The `core/` directory contains solver-facing state that is independent of any si
 Current contents:
 
 - `src/rtr/system/physics/ipc/core/ipc_state.hpp`: the global `3N` state vector used by the future FEM/IPC solver
-- `src/rtr/system/physics/ipc/core/ipc_system.hpp`: the system-level assembly and stepping wrapper that owns state, bodies, and Newton solve callbacks
+- `src/rtr/system/physics/ipc/core/ipc_system.hpp`: the system-level assembly and stepping wrapper that owns deformable state, tet bodies, static obstacle registration, and Newton solve callbacks
 
 This layer intentionally does not own:
 
