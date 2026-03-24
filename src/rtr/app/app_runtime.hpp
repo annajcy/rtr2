@@ -9,9 +9,10 @@
 #include <string>
 #include <utility>
 
+#include "rtr/app/frame_stepper.hpp"
+#include "rtr/app/frame_time_policy.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/world.hpp"
-#include "rtr/framework/integration/physics/scene_physics_step.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/frame_constants.hpp"
 #include "rtr/system/input/input_system.hpp"
@@ -88,7 +89,8 @@ private:
     bool          m_stop_requested{false};
     bool          m_paused{false};
     std::uint64_t m_frame_serial{0};
-    std::uint64_t m_fixed_tick_index{0};
+    std::uint64_t m_fixed_tick_serial{0};
+    FrameStepper  m_frame_stepper{};
 
 public:
     explicit AppRuntime(AppRuntimeConfig config = {})
@@ -160,13 +162,18 @@ public:
         };
 
         try {
-            double previous_time = default_now();
-            double accumulator   = 0.0;
-
             if (m_callbacks.on_startup) {
                 auto ctx = make_runtime_context(0.0);
                 m_callbacks.on_startup(ctx);
             }
+
+            RealtimeFrameTimePolicy time_policy(
+                m_config.fixed_delta_seconds,
+                m_config.max_fixed_steps_per_frame,
+                m_config.max_frame_delta_seconds,
+                default_now
+            );
+            time_policy.reset();
 
             while (!m_stop_requested && !m_renderer.window().is_should_close()) {
                 m_input_system.begin_frame();
@@ -178,56 +185,23 @@ public:
                     m_callbacks.on_input(ctx);
                 }
 
-                const double current_time = default_now();
-                double       frame_delta  = current_time - previous_time;
-                previous_time             = current_time;
-
-                if (frame_delta < 0.0) {
-                    frame_delta = 0.0;
-                }
-                if (m_config.max_frame_delta_seconds > 0.0) {
-                    frame_delta = std::min(frame_delta, m_config.max_frame_delta_seconds);
-                }
+                const FrameExecutionPlan frame_plan = time_policy.make_plan(m_paused);
 
                 if (m_callbacks.on_pre_update) {
-                    auto ctx = make_runtime_context(frame_delta);
+                    auto ctx = make_runtime_context(frame_plan.frame_delta_seconds);
                     m_callbacks.on_pre_update(ctx);
                 }
 
-                if (!m_paused) {
-                    if (m_config.fixed_delta_seconds > 0.0) {
-                        accumulator += frame_delta;
-                        std::uint32_t fixed_steps = 0;
-                        while (accumulator >= m_config.fixed_delta_seconds &&
-                               fixed_steps < m_config.max_fixed_steps_per_frame) {
-                            const framework::core::FixedTickContext fixed_ctx{
-                                .fixed_delta_seconds = m_config.fixed_delta_seconds,
-                                .fixed_tick_index    = m_fixed_tick_index++,
-                            };
-                            m_world.fixed_tick(fixed_ctx);
-                            if (auto* active_scene = m_world.active_scene(); active_scene != nullptr) {
-                                framework::integration::physics::step_scene_physics(
-                                    *active_scene,
-                                    m_physics_system,
-                                    static_cast<float>(fixed_ctx.fixed_delta_seconds)
-                                );
-                            }
-                            accumulator -= m_config.fixed_delta_seconds;
-                            ++fixed_steps;
-                        }
-                    }
-
-                    framework::core::FrameTickContext tick_ctx{
-                        .delta_seconds          = frame_delta,
-                        .unscaled_delta_seconds = frame_delta,
-                        .frame_index            = m_frame_serial,
-                    };
-                    m_world.tick(tick_ctx);
-                    m_world.late_tick(tick_ctx);
-                }
+                FrameStepperContext stepper_ctx{
+                    .world = m_world,
+                    .physics_system = m_physics_system,
+                    .fixed_tick_serial = m_fixed_tick_serial,
+                    .frame_serial = m_frame_serial,
+                };
+                m_frame_stepper.execute(frame_plan, stepper_ctx);
 
                 if (m_callbacks.on_post_update) {
-                    auto ctx = make_runtime_context(frame_delta);
+                    auto ctx = make_runtime_context(frame_plan.frame_delta_seconds);
                     m_callbacks.on_post_update(ctx);
                 }
 
@@ -236,18 +210,18 @@ public:
                     .resources     = m_resources,
                     .input         = m_input_system,
                     .frame_serial  = m_frame_serial,
-                    .delta_seconds = frame_delta,
+                    .delta_seconds = frame_plan.frame_delta_seconds,
                 });
 
                 if (m_callbacks.on_pre_render) {
-                    auto ctx = make_runtime_context(frame_delta);
+                    auto ctx = make_runtime_context(frame_plan.frame_delta_seconds);
                     m_callbacks.on_pre_render(ctx);
                 }
 
                 m_renderer.draw_frame();
 
                 if (m_callbacks.on_post_render) {
-                    auto ctx = make_runtime_context(frame_delta);
+                    auto ctx = make_runtime_context(frame_plan.frame_delta_seconds);
                     m_callbacks.on_post_render(ctx);
                 }
 
@@ -265,7 +239,7 @@ public:
             log->error("Runtime main loop failed: {}", e.what());
         }
 
-        result.fixed_ticks = m_fixed_tick_index;
+        result.fixed_ticks = m_fixed_tick_serial;
 
         try {
             if (m_callbacks.on_shutdown) {

@@ -31,7 +31,7 @@ TEST(FrameworkResetPositionComponentTest, ResetsPositionWhenThresholdIsReached) 
     reset_position.set_reset_position(pbpt::math::Vec3{0.5f, 3.0f, -0.5f});
 
     rigid_body.set_position(pbpt::math::Vec3{0.0f, -1.5f, 0.0f});
-    scene.fixed_tick(core::FixedTickContext{.fixed_delta_seconds = 0.1, .fixed_tick_index = 0});
+    scene.fixed_tick(core::FixedTickContext{.fixed_delta_seconds = 0.1});
 
     const auto position = rigid_body.position();
     EXPECT_NEAR(position.x(), 0.5f, 1e-5f);
@@ -64,7 +64,7 @@ TEST(FrameworkResetPositionComponentTest, ResetClearsTranslationDynamicsButPrese
     rigid_body.sync_runtime_state_from(*physics_body);
 
     rigid_body.set_position(pbpt::math::Vec3{0.0f, -1.5f, 0.0f});
-    scene.fixed_tick(core::FixedTickContext{.fixed_delta_seconds = 0.1, .fixed_tick_index = 0});
+    scene.fixed_tick(core::FixedTickContext{.fixed_delta_seconds = 0.1});
     integration::physics::sync_scene_to_rigid_body(scene, physics_world);
 
     const auto velocity = rigid_body.linear_velocity();
@@ -95,7 +95,7 @@ TEST(FrameworkResetPositionComponentTest, UpdatedParametersAffectNextFixedTick) 
     reset_position.set_reset_position(pbpt::math::Vec3{1.0f, 4.0f, 0.0f});
 
     rigid_body.set_position(pbpt::math::Vec3{0.0f, -0.2f, 0.0f});
-    scene.fixed_tick(core::FixedTickContext{.fixed_delta_seconds = 0.1, .fixed_tick_index = 0});
+    scene.fixed_tick(core::FixedTickContext{.fixed_delta_seconds = 0.1});
 
     const auto position = rigid_body.position();
     EXPECT_NEAR(position.x(), 1.0f, 1e-5f);

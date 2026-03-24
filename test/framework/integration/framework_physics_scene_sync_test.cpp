@@ -113,7 +113,6 @@ TEST(PhysicsSceneIntegrationTest, FixedTickAppliesGravityAndSyncsBackToSceneGrap
     for (std::uint64_t i = 0; i < 10; ++i) {
         physics.fixed_tick(scene, framework::core::FixedTickContext{
                                              .fixed_delta_seconds = 0.1,
-                                             .fixed_tick_index    = i,
                                          });
     }
 
@@ -137,7 +136,6 @@ TEST(PhysicsSceneIntegrationTest, DisableGravityStopsAutomaticFalling) {
     for (std::uint64_t i = 0; i < 10; ++i) {
         physics.fixed_tick(scene, framework::core::FixedTickContext{
                                              .fixed_delta_seconds = 0.1,
-                                             .fixed_tick_index    = i,
                                          });
     }
 
@@ -158,7 +156,6 @@ TEST(PhysicsSceneIntegrationTest, UpwardForceCanCancelGravity) {
         rigid_body.add_force(pbpt::math::Vec3{0.0f, 9.81f * rigid_body.mass(), 0.0f});
         physics.fixed_tick(scene, framework::core::FixedTickContext{
                                              .fixed_delta_seconds = 0.1,
-                                             .fixed_tick_index    = i,
                                          });
     }
 
@@ -177,7 +174,6 @@ TEST(PhysicsSceneIntegrationTest, FixedTickClearsAccumulatedForce) {
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     const auto& state = body_for(physics, moving).state();
@@ -201,7 +197,6 @@ TEST(PhysicsSceneIntegrationTest, TorqueUpdatesAngularVelocityAndSyncsRotation) 
         rigid_body.add_torque(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
         physics.fixed_tick(scene, framework::core::FixedTickContext{
                                              .fixed_delta_seconds = 0.1,
-                                             .fixed_tick_index    = i,
                                          });
     }
 
@@ -222,7 +217,6 @@ TEST(PhysicsSceneIntegrationTest, ZeroInverseInertiaPreventsRotation) {
         rigid_body.add_torque(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
         physics.fixed_tick(scene, framework::core::FixedTickContext{
                                              .fixed_delta_seconds = 0.1,
-                                             .fixed_tick_index    = i,
                                          });
     }
 
@@ -248,7 +242,6 @@ TEST(PhysicsSceneIntegrationTest, ForceAtCenterProducesNoTorque) {
     rigid_body.add_force_at_point(pbpt::math::Vec3{1.0f, 0.0f, 0.0f}, rigid_body.position());
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_GT(rigid_body.linear_velocity().x(), 0.0f);
@@ -269,7 +262,6 @@ TEST(PhysicsSceneIntegrationTest, OffCenterForceProducesTranslationAndRotation) 
     rigid_body.add_force_at_point(pbpt::math::Vec3{1.0f, 0.0f, 0.0f}, pbpt::math::Vec3{0.0f, 0.0f, 1.0f});
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_GT(rigid_body.linear_velocity().x(), 0.0f);
@@ -291,7 +283,6 @@ TEST(PhysicsSceneIntegrationTest, ResetDynamicsAndPositionInvalidateLeapfrogStat
         rigid_body.add_torque(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
         physics.fixed_tick(scene, framework::core::FixedTickContext{
                                              .fixed_delta_seconds = 0.1,
-                                             .fixed_tick_index    = i,
                                          });
     }
 
@@ -301,7 +292,6 @@ TEST(PhysicsSceneIntegrationTest, ResetDynamicsAndPositionInvalidateLeapfrogStat
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 5,
                                      });
 
     const auto pos = scene.scene_graph().node(moving.id()).local_position();
@@ -324,7 +314,6 @@ TEST(PhysicsSceneIntegrationTest, SetOrientationNormalizesAndSyncsBackToSceneGra
     rigid_body.set_orientation(raw_orientation);
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     const auto orientation = rigid_body.orientation();
@@ -342,7 +331,6 @@ TEST(PhysicsSceneIntegrationTest, DestroyRemovesRigidBodyFromRigidBodySystem) {
     (void)moving.add_component<framework::component::SphereCollider>(0.5f);
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
     const auto rigid_body_id = body_id_for(physics, moving);
     const auto collider_ids  = physics.world().colliders_for_body(rigid_body_id);
@@ -368,13 +356,11 @@ TEST(PhysicsSceneIntegrationTest, StaticBodyTransformSyncsColliderOnNextFixedTic
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     wall.node().set_local_position(pbpt::math::Vec3{2.0f, 0.0f, 0.0f});
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 1,
                                      });
 
     const auto wall_colliders = colliders_for(physics, wall);
@@ -408,7 +394,6 @@ TEST(PhysicsSceneIntegrationTest, DynamicSpheresCollideAndStayStoppedOnNextTick)
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.6,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_NEAR(left_body.linear_velocity().x(), 0.0f, 1e-4f);
@@ -416,7 +401,6 @@ TEST(PhysicsSceneIntegrationTest, DynamicSpheresCollideAndStayStoppedOnNextTick)
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.5,
-                                         .fixed_tick_index    = 1,
                                      });
 
     EXPECT_NEAR(left_body.linear_velocity().x(), 0.0f, 1e-4f);
@@ -456,7 +440,6 @@ TEST(PhysicsSceneIntegrationTest, FallingSphereStaysNearStaticRotatedBoxSurface)
     for (std::uint64_t i = 0; i < 90; ++i) {
         physics.fixed_tick(scene, framework::core::FixedTickContext{
                                              .fixed_delta_seconds = 1.0 / 60.0,
-                                             .fixed_tick_index    = i,
                                          });
     }
 
@@ -494,7 +477,6 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxClearsOnlyNormalVelocity
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.25,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_NEAR(sphere_body.linear_velocity().x(), 0.0f, 1e-4f);
@@ -543,7 +525,6 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticFloorFrictionProducesAngula
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_NEAR(sphere_body.linear_velocity().y(), 0.0f, 1e-4f);
@@ -570,7 +551,6 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticBoxUsesMaxRestitutionForBou
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.25,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_NEAR(sphere_body.linear_velocity().x(), -1.6f, 1e-4f);
@@ -598,7 +578,6 @@ TEST(PhysicsSceneIntegrationTest, SphereAgainstStaticFloorFrictionReducesTangent
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_NEAR(sphere_body.linear_velocity().x(), 1.7f, 1e-4f);
@@ -625,7 +604,6 @@ TEST(PhysicsSceneIntegrationTest, ZeroInverseInertiaKeepsCollisionFromAddingAngu
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_NEAR(sphere_body.angular_velocity().x(), 0.0f, 1e-5f);
@@ -654,7 +632,6 @@ TEST(PhysicsSceneIntegrationTest, ZeroFrictionPreservesTangentialVelocity) {
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_NEAR(sphere_body.linear_velocity().x(), 2.0f, 1e-4f);
@@ -692,7 +669,6 @@ TEST(PhysicsSceneIntegrationTest, DynamicBodiesOffCenterCollisionProducesFiniteA
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.25,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_TRUE(std::isfinite(sphere_body.linear_velocity().x()));
@@ -731,7 +707,6 @@ TEST(PhysicsSceneIntegrationTest, SolverIterationsReducePenetrationAcrossStacked
     for (std::uint64_t i = 0; i < 180; ++i) {
         physics.fixed_tick(scene, framework::core::FixedTickContext{
                                              .fixed_delta_seconds = 1.0 / 120.0,
-                                             .fixed_tick_index    = i,
                                          });
     }
 
@@ -788,7 +763,6 @@ TEST(PhysicsSceneIntegrationTest, AccumulatedFrictionDoesNotReverseTangentialVel
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_GE(sphere_body.linear_velocity().x(), -1e-4f);
@@ -814,7 +788,6 @@ TEST(PhysicsSceneIntegrationTest, DynamicSphereCollidesWithStaticPlaneAndCorrect
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_TRUE(std::isfinite(sphere_body.position().x()));
@@ -862,7 +835,6 @@ TEST(PhysicsSceneIntegrationTest, DynamicBoxCollidesWithStaticPlaneAndGeneratesA
 
     physics.fixed_tick(scene, framework::core::FixedTickContext{
                                          .fixed_delta_seconds = 0.1,
-                                         .fixed_tick_index    = 0,
                                      });
 
     EXPECT_TRUE(std::isfinite(box_body.position().x()));

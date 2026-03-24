@@ -34,7 +34,7 @@ TEST(FrameworkCameraControllerTest, InactiveCameraDoesNotRunDerivedUpdate) {
 
     system::input::InputState input{};
     auto&                     controller = go.add_component<ProbeCameraController>(input);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
     EXPECT_EQ(controller.update_calls, 0);
 }
 
@@ -46,7 +46,7 @@ TEST(FrameworkCameraControllerTest, ActiveCameraRunsDerivedUpdate) {
 
     system::input::InputState input{};
     auto&                     controller = go.add_component<ProbeCameraController>(input);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
     EXPECT_EQ(controller.update_calls, 1);
 }
 
@@ -58,7 +58,7 @@ TEST(FrameworkCameraControllerTest, ConstructorInjectedInputKeepsControllerWorki
 
     system::input::InputState input{};
     auto&                     controller = go.add_component<ProbeCameraController>(input);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
     EXPECT_EQ(controller.update_calls, 1);
 }
 

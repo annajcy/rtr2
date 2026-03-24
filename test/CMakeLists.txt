@@ -53,6 +53,11 @@ rtr_add_test(
     utils/log_system_test.cpp
     rtr::runtime
 )
+rtr_add_test(
+    test_app_frame_timing
+    app/frame_timing_test.cpp
+    rtr::runtime
+)
 
 # system
 rtr_add_test(

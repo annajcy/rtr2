@@ -75,8 +75,8 @@ TEST(FrameworkEngineTest, RunDrivesWorldSceneGameObjectTickChain) {
     EXPECT_EQ(comp.fixed_count, 4u);
     EXPECT_EQ(comp.update_count, 3u);
     EXPECT_EQ(comp.late_count, 3u);
-    EXPECT_EQ(engine.fixed_tick_index(), 4u);
-    EXPECT_EQ(engine.frame_index(), 3u);
+    EXPECT_EQ(engine.fixed_tick_serial(), 4u);
+    EXPECT_EQ(engine.frame_serial(), 3u);
 
     ASSERT_EQ(loop_events.size(), 12u);
     EXPECT_EQ(loop_events[0], "input_begin");

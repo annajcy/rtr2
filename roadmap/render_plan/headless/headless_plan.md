@@ -523,17 +523,11 @@ struct FrameOutputTarget {
 
 ### 推荐实现方式
 
-对 `ForwardPipeline` 新增配置：
+不对 `ForwardPipeline` 增加“是否 editor / 是否 realtime”的模式配置。  
+直接统一成：
 
-```cpp
-enum class ForwardOutputMode {
-    RuntimeOwnedFinalImage,
-};
-```
-
-然后：
-
-- `RuntimeOwnedFinalImage`：pipeline 只负责生成 final offscreen image，输出动作交给 backend
+- pipeline 只负责生成 final output
+- output backend 负责决定 present / editor compose / offline export
 
 ### 范围
 
@@ -661,7 +655,7 @@ for (uint32_t output_frame = 0; output_frame < config.total_output_frames; ++out
     run_variable_update(frame_delta);
 
     pipeline->prepare_frame(... frame_delta ...);
-    renderer.render_offline_frame();
+    renderer.render_frame<OfflineImageOutputBackend>();
 
     resources.tick(frame_serial);
     ++frame_serial;
@@ -722,7 +716,7 @@ v0 的首选策略固定为：
   - 明确区分 `RealtimeFrameTimePolicy` 与 `OfflineFrameTimePolicy`
 - 新增：可选 `src/rtr/app/frame_stepper.hpp`
   - 放共享的 fixed step / variable step 执行语义
-- 新增：可选 `src/rtr/system/render/editor_output_backend.hpp`
+- 新增：可选 `src/rtr/editor/render/editor_output_backend.hpp`
   - 明确 editor 输出路径和普通 realtime/headless 分开
 
 ### 验收标准
@@ -1172,7 +1166,7 @@ OfflineRuntimeResult OfflineRuntime::run() {
 
         pipeline->prepare_frame(... plan.frame_delta_seconds ...);
         callbacks.on_pre_render(...);
-        renderer.render_offline_frame();
+        renderer.render_frame<OfflineImageOutputBackend>();
         callbacks.on_post_render(...);
 
         resources.tick(frame_serial);
@@ -1193,6 +1187,7 @@ struct RenderOutputTarget {
     const vk::raii::ImageView* image_view{};
     const vk::Image* image{};
     vk::ImageLayout expected_layout{vk::ImageLayout::eUndefined};
+    vk::Extent2D extent{};
 };
 ```
 
@@ -1202,16 +1197,21 @@ struct RenderFrameTicket {
     rhi::CommandBuffer* command_buffer{};
     vk::Extent2D render_extent{};
     std::optional<RenderOutputTarget> output_target{};
+    std::optional<uint32_t> swapchain_image_index{};
 };
 ```
 
 ```cpp
-class RenderOutputBackend {
-public:
-    virtual ~RenderOutputBackend() = default;
-
-    virtual std::optional<RenderFrameTicket> begin_frame() = 0;
-    virtual void end_frame(RenderFrameTicket& ticket) = 0;
+template <typename T>
+concept RenderOutputBackendConcept = requires(
+    T& backend,
+    RenderPipeline& pipeline,
+    FrameContext& frame_ctx,
+    RenderFrameTicket& ticket
+) {
+    { backend.begin_frame() } -> std::same_as<std::optional<RenderFrameTicket>>;
+    { backend.record_output(pipeline, frame_ctx) } -> std::same_as<void>;
+    { backend.end_frame(ticket) } -> std::same_as<void>;
 };
 ```
 
@@ -1220,43 +1220,38 @@ public:
 建议分成三个实现：
 
 ```cpp
-class SwapchainOutputBackend final : public RenderOutputBackend {
+class SwapchainOutputBackend final {
 public:
     explicit SwapchainOutputBackend(...);
 
-    std::optional<RenderFrameTicket> begin_frame() override;
-    void end_frame(RenderFrameTicket& ticket) override;
+    std::optional<RenderFrameTicket> begin_frame();
+    void record_output(RenderPipeline& pipeline, FrameContext& frame_ctx);
+    void end_frame(RenderFrameTicket& ticket);
 };
 ```
 
 ```cpp
-class EditorOutputBackend final : public RenderOutputBackend {
+class editor::render::EditorOutputBackend final : public IEditorInputCaptureSource {
 public:
     explicit EditorOutputBackend(...);
 
-    std::optional<RenderFrameTicket> begin_frame() override;
-    void end_frame(RenderFrameTicket& ticket) override;
+    std::optional<RenderFrameTicket> begin_frame();
+    void record_output(RenderPipeline& pipeline, FrameContext& frame_ctx);
+    void end_frame(RenderFrameTicket& ticket);
 };
 ```
 
 ```cpp
-class OfflineImageOutputBackend final : public RenderOutputBackend {
+class OfflineImageOutputBackend final {
 public:
     explicit OfflineImageOutputBackend(
         rhi::Device& device,
         const OfflineRuntimeConfig& config
     );
 
-    std::optional<RenderFrameTicket> begin_frame() override;
-    void end_frame(RenderFrameTicket& ticket) override;
-
-    std::uint64_t images_written() const;
-
-private:
-    void record_readback(
-        RenderFrameTicket& ticket,
-        const system::render::FrameContext& frame_ctx
-    );
+    std::optional<RenderFrameTicket> begin_frame();
+    void record_output(RenderPipeline& pipeline, FrameContext& frame_ctx);
+    void end_frame(RenderFrameTicket& ticket);
 };
 ```
 
@@ -1266,46 +1261,42 @@ private:
   - 返回 command buffer / frame index / render extent
   - realtime/editor 可能提供 `output_target`
   - headless 可以不提供 swapchain 风格的 `output_target`
+- `record_output()`
+  - realtime: 持有 realtime present pass，把 pipeline final output 输出到 swapchain
+  - editor: 持有 `EditorImGuiPass`，把 pipeline final output 作为 scene texture 进行 compose
+  - headless: 预留 readback/export 接口
 - `end_frame()`
-  - realtime/editor: submit + present / editor compose
-  - headless: submit + wait + readback + export
+  - realtime/editor: submit + present
+  - headless: 后续阶段再加 submit + wait + readback + export
 
 ### 9. Renderer 接口草案
 
-第一版不必把 `Renderer` 彻底模板化，先把 backend 作为运行时成员即可。
+`Renderer` 不维护运行时 `OutputMode`，而是直接持有三种 backend，并通过模板参数分发。
 
 ```cpp
 class Renderer {
 public:
-    enum class OutputMode {
-        Realtime,
-        Editor,
-        Offline,
-    };
-
-public:
     Renderer(int width, int height, std::string title);
 
     void set_pipeline(std::unique_ptr<RenderPipeline> pipeline);
-    void set_output_mode(OutputMode mode);
+    void bind_editor_host(std::shared_ptr<editor::EditorHost> host);
 
-    void draw_frame();
-    void render_offline_frame();
+    template <RenderOutputBackendConcept TBackend>
+    TBackend& backend();
+
+    template <RenderOutputBackendConcept TBackend>
+    void render_frame();
 
     PipelineRuntime build_pipeline_runtime();
 };
 ```
 
-更进一步的重构方向可以是：
+实现上保留一个共享 helper：
 
 ```cpp
-void render_frame_with_backend(RenderOutputBackend& backend);
+template <RenderOutputBackendConcept TBackend>
+void render_frame_with_backend(TBackend& backend);
 ```
-
-然后：
-
-- `draw_frame()` 走 realtime/editor backend
-- `render_offline_frame()` 走 offline backend
 
 ### 10. Frame Context 草案
 
@@ -1323,6 +1314,7 @@ public:
     );
 
     rhi::CommandBuffer& cmd();
+    const rhi::Device& device() const;
     const vk::Extent2D& render_extent() const;
     uint32_t frame_index() const;
 
@@ -1333,9 +1325,14 @@ public:
 
 ### 11. Forward Pipeline 草案
 
-第一版建议把“final offscreen image”作为显式查询接口暴露给 backend。
+pipeline 只负责生成最终输出，不再区分 editor 版 / realtime 版。
 
 ```cpp
+struct PipelineFinalOutput {
+    TrackedImage color;
+    vk::Extent2D extent{};
+};
+
 class ForwardPipeline final : public RenderPipeline {
 public:
     explicit ForwardPipeline(const PipelineRuntime& runtime, const ForwardPipelineConfig& config = {});
@@ -1343,22 +1340,22 @@ public:
     void prepare_frame(const FramePrepareContext& ctx) override;
     void render(FrameContext& ctx) override;
 
-    const FrameTrackedImage& final_color_image(uint32_t frame_index) const;
-    vk::Extent2D final_image_extent() const;
+    PipelineFinalOutput final_output(uint32_t frame_index) const override;
 };
 ```
 
-这样 backend 可以在 pipeline render 结束后，读取：
+同一原则适用于：
 
-- 当前 frame 对应的 final color image
-- 它的 layout
-- 它的 extent
+- `ShaderToyPipeline`
+- `EditableShaderToyPipeline`
 
-然后决定：
+对应的 editor-specific pipeline：
 
-- realtime: blit / present
-- editor: sample / compose
-- headless: readback / export
+- `ForwardEditorPipeline`
+- `ShaderToyEditorPipeline`
+- `EditableShaderToyEditorPipeline`
+
+都应被删除，改为“纯 pipeline + `editor::render::EditorOutputBackend`”。
 
 ### 12. Image Readback 草案
 

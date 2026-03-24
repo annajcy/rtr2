@@ -132,7 +132,7 @@ v0 should produce these deliverables:
    - offline image backend
 4. Pipeline/output handoff:
    - `FrameContext` no longer hard-requires swapchain image
-   - `ForwardPipeline` exposes final offscreen image
+   - pipelines expose final output for backend consumption
 5. Readback utility:
    - `image_readback.hpp`
 6. Example:
@@ -150,7 +150,7 @@ v0 should produce these deliverables:
 - `src/rtr/app/frame_stepper.hpp`
 - `src/rtr/app/offline_runtime.hpp`
 - `src/rtr/system/render/output_backend.hpp`
-- `src/rtr/system/render/editor_output_backend.hpp`
+- `src/rtr/editor/render/editor_output_backend.hpp`
 - `src/rtr/system/render/offline_image_output_backend.hpp`
 - `src/rtr/rhi/image_readback.hpp`
 - `examples/headless/ipc_offline_render.cpp`
@@ -162,7 +162,12 @@ v0 should produce these deliverables:
 - `src/rtr/system/render/renderer.hpp`
 - `src/rtr/system/render/frame_context.hpp`
 - `src/rtr/system/render/pipeline/forward/forward_pipeline.hpp`
+- `src/rtr/system/render/pipeline/shadertoy/shadertoy_pipeline.hpp`
 - `src/rtr/system/render/pass/present_pass.hpp`
+- `src/rtr/system/render/pass/present_image_pass.hpp`
+- `src/rtr/editor/render/forward_editor_pipeline.hpp`
+- `src/rtr/editor/render/shadertoy_editor_pipeline.hpp`
+- `src/rtr/editor/render/editable_shadertoy_editor_pipeline.hpp`
 - `examples/CMakeLists.txt`
 
 ### Files that should remain untouched in v0 unless blocked
@@ -264,11 +269,11 @@ Refactor `AppRuntime::run()` so that:
 
 ---
 
-## Step 2: Introduce output backend abstraction in `Renderer`
+## Step 2: Backend-owned output, generic `FrameContext`, and template dispatch
 
 ### Goal
 
-Stop hardcoding acquire/render/present into a single frame path.
+Move all present / editor compose ownership out of pipelines and into output backends.
 
 ### New interfaces
 
@@ -277,6 +282,7 @@ struct RenderOutputTarget {
     const vk::raii::ImageView* image_view{};
     const vk::Image* image{};
     vk::ImageLayout expected_layout{vk::ImageLayout::eUndefined};
+    vk::Extent2D extent{};
 };
 ```
 
@@ -286,73 +292,84 @@ struct RenderFrameTicket {
     rhi::CommandBuffer* command_buffer{};
     vk::Extent2D render_extent{};
     std::optional<RenderOutputTarget> output_target{};
+    std::optional<uint32_t> swapchain_image_index{};
 };
 ```
 
 ```cpp
-class RenderOutputBackend {
-public:
-    virtual ~RenderOutputBackend() = default;
-    virtual std::optional<RenderFrameTicket> begin_frame() = 0;
-    virtual void end_frame(RenderFrameTicket& ticket) = 0;
+template <typename T>
+concept RenderOutputBackendConcept = requires(
+    T& backend,
+    RenderPipeline& pipeline,
+    FrameContext& frame_ctx,
+    RenderFrameTicket& ticket
+) {
+    { backend.begin_frame() } -> std::same_as<std::optional<RenderFrameTicket>>;
+    { backend.record_output(pipeline, frame_ctx) } -> std::same_as<void>;
+    { backend.end_frame(ticket) } -> std::same_as<void>;
 };
 ```
 
 ### v0 concrete backends
 
 ```cpp
-class SwapchainOutputBackend final : public RenderOutputBackend { ... };
-class EditorOutputBackend final : public RenderOutputBackend { ... };
-class OfflineImageOutputBackend final : public RenderOutputBackend { ... };
+class SwapchainOutputBackend final { ... };
+class editor::render::EditorOutputBackend final { ... };
+class OfflineImageOutputBackend final { ... };
 ```
 
-`EditorOutputBackend` should be introduced in v0 now.  
-The goal is not to finish a broad editor refactor, but to ensure `Renderer` does not keep editor behavior as an implicit special case outside the backend abstraction.
+Rules fixed for step2:
+
+- `SwapchainOutputBackend` owns realtime present.
+- `editor::render::EditorOutputBackend` lives in the editor module and owns editor compose / imgui pass.
+- `OfflineImageOutputBackend` only reserves the interface in step2; it does not implement readback/export yet.
 
 ### Renderer target shape
 
 ```cpp
 class Renderer {
 public:
-    enum class OutputMode {
-        Realtime,
-        Editor,
-        Offline,
-    };
+    template <RenderOutputBackendConcept TBackend>
+    TBackend& backend();
 
-    void set_output_mode(OutputMode mode);
-    void draw_frame();
-    void render_offline_frame();
+    template <RenderOutputBackendConcept TBackend>
+    void render_frame();
+
+    void bind_editor_host(std::shared_ptr<editor::EditorHost> host);
 };
 ```
 
-Implementation guideline:
+Implementation rules:
 
-- both `draw_frame()` and `render_offline_frame()` should delegate to a shared helper
-- the shared helper should receive a `RenderOutputBackend&`
+- `Renderer` holds all three backends as members.
+- Backend selection is compile-time via template parameter, not runtime `OutputMode`.
+- `render_frame<TBackend>()` delegates to one shared helper.
+- `draw_frame()` / `set_output_mode()` / `render_offline_frame()` are not part of the target API.
 
 ### Detailed tasks
 
-1. Create output backend base interface.
+1. Genericize `FrameContext` so pipelines no longer require swapchain image/view.
 2. Move current frame scheduler acquire/present flow behind `SwapchainOutputBackend`.
-3. Introduce `EditorOutputBackend` in the same abstraction layer, even if its first implementation is thin.
-4. Keep realtime path behavior identical after the move.
-5. Add `Renderer::render_offline_frame()` that uses offline backend plumbing.
+3. Move editor imgui compose path behind `editor::render::EditorOutputBackend`.
+4. Make `Renderer` dispatch by backend template parameter.
+5. Add the backend concept and enforce it at the `Renderer::render_frame<TBackend>()` boundary.
+6. Leave `OfflineImageOutputBackend` as an unimplemented placeholder that throws a clear error when selected.
 
 ### Done when
 
-- `Renderer` no longer assumes swapchain output in its core record/submit path
-- realtime still renders as before
-- editor path is explicitly represented by `EditorOutputBackend`
-- offline mode has a place to plug in readback/export later
+- `Renderer` no longer hardcodes present/editor compose in its core record path
+- realtime present is backend-owned
+- editor compose is backend-owned
+- backend selection is compile-time, not runtime mode-based
+- offline backend has a stable integration point but is intentionally not implemented yet
 
 ---
 
-## Step 3: Decouple `FrameContext` and `ForwardPipeline` from swapchain ownership
+## Step 3: Unify pipeline contracts around final output
 
 ### Goal
 
-Make the renderer/pipeline boundary compatible with non-swapchain output.
+Make every pipeline produce a backend-consumable final output and remove editor-specific pipeline duplication.
 
 ### `FrameContext` target shape
 
@@ -368,6 +385,7 @@ public:
     );
 
     rhi::CommandBuffer& cmd();
+    const rhi::Device& device() const;
     const vk::Extent2D& render_extent() const;
     uint32_t frame_index() const;
 
@@ -376,44 +394,55 @@ public:
 };
 ```
 
-### `ForwardPipeline` target shape
+### `RenderPipeline` target shape
 
 ```cpp
-class ForwardPipeline final : public RenderPipeline {
-public:
-    void prepare_frame(const FramePrepareContext& ctx) override;
-    void render(FrameContext& ctx) override;
+struct PipelineFinalOutput {
+    TrackedImage color;
+    vk::Extent2D extent{};
+};
 
-    const FrameTrackedImage& final_color_image(uint32_t frame_index) const;
-    vk::Extent2D final_image_extent() const;
+class RenderPipeline {
+public:
+    virtual void prepare_frame(const FramePrepareContext& ctx);
+    virtual void render(FrameContext& ctx) = 0;
+    virtual PipelineFinalOutput final_output(uint32_t frame_index) const = 0;
 };
 ```
 
 ### v0 pipeline behavior
 
-`ForwardPipeline::render(...)` should:
+Every pipeline should:
 
-1. render scene into offscreen color/depth
-2. stop there
+1. render into offscreen targets
+2. leave its final output in a backend-consumable layout
+3. expose that final output through `final_output(frame_index)`
 
 It should no longer:
 
 - present
 - read back
 - save images
+- own editor imgui composition
 
-If realtime still needs swapchain output, that output should happen after pipeline render, in the realtime backend.
+Fixed rule for step3:
+
+- `ForwardPipeline` becomes the only forward-scene pipeline; `ForwardEditorPipeline` is removed.
+- `ShaderToyPipeline` and `EditableShaderToyPipeline` become pure content pipelines; `ShaderToyEditorPipeline` and `EditableShaderToyEditorPipeline` are removed.
+- how a pipeline is shown in realtime/editor/offline is solely a backend concern.
 
 ### Detailed tasks
 
-1. Remove swapchain hard requirement from `FrameContext`.
-2. Change `PresentPass` ownership so it becomes backend-side or realtime-only utility.
-3. Make `ForwardPipeline` expose final color image handle, layout, extent.
+1. Remove `PresentPass` / `PresentImagePass` ownership from pipelines and move them behind the relevant backend.
+2. Make `ForwardPipeline`, `ShaderToyPipeline`, and `EditableShaderToyPipeline` implement `final_output(...)`.
+3. Remove duplicate editor pipeline classes and migrate editor examples/callers to pure pipelines plus `EditorOutputBackend`.
+4. Move editor input capture ownership from editor pipelines to `EditorOutputBackend`.
 
 ### Done when
 
-- `ForwardPipeline` no longer owns the output action
-- offline backend can discover the final color image without poking into unrelated internals
+- no pipeline class directly presents or composes editor UI
+- no editor-specific duplicate pipeline remains for forward/shadertoy/editable shadertoy
+- backends consume pipeline final output through one uniform interface
 
 ---
 
@@ -508,7 +537,7 @@ Per output frame:
 4. `on_post_update`
 5. `pipeline->prepare_frame(...)`
 6. `on_pre_render`
-7. `renderer.render_offline_frame()`
+7. `renderer.render_frame<OfflineImageOutputBackend>()`
 8. `on_post_render`
 9. `resources.tick(frame_serial)`
 10. increment frame serial

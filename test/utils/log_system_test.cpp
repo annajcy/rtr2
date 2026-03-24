@@ -435,7 +435,7 @@ TEST(LogSystemTest, ControllerNodeChangeTraceLogsAppearAtTraceLevel) {
     (void)trackball_go.add_component<framework::component::TrackBallCameraController>(input);
 
     input.update_key(system::input::KeyCode::W, system::input::KeyAction::PRESS, system::input::KeyMod::NONE);
-    scene.tick({.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_serial = 0});
     input.update_key(system::input::KeyCode::W, system::input::KeyAction::RELEASE, system::input::KeyMod::NONE);
 
     free_look_camera.set_active(false);
@@ -447,7 +447,7 @@ TEST(LogSystemTest, ControllerNodeChangeTraceLogsAppearAtTraceLevel) {
         system::input::KeyMod::NONE
     );
     input.update_mouse_position(64.0, 24.0);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 1});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 1});
 
     get_logger("framework.component.free_look")->flush();
     get_logger("framework.component.trackball")->flush();

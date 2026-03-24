@@ -21,7 +21,7 @@ TEST(AngryBunnyControllerTest, WaitingStateKeepsBunnySpinningWithoutGravity) {
     auto& rigid_body = bunny.add_component<framework::component::RigidBody>();
     auto& controller = bunny.add_component<AngryBunnyController>(input_state);
 
-    scene.fixed_tick(framework::core::FixedTickContext{.fixed_delta_seconds = 1.0 / 60.0, .fixed_tick_index = 0});
+    scene.fixed_tick(framework::core::FixedTickContext{.fixed_delta_seconds = 1.0 / 60.0});
 
     EXPECT_FALSE(controller.launched());
     EXPECT_FALSE(rigid_body.use_gravity());
@@ -40,19 +40,19 @@ TEST(AngryBunnyControllerTest, LaunchAndResetEdgesUpdateStateOnce) {
     auto& controller = bunny.add_component<AngryBunnyController>(input_state);
 
     input_state.update_key(system::input::KeyCode::L, system::input::KeyAction::PRESS, system::input::KeyMod::NONE);
-    scene.fixed_tick(framework::core::FixedTickContext{.fixed_delta_seconds = 1.0 / 60.0, .fixed_tick_index = 0});
+    scene.fixed_tick(framework::core::FixedTickContext{.fixed_delta_seconds = 1.0 / 60.0});
 
     EXPECT_TRUE(controller.launched());
     EXPECT_TRUE(rigid_body.use_gravity());
     EXPECT_NEAR(rigid_body.linear_velocity().x(), controller.launch_linear_velocity().x(), 1e-5f);
 
     input_state.update_key(system::input::KeyCode::L, system::input::KeyAction::REPEAT, system::input::KeyMod::NONE);
-    scene.fixed_tick(framework::core::FixedTickContext{.fixed_delta_seconds = 1.0 / 60.0, .fixed_tick_index = 1});
+    scene.fixed_tick(framework::core::FixedTickContext{.fixed_delta_seconds = 1.0 / 60.0});
     EXPECT_NEAR(rigid_body.linear_velocity().x(), controller.launch_linear_velocity().x(), 1e-5f);
 
     input_state.update_key(system::input::KeyCode::L, system::input::KeyAction::RELEASE, system::input::KeyMod::NONE);
     input_state.update_key(system::input::KeyCode::R, system::input::KeyAction::PRESS, system::input::KeyMod::NONE);
-    scene.fixed_tick(framework::core::FixedTickContext{.fixed_delta_seconds = 1.0 / 60.0, .fixed_tick_index = 2});
+    scene.fixed_tick(framework::core::FixedTickContext{.fixed_delta_seconds = 1.0 / 60.0});
 
     EXPECT_FALSE(controller.launched());
     EXPECT_FALSE(rigid_body.use_gravity());

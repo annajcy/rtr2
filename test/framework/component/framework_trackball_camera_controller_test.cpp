@@ -34,7 +34,7 @@ TEST(FrameworkTrackballCameraControllerTest, LeftDragOrbitsAroundTargetAndPreser
     input.update_mouse_button(system::input::MouseButton::LEFT, system::input::KeyAction::PRESS,
                               system::input::KeyMod::NONE);
     input.update_mouse_position(120.0, 40.0);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
 
     const pbpt::math::Vec3 after        = go.node().world_position();
     const float            after_radius = pbpt::math::length(after - controller.target());
@@ -53,7 +53,7 @@ TEST(FrameworkTrackballCameraControllerTest, MiddleDragPansCameraAndTargetTogeth
     system::input::InputState input{};
     auto&                     controller = go.add_component<TrackBallCameraController>(input);
 
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
     const pbpt::math::Vec3 before_pos    = go.node().world_position();
     const pbpt::math::Vec3 before_target = controller.target();
     const pbpt::math::Vec3 before_offset = before_target - before_pos;
@@ -62,7 +62,7 @@ TEST(FrameworkTrackballCameraControllerTest, MiddleDragPansCameraAndTargetTogeth
     input.update_mouse_button(system::input::MouseButton::MIDDLE, system::input::KeyAction::PRESS,
                               system::input::KeyMod::NONE);
     input.update_mouse_position(80.0, -30.0);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 1});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 1});
 
     const pbpt::math::Vec3 after_pos    = go.node().world_position();
     const pbpt::math::Vec3 after_target = controller.target();
@@ -84,7 +84,7 @@ TEST(FrameworkTrackballCameraControllerTest, ScrollCallsAdjustZoomPerspective) {
 
     const pbpt::math::Vec3 before = go.node().world_position();
     input.update_mouse_scroll(0.0, 1.0);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
     const pbpt::math::Vec3 after = go.node().world_position();
 
     EXPECT_NEAR(after.z() - before.z(), 0.35f, 1e-4f);
@@ -111,7 +111,7 @@ TEST(FrameworkTrackballCameraControllerTest, OnlyActiveCameraResponds) {
     input.update_mouse_button(system::input::MouseButton::LEFT, system::input::KeyAction::PRESS,
                               system::input::KeyMod::NONE);
     input.update_mouse_position(40.0, 10.0);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
 
     const pbpt::math::Vec3 a_after_first = go_a.node().world_position();
     const pbpt::math::Vec3 b_after_first = go_b.node().world_position();
@@ -122,7 +122,7 @@ TEST(FrameworkTrackballCameraControllerTest, OnlyActiveCameraResponds) {
     camera_b.set_active(true);
     input.reset_deltas();
     input.update_mouse_position(90.0, 20.0);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 1});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 1});
 
     const pbpt::math::Vec3 a_after_second = go_a.node().world_position();
     const pbpt::math::Vec3 b_after_second = go_b.node().world_position();
@@ -151,7 +151,7 @@ TEST(FrameworkTrackballCameraControllerTest, PitchIsClamped) {
     input.update_mouse_button(system::input::MouseButton::LEFT, system::input::KeyAction::PRESS,
                               system::input::KeyMod::NONE);
     input.update_mouse_position(0.0, 8000.0);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
 
     const pbpt::math::Vec3 offset = go.node().world_position() - controller.target();
     const float            radius = pbpt::math::max(pbpt::math::length(offset), 1e-5f);
@@ -176,7 +176,7 @@ TEST(FrameworkTrackballCameraControllerTest, LeftHasPriorityOverMiddle) {
     input.update_mouse_button(system::input::MouseButton::MIDDLE, system::input::KeyAction::PRESS,
                               system::input::KeyMod::NONE);
     input.update_mouse_position(50.0, 25.0);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
 
     EXPECT_GT(pbpt::math::length(go.node().world_position() - before_pos), 1e-4f);
     expect_vec3_near(controller.target(), pbpt::math::Vec3(0.0f), 1e-5f);
@@ -200,7 +200,7 @@ TEST(FrameworkTrackballCameraControllerTest, CustomTargetOrbitWorks) {
     input.update_mouse_button(system::input::MouseButton::LEFT, system::input::KeyAction::PRESS,
                               system::input::KeyMod::NONE);
     input.update_mouse_position(80.0, -20.0);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
 
     const pbpt::math::Vec3 after        = go.node().world_position();
     const float            after_radius = pbpt::math::length(after - target);
@@ -219,7 +219,7 @@ TEST(FrameworkTrackballCameraControllerTest, InitializesLookingAtTargetBeforeMou
     auto&                     controller = go.add_component<TrackBallCameraController>(input);
     controller.set_target({0.0f, 0.0f, 0.0f});
 
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 0});
 
     const pbpt::math::Vec3 pos          = go.node().world_position();
     const pbpt::math::Vec3 expect_front = pbpt::math::normalize(controller.target() - pos);
