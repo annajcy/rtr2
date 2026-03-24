@@ -1,11 +1,16 @@
 #pragma once
 
 #include <concepts>
+#include <filesystem>
 #include <functional>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
+#include <fmt/format.h>
+
+#include "rtr/rhi/image_readback.hpp"
 #include "rtr/rhi/context.hpp"
 #include "rtr/rhi/window.hpp"
 #include "rtr/system/render/frame_context.hpp"
@@ -140,20 +145,102 @@ public:
     }
 };
 
-class OfflineImageOutputBackend final {
+struct OfflineImageOutputConfig {
+    bool export_frames{true};
+    std::filesystem::path output_dir{"output/frames"};
+    std::string filename_pattern{"frame_{:06d}.png"};
+    uint32_t starting_output_frame_index{0};
+};
+
+class OfflineImageOutputBackend final : public SwapchainFrameOutputBackendBase {
+private:
+    PresentPass m_present_pass{};
+    OfflineImageOutputConfig m_config{};
+    uint32_t m_next_output_frame_index{0};
+    std::optional<rtr::rhi::detail::PendingImageReadback> m_pending_readback{};
+    std::optional<std::filesystem::path> m_pending_output_path{};
+
 public:
-    explicit OfflineImageOutputBackend(RenderBackendServices /*services*/) {}
+    explicit OfflineImageOutputBackend(
+        RenderBackendServices services,
+        OfflineImageOutputConfig config = {}
+    )
+        : SwapchainFrameOutputBackendBase(std::move(services)),
+          m_config(std::move(config)),
+          m_next_output_frame_index(m_config.starting_output_frame_index) {}
 
     std::optional<RenderFrameTicket> begin_frame() {
-        throw std::logic_error("OfflineImageOutputBackend is not implemented in step2.");
+        return begin_swapchain_frame();
     }
 
-    void record_output(RenderPipeline&, FrameContext&) {
-        throw std::logic_error("OfflineImageOutputBackend is not implemented in step2.");
+    void record_output(RenderPipeline& pipeline, FrameContext& frame_ctx) {
+        auto final_output = pipeline.final_output(frame_ctx.frame_index());
+
+        if (frame_ctx.has_output_target()) {
+            m_present_pass.execute(
+                frame_ctx,
+                PresentPass::RenderPassResources{
+                    .src_color = final_output.color,
+                    .src_extent = final_output.extent
+                }
+            );
+        }
+
+        if (m_config.export_frames) {
+            const auto output_path = m_config.output_dir /
+                                     fmt::format(fmt::runtime(m_config.filename_pattern), m_next_output_frame_index);
+            m_pending_readback = rhi::detail::record_readback_copy(
+                m_services.device,
+                frame_ctx.cmd(),
+                rhi::ReadbackImageDesc{
+                    .image = *final_output.color.image.image(),
+                    .format = final_output.color.image.format(),
+                    .extent = final_output.extent,
+                    .current_layout = final_output.color.layout
+                }
+            );
+            m_pending_output_path = output_path;
+            ++m_next_output_frame_index;
+        }
+
+        if (frame_ctx.has_output_target()) {
+            transition_output_target_to_present(frame_ctx.cmd().command_buffer(), frame_ctx.output_target());
+        }
     }
 
-    void end_frame(const RenderFrameTicket&) {
-        throw std::logic_error("OfflineImageOutputBackend is not implemented in step2.");
+    void end_frame(const RenderFrameTicket& ticket) {
+        end_swapchain_frame(ticket);
+        if (m_config.export_frames) {
+            wait_for_frame_completion(ticket.frame_index);
+            flush_pending_readback();
+        }
+    }
+
+private:
+    void wait_for_frame_completion(uint32_t frame_index) {
+        const auto& per_frame = m_services.frame_scheduler.per_frame_resources();
+        if (frame_index >= per_frame.size()) {
+            throw std::runtime_error("OfflineImageOutputBackend frame index out of range.");
+        }
+        const vk::Result result = m_services.device.device().waitForFences(
+            *per_frame[frame_index].in_flight_fence,
+            VK_TRUE,
+            UINT64_MAX
+        );
+        if (result != vk::Result::eSuccess) {
+            throw std::runtime_error("OfflineImageOutputBackend failed waiting for frame fence.");
+        }
+    }
+
+    void flush_pending_readback() {
+        if (!m_pending_readback.has_value() || !m_pending_output_path.has_value()) {
+            return;
+        }
+
+        auto image = rhi::detail::finalize_readback_copy(std::move(*m_pending_readback));
+        rhi::save_png(*m_pending_output_path, image);
+        m_pending_readback.reset();
+        m_pending_output_path.reset();
     }
 };
 

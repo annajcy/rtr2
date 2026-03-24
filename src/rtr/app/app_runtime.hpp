@@ -307,6 +307,5 @@ private:
 };
 
 using AppRuntime = AppRuntimeT<system::render::SwapchainOutputBackend>;
-using OfflineAppRuntime = AppRuntimeT<system::render::OfflineImageOutputBackend>;
 
 }  // namespace rtr::app

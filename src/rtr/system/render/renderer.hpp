@@ -174,7 +174,17 @@ private:
 
 public:
     RendererT(int width, int height, std::string title)
-        : m_window(width, height, title),
+        : RendererT(
+              rhi::WindowCreateInfo{
+                  .width = width,
+                  .height = height,
+                  .title = std::move(title),
+              }
+          ) {}
+
+    template <typename... TBackendArgs>
+    explicit RendererT(rhi::WindowCreateInfo window_create_info, TBackendArgs&&... backend_args)
+        : m_window(std::move(window_create_info)),
           m_context(make_context_create_info(m_window)),
           m_device(m_context),
           m_compute_command_pool(
@@ -182,7 +192,7 @@ public:
               vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer
           ),
           m_frame_scheduler(m_window, m_context, m_device),
-          m_output_backend(build_backend_services()) {
+          m_output_backend(build_backend_services(), std::forward<TBackendArgs>(backend_args)...) {
         m_window_resize_subscription =
             m_window.window_resize_event().subscribe([this](int resize_width, int resize_height) {
                 on_window_resized(static_cast<uint32_t>(resize_width), static_cast<uint32_t>(resize_height));

@@ -15,6 +15,15 @@
 
 namespace rtr::rhi {
 
+struct WindowCreateInfo {
+    int width{800};
+    int height{600};
+    std::string title{"WindowGLFW"};
+    bool resizable{true};
+    bool visible{true};
+    bool focus_on_show{true};
+};
+
 class Window {
 public:
     using WindowResizeEvent = utils::Event<int, int>;
@@ -36,13 +45,22 @@ private:
 
 public:
     Window(int width, int height, const std::string& title)
-        : m_width(width), m_height(height), m_title(title) {
+        : Window(WindowCreateInfo{
+              .width = width,
+              .height = height,
+              .title = title,
+          }) {}
+
+    explicit Window(WindowCreateInfo create_info)
+        : m_width(create_info.width), m_height(create_info.height), m_title(std::move(create_info.title)) {
         if (!glfwInit()) {
             throw std::runtime_error("Failed to initialize GLFW");
         }
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        glfwWindowHint(GLFW_RESIZABLE, create_info.resizable ? GLFW_TRUE : GLFW_FALSE);
+        glfwWindowHint(GLFW_VISIBLE, create_info.visible ? GLFW_TRUE : GLFW_FALSE);
+        glfwWindowHint(GLFW_FOCUS_ON_SHOW, create_info.focus_on_show ? GLFW_TRUE : GLFW_FALSE);
 
         m_window = glfwCreateWindow(
             m_width,

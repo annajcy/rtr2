@@ -58,6 +58,11 @@ rtr_add_test(
     app/frame_timing_test.cpp
     rtr::runtime
 )
+rtr_add_test(
+    test_offline_runtime
+    app/offline_runtime_test.cpp
+    rtr::runtime
+)
 
 # system
 rtr_add_test(
