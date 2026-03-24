@@ -114,6 +114,14 @@ nav:
                       - Gravity Energy: documentation/system/physics/ipc/energy/gravity_energy.md
                       - Inertial Energy: documentation/system/physics/ipc/energy/inertial_energy.md
                       - Material Energy: documentation/system/physics/ipc/energy/material_energy.md
+                  - Geometry:
+                      - Overview: documentation/system/physics/ipc/geometry/overview.md
+                      - Distance Common: documentation/system/physics/ipc/geometry/distance_common.md
+                      - Distance Concept: documentation/system/physics/ipc/geometry/distance_concept.md
+                      - Edge Edge Distance: documentation/system/physics/ipc/geometry/edge_edge_distance.md
+                      - Point Edge Distance: documentation/system/physics/ipc/geometry/point_edge_distance.md
+                      - Point Point Distance: documentation/system/physics/ipc/geometry/point_point_distance.md
+                      - Point Triangle Distance: documentation/system/physics/ipc/geometry/point_triangle_distance.md
                   - Model:
                       - Overview: documentation/system/physics/ipc/model/overview.md
                       - Mesh Tet Converter:

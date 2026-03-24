@@ -132,6 +132,31 @@ rtr_add_test(
     Eigen3::Eigen
 )
 rtr_add_test(
+    test_ipc_distance_concept
+    system/physics/ipc/geometry/distance_concept_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_point_point_distance
+    system/physics/ipc/geometry/point_point_distance_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_point_edge_distance
+    system/physics/ipc/geometry/point_edge_distance_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_point_triangle_distance
+    system/physics/ipc/geometry/point_triangle_distance_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_edge_edge_distance
+    system/physics/ipc/geometry/edge_edge_distance_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
     test_ipc_fixed_corotated_material
     system/physics/ipc/fixed_corotated_material_test.cpp
     Eigen3::Eigen

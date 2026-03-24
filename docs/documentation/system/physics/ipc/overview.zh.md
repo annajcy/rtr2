@@ -6,6 +6,7 @@
 
 - `core/`：面向求解器的全局状态容器
 - `model/`：body 元数据、tet 几何以及 tet/mesh 转换辅助
+- `geometry/`：局部 primitive 距离核与局部 dense 导数
 - `energy/`：未来的弹性能、惯性能、重力、接触能入口
 - `solver/`：未来的 Newton、line search 和系统装配入口
 
@@ -14,15 +15,15 @@
 - 全局 `3N` 状态向量 `IPCState`
 - body 到全局自由度的映射元数据 `IPCBodyInfo`
 - 四面体参考构型与预计算 `TetGeometry`、`TetBody`
+- 局部 PP / PE / PT / EE 距离核及其 dense gradient / Hessian
 - surface 到 tet 的 meshing 入口 `mesh_tet_converter/mesh_to_tet.hpp`
 - tet 到渲染网格的写回工具 `mesh_tet_converter/tet_to_mesh.hpp`
 
 当前还没有实现：
 
-- tet 弹性能计算
-- 全局系统装配
-- Newton / line search 求解循环
-- contact barrier / CCD
+- contact barrier 与 contact candidate 管理
+- 建立在局部距离核上的 CCD
+- 完整的全局接触装配
 - 通过 `step_scene_physics(...)` 和 `ipc_system.step(dt)` 接入的 deformable runtime
 
 ## 模块关系
@@ -36,9 +37,14 @@ TetGeometry / TetBody
     -> 未来的 energy / solver 管线
     -> tet_rest_to_surface_mesh(...) / update_surface_mesh_from_tet_dofs(...)
     -> 供渲染使用的 ObjMeshData
+
+局部 primitive 坐标
+    -> geometry distance kernels
+    -> 局部 dense distance / gradient / hessian
+    -> 未来的 barrier / CCD / 导数测试
 ```
 
-`model/` 负责几何和映射元数据，`core/` 负责求解器直接操作的全局向量，未来 `energy/` 和 `solver/` 会同时消费这两层数据。
+`model/` 负责 body 几何与映射元数据，`core/` 负责求解器直接操作的全局向量，`geometry/` 负责局部 primitive 求值，未来 `energy/`、contact 与 `solver/` 会共同消费这些下层模块。
 
 ## 当前边界
 
