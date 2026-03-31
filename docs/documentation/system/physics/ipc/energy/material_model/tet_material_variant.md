@@ -1,6 +1,6 @@
 # `tet_material_variant.hpp`
 
-[`tet_material_variant.hpp`](/Users/jinceyang/Desktop/codebase/graphics/rtr2/src/rtr/system/physics/ipc/energy/material_model/tet_material_variant.hpp) defines the runtime material container used by `TetBody`.
+[`tet_material_variant.hpp`](https://github.com/annajcy/rtr2/blob/main/src/rtr/system/physics/ipc/energy/material_model/tet_material_variant.hpp) defines the runtime material container used by `TetBody`.
 
 ## Role
 

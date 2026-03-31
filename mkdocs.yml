@@ -1,7 +1,9 @@
 site_name: RTR2
 site_description: Real-time 3D rendering engine with Vulkan and Slang
+site_url: https://annajcy.github.io/rtr2/
 repo_url: https://github.com/annajcy/rtr2
 edit_uri: edit/main/docs/
+strict: true
 
 theme:
   name: material
