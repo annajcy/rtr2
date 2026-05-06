@@ -3,6 +3,7 @@
 include(CMakeFindDependencyMacro)
 
 find_dependency(VulkanLoader CONFIG REQUIRED)
+find_dependency(Eigen3 CONFIG REQUIRED)
 find_dependency(glfw3 CONFIG REQUIRED)
 find_dependency(TinyGLTF CONFIG REQUIRED)
 find_dependency(stb CONFIG REQUIRED)

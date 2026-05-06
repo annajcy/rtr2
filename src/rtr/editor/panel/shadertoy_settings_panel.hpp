@@ -5,17 +5,17 @@
 
 #include "imgui.h"
 #include "rtr/editor/core/editor_panel.hpp"
-#include "rtr/editor/render/shadertoy_editor_pipeline.hpp"
+#include "rtr/system/render/pipeline/shadertoy/shadertoy_pipeline.hpp"
 
 namespace rtr::editor {
 
 class ShaderToySettingsPanel final : public IEditorPanel {
 private:
-    render::ShaderToyEditorPipeline* m_pipeline{nullptr};
+    system::render::ShaderToyPipeline* m_pipeline{nullptr};
     bool                             m_visible{true};
 
 public:
-    explicit ShaderToySettingsPanel(render::ShaderToyEditorPipeline* pipeline) : m_pipeline(pipeline) {}
+    explicit ShaderToySettingsPanel(system::render::ShaderToyPipeline* pipeline) : m_pipeline(pipeline) {}
 
     std::string_view id() const override { return "shadertoy_settings"; }
     int              order() const override { return 100; }

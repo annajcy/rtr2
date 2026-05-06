@@ -1,8 +1,26 @@
 # Day 1 Checklist
 
+> Naming note: `TetSurfaceResult` has been renamed to `TetSurfaceMapping` after the mesh/tet converter refactor.
+
 ## 执行顺序与进度追踪
 
 按顺序执行，每完成一项打勾。
+
+### Phase -1: 清理 Physics 目录
+
+- [ ] `collision/` 移入 `rigid_body/collision/`
+- [ ] 修改 `rigid_body_world.hpp`、`collider.hpp`、`contact.hpp` 的 collision include 路径
+- [ ] `common/` 文件分流：ids/material/step_context -> `rigid_body/`
+- [ ] `normal_recompute.hpp` 提到 `physics/` 顶层
+- [ ] 删除 `cloth/` 全链路（源/框架/编辑器/测试/示例）
+- [ ] 修改 `physics_system.hpp`：去掉 ClothWorld
+- [ ] 修改 `scene_physics_step.hpp`：去掉 cloth sync
+- [ ] 修改 `inspector_panel.hpp`：去掉 cloth include
+- [ ] `fem/tet_surface_extract.hpp` 移到 `ipc/model/`
+- [ ] 删除 `coupling/`、`common/`（如已空）
+- [ ] 新建 `ipc/{core,model,energy,solver}/` 目录
+- [ ] 更新 `test/CMakeLists.txt`：删 cloth 测试、改 collision 测试路径
+- [ ] `cmake --build` 成功 + 现有测试通过
 
 ### Phase 0: Eigen 引入
 
@@ -17,7 +35,7 @@
 - [ ] 建目录 `test/system/physics/ipc/solver/`
 - [ ] `core/ipc_state.hpp` 完成
 - [ ] `model/ipc_body.hpp` 完成
-- [ ] `model/tet_body.hpp` 完成（含 precompute）
+- [ ] `model/tet_body.hpp` 完成（含 precompute + AxisConstraint + fix_vertex/fix_vertex_axis）
 - [ ] `model/obstacle_body.hpp` 占位完成
 - [ ] tet block 生成工具完成
 - [ ] `ipc_state_test.cpp` 通过
@@ -26,9 +44,12 @@
 ### Phase 2: 能量模块
 
 - [ ] `energy/inertial_energy.hpp` 完成
-- [ ] `energy/tet_material_model.hpp` 抽象完成
-- [ ] `energy/tet_fixed_corotated_energy.hpp` 完成（至少 energy + PK1）
-- [ ] `energy/tet_elastic_assembler.hpp` 完成
+- [ ] `energy/gravity_energy.hpp` 完成
+- [ ] `energy/tet_material_model.hpp` concept 定义完成
+- [ ] `energy/tet_fixed_corotated_energy.hpp` 完成（至少 energy + PK1），满足 `MaterialModel` concept
+- [ ] `energy/material_model/tet_material_variant.hpp` 完成（`TetMaterialVariant` = `std::variant<FixedCorotated, ...>`）
+- [ ] `energy/material_energy.hpp` 完成（`MaterialModel` → 全局 DOF 的桥接）
+- [ ] `material_energy_variant` 命名空间完成（`std::visit` dispatch per-body material）
 - [ ] 单 tet energy 手算验证正确
 
 ### Phase 3: Solver
@@ -47,18 +68,33 @@
 - [ ] `compute_x_hat()` 含重力修正
 - [ ] 总能量/梯度/Hessian 装配路径打通
 
+### Phase 4b: IPCSystem 接入 PhysicsSystem
+
+- [ ] `PhysicsSystem` 新增 `ipc_system()` 访问器
+- [ ] `IPCBodyComponent` 完成（body_index + TetSurfaceMapping 缓存）
+- [ ] `ipc_scene_sync.hpp` 完成：`sync_ipc_to_scene()` 将 IPC DOF 写回 DeformableMeshComponent
+- [ ] `scene_physics_step.hpp` 新增 IPC step + sync 调用
+
+### Phase 4c: IPC Demo
+
+- [ ] `examples/editor/ipc_falling_block_editor.cpp` 完成
+- [ ] `examples/CMakeLists.txt` 新增 target
+- [ ] demo 编译运行：方块在窗口中可见
+- [ ] demo 运行时：方块在重力下下落，DeformableMesh 每帧更新
+- [ ] demo 运行时：光照法线正确（无黑面）
+
 ### Phase 5: 测试
 
 - [ ] `ipc_tet_smoke_test.cpp` SingleStepNoNaN 通过
 - [ ] `ipc_tet_smoke_test.cpp` MultiStepStable 通过
 - [ ] `ipc_tet_smoke_test.cpp` ZeroGravityStationary 通过
+- [ ] `ipc_tet_smoke_test.cpp` SlipDBCBottomPlane 通过
 - [ ] cmake build + ctest 全部通过
 
 ### 可选
 
 - [ ] tet elastic energy FD gradient check
 - [ ] inertial energy FD gradient check
-- [ ] headless demo 入口
 
 ## Day 1 结束时必须回答的问题
 

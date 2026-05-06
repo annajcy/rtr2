@@ -14,6 +14,9 @@ public:
         : RenderPipeline(runtime) {}
 
     void render(FrameContext&) override {}
+    PipelineFinalOutput final_output(uint32_t) override {
+        throw std::logic_error("ProbePipeline final_output should not be called in this test.");
+    }
 
     const SwapchainChangeSummary& last_diff() const { return m_last_diff; }
     const FrameScheduler::SwapchainState& last_state() const { return m_last_state; }

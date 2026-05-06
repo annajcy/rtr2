@@ -83,7 +83,7 @@ TEST(SceneGraphTest, ParentInactiveMakesChildInactive) {
     ASSERT_TRUE(scene.scene_graph().set_parent(child.id(), parent.id()));
 
     parent.set_enabled(false);
-    scene.tick(FrameTickContext{.delta_seconds = 0.016, .unscaled_delta_seconds = 0.016, .frame_index = 0});
+    scene.tick(FrameTickContext{.delta_seconds = 0.016, .unscaled_delta_seconds = 0.016, .frame_serial = 0});
 
     const auto active = scene.scene_graph().active_nodes();
     EXPECT_FALSE(std::find(active.begin(), active.end(), parent.id()) != active.end());

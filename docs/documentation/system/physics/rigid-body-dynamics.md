@@ -1,12 +1,12 @@
-# Rigid Body Dynamics Theory and Implementation
+# RigidBodySystem Theory and Implementation
 
-This page documents the rigid-body half of the current RTR2 physics runtime. The broader runtime now includes both `RigidBodyWorld` and `ClothWorld`; detailed architecture and algorithm notes are maintained in the Chinese pages under `docs/documentation/system/physics/*.zh.md`.
+This page documents the rigid-body half of the current RTR2 physics runtime. The broader runtime now includes both `rb::RigidBodySystem` and `ipc::IPCSystem`; detailed architecture and algorithm notes are maintained in the Chinese pages under `docs/documentation/system/physics/*.zh.md`.
 
 ## Runtime Context
 
 - Scene/physics synchronization is performed by `step_scene_physics(...)`.
-- `PhysicsSystem::step(dt)` currently calls `RigidBodyWorld::step(dt)` first and `ClothWorld::step(dt)` second.
-- This page focuses only on `RigidBodyWorld`.
+- `step_scene_physics(...)` explicitly calls `rb::RigidBodySystem::step(dt)`.
+- This page focuses only on `rb::RigidBodySystem`.
 
 ## Current Pipeline
 
@@ -36,7 +36,7 @@ clear external forces
 
 ## Code Map
 
-- `src/rtr/system/physics/rigid_body/rigid_body_world.hpp`
+- `src/rtr/system/physics/rigid_body/rigid_body_system.hpp`
 - `src/rtr/system/physics/rigid_body/contact.hpp`
 - `src/rtr/system/physics/collision/*.hpp`
 - `src/rtr/framework/integration/physics/rigid_body_scene_sync.hpp`

@@ -12,7 +12,6 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
-#include "rtr/app/app_runtime.hpp"
 #include "rtr/editor/core/editor_panel.hpp"
 #include "rtr/utils/log.hpp"
 
@@ -203,8 +202,14 @@ private:
     }
 
 public:
-    explicit EditorHost(app::AppRuntime& runtime)
-        : m_context(runtime.world(), runtime.resource_manager(), runtime.renderer(), runtime.input_system()) {}
+    template <typename TRuntime>
+    explicit EditorHost(TRuntime& runtime)
+        : m_context(
+              runtime.world(),
+              runtime.resource_manager(),
+              runtime.renderer(),
+              runtime.input_system()
+          ) {}
 
     void reset_layout() {
         m_default_layout_initialized = false;

@@ -64,6 +64,7 @@ class RTRConan(ConanFile):
         )
 
     def requirements(self):
+        self.requires("eigen/3.4.0", transitive_headers=True)
         self.requires("glfw/3.4", transitive_headers=True)
         self.requires("nlohmann_json/[>=3.11 <4]", transitive_headers=True)
         self.requires("tinygltf/[>=2.8 <3]")
@@ -129,6 +130,7 @@ class RTRConan(ConanFile):
         runtime_component.set_property("cmake_target_name", "rtr::runtime")
         runtime_component.requires = [
             "stb_impl",
+            "eigen::eigen",
             "glfw::glfw",
             "vulkan-loader::vulkan-loader",
             "spdlog::spdlog",

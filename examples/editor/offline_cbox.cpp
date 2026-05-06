@@ -10,7 +10,7 @@
 
 #include "imgui.h"
 
-#include "rtr/app/app_runtime.hpp"
+#include "rtr/editor/core/editor_app_runtime.hpp"
 #include "rtr/editor/core/editor_capture.hpp"
 #include "rtr/editor/core/editor_host.hpp"
 #include "rtr/editor/panel/hierarchy_panel.hpp"
@@ -18,11 +18,12 @@
 #include "rtr/editor/panel/logger_panel.hpp"
 #include "rtr/editor/panel/scene_view_panel.hpp"
 #include "rtr/editor/panel/stats_panel.hpp"
-#include "rtr/editor/render/forward_editor_pipeline.hpp"
+#include "rtr/editor/render/editor_output_backend.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/integration/pbpt/pbpt_offline_render_service.hpp"
 #include "rtr/framework/integration/pbpt/serde/scene_loader.hpp"
 #include "rtr/resource/resource_manager.hpp"
+#include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
 #include "rtr/system/input/input_types.hpp"
 
 namespace {
@@ -90,7 +91,7 @@ private:
     };
 
     rtr::framework::integration::PbptOfflineRenderService& m_offline_render_service;
-    rtr::app::AppRuntime&                                  m_runtime;
+    rtr::editor::EditorAppRuntime&                         m_runtime;
     const rtr::framework::integration::LoadSummary&        m_import_result;
     uint32_t                                               m_scene_width{0};
     uint32_t                                               m_scene_height{0};
@@ -99,7 +100,7 @@ private:
 
 public:
     OfflineRenderPanel(rtr::framework::integration::PbptOfflineRenderService& offline_render_service,
-                       rtr::app::AppRuntime& runtime, const rtr::framework::integration::LoadSummary& import_result,
+                       rtr::editor::EditorAppRuntime& runtime, const rtr::framework::integration::LoadSummary& import_result,
                        uint32_t scene_width, uint32_t scene_height, const std::string& scene_xml_path,
                        const std::string& output_exr_path, const std::string& output_scene_xml_path)
         : m_offline_render_service(offline_render_service),
@@ -192,7 +193,7 @@ public:
 
 int main() {
     try {
-        rtr::app::AppRuntime                                  runtime(rtr::app::AppRuntimeConfig{
+        rtr::editor::EditorAppRuntime                         runtime(rtr::app::AppRuntimeConfig{
                                              .window_width  = 1280,
                                              .window_height = 720,
                                              .window_title  = "RTR Framework Offline CBox",
@@ -240,9 +241,10 @@ int main() {
             (resource_manager.resource_root_dir() / kCboxSceneRootRel / kOutputExrPath).string(),
             (resource_manager.resource_root_dir() / kCboxSceneRootRel / kOutputSceneXmlFilename).string()));
 
-        auto editor_pipeline = std::make_unique<rtr::editor::render::ForwardEditorPipeline>(
-            runtime.renderer().build_pipeline_runtime(), editor_host);
-        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), *editor_pipeline);
+        runtime.renderer().output_backend().bind_editor_host(editor_host);
+        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), runtime.renderer().output_backend());
+        auto editor_pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
+            runtime.renderer().build_pipeline_runtime());
         runtime.set_pipeline(std::move(editor_pipeline));
 
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{

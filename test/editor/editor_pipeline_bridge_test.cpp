@@ -9,7 +9,7 @@
 #include "rtr/system/render/pipeline/shadertoy/shadertoy_pipeline.hpp"
 
 // Test removed since EditorOverlayPipeline and bind_input_capture_to_editor were removed.
-// We will test editor interactions during Phase 3 after ForwardEditorPipeline is cleanly assembled.
+// Editor interactions are exercised through EditorOutputBackend integration targets.
 #if 0
 namespace rtr::editor::test {
 // ... old test code ...

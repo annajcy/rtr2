@@ -1,7 +1,9 @@
 site_name: RTR2
 site_description: Real-time 3D rendering engine with Vulkan and Slang
+site_url: https://annajcy.github.io/rtr2/
 repo_url: https://github.com/annajcy/rtr2
 edit_uri: edit/main/docs/
+strict: true
 
 theme:
   name: material
@@ -48,14 +50,98 @@ nav:
   - Headless MCP: headless-mcp.md
   - Documentation:
       - Overview: documentation/overview.md
+      - Editor:
+          - Overview: documentation/editor/overview.md
+          - Render:
+              # BEGIN AUTO-GENERATED EDITOR RENDER NAV
+              - Overview: documentation/editor/render/overview.md
+              - Editor Imgui Pass: documentation/editor/render/editor_imgui_pass.md
+              - Editor Output Backend: documentation/editor/render/editor_output_backend.md
+              # END AUTO-GENERATED EDITOR RENDER NAV
       - System:
           - Render:
+              # BEGIN AUTO-GENERATED RENDER NAV
+              - Overview: documentation/system/render/overview.md
+              - Pass:
+                  - Overview: documentation/system/render/pass/overview.md
+                  - Present Image Pass: documentation/system/render/pass/present_image_pass.md
+                  - Present Pass: documentation/system/render/pass/present_pass.md
+              - Pipeline:
+                  - Overview: documentation/system/render/pipeline/overview.md
+                  - Forward:
+                      - Overview: documentation/system/render/pipeline/forward/overview.md
+                      - Forward Pass: documentation/system/render/pipeline/forward/forward_pass.md
+                      - Forward Pipeline: documentation/system/render/pipeline/forward/forward_pipeline.md
+                      - Forward Scene View: documentation/system/render/pipeline/forward/forward_scene_view.md
+                  - Shadertoy:
+                      - Overview: documentation/system/render/pipeline/shadertoy/overview.md
+                      - Editable Shadertoy Pipeline: documentation/system/render/pipeline/shadertoy/editable_shadertoy_pipeline.md
+                      - Editable Shadertoy Reload Controller: documentation/system/render/pipeline/shadertoy/editable_shadertoy_reload_controller.md
+                      - Shadertoy Compute Pass: documentation/system/render/pipeline/shadertoy/shadertoy_compute_pass.md
+                      - Shadertoy Pipeline: documentation/system/render/pipeline/shadertoy/shadertoy_pipeline.md
+              - Utils:
+                  - Overview: documentation/system/render/utils/overview.md
+                  - Shader Compiler: documentation/system/render/utils/shader_compiler.md
+              - Frame Context: documentation/system/render/frame_context.md
+              - Frame Scheduler: documentation/system/render/frame_scheduler.md
+              - Output Backend: documentation/system/render/output_backend.md
+              - Render Pass: documentation/system/render/render_pass.md
+              - Render Pipeline: documentation/system/render/render_pipeline.md
+              - Render Resource State: documentation/system/render/render_resource_state.md
+              - Renderer: documentation/system/render/renderer.md
+              - Scene Target Controller: documentation/system/render/scene_target_controller.md
+              # END AUTO-GENERATED RENDER NAV
               - Camera and Coordinates: documentation/system/render/camera-coordinate-conventions.md
           - Physics:
               - Overview: documentation/system/physics/overview.md
               - Runtime Integration: documentation/system/physics/runtime-integration.md
-              - Cloth Simulation: documentation/system/physics/cloth-simulation.md
+              - IPC Scene Bridge: documentation/system/physics/ipc-scene-bridge.md
+              - IPC Fixed-End Block Example: documentation/system/physics/ipc-fixed-end-block-example.md
               - Rigid Body Dynamics: documentation/system/physics/rigid-body-dynamics.md
+              # BEGIN AUTO-GENERATED PHYSICS NAV
+              - IPC:
+                  - Overview: documentation/system/physics/ipc/overview.md
+                  - Contact:
+                      - Overview: documentation/system/physics/ipc/contact/overview.md
+                      - Collision Candidates: documentation/system/physics/ipc/contact/collision_candidates.md
+                      - Collision Mesh: documentation/system/physics/ipc/contact/collision_mesh.md
+                  - Core:
+                      - Overview: documentation/system/physics/ipc/core/overview.md
+                      - IPC State: documentation/system/physics/ipc/core/ipc_state.md
+                      - IPC System: documentation/system/physics/ipc/core/ipc_system.md
+                  - Energy:
+                      - Overview: documentation/system/physics/ipc/energy/overview.md
+                      - Material Model:
+                          - Overview: documentation/system/physics/ipc/energy/material_model/overview.md
+                          - Tet Fixed Corotated: documentation/system/physics/ipc/energy/material_model/tet_fixed_corotated.md
+                          - Tet Material Model Concept: documentation/system/physics/ipc/energy/material_model/tet_material_model_concept.md
+                          - Tet Material Variant: documentation/system/physics/ipc/energy/material_model/tet_material_variant.md
+                      - Energy Concept: documentation/system/physics/ipc/energy/energy_concept.md
+                      - Gravity Energy: documentation/system/physics/ipc/energy/gravity_energy.md
+                      - Inertial Energy: documentation/system/physics/ipc/energy/inertial_energy.md
+                      - Material Energy: documentation/system/physics/ipc/energy/material_energy.md
+                  - Geometry:
+                      - Overview: documentation/system/physics/ipc/geometry/overview.md
+                      - Distance Common: documentation/system/physics/ipc/geometry/distance_common.md
+                      - Distance Concept: documentation/system/physics/ipc/geometry/distance_concept.md
+                      - Edge Edge Distance: documentation/system/physics/ipc/geometry/edge_edge_distance.md
+                      - Point Edge Distance: documentation/system/physics/ipc/geometry/point_edge_distance.md
+                      - Point Point Distance: documentation/system/physics/ipc/geometry/point_point_distance.md
+                      - Point Triangle Distance: documentation/system/physics/ipc/geometry/point_triangle_distance.md
+                  - Model:
+                      - Overview: documentation/system/physics/ipc/model/overview.md
+                      - Mesh Tet Converter:
+                          - Overview: documentation/system/physics/ipc/model/mesh_tet_converter/overview.md
+                          - Mesh To Tet: documentation/system/physics/ipc/model/mesh_tet_converter/mesh_to_tet.md
+                          - Tet To Mesh: documentation/system/physics/ipc/model/mesh_tet_converter/tet_to_mesh.md
+                      - IPC Body: documentation/system/physics/ipc/model/ipc_body.md
+                      - Obstacle Body: documentation/system/physics/ipc/model/obstacle_body.md
+                      - Tet Body: documentation/system/physics/ipc/model/tet_body.md
+                  - Solver:
+                      - Overview: documentation/system/physics/ipc/solver/overview.md
+                      - Line Search: documentation/system/physics/ipc/solver/line_search.md
+                      - Newton Solver: documentation/system/physics/ipc/solver/newton_solver.md
+              # END AUTO-GENERATED PHYSICS NAV
       - Utils: documentation/utils.md
   - Profiling:
       - MacOS: profiling/macos.md

@@ -48,8 +48,8 @@ private:
     LoopHooks m_hooks{};
     bool m_stop_requested{false};
     bool m_paused{false};
-    std::uint64_t m_fixed_tick_index{0};
-    std::uint64_t m_frame_index{0};
+    std::uint64_t m_fixed_tick_serial{0};
+    std::uint64_t m_frame_serial{0};
 
 public:
     explicit Engine(EngineConfig config = {})
@@ -110,12 +110,12 @@ public:
         return m_paused;
     }
 
-    std::uint64_t fixed_tick_index() const {
-        return m_fixed_tick_index;
+    std::uint64_t fixed_tick_serial() const {
+        return m_fixed_tick_serial;
     }
 
-    std::uint64_t frame_index() const {
-        return m_frame_index;
+    std::uint64_t frame_serial() const {
+        return m_frame_serial;
     }
 
     void run() {
@@ -176,9 +176,10 @@ public:
                     accumulator += frame_delta;
                     std::uint32_t fixed_steps = 0;
                     while (accumulator >= fixed_dt && fixed_steps < m_config.max_fixed_steps_per_frame) {
+                        const std::uint64_t fixed_tick_serial = m_fixed_tick_serial++;
                         fixed_tick(FixedTickContext{
                             .fixed_delta_seconds = fixed_dt,
-                            .fixed_tick_index = m_fixed_tick_index++,
+                            .fixed_tick_serial = fixed_tick_serial,
                         });
                         accumulator -= fixed_dt;
                         ++fixed_steps;
@@ -188,7 +189,7 @@ public:
                 FrameTickContext frame_ctx{
                     .delta_seconds = frame_delta,
                     .unscaled_delta_seconds = frame_delta,
-                    .frame_index = m_frame_index++,
+                    .frame_serial = m_frame_serial++,
                 };
                 tick(frame_ctx);
                 late_tick(frame_ctx);
@@ -205,8 +206,8 @@ public:
 
         log->info(
             "Engine run finished (frames={}, fixed_ticks={}, stop_requested={}, should_close={})",
-            m_frame_index,
-            m_fixed_tick_index,
+            m_frame_serial,
+            m_fixed_tick_serial,
             m_stop_requested,
             closed_by_hook
         );

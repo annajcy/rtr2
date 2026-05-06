@@ -6,6 +6,7 @@
 
 #include "gtest/gtest.h"
 
+#include "rtr/system/render/render_resource_state.hpp"
 #include "rtr/system/render/renderer.hpp"
 
 namespace rtr::system::render::test {
@@ -24,20 +25,39 @@ void require_gpu_tests_enabled() {
 }
 
 class NoopPipeline final : public RenderPipeline {
+private:
+    std::array<FrameTrackedImage, rhi::kFramesInFlight> m_color_images;
+    vk::Extent2D m_extent{1, 1};
+
 public:
-    explicit NoopPipeline(const PipelineRuntime& runtime) : RenderPipeline(runtime) {}
+    explicit NoopPipeline(const PipelineRuntime& runtime)
+        : RenderPipeline(runtime),
+          m_color_images(create_color_images(vk::Extent2D{1, 1})) {}
+
+    PipelineFinalOutput final_output(uint32_t frame_index) override {
+        return PipelineFinalOutput{
+            .color = m_color_images[frame_index].view(),
+            .extent = m_extent
+        };
+    }
 
     void render(FrameContext& ctx) override {
+        if (m_extent.width != ctx.render_extent().width || m_extent.height != ctx.render_extent().height) {
+            m_extent = ctx.render_extent();
+            m_color_images = create_color_images(m_extent);
+        }
+
         auto& cmd = ctx.cmd().command_buffer();
+        auto& tracked_color = m_color_images[ctx.frame_index()];
 
         vk::ImageMemoryBarrier2 to_color{};
         to_color.srcStageMask                    = vk::PipelineStageFlagBits2::eTopOfPipe;
         to_color.dstStageMask                    = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
         to_color.srcAccessMask                   = vk::AccessFlagBits2::eNone;
         to_color.dstAccessMask                   = vk::AccessFlagBits2::eColorAttachmentWrite;
-        to_color.oldLayout                       = vk::ImageLayout::eUndefined;
+        to_color.oldLayout                       = tracked_color.layout;
         to_color.newLayout                       = vk::ImageLayout::eColorAttachmentOptimal;
-        to_color.image                           = ctx.swapchain_image();
+        to_color.image                           = *tracked_color.image.image();
         to_color.subresourceRange.aspectMask     = vk::ImageAspectFlagBits::eColor;
         to_color.subresourceRange.baseMipLevel   = 0;
         to_color.subresourceRange.levelCount     = 1;
@@ -50,7 +70,7 @@ public:
         cmd.pipelineBarrier2(dep);
 
         vk::RenderingAttachmentInfo color_attachment{};
-        color_attachment.imageView   = *ctx.swapchain_image_view();
+        color_attachment.imageView   = *tracked_color.image.image_view();
         color_attachment.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
         color_attachment.loadOp      = vk::AttachmentLoadOp::eClear;
         color_attachment.storeOp     = vk::AttachmentStoreOp::eStore;
@@ -64,10 +84,37 @@ public:
         rendering_info.pColorAttachments    = &color_attachment;
         cmd.beginRendering(rendering_info);
         cmd.endRendering();
+        tracked_color.layout = vk::ImageLayout::eColorAttachmentOptimal;
     }
 
 private:
-    void handle_swapchain_state_change(const FrameScheduler::SwapchainState&, const SwapchainChangeSummary&) override {}
+    void handle_swapchain_state_change(const FrameScheduler::SwapchainState& state, const SwapchainChangeSummary&) override {
+        m_extent = state.extent;
+        if (m_extent.width > 0 && m_extent.height > 0) {
+            m_color_images = create_color_images(m_extent);
+        }
+    }
+
+    std::array<FrameTrackedImage, rhi::kFramesInFlight> create_color_images(vk::Extent2D extent) {
+        return make_frame_array<FrameTrackedImage>([&](uint32_t) {
+            return FrameTrackedImage{
+                rhi::Image(
+                    m_device,
+                    extent.width,
+                    extent.height,
+                    m_color_format,
+                    vk::ImageTiling::eOptimal,
+                    vk::ImageUsageFlagBits::eColorAttachment |
+                        vk::ImageUsageFlagBits::eSampled |
+                        vk::ImageUsageFlagBits::eTransferSrc,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal,
+                    vk::ImageAspectFlagBits::eColor,
+                    false
+                ),
+                vk::ImageLayout::eUndefined
+            };
+        });
+    }
 };
 
 }  // namespace

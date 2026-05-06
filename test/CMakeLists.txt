@@ -53,6 +53,16 @@ rtr_add_test(
     utils/log_system_test.cpp
     rtr::runtime
 )
+rtr_add_test(
+    test_app_frame_timing
+    app/frame_timing_test.cpp
+    rtr::runtime
+)
+rtr_add_test(
+    test_offline_runtime
+    app/offline_runtime_test.cpp
+    rtr::runtime
+)
 
 # system
 rtr_add_test(
@@ -67,6 +77,12 @@ rtr_add_test(
     rtr::runtime
 )
 rtr_add_test(
+    test_framework_ipc_scene_sync
+    framework/integration/framework_ipc_scene_sync_test.cpp
+    rtr::runtime
+    Eigen3::Eigen
+)
+rtr_add_test(
     test_collision_detection
     system/physics/collision/collision_detection_test.cpp
 )
@@ -75,36 +91,114 @@ rtr_add_test(
     system/physics/rigid_body/rigid_body_world_test.cpp
 )
 rtr_add_test(
-    test_cloth_mesh_topology_builder
-    system/physics/cloth/cloth_mesh_topology_builder_test.cpp
-)
-rtr_add_test(
-    test_cloth_state
-    system/physics/cloth/cloth_state_test.cpp
-)
-rtr_add_test(
-    test_cloth_spring
-    system/physics/cloth/cloth_spring_test.cpp
-)
-rtr_add_test(
-    test_cloth_world
-    system/physics/cloth/cloth_world_test.cpp
-)
-rtr_add_test(
     test_physics_system
     system/physics/physics_system/physics_system_test.cpp
+    Eigen3::Eigen
 )
 rtr_add_test(
-    test_tet_surface_extract
-    system/physics/fem/tet_surface_extract_test.cpp
+    test_tet_to_mesh
+    system/physics/ipc/tet_to_mesh_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_mesh_to_tet
+    system/physics/ipc/mesh_to_tet_test.cpp
+    rtr::runtime
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_state
+    system/physics/ipc/ipc_state_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_tet_body
+    system/physics/ipc/tet_body_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_inertial_energy
+    system/physics/ipc/inertial_energy_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_gravity_energy
+    system/physics/ipc/gravity_energy_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_energy_concept
+    system/physics/ipc/energy_concept_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_distance_concept
+    system/physics/ipc/geometry/distance_concept_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_point_point_distance
+    system/physics/ipc/geometry/point_point_distance_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_point_edge_distance
+    system/physics/ipc/geometry/point_edge_distance_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_point_triangle_distance
+    system/physics/ipc/geometry/point_triangle_distance_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_edge_edge_distance
+    system/physics/ipc/geometry/edge_edge_distance_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_collision_mesh
+    system/physics/ipc/contact/collision_mesh_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_collision_candidates
+    system/physics/ipc/contact/collision_candidates_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_fixed_corotated_material
+    system/physics/ipc/fixed_corotated_material_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_material_energy
+    system/physics/ipc/material_energy_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_system
+    system/physics/ipc/ipc_system_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_line_search
+    system/physics/ipc/line_search_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_ipc_newton_solver
+    system/physics/ipc/newton_solver_test.cpp
+    Eigen3::Eigen
+)
+rtr_add_test(
+    test_eigen_compile
+    system/physics/ipc/eigen_compile_test.cpp
+    Eigen3::Eigen
 )
 rtr_add_test(
     test_normal_recompute
-    system/physics/common/normal_recompute_test.cpp
-)
-rtr_add_test(
-    test_deformable_mesh_state
-    system/physics/common/deformable_mesh_state_test.cpp
+    system/physics/normal_recompute_test.cpp
 )
 rtr_add_test(
     test_framework_forward_scene_view_builder
@@ -115,11 +209,7 @@ rtr_add_test(
     test_framework_scene_physics_step
     framework/integration/framework_scene_physics_step_test.cpp
     rtr::runtime
-)
-rtr_add_test(
-    test_framework_deformable_mesh_sync
-    framework/integration/framework_deformable_mesh_sync_test.cpp
-    rtr::runtime
+    Eigen3::Eigen
 )
 rtr_add_test(
     test_pipeline_base
@@ -193,11 +283,6 @@ rtr_add_integration_test(
     rtr::runtime
 )
 rtr_add_test(
-    test_framework_cloth_component
-    framework/component/framework_cloth_component_test.cpp
-    rtr::runtime
-)
-rtr_add_test(
     test_sine_wave_deformer
     framework/component/sine_wave_deformer_test.cpp
     rtr::runtime
@@ -219,6 +304,12 @@ rtr_add_test(
 rtr_add_test(
     test_framework_rigid_body_component
     framework/component/framework_rigid_body_component_test.cpp
+)
+rtr_add_test(
+    test_framework_ipc_tet_component
+    framework/component/framework_ipc_tet_component_test.cpp
+    rtr::runtime
+    Eigen3::Eigen
 )
 rtr_add_test(
     test_framework_collider_component

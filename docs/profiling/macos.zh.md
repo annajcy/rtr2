@@ -46,11 +46,12 @@ vulkaninfo --summary
 
 入口在 `examples/editor/quickstart.cpp`。
 
-这个 sample 走的是 `ForwardEditorPipeline`，不是纯 runtime 的 `ForwardPipeline`。因此一帧大致分成：
+这个 sample 现在走的是“纯 `ForwardPipeline` + `EditorOutputBackend`”路径，而不是单独的 `ForwardEditorPipeline`。因此一帧大致分成：
 
 1. `ForwardPass`：把 3D 场景渲染到离屏颜色目标
-2. 图像 barrier：让离屏颜色目标转成可采样，让 swapchain 转成 color attachment
-3. `EditorImGuiPass`：把编辑器 UI 画到 swapchain，上面的 scene view 会采样离屏图像
+2. 图像 barrier：让离屏颜色目标转成可采样
+3. `EditorOutputBackend`：把场景图像切到可采样状态，并准备输出目标
+4. `EditorImGuiPass`：把编辑器 UI 画到 swapchain，上面的 scene view 会采样离屏图像
 
 所以你在 Xcode 里看到的通常不是“一个场景 pass”，而是“场景 pass + UI pass”。
 
@@ -97,11 +98,11 @@ Xcode 会直接打开这份 trace。
 对 `quickstart` 来说，可以这样和源码对应：
 
 - 场景渲染耗时：
-  `ForwardEditorPipeline::render()` 里的 `m_forward_pass.execute(...)`
+  `ForwardPipeline::render()` 里的 `m_forward_pass.execute(...)`
 - barrier 段：
-  scene pass 和 editor pass 之间的 `pipelineBarrier2(...)`
+  `EditorOutputBackend::record_output(...)` 里把场景图像切到可采样状态的 barrier
 - UI / overlay 耗时：
-  `ForwardEditorPipeline::render()` 里的 `m_editor_pass.execute(...)`
+  `EditorOutputBackend::record_output(...)` 里调用的 `EditorImGuiPass::execute(...)`
 
 如果某一个 encoder 明显比其它段长，那就是第一嫌疑 pass。
 
@@ -119,7 +120,7 @@ Xcode 会直接打开这份 trace。
 
 先看这些文件：
 
-- `src/rtr/editor/render/forward_editor_pipeline.hpp`
+- `src/rtr/system/render/pipeline/forward/forward_pipeline.hpp`
 - `src/rtr/system/render/pipeline/forward/forward_pass.hpp`
 - `src/rtr/framework/integration/render/forward_scene_view_builder.hpp`
 
@@ -139,6 +140,7 @@ Xcode 会直接打开这份 trace。
 
 先看：
 
+- `src/rtr/editor/render/editor_output_backend.hpp`
 - `src/rtr/editor/render/editor_imgui_pass.hpp`
 
 优先问这几个问题：

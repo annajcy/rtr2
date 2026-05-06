@@ -14,7 +14,10 @@
 
 ### 编辑器渲染（`src/rtr/editor/render`）
 
-专用渲染 Pass，处理编辑器特有的叠层显示（Gizmo、网格等）。
+负责 editor 专用的输出合成和 UI 渲染。
+
+- **Editor Output Backend：** 消费纯场景 pipeline 的输出，再合成 editor UI。
+- **Editor ImGui Pass：** 把 ImGui 和 scene view 内容画到最终输出目标。
 
 -------
 
@@ -77,9 +80,10 @@
 
 管理 Vulkan 渲染管线、帧调度和资源同步。
 
-- **Renderer：** 高层级 Vulkan 渲染器控制。
-- **Frame Scheduler：** 管理多缓冲渲染与 Swapchain 交互。
-- **Pipelines：** `IRenderPipeline` 的定义及其具体实现。
+- **Renderer：** 按 output backend 参数化的 swapchain 渲染引导层。
+- **Frame Scheduler：** 负责多缓冲 swapchain acquire / submit / present 调度。
+- **Output Backends：** 处理 realtime present、editor 合成和 preview/export 输出。
+- **Pipelines：** 只产出最终 offscreen image 的纯内容 pipeline。
 
 ### 输入系统（`src/rtr/system/input`）
 
@@ -90,11 +94,11 @@
 
 ### 物理系统（`src/rtr/system/physics`）
 
-负责当前运行时中的刚体与布料模拟。
+负责当前运行时中的刚体与 IPC 形变模拟。
 
-- **PhysicsSystem：** 同时持有 `RigidBodyWorld` 与 `ClothWorld`。
-- **Fixed Tick 集成：** 框架层通过 `step_scene_physics(...)` 把 scene graph、刚体世界和 cloth 世界连接起来。
-- **文档入口：** 详见 `docs/documentation/system/physics/` 下的总览、运行时集成、Cloth Simulation 与 Rigid Body Dynamics。
+- **PhysicsSystem：** 同时持有 `rb::RigidBodySystem` 与 `ipc::IPCSystem`。
+- **Fixed Tick 集成：** 框架层通过 `step_scene_physics(...)` 把 scene graph、`rb::RigidBodySystem` 和 IPC 运行时连接起来。
+- **文档入口：** 详见 `docs/documentation/system/physics/` 下的总览、运行时集成、IPC bridge/example 与 Rigid Body Dynamics。
 
 ## RHI（`src/rtr/rhi`）
 

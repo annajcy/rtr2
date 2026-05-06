@@ -14,8 +14,6 @@
 #include <vector>
 
 #include <tiny_obj_loader.h>
-
-
 #include "rtr/utils/obj_types.hpp"
 
 namespace rtr::utils {

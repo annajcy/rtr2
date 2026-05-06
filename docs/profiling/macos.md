@@ -46,11 +46,12 @@ The `quickstart` executable is:
 
 Its entry point is `examples/editor/quickstart.cpp`.
 
-That sample uses `ForwardEditorPipeline`, not the plain runtime `ForwardPipeline`. The frame sequence is:
+That sample now uses a pure `ForwardPipeline` together with `EditorOutputBackend`. The frame sequence is:
 
 1. `ForwardPass`: render the 3D scene into an offscreen color target
-2. image barriers: offscreen target becomes shader-readable, swapchain becomes color-attachment
-3. `EditorImGuiPass`: draw the editor UI onto the swapchain, with the scene view sampling the offscreen image
+2. image barriers: offscreen target becomes shader-readable
+3. `EditorOutputBackend`: transition the scene image for sampling and prepare the output target
+4. `EditorImGuiPass`: draw the editor UI onto the swapchain, with the scene view sampling the offscreen image
 
 When you inspect the capture, expect to see both the scene render and the ImGui/editor overlay.
 
@@ -97,11 +98,11 @@ In Xcode GPU Frame Capture:
 For `quickstart`, use this mapping:
 
 - Scene rendering time:
-  `ForwardEditorPipeline::render()` calling `m_forward_pass.execute(...)`
+  `ForwardPipeline::render()` calling `m_forward_pass.execute(...)`
 - Barrier section:
-  `pipelineBarrier2(...)` between the scene pass and editor pass
+  `EditorOutputBackend::record_output(...)` transitioning the scene image for sampling
 - UI / overlay time:
-  `ForwardEditorPipeline::render()` calling `m_editor_pass.execute(...)`
+  `EditorImGuiPass::execute(...)` from `EditorOutputBackend::record_output(...)`
 
 If one encoder is much longer than the others, that is your first suspect pass.
 
@@ -119,7 +120,7 @@ Symptoms:
 
 Start from:
 
-- `src/rtr/editor/render/forward_editor_pipeline.hpp`
+- `src/rtr/system/render/pipeline/forward/forward_pipeline.hpp`
 - `src/rtr/system/render/pipeline/forward/forward_pass.hpp`
 - `src/rtr/framework/integration/render/forward_scene_view_builder.hpp`
 
@@ -139,6 +140,7 @@ Symptoms:
 
 Start from:
 
+- `src/rtr/editor/render/editor_output_backend.hpp`
 - `src/rtr/editor/render/editor_imgui_pass.hpp`
 
 Questions to ask:

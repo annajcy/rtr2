@@ -1,5 +1,36 @@
 # Phase 5: 测试与验证
 
+## 理论基础
+
+### 单元→全局装配
+
+**参考：Lec 2 §3.5-3.7**
+
+每个 tet 产生 12×12 局部 Hessian（4 顶点 × 3 DOF），用全局 DOF 索引 scatter 到 triplets，再用 `Eigen::SparseMatrix::setFromTriplets` 构建。
+
+```cpp
+// 对 tet t 的 4 个顶点 v[0..3]
+for (int a = 0; a < 4; ++a)
+    for (int b = 0; b < 4; ++b)
+        for (int di = 0; di < 3; ++di)
+            for (int dj = 0; dj < 3; ++dj)
+                triplets.emplace_back(3*v[a]+di, 3*v[b]+dj, local_H(3*a+di, 3*b+dj));
+```
+
+### 有限差分验证
+
+IPC 从零实现最重要的工程保障。对任意能量 $E(x)$：
+
+$$
+\frac{\partial E}{\partial x_i} \approx \frac{E(x + \epsilon e_i) - E(x - \epsilon e_i)}{2\epsilon}
+$$
+
+Day 1 FD 测试优先级：
+1. inertial energy gradient（二次型，精确到 $10^{-10}$）
+2. tet elastic energy gradient（非线性，精度 ~$10^{-5}$）
+
+---
+
 ## 测试注册
 
 在 `test/CMakeLists.txt` 中新增（需要 link Eigen）：
@@ -66,10 +97,16 @@ TEST(TetBodyTest, TetBlockGeneration)
   - 所有 rest_volumes > 0
   - precompute 不抛异常
 
-TEST(TetBodyTest, FixedVerticesMask)
+TEST(TetBodyTest, StickDBC)
   - 3x3x3 block
-  - 标记 y >= 2.0 的顶点为 fixed
-  - 验证 fixed_vertices 数量正确
+  - 标记 y >= 2.0 的顶点为 stick fixed (fix_vertex)
+  - 验证 vertex_constraints 中 is_stick() 数量正确
+
+TEST(TetBodyTest, AxisAlignedSlipDBC)
+  - 3x3x3 block
+  - 标记底部顶点 (y == 0) 为 y-slip: fix_vertex_axis(v, 1)
+  - 验证 vertex_constraints[v].fixed == {false, true, false}
+  - 验证 is_stick() == false, is_free() == false, any_fixed() == true
 ```
 
 ---
@@ -105,6 +142,16 @@ TEST(IPCTetSmokeTest, EnergyDecreases)
   - 给一些顶点初始速度
   - 观察能量（通过 solver log 或直接算）
   - 多步后系统倾向于静止（惯性能主导的阻尼效果）
+
+TEST(IPCTetSmokeTest, SlipDBCBottomPlane)
+  - 3x3x3 tet block
+  - 底部顶点 (y==0) 设为 y-slip: fix_vertex_axis(v, 1)
+  - 不固定顶部
+  - step 10 次
+  - 验证无 NaN
+  - 验证底部顶点 y 坐标始终 == 0（y 轴锁定）
+  - 验证底部顶点 x/z 坐标可以变化（自由滑动）
+  - 验证非底部顶点在重力下有 y 方向位移
 ```
 
 ---

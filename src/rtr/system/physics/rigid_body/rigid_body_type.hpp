@@ -1,6 +1,6 @@
 #pragma once
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 enum class RigidBodyType {
     Static,
@@ -8,4 +8,4 @@ enum class RigidBodyType {
     Kinematic,
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

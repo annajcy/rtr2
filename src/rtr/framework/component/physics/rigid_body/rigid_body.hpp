@@ -1,33 +1,44 @@
 #pragma once
 
 #include <cmath>
-#include <string>
 #include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include <pbpt/math/math.h>
 
 #include "rtr/framework/component/component.hpp"
 #include "rtr/framework/core/game_object.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body.hpp"
 
 namespace rtr::framework::component {
 
 class RigidBody final : public Component {
-private:
-    system::physics::RigidBodyWorld& m_physics_world;
-    system::physics::RigidBodyID   m_rigid_body_id{};
-    system::physics::RigidBodyType m_type{system::physics::RigidBodyType::Dynamic};
-    pbpt::math::Float              m_mass{1.0f};
-    bool                           m_use_gravity{true};
-    pbpt::math::Float              m_restitution{0.0f};
-    pbpt::math::Float              m_friction{0.0f};
-    pbpt::math::Float              m_linear_decay{1.0f};
-    pbpt::math::Float              m_angular_decay{1.0f};
-    pbpt::math::Mat3               m_inverse_inertia_tensor_ref{pbpt::math::Mat3::zeros()};
-    bool                           m_registered{false};
+public:
+    enum class PendingRigidBodyCommandType {
+        AddForce,
+        AddTorque,
+        AddForceAtPoint,
+        ClearForces,
+        ResetDynamics,
+        ResetTranslationDynamics,
+        ResetRotationalDynamics,
+    };
 
-    bool has_registered_body() const { return m_registered && m_physics_world.has_rigid_body(m_rigid_body_id); }
+    struct PendingRigidBodyCommand {
+        PendingRigidBodyCommandType type{};
+        pbpt::math::Vec3 value{0.0f};
+        pbpt::math::Vec3 point{0.0f};
+    };
+
+private:
+    system::physics::rb::RigidBody m_source_body{};
+    bool m_source_dirty{false};
+    bool m_transform_dirty{false};
+    bool m_lifecycle_dirty{false};
+    bool m_should_exist_in_runtime{false};
+    std::vector<PendingRigidBodyCommand> m_pending_commands{};
 
     static pbpt::math::Float sanitize_mass(pbpt::math::Float mass) {
         if (!std::isfinite(mass) || mass <= 0.0f) {
@@ -68,287 +79,210 @@ private:
         return decay;
     }
 
-    system::physics::RigidBody* physics_body() {
-        if (!has_registered_body()) {
-            return nullptr;
-        }
-        return &m_physics_world.get_rigid_body(m_rigid_body_id);
+    static system::physics::rb::RigidBody sanitize_source_body(system::physics::rb::RigidBody source_body) {
+        source_body.set_awake(true);
+        source_body.state().mass = sanitize_mass(source_body.state().mass);
+        source_body.set_restitution(sanitize_restitution(source_body.restitution()));
+        source_body.set_friction(sanitize_friction(source_body.friction()));
+        source_body.set_linear_decay(sanitize_decay(source_body.linear_decay(), "RigidBody linear_decay"));
+        source_body.set_angular_decay(sanitize_decay(source_body.angular_decay(), "RigidBody angular_decay"));
+        source_body.set_inverse_inertia_tensor_ref(
+            sanitize_inverse_inertia_tensor_ref(source_body.inverse_inertia_tensor_ref())
+        );
+        return source_body;
     }
 
-    const system::physics::RigidBody* physics_body() const {
-        if (!has_registered_body()) {
-            return nullptr;
-        }
-        return &m_physics_world.get_rigid_body(m_rigid_body_id);
+    static system::physics::rb::RigidBody make_default_source_body() {
+        system::physics::rb::RigidBody source_body{};
+        source_body.state().mass = 1.0f;
+        source_body.set_type(system::physics::rb::RigidBodyType::Dynamic);
+        source_body.set_use_gravity(true);
+        source_body.set_restitution(0.0f);
+        source_body.set_friction(0.0f);
+        source_body.set_linear_decay(1.0f);
+        source_body.set_angular_decay(1.0f);
+        source_body.set_inverse_inertia_tensor_ref(pbpt::math::Mat3::zeros());
+        return source_body;
     }
+
+    void enqueue_command(PendingRigidBodyCommand command) { m_pending_commands.push_back(std::move(command)); }
 
 public:
-    explicit RigidBody(core::GameObject& owner, system::physics::RigidBodyWorld& world, pbpt::math::Float mass = 1.0f,
-                       system::physics::RigidBodyType type = system::physics::RigidBodyType::Dynamic,
-                       bool use_gravity = true,
-                       const pbpt::math::Mat3& inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros(),
-                       pbpt::math::Float restitution = 0.0f,
-                       pbpt::math::Float friction = 0.0f,
-                       pbpt::math::Float linear_decay = 1.0f,
-                       pbpt::math::Float angular_decay = 1.0f)
+    explicit RigidBody(core::GameObject& owner)
         : Component(owner),
-          m_physics_world(world),
-          m_type(type),
-          m_mass(sanitize_mass(mass)),
-          m_use_gravity(use_gravity),
-          m_restitution(sanitize_restitution(restitution)),
-          m_friction(sanitize_friction(friction)),
-          m_linear_decay(sanitize_decay(linear_decay, "RigidBody linear_decay")),
-          m_angular_decay(sanitize_decay(angular_decay, "RigidBody angular_decay")),
-          m_inverse_inertia_tensor_ref(sanitize_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref)) {}
+          m_source_body(sanitize_source_body(make_default_source_body())) {}
+
+    explicit RigidBody(core::GameObject& owner, system::physics::rb::RigidBody source_body)
+        : Component(owner),
+          m_source_body(sanitize_source_body(std::move(source_body))) {}
 
     void on_awake() override {}
 
     void on_enable() override {
-        if (m_registered) {
-            return;
-        }
-
-        system::physics::RigidBody body;
-        body.set_type(m_type);
-        body.set_awake(true);
-        body.set_use_gravity(m_use_gravity);
-        body.set_restitution(m_restitution);
-        body.set_friction(m_friction);
-        body.set_linear_decay(m_linear_decay);
-        body.set_angular_decay(m_angular_decay);
-        body.set_inverse_inertia_tensor_ref(m_inverse_inertia_tensor_ref);
-        body.state().mass                        = m_mass;
-        body.state().translation.position        = owner().node().world_position();
-        body.state().translation.linear_velocity = pbpt::math::Vec3(0.0f);
-        body.state().rotation.orientation        = owner().node().world_rotation();
-        body.state().rotation.angular_velocity   = pbpt::math::Vec3(0.0f);
-        body.state().scale                       = owner().node().world_scale();
-        body.clear_forces();
-
-        m_rigid_body_id = m_physics_world.create_rigid_body(std::move(body));
-        m_registered    = true;
+        m_should_exist_in_runtime = true;
+        m_lifecycle_dirty = true;
     }
 
     void on_disable() override {
-        if (!m_registered) {
-            return;
-        }
-        (void)m_physics_world.remove_rigid_body(m_rigid_body_id);
-        m_rigid_body_id = system::physics::RigidBodyID{};
-        m_registered    = false;
+        m_should_exist_in_runtime = false;
+        m_lifecycle_dirty = true;
     }
 
-    void on_destroy() override {}
-
-    bool has_rigid_body() const { return has_registered_body(); }
-
-    system::physics::RigidBodyID rigid_body_id() const { return m_rigid_body_id; }
-
-    system::physics::RigidBodyType type() const {
-        const auto* body = physics_body();
-        return body != nullptr ? body->type() : m_type;
+    void on_destroy() override {
+        m_should_exist_in_runtime = false;
+        m_lifecycle_dirty = true;
     }
 
-    void set_type(system::physics::RigidBodyType type) {
-        m_type = type;
-        if (auto* body = physics_body(); body != nullptr) {
-            body->set_type(type);
-        }
+    const system::physics::rb::RigidBody& source_body() const { return m_source_body; }
+
+    system::physics::rb::RigidBody make_runtime_body_snapshot() const {
+        auto runtime_body = m_source_body;
+        runtime_body.set_awake(true);
+        runtime_body.state().translation.position = owner().node().world_position();
+        runtime_body.state().rotation.orientation = owner().node().world_rotation();
+        runtime_body.state().scale = owner().node().world_scale();
+        runtime_body.clear_forces();
+        return runtime_body;
     }
 
-    pbpt::math::Vec3 position() const {
-        const auto* body = physics_body();
-        if (body == nullptr) {
-            return pbpt::math::Vec3(0.0f);
-        }
-        return body->state().translation.position;
+    bool source_dirty() const { return m_source_dirty; }
+    bool transform_dirty() const { return m_transform_dirty; }
+    bool lifecycle_dirty() const { return m_lifecycle_dirty; }
+    bool should_exist_in_runtime() const { return m_should_exist_in_runtime; }
+    bool has_pending_commands() const { return !m_pending_commands.empty(); }
+    const std::vector<PendingRigidBodyCommand>& pending_commands() const { return m_pending_commands; }
+
+    void clear_source_dirty() { m_source_dirty = false; }
+    void clear_transform_dirty() { m_transform_dirty = false; }
+    void clear_lifecycle_dirty() { m_lifecycle_dirty = false; }
+    void clear_pending_commands() { m_pending_commands.clear(); }
+
+    void sync_runtime_state_from(const system::physics::rb::RigidBody& runtime_body) {
+        m_source_body.state().translation.linear_velocity = runtime_body.state().translation.linear_velocity;
+        m_source_body.state().rotation.angular_velocity = runtime_body.state().rotation.angular_velocity;
     }
 
+    system::physics::rb::RigidBodyType type() const { return m_source_body.type(); }
+    void set_type(system::physics::rb::RigidBodyType type) {
+        m_source_body.set_type(type);
+        m_source_dirty = true;
+    }
+
+    pbpt::math::Vec3 position() const { return owner().node().world_position(); }
     void set_position(const pbpt::math::Vec3& position) {
-        auto* body = physics_body();
-        if (body == nullptr) {
-            return;
-        }
-        body->state().translation.position = position;
+        owner().node().set_world_position(position);
+        m_transform_dirty = true;
     }
 
-    pbpt::math::Vec3 linear_velocity() const {
-        const auto* body = physics_body();
-        if (body == nullptr) {
-            return pbpt::math::Vec3(0.0f);
-        }
-        return body->state().translation.linear_velocity;
-    }
-
+    pbpt::math::Vec3 linear_velocity() const { return m_source_body.state().translation.linear_velocity; }
     void set_linear_velocity(const pbpt::math::Vec3& linear_velocity) {
-        auto* body = physics_body();
-        if (body == nullptr) {
-            return;
-        }
-        body->state().translation.linear_velocity = linear_velocity;
+        m_source_body.state().translation.linear_velocity = linear_velocity;
+        m_source_dirty = true;
     }
 
-    pbpt::math::Quat orientation() const {
-        const auto* body = physics_body();
-        if (body == nullptr) {
-            return pbpt::math::Quat::identity();
-        }
-        return body->state().rotation.orientation;
-    }
-
+    pbpt::math::Quat orientation() const { return owner().node().world_rotation(); }
     void set_orientation(const pbpt::math::Quat& orientation) {
-        auto* body = physics_body();
-        if (body == nullptr) {
-            return;
-        }
-        body->state().rotation.orientation = pbpt::math::normalize(orientation);
+        owner().node().set_world_rotation(pbpt::math::normalize(orientation));
+        m_transform_dirty = true;
     }
 
-    pbpt::math::Vec3 angular_velocity() const {
-        const auto* body = physics_body();
-        if (body == nullptr) {
-            return pbpt::math::Vec3(0.0f);
-        }
-        return body->state().rotation.angular_velocity;
-    }
-
+    pbpt::math::Vec3 angular_velocity() const { return m_source_body.state().rotation.angular_velocity; }
     void set_angular_velocity(const pbpt::math::Vec3& angular_velocity) {
-        auto* body = physics_body();
-        if (body == nullptr) {
-            return;
-        }
-        body->state().rotation.angular_velocity = angular_velocity;
+        m_source_body.state().rotation.angular_velocity = angular_velocity;
+        m_source_dirty = true;
     }
 
-    pbpt::math::Float mass() const {
-        const auto* body = physics_body();
-        return body != nullptr ? body->state().mass : m_mass;
-    }
-
+    pbpt::math::Float mass() const { return m_source_body.state().mass; }
     void set_mass(pbpt::math::Float mass) {
-        m_mass = sanitize_mass(mass);
-        if (auto* body = physics_body(); body != nullptr) {
-            body->state().mass = m_mass;
-        }
+        m_source_body.state().mass = sanitize_mass(mass);
+        m_source_dirty = true;
     }
 
-    bool use_gravity() const {
-        const auto* body = physics_body();
-        return body != nullptr ? body->use_gravity() : m_use_gravity;
-    }
-
+    bool use_gravity() const { return m_source_body.use_gravity(); }
     void set_use_gravity(bool use_gravity) {
-        m_use_gravity = use_gravity;
-        if (auto* body = physics_body(); body != nullptr) {
-            body->set_use_gravity(use_gravity);
-        }
+        m_source_body.set_use_gravity(use_gravity);
+        m_source_dirty = true;
     }
 
-    pbpt::math::Float restitution() const {
-        const auto* body = physics_body();
-        return body != nullptr ? body->restitution() : m_restitution;
-    }
-
+    pbpt::math::Float restitution() const { return m_source_body.restitution(); }
     void set_restitution(pbpt::math::Float restitution) {
-        m_restitution = sanitize_restitution(restitution);
-        if (auto* body = physics_body(); body != nullptr) {
-            body->set_restitution(m_restitution);
-        }
+        m_source_body.set_restitution(sanitize_restitution(restitution));
+        m_source_dirty = true;
     }
 
-    pbpt::math::Float friction() const {
-        const auto* body = physics_body();
-        return body != nullptr ? body->friction() : m_friction;
-    }
-
+    pbpt::math::Float friction() const { return m_source_body.friction(); }
     void set_friction(pbpt::math::Float friction) {
-        m_friction = sanitize_friction(friction);
-        if (auto* body = physics_body(); body != nullptr) {
-            body->set_friction(m_friction);
-        }
+        m_source_body.set_friction(sanitize_friction(friction));
+        m_source_dirty = true;
     }
 
-    pbpt::math::Float linear_decay() const {
-        const auto* body = physics_body();
-        return body != nullptr ? body->linear_decay() : m_linear_decay;
-    }
-
+    pbpt::math::Float linear_decay() const { return m_source_body.linear_decay(); }
     void set_linear_decay(pbpt::math::Float linear_decay) {
-        m_linear_decay = sanitize_decay(linear_decay, "RigidBody linear_decay");
-        if (auto* body = physics_body(); body != nullptr) {
-            body->set_linear_decay(m_linear_decay);
-        }
+        m_source_body.set_linear_decay(sanitize_decay(linear_decay, "RigidBody linear_decay"));
+        m_source_dirty = true;
     }
 
-    pbpt::math::Float angular_decay() const {
-        const auto* body = physics_body();
-        return body != nullptr ? body->angular_decay() : m_angular_decay;
-    }
-
+    pbpt::math::Float angular_decay() const { return m_source_body.angular_decay(); }
     void set_angular_decay(pbpt::math::Float angular_decay) {
-        m_angular_decay = sanitize_decay(angular_decay, "RigidBody angular_decay");
-        if (auto* body = physics_body(); body != nullptr) {
-            body->set_angular_decay(m_angular_decay);
-        }
+        m_source_body.set_angular_decay(sanitize_decay(angular_decay, "RigidBody angular_decay"));
+        m_source_dirty = true;
     }
 
-    pbpt::math::Mat3 inverse_inertia_tensor_ref() const {
-        const auto* body = physics_body();
-        return body != nullptr ? body->inverse_inertia_tensor_ref() : m_inverse_inertia_tensor_ref;
-    }
-
+    pbpt::math::Mat3 inverse_inertia_tensor_ref() const { return m_source_body.inverse_inertia_tensor_ref(); }
     void set_inverse_inertia_tensor_ref(const pbpt::math::Mat3& inverse_inertia_tensor_ref) {
-        m_inverse_inertia_tensor_ref = sanitize_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref);
-        if (auto* body = physics_body(); body != nullptr) {
-            body->set_inverse_inertia_tensor_ref(m_inverse_inertia_tensor_ref);
-        }
+        m_source_body.set_inverse_inertia_tensor_ref(
+            sanitize_inverse_inertia_tensor_ref(inverse_inertia_tensor_ref)
+        );
+        m_source_dirty = true;
     }
 
     void add_force(const pbpt::math::Vec3& force) {
-        if (auto* body = physics_body(); body != nullptr) {
-            body->state().forces.accumulated_force += force;
-        }
+        enqueue_command(PendingRigidBodyCommand{
+            .type = PendingRigidBodyCommandType::AddForce,
+            .value = force,
+        });
     }
 
     void add_torque(const pbpt::math::Vec3& torque) {
-        if (auto* body = physics_body(); body != nullptr) {
-            body->state().forces.accumulated_torque += torque;
-        }
+        enqueue_command(PendingRigidBodyCommand{
+            .type = PendingRigidBodyCommandType::AddTorque,
+            .value = torque,
+        });
     }
 
     void add_force_at_point(const pbpt::math::Vec3& force, const pbpt::math::Vec3& world_point) {
-        auto* body = physics_body();
-        if (body == nullptr) {
-            return;
-        }
-        body->state().forces.accumulated_force += force;
-        const pbpt::math::Vec3 lever_arm = world_point - body->state().translation.position;
-        body->state().forces.accumulated_torque += pbpt::math::cross(lever_arm, force);
+        enqueue_command(PendingRigidBodyCommand{
+            .type = PendingRigidBodyCommandType::AddForceAtPoint,
+            .value = force,
+            .point = world_point,
+        });
     }
 
     void clear_forces() {
-        if (auto* body = physics_body(); body != nullptr) {
-            body->clear_forces();
-        }
+        enqueue_command(PendingRigidBodyCommand{
+            .type = PendingRigidBodyCommandType::ClearForces,
+        });
     }
 
     void reset_dynamics() {
-        if (auto* body = physics_body(); body != nullptr) {
-            body->reset_dynamics();
-        }
+        m_source_body.reset_dynamics();
+        enqueue_command(PendingRigidBodyCommand{
+            .type = PendingRigidBodyCommandType::ResetDynamics,
+        });
     }
 
     void reset_translation_dynamics() {
-        if (auto* body = physics_body(); body != nullptr) {
-            body->reset_translation_dynamics();
-        }
+        m_source_body.reset_translation_dynamics();
+        enqueue_command(PendingRigidBodyCommand{
+            .type = PendingRigidBodyCommandType::ResetTranslationDynamics,
+        });
     }
 
     void reset_rotational_dynamics() {
-        if (auto* body = physics_body(); body != nullptr) {
-            body->reset_rotational_dynamics();
-        }
+        m_source_body.reset_rotational_dynamics();
+        enqueue_command(PendingRigidBodyCommand{
+            .type = PendingRigidBodyCommandType::ResetRotationalDynamics,
+        });
     }
 };
 

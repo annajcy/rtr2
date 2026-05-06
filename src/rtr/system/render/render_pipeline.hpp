@@ -20,6 +20,7 @@
 #include "rtr/rhi/window.hpp"
 #include "rtr/system/render/frame_context.hpp"
 #include "rtr/system/render/frame_scheduler.hpp"
+#include "rtr/system/render/render_resource_state.hpp"
 #include "rtr/utils/event_center.hpp"
 #include "vulkan/vulkan_enums.hpp"
 
@@ -71,6 +72,11 @@ struct SwapchainChangeSummary {
     }
 };
 
+struct PipelineFinalOutput {
+    TrackedImage color;
+    vk::Extent2D extent{};
+};
+
 class RenderPipeline {
 protected:
     rhi::Device& m_device;
@@ -96,6 +102,7 @@ public:
     virtual ~RenderPipeline() = default;
 
     virtual void render(FrameContext& ctx) = 0;
+    virtual PipelineFinalOutput final_output(uint32_t frame_index) = 0;
     virtual void prepare_frame(const FramePrepareContext& ctx) {
         (void)ctx;
     }

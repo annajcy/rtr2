@@ -3,7 +3,7 @@
 #include <memory>
 #include <stdexcept>
 
-#include "rtr/app/app_runtime.hpp"
+#include "rtr/editor/core/editor_app_runtime.hpp"
 #include "rtr/editor/core/editor_capture.hpp"
 #include "rtr/editor/core/editor_host.hpp"
 #include "rtr/editor/panel/editable_shadertoy_settings_panel.hpp"
@@ -12,12 +12,13 @@
 #include "rtr/editor/panel/logger_panel.hpp"
 #include "rtr/editor/panel/scene_view_panel.hpp"
 #include "rtr/editor/panel/stats_panel.hpp"
-#include "rtr/editor/render/editable_shadertoy_editor_pipeline.hpp"
+#include "rtr/editor/render/editor_output_backend.hpp"
+#include "rtr/system/render/pipeline/shadertoy/editable_shadertoy_pipeline.hpp"
 #include "rtr/system/input/input_types.hpp"
 
 int main() {
     try {
-        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
+        rtr::editor::EditorAppRuntime runtime(rtr::app::AppRuntimeConfig{
             .window_width = 1280,
             .window_height = 720,
             .window_title = "RTR Editable ShaderToy Editor",
@@ -25,10 +26,10 @@ int main() {
 
         auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);
 
-        auto editor_pipeline = std::make_unique<rtr::editor::render::EditableShaderToyEditorPipeline>(
+        runtime.renderer().output_backend().bind_editor_host(editor_host);
+        auto editor_pipeline = std::make_unique<rtr::system::render::EditableShaderToyPipeline>(
             runtime.renderer().build_pipeline_runtime(),
-            editor_host,
-            rtr::editor::render::EditableShaderToyEditorPipelineConfig{
+            rtr::system::render::EditableShaderToyPipelineConfig{
                 .initial_shader_source_path = "shaders/editable_shadertoy_compute.slang",
                 .auto_reload_enabled = true,
             }
@@ -46,7 +47,7 @@ int main() {
         editor_host->set_panel_visible("hierarchy", false);
         editor_host->set_panel_visible("inspector", false);
 
-        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), *editor_pipeline);
+        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), runtime.renderer().output_backend());
         runtime.set_pipeline(std::move(editor_pipeline));
 
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{

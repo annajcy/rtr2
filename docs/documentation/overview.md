@@ -14,7 +14,10 @@ ImGui-based tools for scene inspection and engine monitoring.
 
 ### Editor Render (`src/rtr/editor/render`)
 
-Specialized rendering passes for editor-specific overlays (gizmos, grid, etc.).
+Editor-specific composition and output integration.
+
+- **Editor Output Backend:** Consumes a pure scene pipeline output and composites editor UI.
+- **Editor ImGui Pass:** Draws ImGui and scene-view content into the final output target.
 
 -------
 
@@ -77,9 +80,10 @@ Higher-level systems that orchestrate specific engine functions.
 
 Manages the Vulkan rendering pipeline, frame scheduling, and resource synchronization.
 
-- **Renderer:** High-level Vulkan renderer control.
-- **Frame Scheduler:** Manages multi-buffered rendering and swapchain interaction.
-- **Pipelines:** Definition of `IRenderPipeline` and specific implementations.
+- **Renderer:** Swapchain-backed renderer bootstrap parameterized by an output backend.
+- **Frame Scheduler:** Multi-buffered swapchain acquire / submit / present orchestration.
+- **Output Backends:** Realtime present, editor composition, and preview/export output handling.
+- **Pipelines:** Pure content pipelines that render to final offscreen images.
 
 ### Input System (`src/rtr/system/input`)
 
@@ -90,11 +94,11 @@ Handles user input from keyboard, mouse, and gamepads.
 
 ### Physics System (`src/rtr/system/physics`)
 
-Owns the current rigid-body and cloth runtime.
+Owns the current rigid-body and IPC runtime.
 
-- **PhysicsSystem:** Holds both `RigidBodyWorld` and `ClothWorld`.
+- **PhysicsSystem:** Holds both `rb::RigidBodySystem` and `ipc::IPCSystem`.
 - **Fixed-Step Integration:** The framework layer uses `step_scene_physics(...)` to synchronize scene state into physics and write simulation results back.
-- **Documentation Entry:** See `docs/documentation/system/physics/` for the runtime overview, integration guide, cloth simulation notes, and rigid-body dynamics write-up.
+- **Documentation Entry:** See `docs/documentation/system/physics/` for the runtime overview, integration guide, IPC bridge/example notes, and rigid-body dynamics write-up.
 
 ## RHI (`src/rtr/rhi`)
 

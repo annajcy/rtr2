@@ -1,9 +1,9 @@
 #pragma once
 
-#include "rtr/system/physics/collision/collider_shape.hpp"
-#include "rtr/system/physics/common/physics_ids.hpp"
+#include "rtr/system/physics/rigid_body/collision/collider_shape.hpp"
+#include "rtr/system/physics/rigid_body/physics_ids.hpp"
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 struct Collider {
     ColliderShape      shape{SphereShape{}};
@@ -11,4 +11,4 @@ struct Collider {
     RigidBodyID        rigid_body_id{kInvalidRigidBodyId};
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

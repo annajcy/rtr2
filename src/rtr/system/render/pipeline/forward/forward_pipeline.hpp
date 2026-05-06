@@ -20,7 +20,6 @@
 #include "rtr/rhi/mesh.hpp"
 #include "rtr/rhi/shader_module.hpp"
 #include "rtr/rhi/texture.hpp"
-#include "rtr/system/render/pass/present_pass.hpp"
 #include "rtr/system/render/pipeline/forward/forward_pass.hpp"
 #include "rtr/system/render/pipeline/forward/forward_scene_view.hpp"
 #include "rtr/system/render/render_pipeline.hpp"
@@ -31,7 +30,7 @@
 namespace rtr::system::render {
 
 // ---------------------------------------------------------------------------
-// Shared GPU data types (used by both ForwardPipeline and ForwardEditorPipeline)
+// Shared GPU data types for the forward scene pipeline.
 // ---------------------------------------------------------------------------
 
 struct GpuMat4 {
@@ -75,7 +74,7 @@ struct ForwardPipelineConfig {
 
 // ---------------------------------------------------------------------------
 // ForwardPipeline
-// Sequence: ForwardPass (offscreen) → PresentPass (blit to swapchain).
+// Sequence: ForwardPass (offscreen), final output consumed by backend.
 // ---------------------------------------------------------------------------
 class ForwardPipeline final : public RenderPipeline {
     static constexpr uint32_t kMaxRenderables = 256;
@@ -107,7 +106,6 @@ class ForwardPipeline final : public RenderPipeline {
     std::optional<ForwardSceneView> m_scene_view{};
 
     render::ForwardPass m_forward_pass;
-    render::PresentPass m_present_pass{};
 
 public:
     ForwardPipeline(const render::PipelineRuntime& runtime, const ForwardPipelineConfig& config = {})
@@ -134,6 +132,17 @@ public:
     }
 
     ~ForwardPipeline() override = default;
+
+    PipelineFinalOutput final_output(uint32_t frame_index) override {
+        auto& frame_targets = m_scene_targets.require_targets();
+        if (frame_index >= rhi::kFramesInFlight) {
+            throw std::runtime_error("ForwardPipeline final output frame index out of range.");
+        }
+        return PipelineFinalOutput{
+            .color = frame_targets.color_images[frame_index].view(),
+            .extent = m_scene_targets.scene_extent()
+        };
+    }
 
     void prepare_frame(const FramePrepareContext& ctx) override {
         auto* scene = ctx.world.active_scene();
@@ -184,13 +193,22 @@ public:
             }
         );
 
-        m_present_pass.execute(
-            ctx,
-            PresentPass::RenderPassResources{
-                .src_color = tracked_color.view(),
-                .src_extent = m_scene_targets.scene_extent()
-            }
-        );
+        auto& cmd = ctx.cmd().command_buffer();
+        vk::ImageMemoryBarrier2 to_sampled{};
+        to_sampled.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+        to_sampled.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader;
+        to_sampled.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+        to_sampled.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
+        to_sampled.oldLayout = tracked_color.layout;
+        to_sampled.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        to_sampled.image = *tracked_color.image.image();
+        to_sampled.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+
+        vk::DependencyInfo dependency{};
+        dependency.imageMemoryBarrierCount = 1;
+        dependency.pImageMemoryBarriers = &to_sampled;
+        cmd.pipelineBarrier2(dependency);
+        tracked_color.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
     }
 
 private:

@@ -10,6 +10,7 @@ target_include_directories(rtr_runtime INTERFACE
 
 target_link_libraries(rtr_runtime INTERFACE
   stb_impl
+  Eigen3::Eigen
   glfw
   Vulkan::Loader
   spdlog::spdlog
@@ -18,6 +19,11 @@ target_link_libraries(rtr_runtime INTERFACE
   tinyobjloader::tinyobjloader
   pbpt::pbpt
 )
+
+if(RTR_BUILD_FTETWILD)
+  target_link_libraries(rtr_runtime INTERFACE $<BUILD_INTERFACE:FloatTetwild>)
+  target_compile_definitions(rtr_runtime INTERFACE $<BUILD_INTERFACE:RTR_HAS_FTETWILD=1>)
+endif()
 
 target_compile_definitions(rtr_runtime INTERFACE
   RTR_DEFAULT_SHADER_OUTPUT_DIR=\"${RTR_DEFAULT_SHADER_OUTPUT_DIR}\"

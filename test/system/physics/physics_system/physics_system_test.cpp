@@ -5,15 +5,15 @@
 namespace rtr::system::physics::test {
 
 TEST(PhysicsSystemTest, EmptyStepRunsAllWorldStagesOnce) {
-    PhysicsSystem          physics_system{};
+    PhysicsSystem physics_system{};
 
-    physics_system.step(1.0f / 60.0f);
+    physics_system.rigid_body_system().step(1.0f / 60.0f);
+    physics_system.ipc_system().step(1.0 / 60.0);
 
-    EXPECT_EQ(physics_system.cloth_world().cloth_count(), 0u);
-    EXPECT_EQ(physics_system.rigid_body_world().velocity_iterations(),
-              RigidBodyWorld::kDefaultVelocityIterations);
-    EXPECT_EQ(physics_system.rigid_body_world().position_iterations(),
-              RigidBodyWorld::kDefaultPositionIterations);
+    EXPECT_EQ(physics_system.rigid_body_system().velocity_iterations(),
+              rb::RigidBodySystem::kDefaultVelocityIterations);
+    EXPECT_EQ(physics_system.rigid_body_system().position_iterations(),
+              rb::RigidBodySystem::kDefaultPositionIterations);
 }
 
 }  // namespace rtr::system::physics::test

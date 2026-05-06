@@ -22,7 +22,7 @@
 #include "rtr/rhi/window.hpp"
 #include "rtr/system/input/input_state.hpp"
 #include "rtr/system/input/input_types.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 #include "rtr/utils/log.hpp"
 
 namespace rtr::utils::test {
@@ -331,17 +331,17 @@ TEST(LogSystemTest, RigidBodyWorldLifecycleLogsAreWritten) {
     config.level = LogLevel::trace;
     init_logging(config);
 
-    system::physics::RigidBodyWorld world{};
+    system::physics::rb::RigidBodySystem world{};
     world.set_gravity(pbpt::math::Vec3{0.0f, -3.5f, 0.0f});
     world.set_velocity_iterations(4);
     world.set_position_iterations(2);
 
-    system::physics::RigidBody body{};
-    body.set_type(system::physics::RigidBodyType::Dynamic);
+    system::physics::rb::RigidBody body{};
+    body.set_type(system::physics::rb::RigidBodyType::Dynamic);
     body.set_awake(true);
     body.state().mass = 2.0f;
     const auto body_id = world.create_rigid_body(body);
-    const auto collider_id = world.create_collider(body_id, system::physics::Collider{});
+    const auto collider_id = world.create_collider(body_id, system::physics::rb::Collider{});
     world.step(1.0f / 60.0f);
     EXPECT_TRUE(world.remove_collider(collider_id));
     EXPECT_TRUE(world.remove_rigid_body(body_id));
@@ -371,19 +371,19 @@ TEST(LogSystemTest, RigidBodyWorldCollisionLogsAreWritten) {
     config.level = LogLevel::trace;
     init_logging(config);
 
-    system::physics::RigidBodyWorld world{};
+    system::physics::rb::RigidBodySystem world{};
     world.set_velocity_iterations(2);
     world.set_position_iterations(1);
 
-    system::physics::RigidBody body_a{};
-    body_a.set_type(system::physics::RigidBodyType::Dynamic);
+    system::physics::rb::RigidBody body_a{};
+    body_a.set_type(system::physics::rb::RigidBodyType::Dynamic);
     body_a.set_awake(true);
     body_a.set_use_gravity(false);
     body_a.state().mass = 1.0f;
     body_a.state().translation.position = pbpt::math::Vec3{0.0f, 0.0f, 0.0f};
 
-    system::physics::RigidBody body_b{};
-    body_b.set_type(system::physics::RigidBodyType::Dynamic);
+    system::physics::rb::RigidBody body_b{};
+    body_b.set_type(system::physics::rb::RigidBodyType::Dynamic);
     body_b.set_awake(true);
     body_b.set_use_gravity(false);
     body_b.state().mass = 1.0f;
@@ -391,8 +391,8 @@ TEST(LogSystemTest, RigidBodyWorldCollisionLogsAreWritten) {
 
     const auto body_a_id = world.create_rigid_body(body_a);
     const auto body_b_id = world.create_rigid_body(body_b);
-    (void)world.create_collider(body_a_id, system::physics::Collider{});
-    (void)world.create_collider(body_b_id, system::physics::Collider{});
+    (void)world.create_collider(body_a_id, system::physics::rb::Collider{});
+    (void)world.create_collider(body_b_id, system::physics::rb::Collider{});
     world.step(1.0f / 60.0f);
 
     get_logger("system.physics.rigid_body.world")->flush();
@@ -435,7 +435,7 @@ TEST(LogSystemTest, ControllerNodeChangeTraceLogsAppearAtTraceLevel) {
     (void)trackball_go.add_component<framework::component::TrackBallCameraController>(input);
 
     input.update_key(system::input::KeyCode::W, system::input::KeyAction::PRESS, system::input::KeyMod::NONE);
-    scene.tick({.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_index = 0});
+    scene.tick({.delta_seconds = 1.0, .unscaled_delta_seconds = 1.0, .frame_serial = 0});
     input.update_key(system::input::KeyCode::W, system::input::KeyAction::RELEASE, system::input::KeyMod::NONE);
 
     free_look_camera.set_active(false);
@@ -447,7 +447,7 @@ TEST(LogSystemTest, ControllerNodeChangeTraceLogsAppearAtTraceLevel) {
         system::input::KeyMod::NONE
     );
     input.update_mouse_position(64.0, 24.0);
-    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_index = 1});
+    scene.tick({.delta_seconds = 0.0, .unscaled_delta_seconds = 0.0, .frame_serial = 1});
 
     get_logger("framework.component.free_look")->flush();
     get_logger("framework.component.trackball")->flush();

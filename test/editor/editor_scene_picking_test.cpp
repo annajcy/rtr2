@@ -6,18 +6,17 @@
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/resource/resource_manager.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 namespace rtr::editor::test {
 
 TEST(EditorScenePickingTest, SpherePickUsesColliderLocalScale) {
-    resource::ResourceManager      resources;
-    system::physics::RigidBodyWorld  physics_world;
-    framework::core::Scene         scene(1);
+    resource::ResourceManager resources;
+    framework::core::Scene    scene(1);
 
     auto& go = scene.create_game_object("sphere");
-    (void)go.add_component<framework::component::RigidBody>(physics_world);
-    auto& sphere = go.add_component<framework::component::SphereCollider>(physics_world, 0.5f);
+    (void)go.add_component<framework::component::RigidBody>();
+    auto& sphere = go.add_component<framework::component::SphereCollider>(0.5f);
     sphere.set_local_scale(pbpt::math::Vec3{4.0f, 1.0f, 1.0f});
 
     scene.scene_graph().update_world_transforms();
@@ -37,14 +36,12 @@ TEST(EditorScenePickingTest, SpherePickUsesColliderLocalScale) {
 }
 
 TEST(EditorScenePickingTest, BoxPickUsesColliderLocalScale) {
-    resource::ResourceManager      resources;
-    system::physics::RigidBodyWorld  physics_world;
-    framework::core::Scene         scene(1);
+    resource::ResourceManager resources;
+    framework::core::Scene    scene(1);
 
     auto& go = scene.create_game_object("box");
-    (void)go.add_component<framework::component::RigidBody>(physics_world);
-    auto& box = go.add_component<framework::component::BoxCollider>(
-        physics_world, pbpt::math::Vec3{0.5f, 0.5f, 0.5f});
+    (void)go.add_component<framework::component::RigidBody>();
+    auto& box = go.add_component<framework::component::BoxCollider>(pbpt::math::Vec3{0.5f, 0.5f, 0.5f});
     box.set_local_scale(pbpt::math::Vec3{3.0f, 1.0f, 1.0f});
 
     scene.scene_graph().update_world_transforms();

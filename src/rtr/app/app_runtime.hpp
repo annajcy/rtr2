@@ -9,13 +9,15 @@
 #include <string>
 #include <utility>
 
+#include "rtr/app/frame_stepper.hpp"
+#include "rtr/app/frame_time_policy.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/core/world.hpp"
-#include "rtr/framework/integration/physics/scene_physics_step.hpp"
 #include "rtr/resource/resource_manager.hpp"
 #include "rtr/rhi/frame_constants.hpp"
 #include "rtr/system/input/input_system.hpp"
 #include "rtr/system/physics/physics_system.hpp"
+#include "rtr/system/render/output_backend.hpp"
 #include "rtr/system/render/render_pipeline.hpp"
 #include "rtr/system/render/renderer.hpp"
 #include "rtr/utils/log.hpp"
@@ -25,34 +27,34 @@ namespace rtr::app {
 struct AppRuntimeConfig {
     std::uint32_t window_width{800};
     std::uint32_t window_height{600};
-    std::string   window_title{"RTR2 AppRuntime"};
-    std::string   resource_root_dir{"./assets/"};
+    std::string window_title{"RTR2 AppRuntime"};
+    std::string resource_root_dir{"./assets/"};
 
-    double           fixed_delta_seconds{1.0 / 60.0};
-    std::uint32_t    max_fixed_steps_per_frame{4};
-    double           max_frame_delta_seconds{0.1};
-    bool             start_paused{false};
-    bool             auto_init_logging{true};
+    double fixed_delta_seconds{1.0 / 60.0};
+    std::uint32_t max_fixed_steps_per_frame{4};
+    double max_frame_delta_seconds{0.1};
+    bool start_paused{false};
+    bool auto_init_logging{true};
     utils::LogConfig log_config{};
 };
 
 struct RuntimeResult {
-    bool          ok{true};
-    std::string   error_message{};
+    bool ok{true};
+    std::string error_message{};
     std::uint64_t frames_rendered{0};
     std::uint64_t fixed_ticks{0};
 };
 
 struct RuntimeContext {
-    framework::core::World&         world;
-    resource::ResourceManager&      resources;
-    system::render::Renderer&       renderer;
-    system::input::InputSystem&     input_system;
-    system::physics::PhysicsSystem&  physics_system;
-    std::uint64_t                   frame_serial{0};
-    double                          delta_seconds{0.0};
-    std::function<void()>           request_stop{};
-    bool                            paused{false};
+    framework::core::World& world;
+    resource::ResourceManager& resources;
+    system::render::IRenderer& renderer;
+    system::input::InputSystem& input_system;
+    system::physics::PhysicsSystem& physics_system;
+    std::uint64_t frame_serial{0};
+    double delta_seconds{0.0};
+    std::function<void()> request_stop{};
+    bool paused{false};
 };
 
 struct RuntimeCallbacks {
@@ -65,7 +67,10 @@ struct RuntimeCallbacks {
     std::function<void(RuntimeContext&)> on_shutdown{};
 };
 
-class AppRuntime {
+template <typename TBackend>
+class AppRuntimeT {
+    static_assert(system::render::RenderOutputBackendConcept<TBackend>, "AppRuntimeT requires a valid render output backend.");
+
 private:
     static AppRuntimeConfig prepare_config(AppRuntimeConfig config) {
         if (config.auto_init_logging) {
@@ -74,55 +79,66 @@ private:
         return config;
     }
 
-    static std::shared_ptr<spdlog::logger> logger() { return utils::get_logger("app.runtime"); }
+    static std::shared_ptr<spdlog::logger> logger() {
+        return utils::get_logger("app.runtime");
+    }
 
     AppRuntimeConfig m_config{};
     RuntimeCallbacks m_callbacks{};
 
-    resource::ResourceManager      m_resources;
-    system::render::Renderer       m_renderer;
-    system::input::InputSystem     m_input_system;
+    resource::ResourceManager m_resources;
+    system::render::RendererT<TBackend> m_renderer;
+    system::input::InputSystem m_input_system;
     system::physics::PhysicsSystem m_physics_system;
-    framework::core::World         m_world;
+    framework::core::World m_world;
 
-    bool          m_stop_requested{false};
-    bool          m_paused{false};
+    bool m_stop_requested{false};
+    bool m_paused{false};
     std::uint64_t m_frame_serial{0};
-    std::uint64_t m_fixed_tick_index{0};
+    std::uint64_t m_fixed_tick_serial{0};
+    FrameStepper m_frame_stepper{};
 
 public:
-    explicit AppRuntime(AppRuntimeConfig config = {})
+    explicit AppRuntimeT(AppRuntimeConfig config = {})
         : m_config(prepare_config(std::move(config))),
           m_resources(m_config.resource_root_dir),
-          m_renderer(static_cast<int>(m_config.window_width), static_cast<int>(m_config.window_height),
-                     m_config.window_title),
+          m_renderer(
+              static_cast<int>(m_config.window_width),
+              static_cast<int>(m_config.window_height),
+              m_config.window_title
+          ),
           m_input_system(&m_renderer.window()),
           m_physics_system(),
           m_world(m_resources),
           m_paused(m_config.start_paused) {
-        logger()->info("AppRuntime initialized (window={}x{}, title='{}', frames_in_flight={}, paused={})",
-                       m_config.window_width, m_config.window_height, m_config.window_title, rhi::kFramesInFlight,
-                       m_paused);
+        logger()->info(
+            "AppRuntime initialized (window={}x{}, title='{}', frames_in_flight={}, paused={})",
+            m_config.window_width,
+            m_config.window_height,
+            m_config.window_title,
+            rhi::kFramesInFlight,
+            m_paused
+        );
     }
 
     const AppRuntimeConfig& config() const { return m_config; }
 
-    framework::core::World&       world() { return m_world; }
+    framework::core::World& world() { return m_world; }
     const framework::core::World& world() const { return m_world; }
 
-    resource::ResourceManager&       resource_manager() { return m_resources; }
+    resource::ResourceManager& resource_manager() { return m_resources; }
     const resource::ResourceManager& resource_manager() const { return m_resources; }
 
-    system::render::Renderer&       renderer() { return m_renderer; }
-    const system::render::Renderer& renderer() const { return m_renderer; }
+    system::render::RendererT<TBackend>& renderer() { return m_renderer; }
+    const system::render::RendererT<TBackend>& renderer() const { return m_renderer; }
 
-    system::input::InputSystem&       input_system() { return m_input_system; }
+    system::input::InputSystem& input_system() { return m_input_system; }
     const system::input::InputSystem& input_system() const { return m_input_system; }
 
-    system::physics::PhysicsSystem&       physics_system() { return m_physics_system; }
+    system::physics::PhysicsSystem& physics_system() { return m_physics_system; }
     const system::physics::PhysicsSystem& physics_system() const { return m_physics_system; }
 
-    void                    set_callbacks(RuntimeCallbacks callbacks) { m_callbacks = std::move(callbacks); }
+    void set_callbacks(RuntimeCallbacks callbacks) { m_callbacks = std::move(callbacks); }
     const RuntimeCallbacks& callbacks() const { return m_callbacks; }
 
     void set_pipeline(std::unique_ptr<system::render::RenderPipeline> pipeline) {
@@ -142,117 +158,91 @@ public:
     bool paused() const { return m_paused; }
 
     RuntimeResult run() {
-        auto          log = logger();
+        auto log = logger();
         RuntimeResult result{};
         if (m_renderer.pipeline() == nullptr) {
-            result.ok            = false;
+            result.ok = false;
             result.error_message = "AppRuntime requires pipeline before run().";
             log->error("run() aborted: pipeline is not bound.");
             return result;
         }
-        log->info("Run started (paused={}, fixed_dt={}, max_fixed_steps_per_frame={}, max_frame_delta={})", m_paused,
-                  m_config.fixed_delta_seconds, m_config.max_fixed_steps_per_frame, m_config.max_frame_delta_seconds);
+        log->info(
+            "Run started (paused={}, fixed_dt={}, max_fixed_steps_per_frame={}, max_frame_delta={})",
+            m_paused,
+            m_config.fixed_delta_seconds,
+            m_config.max_fixed_steps_per_frame,
+            m_config.max_frame_delta_seconds
+        );
 
         const auto default_now = []() -> double {
-            using Clock    = std::chrono::steady_clock;
+            using Clock = std::chrono::steady_clock;
             const auto now = Clock::now().time_since_epoch();
             return std::chrono::duration<double>(now).count();
         };
 
         try {
-            double previous_time = default_now();
-            double accumulator   = 0.0;
-
             if (m_callbacks.on_startup) {
                 auto ctx = make_runtime_context(0.0);
                 m_callbacks.on_startup(ctx);
             }
 
+            RealtimeFrameTimePolicy time_policy(
+                m_config.fixed_delta_seconds,
+                m_config.max_fixed_steps_per_frame,
+                m_config.max_frame_delta_seconds,
+                default_now
+            );
+            time_policy.reset();
+
             while (!m_stop_requested && !m_renderer.window().is_should_close()) {
                 m_input_system.begin_frame();
                 m_renderer.window().poll_events();
 
-                // callbacks may call request_stop(), so check it before doing any work.
                 if (m_callbacks.on_input) {
                     auto ctx = make_runtime_context(0.0);
                     m_callbacks.on_input(ctx);
                 }
 
-                const double current_time = default_now();
-                double       frame_delta  = current_time - previous_time;
-                previous_time             = current_time;
-
-                if (frame_delta < 0.0) {
-                    frame_delta = 0.0;
-                }
-                if (m_config.max_frame_delta_seconds > 0.0) {
-                    frame_delta = std::min(frame_delta, m_config.max_frame_delta_seconds);
-                }
+                const FrameExecutionPlan frame_plan = time_policy.make_plan(m_paused);
 
                 if (m_callbacks.on_pre_update) {
-                    auto ctx = make_runtime_context(frame_delta);
+                    auto ctx = make_runtime_context(frame_plan.frame_delta_seconds);
                     m_callbacks.on_pre_update(ctx);
                 }
 
-                if (!m_paused) {
-                    if (m_config.fixed_delta_seconds > 0.0) {
-                        accumulator += frame_delta;
-                        std::uint32_t fixed_steps = 0;
-                        while (accumulator >= m_config.fixed_delta_seconds &&
-                               fixed_steps < m_config.max_fixed_steps_per_frame) {
-                            const framework::core::FixedTickContext fixed_ctx{
-                                .fixed_delta_seconds = m_config.fixed_delta_seconds,
-                                .fixed_tick_index    = m_fixed_tick_index++,
-                            };
-                            m_world.fixed_tick(fixed_ctx);
-                            if (auto* active_scene = m_world.active_scene(); active_scene != nullptr) {
-                                framework::integration::physics::step_scene_physics(
-                                    *active_scene,
-                                    m_physics_system,
-                                    static_cast<float>(fixed_ctx.fixed_delta_seconds)
-                                );
-                            }
-                            accumulator -= m_config.fixed_delta_seconds;
-                            ++fixed_steps;
-                        }
-                    }
-
-                    framework::core::FrameTickContext tick_ctx{
-                        .delta_seconds          = frame_delta,
-                        .unscaled_delta_seconds = frame_delta,
-                        .frame_index            = m_frame_serial,
-                    };
-                    m_world.tick(tick_ctx);
-                    m_world.late_tick(tick_ctx);
-                }
+                FrameStepperContext stepper_ctx{
+                    .world = m_world,
+                    .physics_system = m_physics_system,
+                    .fixed_tick_serial = m_fixed_tick_serial,
+                    .frame_serial = m_frame_serial,
+                };
+                m_frame_stepper.execute(frame_plan, stepper_ctx);
 
                 if (m_callbacks.on_post_update) {
-                    auto ctx = make_runtime_context(frame_delta);
+                    auto ctx = make_runtime_context(frame_plan.frame_delta_seconds);
                     m_callbacks.on_post_update(ctx);
                 }
 
                 m_renderer.pipeline()->prepare_frame(system::render::FramePrepareContext{
-                    .world         = m_world,
-                    .resources     = m_resources,
-                    .input         = m_input_system,
-                    .frame_serial  = m_frame_serial,
-                    .delta_seconds = frame_delta,
+                    .world = m_world,
+                    .resources = m_resources,
+                    .input = m_input_system,
+                    .frame_serial = m_frame_serial,
+                    .delta_seconds = frame_plan.frame_delta_seconds,
                 });
 
                 if (m_callbacks.on_pre_render) {
-                    auto ctx = make_runtime_context(frame_delta);
+                    auto ctx = make_runtime_context(frame_plan.frame_delta_seconds);
                     m_callbacks.on_pre_render(ctx);
                 }
 
                 m_renderer.draw_frame();
 
                 if (m_callbacks.on_post_render) {
-                    auto ctx = make_runtime_context(frame_delta);
+                    auto ctx = make_runtime_context(frame_plan.frame_delta_seconds);
                     m_callbacks.on_post_render(ctx);
                 }
 
-                // Keep per-frame mouse deltas available through update/render,
-                // then clear them at frame tail.
                 m_input_system.end_frame();
 
                 m_resources.tick(m_frame_serial);
@@ -260,12 +250,12 @@ public:
                 ++result.frames_rendered;
             }
         } catch (const std::exception& e) {
-            result.ok            = false;
+            result.ok = false;
             result.error_message = e.what();
             log->error("Runtime main loop failed: {}", e.what());
         }
 
-        result.fixed_ticks = m_fixed_tick_index;
+        result.fixed_ticks = m_fixed_tick_serial;
 
         try {
             if (m_callbacks.on_shutdown) {
@@ -275,7 +265,7 @@ public:
         } catch (const std::exception& e) {
             log->error("Shutdown callback failed: {}", e.what());
             if (result.ok) {
-                result.ok            = false;
+                result.ok = false;
                 result.error_message = e.what();
             }
         }
@@ -286,30 +276,36 @@ public:
         } catch (const std::exception& e) {
             log->error("wait_idle/flush_after_wait_idle failed: {}", e.what());
             if (result.ok) {
-                result.ok            = false;
+                result.ok = false;
                 result.error_message = e.what();
             }
         }
 
-        log->info("Run finished (ok={}, frames_rendered={}, fixed_ticks={})", result.ok, result.frames_rendered,
-                  result.fixed_ticks);
+        log->info(
+            "Run finished (ok={}, frames_rendered={}, fixed_ticks={})",
+            result.ok,
+            result.frames_rendered,
+            result.fixed_ticks
+        );
         return result;
     }
 
 private:
     RuntimeContext make_runtime_context(double delta_seconds) {
         return RuntimeContext{
-            .world          = m_world,
-            .resources      = m_resources,
-            .renderer       = m_renderer,
-            .input_system   = m_input_system,
+            .world = m_world,
+            .resources = m_resources,
+            .renderer = m_renderer,
+            .input_system = m_input_system,
             .physics_system = m_physics_system,
-            .frame_serial   = m_frame_serial,
-            .delta_seconds  = delta_seconds,
-            .request_stop   = [this]() { request_stop(); },
-            .paused         = m_paused,
+            .frame_serial = m_frame_serial,
+            .delta_seconds = delta_seconds,
+            .request_stop = [this]() { request_stop(); },
+            .paused = m_paused,
         };
     }
 };
+
+using AppRuntime = AppRuntimeT<system::render::SwapchainOutputBackend>;
 
 }  // namespace rtr::app

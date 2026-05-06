@@ -19,6 +19,9 @@ public:
         : RenderPipeline(runtime) {}
 
     void render(FrameContext&) override {}
+    PipelineFinalOutput final_output(uint32_t) override {
+        throw std::logic_error("ProbePipeline final_output should not be called in this test.");
+    }
 
     std::uint32_t wait_call_count{0};
 

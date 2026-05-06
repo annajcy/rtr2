@@ -9,17 +9,17 @@
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/integration/physics/rigid_body_scene_sync.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 int main() {
     try {
-        rtr::system::physics::RigidBodyWorld physics_world;
+        rtr::system::physics::rb::RigidBodySystem physics_world;
         rtr::framework::core::Scene        scene(1);
 
         auto& spinner = scene.create_game_object("torque_spinner");
         spinner.node().set_local_position(pbpt::math::Vec3{0.0f, 0.0f, 0.0f});
 
-        auto& rigid_body = spinner.add_component<rtr::framework::component::RigidBody>(physics_world);
+        auto& rigid_body = spinner.add_component<rtr::framework::component::RigidBody>();
         rigid_body.set_use_gravity(false);
         pbpt::math::Mat3 inverse_inertia_tensor_ref = pbpt::math::Mat3::zeros();
         inverse_inertia_tensor_ref[1][1] = 1.0f;
@@ -35,7 +35,7 @@ int main() {
             rigid_body.add_torque(pbpt::math::Vec3{0.0f, 1.0f, 0.0f});
             const rtr::framework::core::FixedTickContext fixed_ctx{
                 .fixed_delta_seconds = kFixedDt,
-                .fixed_tick_index    = static_cast<std::uint64_t>(tick),
+                .fixed_tick_serial    = static_cast<std::uint64_t>(tick),
             };
             rtr::framework::integration::physics::sync_scene_to_rigid_body(scene, physics_world);
             physics_world.step(static_cast<float>(fixed_ctx.fixed_delta_seconds));

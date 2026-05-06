@@ -2,10 +2,10 @@
 
 #include <pbpt/math/math.h>
 
-#include "rtr/system/physics/collision/contact.hpp"
-#include "rtr/system/physics/common/physics_ids.hpp"
+#include "rtr/system/physics/rigid_body/collision/contact.hpp"
+#include "rtr/system/physics/rigid_body/physics_ids.hpp"
 
-namespace rtr::system::physics {
+namespace rtr::system::physics::rb {
 
 struct Contact {
     RigidBodyID        body_a{kInvalidRigidBodyId};
@@ -41,4 +41,4 @@ struct SolverContact {
     bool is_valid() const { return penetration > 0.0f; }
 };
 
-}  // namespace rtr::system::physics
+}  // namespace rtr::system::physics::rb

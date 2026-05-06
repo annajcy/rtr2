@@ -10,29 +10,27 @@
 #include "rtr/framework/core/scene.hpp"
 #include "rtr/framework/core/tick_context.hpp"
 #include "rtr/framework/integration/physics/rigid_body_scene_sync.hpp"
-#include "rtr/system/physics/rigid_body/rigid_body_world.hpp"
+#include "rtr/system/physics/rigid_body/rigid_body_system.hpp"
 
 int main() {
     try {
-        rtr::system::physics::RigidBodyWorld physics_world;
+        rtr::system::physics::rb::RigidBodySystem physics_world;
         rtr::framework::core::Scene        scene(1);
 
         auto& left = scene.create_game_object("left_sphere");
         left.node().set_local_position(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
-        auto& left_body = left.add_component<rtr::framework::component::RigidBody>(physics_world);
-        (void)left.add_component<rtr::framework::component::SphereCollider>(physics_world, 0.5f);
+        auto& left_body = left.add_component<rtr::framework::component::RigidBody>();
+        (void)left.add_component<rtr::framework::component::SphereCollider>(0.5f);
         left_body.set_use_gravity(false);
 
         auto& right = scene.create_game_object("right_sphere");
         right.node().set_local_position(pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
-        auto& right_body = right.add_component<rtr::framework::component::RigidBody>(physics_world);
-        (void)right.add_component<rtr::framework::component::SphereCollider>(physics_world, 0.5f);
+        auto& right_body = right.add_component<rtr::framework::component::RigidBody>();
+        (void)right.add_component<rtr::framework::component::SphereCollider>(0.5f);
         right_body.set_use_gravity(false);
 
-        physics_world.get_rigid_body(left_body.rigid_body_id()).state().translation.linear_velocity =
-            pbpt::math::Vec3{1.0f, 0.0f, 0.0f};
-        physics_world.get_rigid_body(right_body.rigid_body_id()).state().translation.linear_velocity =
-            pbpt::math::Vec3{-1.0f, 0.0f, 0.0f};
+        left_body.set_linear_velocity(pbpt::math::Vec3{1.0f, 0.0f, 0.0f});
+        right_body.set_linear_velocity(pbpt::math::Vec3{-1.0f, 0.0f, 0.0f});
 
         constexpr double kFixedDt   = 0.1;
         constexpr int    kTickCount = 20;
@@ -43,7 +41,7 @@ int main() {
         for (int tick = 0; tick < kTickCount; ++tick) {
             const rtr::framework::core::FixedTickContext fixed_ctx{
                 .fixed_delta_seconds = kFixedDt,
-                .fixed_tick_index    = static_cast<std::uint64_t>(tick),
+                .fixed_tick_serial    = static_cast<std::uint64_t>(tick),
             };
             rtr::framework::integration::physics::sync_scene_to_rigid_body(scene, physics_world);
             physics_world.step(static_cast<float>(fixed_ctx.fixed_delta_seconds));

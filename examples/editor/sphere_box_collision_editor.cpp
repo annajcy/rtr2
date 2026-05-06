@@ -5,7 +5,7 @@
 
 #include <pbpt/math/math.h>
 
-#include "rtr/app/app_runtime.hpp"
+#include "rtr/editor/core/editor_app_runtime.hpp"
 #include "rtr/editor/core/editor_capture.hpp"
 #include "rtr/editor/core/editor_host.hpp"
 #include "rtr/editor/panel/hierarchy_panel.hpp"
@@ -13,7 +13,7 @@
 #include "rtr/editor/panel/logger_panel.hpp"
 #include "rtr/editor/panel/scene_view_panel.hpp"
 #include "rtr/editor/panel/stats_panel.hpp"
-#include "rtr/editor/render/forward_editor_pipeline.hpp"
+#include "rtr/editor/render/editor_output_backend.hpp"
 #include "rtr/framework/component/camera/camera.hpp"
 #include "rtr/framework/component/camera_control/free_look_camera_controller.hpp"
 #include "rtr/framework/component/light/point_light.hpp"
@@ -22,6 +22,7 @@
 #include "rtr/framework/component/physics/rigid_body/reset_position.hpp"
 #include "rtr/framework/component/physics/rigid_body/rigid_body.hpp"
 #include "rtr/framework/component/physics/rigid_body/sphere_collider.hpp"
+#include "rtr/system/render/pipeline/forward/forward_pipeline.hpp"
 #include "rtr/system/input/input_types.hpp"
 
 int main() {
@@ -29,7 +30,7 @@ int main() {
     constexpr uint32_t kHeight = 720;
 
     try {
-        rtr::app::AppRuntime runtime(rtr::app::AppRuntimeConfig{
+        rtr::editor::EditorAppRuntime runtime(rtr::app::AppRuntimeConfig{
             .window_width = kWidth, .window_height = kHeight, .window_title = "RTR Sphere Box Collision Demo"});
 
         auto editor_host = std::make_shared<rtr::editor::EditorHost>(runtime);
@@ -39,9 +40,10 @@ int main() {
         editor_host->register_panel(std::make_unique<rtr::editor::StatsPanel>());
         editor_host->register_panel(std::make_unique<rtr::editor::LoggerPanel>());
 
-        auto editor_pipeline = std::make_unique<rtr::editor::render::ForwardEditorPipeline>(
-            runtime.renderer().build_pipeline_runtime(), editor_host);
-        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), *editor_pipeline);
+        runtime.renderer().output_backend().bind_editor_host(editor_host);
+        rtr::editor::bind_input_capture_to_editor(runtime.input_system(), runtime.renderer().output_backend());
+        auto editor_pipeline = std::make_unique<rtr::system::render::ForwardPipeline>(
+            runtime.renderer().build_pipeline_runtime());
         runtime.set_pipeline(std::move(editor_pipeline));
 
         auto& scene = runtime.world().create_scene("sphere_box_collision_scene");
@@ -69,9 +71,9 @@ int main() {
         sphere_go.node().set_local_position({0.0f, 1.5f, 0.0f});
         sphere_go.node().set_local_scale({8.0f, 8.0f, 8.0f});
 
-        auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
+        auto& sphere_body = sphere_go.add_component<rtr::framework::component::RigidBody>();
         (void)sphere_body;
-        (void)sphere_go.add_component<rtr::framework::component::SphereCollider>(runtime.physics_system().rigid_body_world(), 0.1f);
+        (void)sphere_go.add_component<rtr::framework::component::SphereCollider>(0.1f);
         auto& reset = sphere_go.add_component<rtr::framework::component::ResetPosition>();
         reset.set_threshold_y(-2.0f);
         reset.set_reset_position(pbpt::math::Vec3{0.0f, 1.5f, 0.0f});
@@ -86,10 +88,9 @@ int main() {
             pbpt::math::angle_axis(pbpt::math::radians(-90.0f), pbpt::math::Vec3{1.0f, 0.0f, 0.0f}) *
             pbpt::math::angle_axis(pbpt::math::radians(15.0f), pbpt::math::Vec3{0.0f, 0.0f, 1.0f}));
         floor_go.node().set_local_scale({10.0f, 10.0f, 1.0f});
-        auto& floor_body = floor_go.add_component<rtr::framework::component::RigidBody>(runtime.physics_system().rigid_body_world());
-        floor_body.set_type(rtr::system::physics::RigidBodyType::Static);
-        (void)floor_go.add_component<rtr::framework::component::BoxCollider>(
-            runtime.physics_system().rigid_body_world(), pbpt::math::Vec3{0.5f, 0.5f, 0.05f});
+        auto& floor_body = floor_go.add_component<rtr::framework::component::RigidBody>();
+        floor_body.set_type(rtr::system::physics::rb::RigidBodyType::Static);
+        (void)floor_go.add_component<rtr::framework::component::BoxCollider>(pbpt::math::Vec3{0.5f, 0.5f, 0.05f});
 
         runtime.set_callbacks(rtr::app::RuntimeCallbacks{
             .on_post_update =

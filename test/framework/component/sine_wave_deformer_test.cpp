@@ -35,7 +35,7 @@ TEST(SineWaveDeformerTest, DeformsOnlyDuringFixedTick) {
 
     const auto original = mesh.local_vertices();
 
-    scene.tick({.delta_seconds = 0.25, .unscaled_delta_seconds = 0.25, .frame_index = 0});
+    scene.tick({.delta_seconds = 0.25, .unscaled_delta_seconds = 0.25, .frame_serial = 0});
     const auto after_frame_tick = mesh.local_vertices();
     ASSERT_EQ(after_frame_tick.size(), original.size());
     for (std::size_t i = 0; i < original.size(); ++i) {
@@ -44,7 +44,7 @@ TEST(SineWaveDeformerTest, DeformsOnlyDuringFixedTick) {
         EXPECT_FLOAT_EQ(after_frame_tick[i].z(), original[i].z());
     }
 
-    scene.fixed_tick({.fixed_delta_seconds = 0.25, .fixed_tick_index = 0});
+    scene.fixed_tick({.fixed_delta_seconds = 0.25});
     const auto after_fixed_tick = mesh.local_vertices();
 
     bool any_changed = false;
@@ -56,7 +56,7 @@ TEST(SineWaveDeformerTest, DeformsOnlyDuringFixedTick) {
     }
     EXPECT_TRUE(any_changed);
 
-    scene.tick({.delta_seconds = 0.25, .unscaled_delta_seconds = 0.25, .frame_index = 1});
+    scene.tick({.delta_seconds = 0.25, .unscaled_delta_seconds = 0.25, .frame_serial = 1});
     const auto after_second_frame_tick = mesh.local_vertices();
     for (std::size_t i = 0; i < after_fixed_tick.size(); ++i) {
         EXPECT_FLOAT_EQ(after_second_frame_tick[i].x(), after_fixed_tick[i].x());
